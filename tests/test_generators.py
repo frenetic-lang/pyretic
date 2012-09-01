@@ -6,7 +6,6 @@ import time
 r = ["first", "second", "third", "fourth"]
 
 def delaygen1():
-    time.sleep(1)
     yield "first"
     time.sleep(2)
     yield "fourth"
@@ -14,7 +13,7 @@ def delaygen1():
 def delaygen2():
     time.sleep(1)
     yield "second"
-    time.sleep(1)
+    time.sleep(0.5)
     yield "third"
 
 def test_merge():

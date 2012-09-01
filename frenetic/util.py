@@ -132,4 +132,58 @@ def Data(fields):
     class _Record(Record):
         _fields = fields
     return _Record
-    
+
+
+# TODO optimize this
+class frozendict(object):
+    __slots__ = ["_dict"]
+
+    def __init__(self, new_dict=None, **kwargs):
+        self._dict = dict()
+        if new_dict is not None:
+            self._dict.update(new_dict)
+        self._dict.update(kwargs)
+
+    def update(self, new_dict=None, **kwargs):
+        d = self._dict.copy()
+        
+        if new_dict is not None:
+            d.update(new_dict)    
+            
+        d.update(kwargs)
+        
+        return frozendict(d)
+
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def keys(self):
+        return self._dict.keys()
+
+    def values(self):
+        return self._dict.values()
+        
+    def items(self):
+        return self._dict.items()
+
+    def iterkeys(self):
+        return self._dict.iterkeys()
+
+    def itervalues(self):
+        return self._dict.itervalues()
+        
+    def iteritems(self):
+        return self._dict.iteritems()
+
+    def get(self, key, default=None):
+        return self._dict.get(key, default)
+
+    def __getitem__(self, item):
+        return self._dict[item]
+
+    def __len__(self):
+        return len(self._dict)
+        

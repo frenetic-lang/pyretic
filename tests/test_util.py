@@ -57,3 +57,20 @@ def test_Case():
             return 1 + self(branch.left) + self(branch.right)
 
     assert tree_len()(tree) == 5
+
+
+def test_frozendict():
+    d = frozendict(a="hi", b=4)
+
+    assert d["a"] == "hi"
+    assert d["b"] == 4
+
+    assert d.get("c", "hello") == "hello"
+
+    assert d.update(c="meow").get("c", "hello") == "meow"
+
+    # Test mutation didn't screw us up
+    assert d.get("c", "hello") == "hello"
+
+    assert len(d) == 2
+    
