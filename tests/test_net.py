@@ -8,6 +8,10 @@ def make_header():
                   vlan=None, vlan_pcp=None, srcip=None, dstip=None, protocol=None, srcport=None, dstport=None)
 
 
+def test_Packet_strange_bug():
+    assert Packet(None, None, None) is not None
+
+    
 def test_FixedInt_bitarray():
     i1 = FixedInt("00000000000000000000000000000000", 32)
     assert i1.to_bits().to01() == "00000000000000000000000000000000"

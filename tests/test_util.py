@@ -28,8 +28,17 @@ def test_Record():
     assert hasattr(x, "hope")
     assert hasattr(x, "this")
     assert hasattr(x, "works")
-    
 
+
+def test_Record_override():
+    class RecordTest(Record):
+        _fields = "lame"
+        def __new__(cls, lame=None):
+            return Record.__new__(cls, lame)
+
+    assert RecordTest().lame is None
+
+    
 def test_Data():
     class RecordTest(Data("id bob foo bar")): pass
 

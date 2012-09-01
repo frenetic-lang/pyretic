@@ -104,9 +104,10 @@ class RecordMeta(ABCMeta):
                 fields += next_fields
             
         if not isinstance(fields, abstractproperty):
-            basetuple = namedtuple(name, fields)
+            basetuple = namedtuple("Record", fields)
             bases = (basetuple,) + bases
             namespace.pop('_fields', None)
+            namespace["__real_base__"] = basetuple
             namespace.setdefault('__doc__', basetuple.__doc__)
             namespace.setdefault('__slots__', ())
         return ABCMeta.__new__(mcls, name, bases, namespace)
@@ -116,6 +117,9 @@ class Record(object):
     '''The abstract base class + mix-in for named tuples.'''
     __metaclass__ = RecordMeta
     _fields = abstractproperty()
+
+    def __new__(cls, *args, **kwargs):
+        return cls.__real_base__.__new__(cls, *args, **kwargs)
 
     def asdict(self):
         return self._asdict()

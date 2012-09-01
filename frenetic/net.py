@@ -51,9 +51,9 @@ class Packet(Record):
 
     _fields = "header size payload time"
 
-    def __init__(self, header, size, payload, time=None):
+    def __new__(cls, header, size, payload, time=None):
         time = time or util.current_time()
-        Record.__init__(self, header, size, payload, time)
+        return Record.__new__(cls, header, size, payload, time)
         
    
 class PortEvent(Record):
@@ -174,8 +174,6 @@ class IP(str):
         pass
     
 
-    
-        
 
 class bitarray_mac(bitarray):
     def __str__(self):
@@ -185,23 +183,7 @@ class bitarray_ip(bitarray):
     """Expects input to be 32 bits"""
     def __str__(self):
         return nox_packet_utils.ip_to_str(struct.unpack("!L", self.tobytes())[0])
-    
-class bitarray_num(bitarray):
-    def __int__(self):
-        # XXX slow.
-        return int(self.to01(), 2)
 
-class bitarray_location(bitarray):
-    """I need to be 9 bits!"""
-    def at(self):
-        if self[0]:
-            return "out"
-        else:
-            return "in"
-
-    def __int__(self):
-        return struct.unpack("!B", self[1:].tobytes())[0]
-                                        
 
 ################################################################################
 # NOX Operations
