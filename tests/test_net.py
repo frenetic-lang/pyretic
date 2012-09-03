@@ -69,13 +69,11 @@ def test_MAC_fail():
 
 def test_IP():
     IP("1.5.3.2")
-    IP(FixedInt(3, 32))
 
 @pytest.mark.xfail
 def test_IP_fail():
     IP("1.3.3.5heytest")
     IP("1.3.3.500000000")
-    IP(FixedInt(2, 16))
 
 
     

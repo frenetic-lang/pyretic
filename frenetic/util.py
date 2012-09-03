@@ -88,7 +88,7 @@ class Case(object):
         raise ValueError
 
 # Adapted from http://code.activestate.com/recipes/577629-namedtupleabc-abstract-base-class-mix-in-for-named/
-class RecordMeta(ABCMeta):
+class RecordMeta(type):
     '''The metaclass for the abstract base class + mix-in for named tuples.'''
     def __new__(mcls, name, bases, namespace):
         fields = namespace.get('_fields')
@@ -102,21 +102,37 @@ class RecordMeta(ABCMeta):
                 fields = next_fields
             elif isinstance(next_fields, tuple):
                 fields += next_fields
-            
-        if not isinstance(fields, abstractproperty):
-            basetuple = namedtuple("Record", fields)
-            bases += (basetuple,) 
-            namespace.pop('_fields', None)
-            namespace["__real_base__"] = basetuple
-            namespace.setdefault('__doc__', basetuple.__doc__)
-            namespace.setdefault('__slots__', ())
-        return ABCMeta.__new__(mcls, name, bases, namespace)
+        
+        basetuple = namedtuple("Record_" + name, fields)
+        basetuple.__is_namedtuple__ = True
+        bases = (basetuple,) + bases 
+        namespace.pop('_fields', None)
+        namespace["__real_base__"] = basetuple
+        namespace["__is_namedtuple__"] = False
+        namespace.setdefault('__doc__', basetuple.__doc__)
+        namespace.setdefault('__slots__', ())
+        
+        return type.__new__(mcls, name, bases, namespace)
 
+    def mro(cls):
+        oldmro = type.mro(cls)
+        found_nt = None
+        newmro = []
+        for cls in oldmro:
+            if getattr(cls, "__is_namedtuple__", False):
+                if found_nt is None:
+                    found_nt = cls
+            else:
+                if cls == tuple:
+                    newmro.append(found_nt)
+                newmro.append(cls)
+        return newmro
+            
 
 class Record(object):
     '''The abstract base class + mix-in for named tuples.'''
     __metaclass__ = RecordMeta
-    _fields = abstractproperty()
+    _fields = ""
 
     def __new__(cls, *args, **kwargs):
         return cls.__real_base__.__new__(cls, *args, **kwargs)

@@ -28,7 +28,6 @@
 
 """Netcore grammar objects and related functions."""
 
-from abc import ABCMeta, abstractmethod
 from bitarray import bitarray
 import struct
 
@@ -44,31 +43,28 @@ from frenetic.util import Record, Case, frozendict
 
 class Matchable(object):
     """Assumption: the binary operatiors are passed in the same class as the invoking object."""
-
-    __metaclass__ = ABCMeta
     
     @staticmethod
-    @abstractmethod
     def top(self, length):
         pass
 
-    @abstractmethod
+    
     def __and__(self, other):
         pass
 
-    @abstractmethod
+    
     def overlap(self, other):
         pass
         
-    @abstractmethod
+    
     def disjoint(self, other):
         pass
         
-    @abstractmethod
+    
     def __cmp__(self, other):
         pass
 
-    @abstractmethod
+    
     def match_object(self, other):
         """other is a bitarray"""
         pass
@@ -77,13 +73,11 @@ class Matchable(object):
 # TODO
 class Approx(object):
     """Interface for things which can be approximated."""
-    __metaclass__ = ABCMeta
-
-    @abstractmethod
+    
     def overapprox(self, overapproxer):
         pass
 
-    @abstractmethod
+    
     def underapprox(self, underapproxer):
         pass
         
@@ -194,6 +188,13 @@ class IPWildcard(Wildcard):
                 prefix.frombytes(struct.pack("!B", int(d)))
             
             return Wildcard.__new__(cls, prefix, mask)
+        elif isinstance(mask, int):
+            prefix = IP(ipexpr).to_bits()
+            bmask = bitarray(32)
+            bmask.setall(True)
+            bmask[0:mask] = False
+            
+            return Wildcard.__new__(cls, prefix, bmask)
         else:
             prefix = IP(ipexpr).to_bits()
             mask = IP(mask).to_bits()

@@ -135,9 +135,14 @@ class FixedInt(int):
 
     
         
-class Switch(int):
+class Switch(Record):
+    _fields = "switch_int"
+    
     def __repr__(self):
         return "<switch %s>" % self
+
+    def __int__(self):
+        return self.switch_int
     
     def to_bits(self):
         return bitarray(struct.pack("!L", self))
