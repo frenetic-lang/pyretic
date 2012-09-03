@@ -38,6 +38,9 @@ def test_Record_override():
 
     assert RecordTest().lame is None
 
+
+
+    
     
 def test_Data():
     class RecordTest(Data("id bob foo bar")): pass
@@ -51,7 +54,7 @@ def test_Data():
     assert hasattr(x, "foo")
     assert hasattr(x, "bar")
 
-
+    
 def test_Case():
     class Branch(Data("left right")): pass
     class Node(Data("value")): pass

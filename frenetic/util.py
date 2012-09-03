@@ -105,7 +105,7 @@ class RecordMeta(ABCMeta):
             
         if not isinstance(fields, abstractproperty):
             basetuple = namedtuple("Record", fields)
-            bases = (basetuple,) + bases
+            bases += (basetuple,) 
             namespace.pop('_fields', None)
             namespace["__real_base__"] = basetuple
             namespace.setdefault('__doc__', basetuple.__doc__)
@@ -140,7 +140,7 @@ def Data(fields):
 
 # TODO optimize this
 class frozendict(object):
-    __slots__ = ["_dict"]
+    __slots__ = ["_dict", "_cached_hash"]
 
     def __init__(self, new_dict=None, **kwargs):
         self._dict = dict()
@@ -157,6 +157,9 @@ class frozendict(object):
         d.update(kwargs)
         
         return frozendict(d)
+
+    def __repr__(self):
+        return repr(self._dict)
 
     def __iter__(self):
         return iter(self._dict)
@@ -187,6 +190,16 @@ class frozendict(object):
 
     def __getitem__(self, item):
         return self._dict[item]
+
+    def __hash__(self):
+        try:
+            return self._cached_hash
+        except AttributeError:
+            h = self._cached_hash = hash(frozenset(self._dict.items()))
+            return h
+        
+    def __eq__(self, other):
+        return self._dict == other._dict
 
     def __len__(self):
         return len(self._dict)

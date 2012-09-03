@@ -31,7 +31,7 @@ import array
 import struct
 from abc import ABCMeta, abstractmethod
 
-from frenetic import util, netcore
+from frenetic import util
 from frenetic.util import Record, Case, frozendict
 
 from bitarray import bitarray
@@ -166,24 +166,30 @@ class MAC(str):
 
 
 # XXX what should this fundamentally be?
-class IP(str):
+class IP(Record):
+    _fields = "ip_int"
+
+    def __new__(cls, ip):
+        import socket
+        
+        if len(ip) != 4:
+            ip = socket.inet_aton(ip)
+
+        return Record.__new__(cls, ip)
+        
     def __repr__(self):
-        pass
-
+        import socket
+        return socket.inet_ntoa(self.ip_int)
+       
     def to_bits(self):
-        pass
+        b = bitarray()
+        b.frombytes(self.ip_int)
+        return b
     
-
-
 class bitarray_mac(bitarray):
     def __str__(self):
         return nox_packet_utils.array_to_octstr(self.tobytes())
     
-class bitarray_ip(bitarray):
-    """Expects input to be 32 bits"""
-    def __str__(self):
-        return nox_packet_utils.ip_to_str(struct.unpack("!L", self.tobytes())[0])
-
 
 ################################################################################
 # NOX Operations
