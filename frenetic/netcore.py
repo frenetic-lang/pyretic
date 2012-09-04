@@ -33,7 +33,7 @@ import struct
 
 from collections import Counter
 
-from frenetic.net import *
+from frenetic import net
 from frenetic.util import Record, Case, frozendict
 
 ################################################################################
@@ -85,7 +85,7 @@ class Approx(object):
 class Wildcard(Matchable, Record):
     """Full wildcards."""
 
-    _fields = "prefix mask"
+    _fields = "width prefix mask"
 
     def __new__(cls, prefix, mask=None):
         """Create a wildcard. Prefix is a binary string.
@@ -95,13 +95,13 @@ class Wildcard(Matchable, Record):
             mask = bitarray(len(prefix))
             mask.setall(False)
 
-        return Record.__new__(cls, prefix, mask)
-    
+        return Record.__new__(cls, len(prefix), prefix, mask)
+        
     # XXX is this really necessary
     def normalize(self):
         """Return a bitarray, masked."""
         return self.prefix | self.mask 
-    
+
     @staticmethod
     def top(length):
         return Wildcard(bitarray([False] * length), bitarray([True] * length))
@@ -149,61 +149,27 @@ class Wildcard(Matchable, Record):
     def __ge__(self, other):
         return cmp(self, other) >= 0
 
+def str_to_wildcard(s):
+    "Make a wildcard from a string."
+    
+    prefix = bitarray(s.replace("?", "0"))
+    mask = bitarray(s.replace("1", "0").replace("?", "1"))
+    return Wildcard(prefix, mask)
 
-class MatchExact(Wildcard):
-    def __new__(cls, v):
-        return Wildcard.__new__(cls, v.to_bits())
-        
 
-class IPWildcard(Wildcard):
-    def __new__(cls, ipexpr, mask=None):
-        # 1.2.*.* etc
-        if mask is None:
-            prefix = bitarray()
-            mask = bitarray(32)
-            (a, b, c, d) = ipexpr.split(".")
-            mask.setall(False)
-            if a == "*":
-                mask[0:8] = True
-                prefix.extend("00000000")
-            else:
-                prefix.frombytes(struct.pack("!B", int(a)))
-                
-            if b == "*":
-                mask[8:16] = True
-                prefix.extend("00000000")
-            else:
-                prefix.frombytes(struct.pack("!B", int(b)))
-             
-            if c == "*":
-                mask[16:24] = True
-                prefix.extend("00000000")
-            else:
-                prefix.frombytes(struct.pack("!B", int(c)))
-                
-            if d == "*":
-                mask[24:32] = True
-                prefix.extend("00000000")
-            else:
-                prefix.frombytes(struct.pack("!B", int(d)))
-            
-            return Wildcard.__new__(cls, prefix, mask)
-        elif isinstance(mask, int):
-            prefix = IP(ipexpr).to_bits()
-            bmask = bitarray(32)
-            bmask.setall(True)
-            bmask[0:mask] = False
-            
-            return Wildcard.__new__(cls, prefix, bmask)
-        else:
-            prefix = IP(ipexpr).to_bits()
-            mask = IP(mask).to_bits()
-            
-            mask.invert()
+def is_wildcard_str(value, width):
+    return isinstance(value, basestring) and len(value) == width and set(value) <= set("?10")
+    
+def MatchExact(cls):
+    class MatchExact_(Wildcard):
+        width = cls.width
+        def __new__(cls2, *v):
+            bits = cls(*v).to_bits()
+            assert len(bits) == cls.width
+            return Wildcard.__new__(cls2, bits)
 
-            return Wildcard.__new__(cls, prefix, mask)
-            
-            
+    MatchExact_.__name__ += cls.__name__
+    return MatchExact_
         
 
 ################################################################################
@@ -231,11 +197,11 @@ class Predicate(Record):
 
         
 class PredTop(Predicate):
-   """The always-true predicate."""
-   _fields = ""
+  """The always-true predicate."""
+  _fields = ""
    
-   def __repr__(self):
-      return "*"
+  def __repr__(self):
+    return "*"
       
    
 class PredBottom(Predicate):
@@ -422,7 +388,10 @@ class _eval(Case):
         return False
 
     def case_PredMatch(self, pred, packet, env):
-        return pred.pattern.match_object(env[pred.varname])
+        if pred.pattern is None:
+            return pred.varname not in env
+        else:
+            return pred.pattern.match_object(env[pred.varname])
 
     def case_PredUnion(self, pred, packet, env):
         return self(pred.left, packet, env) or self(pred.right, packet, env)
@@ -467,16 +436,71 @@ class _eval(Case):
             action = ActChain(action, self(pol.right, n_packet, env.update(n_packet.header)))
         return action
 
-        
 class _mod_packet(Case):
     def case_ActDrop(self, act, packet):
         return []
       
     def case_ActMod(self, act, packet):
-         return [packet._replace(header=packet.header.update(act.mapping))]
-         
+        h = dict(packet.header)
+        for k, v in act.mapping.iteritems():
+            if v is None and k in h:
+                del h[k]
+            else:
+                h[k] = v
+        return [packet._replace(header=net.Header(h))]
+      
     def case_ActChain(self, act, packet):
         return self(act.left, packet) + self(act.right, packet)
+      
+def mod_packet(act, packet):
+    r = []
+    for packet in _mod_packet()(act, packet):
+        n_packet = packet.replace(payload=propagate_header_to_payload(packet.header, packet.payload))
+        r.append(n_packet) 
+    return r
 
-mod_packet = _mod_packet()
+# XXX                                XXX 
+# XXX super slow, and POX dependency XXX
+# XXX                                XXX
+def propagate_header_to_payload(h, data):
+    from pox.lib.packet.ethernet import ethernet
+
+    # TODO is this correct? when would we ever not have a payload, as
+    # the header is supposed to reflect the payload?
+    if data is None: return data
+
+    packet = ethernet(data)
     
+    for k, v in h.iteritems():
+        if k == "vlan":
+            if not isinstance(packet.next, vlan):
+                packet.next = vlan(prev = packet.next)
+                packet.next.eth_type = packet.type
+                packet.type = ethernet.VLAN_TYPE
+            packet.id = action.vlan_id
+        elif k == "dstport":
+            if isinstance(packet.next, udp) or isinstance(packet.next, tcp):
+                packet.next.dstport = action.tp_port
+        elif k == "srcport":
+            if isinstance(packet.next, udp) or isinstance(packet.next, tcp):
+                packet.next.srcport = action.tp_port
+        elif k == "tos":
+            if isinstance(packet.next, ipv4):
+                packet.next.tos = action.nw_tos
+        elif k == "dstip":
+            if isinstance(packet.next, ipv4):
+                packet.next.nw_dst = action.nw_addr
+        elif k == "srcip":
+            if isinstance(packet.next, ipv4):
+                packet.next.nw_src = action.nw_addr
+        elif k == "dstaddr":
+            packet.dst = action.dl_addr
+        elif k == "srcaddr":
+            packet.src = action.dl_addr
+        elif k == "vlan_pcp":
+            if not isinstance(packet.next, vlan):
+                packet.next = vlan(prev = packet)
+                packet.next.eth_type = packet.type
+                packet.type = ethernet.VLAN_TYPE
+            packet.pcp = action.vlan_pcp
+    return packet.pack()

@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Frenetic Project                                                         #
 # frenetic@frenetic-lang.org                                                   #
@@ -27,15 +28,18 @@
 
 """Frenetic networking structures and NOX wrappers"""
 
+# This module is designed for import *.
+
 import array 
 import struct
-from abc import ABCMeta, abstractmethod
 
 from frenetic import util
 from frenetic.util import Record, Case, frozendict
 
 from bitarray import bitarray
 
+
+__all__ = ["Header", "Packet", "FixedInt", "IP", "MAC", "Switch"]
 
 ################################################################################
 # Network Structures
@@ -73,86 +77,97 @@ class PortEvent(Record):
 # Utility network structures
         
 
-class FixedInt(int):
-    def __new__(cls, value, width):
-        if isinstance(value, basestring):
-            assert len(value) == width
-            i = int.__new__(cls, value, 2)
-        else:
-            i = int.__new__(cls, value)
+def FixedInt(width_):
+    class FixedInt_(int):
+        width = width_
+        
+        def __new__(cls, value):
+            if isinstance(value, basestring):
+                assert len(value) == cls.width
+                i = int.__new__(cls, value, 2)
+            else:
+                i = int.__new__(cls, value)
+            return i
 
-        i.width = width
-        return i
+        # TODO this is slow.
+        def to_bits(self):
+            return bitarray(bin(self)[2:self.width+2].zfill(self.width))
+
+        def __add__(self, v):
+            return FixedInt(self.width)(int.__add__(self, v))
+
+        def __sub__(self, v):
+            return FixedInt(self.width)(int.__sub__(self, v))
+
+        def __mul__(self, v):
+            return FixedInt(self.width)(int.__mul__(self, v))
+
+        def __div__(self, v):
+            return FixedInt(self.width)(int.__div__(self, v))
+
+        def __mod__(self, v):
+            return FixedInt(self.width)(int.__mod__(self, v))
+
+        def __and__(self, v):
+            return FixedInt(self.width)(int.__and__(self, v))
+
+        def __or__(self, v):
+            return FixedInt(self.width)(int.__or__(self, v))
+
+        def __xor__(self, v):
+            return FixedInt(self.width)(int.__xor__(self, v))
+
+        def __pow__(self, v):
+            return FixedInt(self.width)(int.__pow__(self, v))
+
+        def __rshift__(self, v):
+            return FixedInt(self.width)(int.__lshift__(self, v))
+
+        def __lshift__(self, v):
+            return FixedInt(self.width)(int.__rshift__(self, v))
+
+        def __abs__(self):
+            return FixedInt(self.width)(int.__abs__(self))
+
+        def __invert__(self):
+            return FixedInt(self.width)(int.__invert__(self))
+
+        def __pos__(self):
+            return FixedInt(self.width)(int.__pos__(self))
+
+        def __neg__(self):
+            return FixedInt(self.width)(int.__or__(self))
+
+        def __repr__(self):
+            return int.__repr__(self) + "#" + str(self.width)
             
-    # TODO this is slow.
-    def to_bits(self):
-        return bitarray(bin(self)[2:self.width+2].zfill(self.width))
-
-    def __add__(self, v):
-        return FixedInt(int.__add__(self, v), self.width)
-
-    def __sub__(self, v):
-        return FixedInt(int.__sub__(self, v), self.width)
-
-    def __mul__(self, v):
-        return FixedInt(int.__mul__(self, v), self.width)
-
-    def __div__(self, v):
-        return FixedInt(int.__div__(self, v), self.width)
-
-    def __mod__(self, v):
-        return FixedInt(int.__mod__(self, v), self.width)
-        
-    def __and__(self, v):
-        return FixedInt(int.__and__(self, v), self.width)
-
-    def __or__(self, v):
-        return FixedInt(int.__or__(self, v), self.width)
-
-    def __xor__(self, v):
-        return FixedInt(int.__xor__(self, v), self.width)
-        
-    def __pow__(self, v):
-        return FixedInt(int.__pow__(self, v), self.width)
-
-    def __rshift__(self, v):
-        return FixedInt(int.__lshift__(self, v), self.width)
-
-    def __lshift__(self, v):
-        return FixedInt(int.__rshift__(self, v), self.width)
-        
-    def __abs__(self):
-        return FixedInt(int.__abs__(self), self.width)
-
-    def __invert__(self):
-        return FixedInt(int.__invert__(self), self.width)
-
-    def __pos__(self):
-        return FixedInt(int.__pos__(self), self.width)
-
-    def __neg__(self):
-        return FixedInt(int.__or__(self), self.width)
-
+    FixedInt_.__name__ += repr(FixedInt_.width)
+    return FixedInt_
     
         
 class Switch(Record):
     _fields = "switch_int"
+
+    width = 8
     
     def __repr__(self):
-        return "<switch %s>" % self
+        return "<switch %s>" % self.switch_int
 
     def __int__(self):
         return self.switch_int
     
     def to_bits(self):
-        return bitarray(struct.pack("!L", self))
-        
+        b = bitarray()
+        b.frombytes(struct.pack("!B", self.switch_int))
+        return b
 
 class Location(Record):
     _fields = "at port"
 
     # At is "in" or "out"
     # Port is an int
+
+    width = 9
 
     def __repr__(self):
         return "<loc %s %s>" % (self.at, self.port)
@@ -165,15 +180,22 @@ class Location(Record):
         return b
         
 
-class MAC(str):
-    def to_bits(self):
-        return bitarray(self)
+class MAC(Record):
+  _fields = "macbytes"
+  width = 48
 
+  def to_bits(self):
+    b = bitarray()
+    b.frombytes(self.macbytes)
+    return b
+    
 
 # XXX what should this fundamentally be?
 class IP(Record):
-    _fields = "ip_int"
+    _fields = "ipbytes"
 
+    width = 32
+    
     def __new__(cls, ip):
         import socket
         
@@ -184,44 +206,14 @@ class IP(Record):
         
     def __repr__(self):
         import socket
-        return socket.inet_ntoa(self.ip_int)
+        return socket.inet_ntoa(self.ipbytes)
        
     def to_bits(self):
         b = bitarray()
-        b.frombytes(self.ip_int)
+        b.frombytes(self.ipbytes)
         return b
-    
-class bitarray_mac(bitarray):
-    def __str__(self):
-        return nox_packet_utils.array_to_octstr(self.tobytes())
-    
 
-################################################################################
-# NOX Operations
-################################################################################
 
-class Backend(object):
-    __metaclass__ = ABCMeta
-
-    @abstractmethod
-    def add_microflow(self, header, action, timeout=None):
-        pass
-
-    @abstractmethod
-    def remove_microflow(self, header):
-        pass
-
-    @abstractmethod
-    def query_microflow(self, header):
-        pass
-
-    @abstractmethod
-    def perform_action(self, action):
-        pass
-
-    @abstractmethod
-    def nuke_switches(self, switches):
-        pass
         
-    
 
+    

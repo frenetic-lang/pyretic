@@ -55,7 +55,7 @@ class FRef:
         return self.x
     def set(self, x):
         self.x = x
-
+        pop()
 
 def add_pair(p1, p2):
     """Addition lifted to pairs"""
@@ -174,6 +174,19 @@ class frozendict(object):
         
         return frozendict(d)
 
+    def remove(self, *ks):
+        d = self._dict.copy()
+        for k in ks:
+            del d[k]
+        return frozendict(d)
+        
+    def pop(self, *ks):
+        result = []
+        for k in ks:
+            result.append(self[k])
+        result.append(self.remove(*ks))
+        return result
+      
     def __repr__(self):
         return repr(self._dict)
 

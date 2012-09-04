@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python -W ignore
 
 sources = """
 eNrcvVubI9d2GHbsJFaMWJaUOE4cS0kR4zGqOGhM9xwenSOYIE2RM9JIvEzmIlFptsFqoLq7TgNV
