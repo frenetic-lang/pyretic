@@ -30,7 +30,7 @@ def test_Predicate_eval():
     assert eval(PredMatch("srcip", IPWildcard("1.2.3.4", "255.255.255.0")), p)
 
 act = ActMod({"srcport": FixedInt(16)(30)})
-pol = PredMatch("srcip", IPWildcard("1.2.3.*")) >> act
+pol = PredMatch("srcip", IPWildcard("1.2.3.*")) >> ModPolicy({"srcport": FixedInt(16)(30)})
 
 def test_Action():
     assert not mod_packet(ActDrop(), p)
@@ -42,13 +42,13 @@ def test_Action():
 def test_Policy():
     assert eval(pol, p) == act
 
-lact = ActMod({"switch": Switch(10)})
+lact = ModPolicy({"switch": Switch(10)})
 l = PolLet("x", pol, "srcport", PredMatch("x", MatchExact(FixedInt(16))(30)) >> lact)
 
 def test_Let():
     assert eval(l, p) == ActMod({"switch": Switch(10)})
 
-ipol = PredMatch("switch", MatchExact(Switch)(10)) >> ActMod({"switch": Switch(25)})
+ipol = PredMatch("switch", MatchExact(Switch)(10)) >> ModPolicy({"switch": Switch(25)})
 cpol = l * ipol
 
 def test_Composition():
@@ -85,7 +85,7 @@ def test_IPWildcard():
     assert not IPWildcard("255.255.255.255").match_object(IP("255.255.255.252"))
 
 def test_fwd():
-    assert mod_packet(fwd(30), p2) == [p5]
+    assert mod_packet(eval(fwd(30), p2), p2) == [p5]
 
 def test_match_ips():
     assert eval(match("srcip", "127.0.0.1"), p2)

@@ -257,10 +257,9 @@ class PredNegation(Predicate):
 
     
 ################################################################################
-# Actions
+# Actions (these are internal data structures)
 ################################################################################
 
-        
 class Action(Record):
     def __add__(self, act):
         return ActChain(self, act)
@@ -327,50 +326,58 @@ class Policy(Record):
    def __mul__(self, pol):
       return PolComposition(self, pol)
 
-        
-class BottomPolicy(Policy):
+class DropPolicy(Policy):
     """Policy that drops everything."""
     _fields = ""
-
-    def __repr__(self):
-        return "BottomPolicy"
-
     
+    def __repr__(self):
+        return "drop"
+
+class ModPolicy(Policy):
+    """Policy that drops everything."""
+    _fields = "mapping"
+
+    def __new__(cls, mapping):
+        if not isinstance(mapping, frozendict):
+            mapping = frozendict(mapping)
+
+        return Policy.__new__(cls, mapping)
+    
+    def __repr__(self):
+        return repr(self.mapping)
+        
 class PolImply(Policy):
     """Policy for mapping a single predicate to a list of actions."""
 
-    _fields = "predicate action"
+    _fields = "predicate policy"
     
     def __repr__(self):
-        return "%s => %s" % (self.predicate, self.action)
+        return "%s >> %s" % (self.predicate, self.policy)
         
-
 class PolLet(Policy):
     _fields = "varname policy attr body"
 
     def __repr__(self):
         return "let %s <- (%s).%s in %s" % (self.varname, self.policy, self.attr, self.body)
 
-        
 class PolComposition(Policy):
     _fields = "left right"
     
     def __repr__(self):
         return "%s * %s" % (self.left, self.right)
 
-
 class PolUnion(Policy):
     _fields = "left right"
     
     def __repr__(self):
         return "%s + %s" % (self.left, self.right)
-        
+
 class PolRestriction(Policy):
     _fields =  "policy predicate"
     
     def __repr__(self):
         return "%s - %s" % (self.predicate, self.policy)
-
+        
 ################################################################################
 # Traversals
 ################################################################################
@@ -378,7 +385,6 @@ class PolRestriction(Policy):
 def eval(expr, packet):
     """Evaluate a NetCore expression, producing an `Action`."""
     return _eval()(expr, packet, packet.header)
-
     
 class _eval(Case):
     def case_PredTop(self, pred, packet, env):
@@ -405,23 +411,26 @@ class _eval(Case):
     def case_PredNegation(self, pred, packet, env):
         return not self(pred.pred, packet, env)
       
-    def case_BottomPolicy(self, pred, packet, env):
+    def case_DropPolicy(self, pol, packet, env):
         return ActDrop()
 
+    def case_ModPolicy(self, pol, packet, env):
+        return ActMod(pol.mapping)
+    
     def case_PolImply(self, pol, packet, env):
         if self(pol.predicate, packet, env):
-            return pol.action
+            return self(pol.policy, packet, env)
         else:
             return ActDrop()
-
-    def case_PolUnion(self, pol, packet, env):
-        return self(pol.left, packet, env) + self(pol.right, packet, env)
 
     def case_PolRestriction(self, pol, packet, env):
         if self(pol.predicate, packet, env):
             return ActDrop()
         else:
             return self(pol.policy, packet, env)
+
+    def case_PolUnion(self, pol, packet, env):
+        return self(pol.left, packet, env) + self(pol.right, packet, env)
 
     def case_PolLet(self, pol, packet, env):
         action = ActDrop()

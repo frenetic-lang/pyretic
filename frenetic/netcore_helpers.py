@@ -154,9 +154,9 @@ def dstport_p(k): return match("dstport", k)
 # Action helpers
 #
 
-drop = netcore.ActDrop()
+drop = netcore.DropPolicy()
 
-class mod(netcore.ActMod):
+class mod(netcore.ModPolicy):
     def __new__(cls, arg=None, **keys):
         raw_mapping = {}
         if arg is not None:
@@ -174,7 +174,7 @@ class mod(netcore.ActMod):
                     v = (v,)
                 mapping[k] = mapping_cls(*v)
             
-        return netcore.ActMod.__new__(cls, mapping)
+        return netcore.ModPolicy.__new__(cls, mapping)
 
         
 class fwd(mod):
