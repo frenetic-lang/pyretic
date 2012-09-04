@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from frenetic import generators, netcore, net, backend
+from frenetic import generators, netcore_lib, netcore_helpers, net, backend
 
 from pox.core import core
 from pox.lib.revent import EventMixin
@@ -43,25 +43,25 @@ class POXNetwork(backend.Network):
         backend.Network.__init__(self)
     
 class POXBackend(EventMixin):
-    def __init__(self):
-        self.netcore_policy = None
+    def __init__(self, user_program):
+        self.netcore_policy = netcore_lib.DropPolicy()
+        self.user_program = user_program
         self.listenTo(core)
 
     def _handle_GoingUpEvent(self, event):
         self.switch_connections = {}
         self.pyretic_network = POXNetwork(self)
-
-        # XXX get user's policy func
-        generators.run(policy_func, self.pyretic_network)
+        
+        generators.run(self.user_program, self.pyretic_network)
 
         self.listenTo(core.openflow)
 
     def _handle_PacketIn(self, event):
         pox_pkt = event.parsed
-        packet = pox_to_pyretic_packet(event.dpid, event.in_port, pox_pkt)
-        action = netcore.eval(self.netcore_policy, self.packet)
-
-        n_pkts = netcore.mod_packet(action, packet)
+        packet = pox_to_pyretic_packet(event.dpid, event.ofp.in_port, pox_pkt)
+        action = netcore_lib.eval(self.netcore_policy, packet)
+        n_pkts = netcore_lib.mod_packet(action, packet)
+        import ipdb;ipdb.set_trace()
         for pkt in n_pkts:
             # if buckety:
             #     buckety.signal(pkt)
@@ -91,29 +91,40 @@ class POXBackend(EventMixin):
         pass
 
     def send_packet(self, packet):
-        switch, inport, outport, real_hdr = pkt.header.pop("switch", "inport", "outport")
-        real_pkt = pkt.replace(header=real_hdr)
-
+        switch = packet.header["switch"]
+        inport = packet.header["inport"]
+        outport = packet.header["outport"]
+        
         msg = of.ofp_packet_out()
         msg.in_port = int(inport)
-            # TODO Something about buffer ids
-            # If we can compile the action, we can be much more efficient here.
-        msg.data = real_pkt.payload
-        msg.actions.append(of.ofp_action_output(port = int(outport)))
+        # TODO Something about buffer ids
+        # If we can compile the action, we can be much more efficient here.
+        msg.data = packet.payload
+
+        outport = int(outport)
+        if outport == 65535:
+            outport = of.OFPP_FLOOD
+        msg.actions.append(of.ofp_action_output(port = outport))
 
         self.switch_connections[int(switch)].send(msg)
 
 
+_hack_program = None
+        
 def launch():
-    core.registerNew(POXBackend)
-
-
+    POXBackend(_hack_program)
+        
+def start(f):
+    global _hack_program
+    _hack_program = f
+    
 #
 # Utils
 #
 
 
 def pyretic_header_to_pox_match(h):
+    # XXX convert back.
     match = of.ofp_match()
     match.in_port = h["inport"]
     match.dl_src = h["srcaddr"]
@@ -129,8 +140,8 @@ def pyretic_header_to_pox_match(h):
     match.tp_dst = h["dstport"]
     return match
 
-    
 def pox_match_to_pyretic_header(match):
+    # XXX convert here using netcore_helper
     h = dict()
     h["inport"] = match.in_port
     h["srcaddr"] = match.dl_src
@@ -196,7 +207,11 @@ def compile_action(act):
                 actions.append(a)
             else:
                 raise ValueError
-        send_action = of.ofp_action_output(port=int(outport))
+        
+        outport = int(outport)
+        if outport == 65535:
+            outport = of.OFPP_FLOOD
+        send_action = of.ofp_action_output(port=outport)
         actions.append(send_action)
     return actions 
 

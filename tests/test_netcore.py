@@ -2,7 +2,7 @@
 import pytest
 
 from frenetic.net import *
-from frenetic.netcore import *
+from frenetic.netcore_lib import *
 from frenetic.netcore_helpers import *
 
 h = Header(srcip=IP("1.2.3.4"))

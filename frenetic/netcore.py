@@ -4,7 +4,7 @@
 # frenetic@frenetic-lang.org                                                   #
 ################################################################################
 # Licensed to the Frenetic Project by one or more contributors. See the        #
-# NOTICE file distributed with this work for additional information            #
+# NOTICES file distributed with this work for additional information           #
 # regarding copyright and ownership. The Frenetic Project licenses this        #
 # file to you under the following license.                                     #
 #                                                                              #
@@ -26,128 +26,153 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-"""Netcore grammar objects and related functions."""
+# This module is designed for import *.
 
 from bitarray import bitarray
-import struct
+from frenetic import util
+from frenetic import netcore_lib as nl
 
-from collections import Counter
+import weakref
 
-from frenetic import net
-from frenetic.util import Record, Case, frozendict
+# Useful field types
+#
 
-################################################################################
-# Matching and wildcards
-################################################################################
+def FixedInt(width_):
+    class FixedInt_(int):
+        width = width_
+        
+        def __new__(cls, value):
+            if isinstance(value, basestring):
+                assert len(value) == cls.width
+                i = int.__new__(cls, value, 2)
+            else:
+                i = int.__new__(cls, value)
+            return i
 
+        # TODO this is slow.
+        def to_bits(self):
+            return bitarray(bin(self)[2:self.width+2].zfill(self.width))
 
-class Matchable(object):
-    """Assumption: the binary operatiors are passed in the same class as the invoking object."""
+        def __add__(self, v):
+            return FixedInt(self.width)(int.__add__(self, v))
+
+        def __sub__(self, v):
+            return FixedInt(self.width)(int.__sub__(self, v))
+
+        def __mul__(self, v):
+            return FixedInt(self.width)(int.__mul__(self, v))
+
+        def __div__(self, v):
+            return FixedInt(self.width)(int.__div__(self, v))
+
+        def __mod__(self, v):
+            return FixedInt(self.width)(int.__mod__(self, v))
+
+        def __and__(self, v):
+            return FixedInt(self.width)(int.__and__(self, v))
+
+        def __or__(self, v):
+            return FixedInt(self.width)(int.__or__(self, v))
+
+        def __xor__(self, v):
+            return FixedInt(self.width)(int.__xor__(self, v))
+
+        def __pow__(self, v):
+            return FixedInt(self.width)(int.__pow__(self, v))
+
+        def __rshift__(self, v):
+            return FixedInt(self.width)(int.__lshift__(self, v))
+
+        def __lshift__(self, v):
+            return FixedInt(self.width)(int.__rshift__(self, v))
+
+        def __abs__(self):
+            return FixedInt(self.width)(int.__abs__(self))
+
+        def __invert__(self):
+            return FixedInt(self.width)(int.__invert__(self))
+
+        def __pos__(self):
+            return FixedInt(self.width)(int.__pos__(self))
+
+        def __neg__(self):
+            return FixedInt(self.width)(int.__or__(self))
+
+        def __repr__(self):
+            return int.__repr__(self) + "#" + str(self.width)
+            
+    FixedInt_.__name__ += repr(FixedInt_.width)
+    return FixedInt_
     
-    @staticmethod
-    def top(self, length):
-        pass
+        
+class Switch(Record):
+    _fields = "switch_int"
 
+    width = 8
     
-    def __and__(self, other):
-        pass
+    def __repr__(self):
+        return "<switch %s>" % self.switch_int
 
+    def __int__(self):
+        return self.switch_int
     
-    def overlap(self, other):
-        pass
+    def to_bits(self):
+        b = bitarray()
+        b.frombytes(struct.pack("!B", self.switch_int))
+        return b
+
+class Location(Record):
+    _fields = "at port"
+
+    # At is "in" or "out"
+    # Port is an int
+
+    width = 9
+
+    def __repr__(self):
+        return "<loc %s %s>" % (self.at, self.port)
+
+    # XXX double check
+    def to_bits(self):
+        b = bitarray()
+        b.insert(0, self.at == "out")
+        b.frombytes(struct.pack("!B", self.port))
+        return b
         
+class MAC(Record):
+  _fields = "macbytes"
+  width = 48
+
+  def to_bits(self):
+    b = bitarray()
+    b.frombytes(self.macbytes)
+    return b
+
+# XXX what should this fundamentally be?
+class IP(Record):
+    _fields = "ipbytes"
+
+    width = 32
     
-    def disjoint(self, other):
-        pass
+    def __new__(cls, ip):
+        import socket
         
-    
-    def __cmp__(self, other):
-        pass
+        if len(ip) != 4:
+            ip = socket.inet_aton(ip)
 
-    
-    def match_object(self, other):
-        """other is a bitarray"""
-        pass
-
-
-# TODO
-class Approx(object):
-    """Interface for things which can be approximated."""
-    
-    def overapprox(self, overapproxer):
-        pass
-
-    
-    def underapprox(self, underapproxer):
-        pass
+        return Record.__new__(cls, ip)
         
-        
-class Wildcard(Matchable, Record):
-    """Full wildcards."""
+    def __repr__(self):
+        import socket
+        return socket.inet_ntoa(self.ipbytes)
+       
+    def to_bits(self):
+        b = bitarray()
+        b.frombytes(self.ipbytes)
+        return b
 
-    _fields = "width prefix mask"
-
-    def __new__(cls, prefix, mask=None):
-        """Create a wildcard. Prefix is a binary string.
-        Mask can either be an integer (how many bits to mask) or a binary string."""
-   
-        if mask is None:
-            mask = bitarray(len(prefix))
-            mask.setall(False)
-
-        return Record.__new__(cls, len(prefix), prefix, mask)
-        
-    # XXX is this really necessary
-    def normalize(self):
-        """Return a bitarray, masked."""
-        return self.prefix | self.mask 
-
-    @staticmethod
-    def top(length):
-        return Wildcard(bitarray([False] * length), bitarray([True] * length))
-        
-    def match_object(self, other):
-        return other.to_bits() | self.mask == self.normalize()
-        
-    def __and__(self, other):
-        if self.overlap(other):
-            return Wildcard(self.normalize() & other.normalize(), self.mask & other.mask)
-        else:
-            return None
-
-    def overlap(self, other):
-        c_mask = self.mask | other.mask
-        return self.prefix | c_mask == other.prefix | c_mask
-        
-    def disjoint(self, other):
-        return not self.overlap(self, other)
-        
-    def _match(self, other):
-        return (self.mask & other.mask == other.mask) and (self.prefix | self.mask == other.prefix | self.mask)
-
-    def __cmp__(self, other):
-        x = self._match(other)
-        y = other._match(self)
-        
-        return x - y    
-
-    def __eq__(self, other):
-        return self.normalize() == other.normalize()
-
-    def __ne__(self, other):
-        return self.normalize() != other.normalize()
-
-    def __lt__(self, other):
-        return cmp(self, other) < 0
-
-    def __gt__(self, other):
-        return cmp(self, other) > 0    
-        
-    def __le__(self, other):
-        return cmp(self, other) <= 0
-
-    def __ge__(self, other):
-        return cmp(self, other) >= 0
+# Useful wildcards
+#
 
 def str_to_wildcard(s):
     "Make a wildcard from a string."
@@ -156,360 +181,192 @@ def str_to_wildcard(s):
     mask = bitarray(s.replace("1", "0").replace("?", "1"))
     return Wildcard(prefix, mask)
 
-
 def is_wildcard_str(value, width):
     return isinstance(value, basestring) and len(value) == width and set(value) <= set("?10")
-    
-def MatchExact(cls):
-    class MatchExact_(Wildcard):
-        width = cls.width
-        def __new__(cls2, *v):
-            bits = cls(*v).to_bits()
-            assert len(bits) == cls.width
-            return Wildcard.__new__(cls2, bits)
 
-    MatchExact_.__name__ += cls.__name__
-    return MatchExact_
+_match_exact_cache = weakref.WeakKeyDictionary()
+def MatchExact(match_cls):
+    assert hasattr(match_cls, "width")
+    
+    try:
+        return _match_exact_cache[match_cls]
+    except:
+        class MatchExact_(nl.Wildcard):
+            width = match_cls.width
+            def __new__(cls, *v):
+                bits = match_cls(*v).to_bits()
+                assert len(bits) == match_cls.width
+                return Wildcard.__new__(cls, bits)
+
+        MatchExact_.__name__ += match_cls.__name__
         
+        _match_exact_cache[cls] = MatchExact_
+        return MatchExact_
 
-################################################################################
-# Predicates
-################################################################################
-
+class IPWildcard(nl.Wildcard):
+    width = 32
+    
+    def __new__(cls, ipexpr, mask=None):
+        import struct
         
-class Predicate(Record):
-   """Top-level abstract class for predicates."""
-   
-   def __and__(self, other):
-      return PredIntersection(self, other)
+        parts = ipexpr.split("/")
 
-   def __or__(self, other):
-      return PredUnion(self, other)
+        if len(parts) == 2:
+            ipexpr = parts[0]
+            try:
+                mask = int(parts[1], 10)
+            except ValueError:
+                mask = parts[1]
+        elif len(parts) != 1:
+            raise ValueError
 
-   def __sub__(self, other):
-      return PredDifference(self, other)
-
-   def __invert__(self):
-      return PredNegation(self)
-
-   def __rshift__(self, act):
-      return PolImply(self, act)
-
-        
-class PredTop(Predicate):
-  """The always-true predicate."""
-  _fields = ""
-   
-  def __repr__(self):
-    return "*"
-      
-   
-class PredBottom(Predicate):
-   """The always-false predicate."""
-   _fields = ""
-
-   def __repr__(self):
-      return "!*"
-
-   def _match(self, packet, env):
-      return False
-
-        
-class PredMatch(Predicate):
-   """A basic predicate matching against a single field"""
-
-   _fields = "varname pattern"
-    
-   def __repr__(self):
-      return "%s:%s" % (self.varname, self.pattern)
-
-        
-class PredUnion(Predicate):
-   """A predicate representing the union of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) | (%s)" % (self.left, self.right)
-        
-
-class PredIntersection(Predicate):
-   """A predicate representing the intersection of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) & (%s)" % (self.left, self.right)
-
-
-class PredDifference(Predicate):
-   """A predicate representing the difference of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) - (%s)" % (self.left, self.right)
-
-      
-class PredNegation(Predicate):
-   """A predicate representing the difference of two predicates."""
-   _fields = "pred"
-    
-   def __repr__(self):
-      return "~(%s)" % (self.pred)
-
-    
-################################################################################
-# Actions (these are internal data structures)
-################################################################################
-
-class Action(Record):
-    def __add__(self, act):
-        return ActChain(self, act)
-
-    def get_counter(self):
-        c = Counter()
-        self._set_counter(c)
-        return c
-
-    def __eq__(self, other):
-        return self.get_counter() == other.get_counter()
-        
-
-class ActDrop(Action):
-    _fields = ""
-    
-    def __repr__(self):
-        return "Nothing"
-
-    def _set_counter(self, c):
-        return
-        
-        
-class ActMod(Action):
-    _fields = "mapping"
-
-    def __new__(cls, mapping):
-        if not isinstance(mapping, frozendict):
-            mapping = frozendict(mapping)
-
-        return Action.__new__(cls, mapping)
-    
-    def __repr__(self):
-        return repr(self.mapping)
-
-    def _set_counter(self, c):
-        c[self.mapping] += 1
-       
-
-class ActChain(Action):
-    _fields = "left right"
-    
-    def __repr__(self):
-        return "(%s, %s)" % (self.left, self.right)
-
-    def _set_counter(self, c):
-        self.left._set_counter(c)
-        self.right._set_counter(c)
-            
-################################################################################
-# Policies
-################################################################################
-
-        
-class Policy(Record):
-   """Top-level abstract description of a static network program."""
-
-   def __or__(self, other):
-      return PolUnion(self, other)
-
-   def __sub__(self, pred):
-      return PolRestriction(self, pred)
-
-   def __mul__(self, pol):
-      return PolComposition(self, pol)
-
-class DropPolicy(Policy):
-    """Policy that drops everything."""
-    _fields = ""
-    
-    def __repr__(self):
-        return "drop"
-
-class ModPolicy(Policy):
-    """Policy that drops everything."""
-    _fields = "mapping"
-
-    def __new__(cls, mapping):
-        if not isinstance(mapping, frozendict):
-            mapping = frozendict(mapping)
-
-        return Policy.__new__(cls, mapping)
-    
-    def __repr__(self):
-        return repr(self.mapping)
-        
-class PolImply(Policy):
-    """Policy for mapping a single predicate to a list of actions."""
-
-    _fields = "predicate policy"
-    
-    def __repr__(self):
-        return "%s >> %s" % (self.predicate, self.policy)
-        
-class PolLet(Policy):
-    _fields = "varname policy attr body"
-
-    def __repr__(self):
-        return "let %s <- (%s).%s in %s" % (self.varname, self.policy, self.attr, self.body)
-
-class PolComposition(Policy):
-    _fields = "left right"
-    
-    def __repr__(self):
-        return "%s * %s" % (self.left, self.right)
-
-class PolUnion(Policy):
-    _fields = "left right"
-    
-    def __repr__(self):
-        return "%s + %s" % (self.left, self.right)
-
-class PolRestriction(Policy):
-    _fields =  "policy predicate"
-    
-    def __repr__(self):
-        return "%s - %s" % (self.predicate, self.policy)
-        
-################################################################################
-# Traversals
-################################################################################
-
-def eval(expr, packet):
-    """Evaluate a NetCore expression, producing an `Action`."""
-    return _eval()(expr, packet, packet.header)
-    
-class _eval(Case):
-    def case_PredTop(self, pred, packet, env):
-        return True
-      
-    def case_PredBottom(self, pred, packet, env):
-        return False
-
-    def case_PredMatch(self, pred, packet, env):
-        if pred.pattern is None:
-            return pred.varname not in env
-        else:
-            return pred.pattern.match_object(env[pred.varname])
-
-    def case_PredUnion(self, pred, packet, env):
-        return self(pred.left, packet, env) or self(pred.right, packet, env)
-
-    def case_PredIntersection(self, pred, packet, env):
-        return self(pred.left, packet, env) and self(pred.right, packet, env)
-
-    def case_PredDifference(self, pred, packet, env):
-        return self(pred.left, packet, env) and not self(pred.right, packet, env)
-
-    def case_PredNegation(self, pred, packet, env):
-        return not self(pred.pred, packet, env)
-      
-    def case_DropPolicy(self, pol, packet, env):
-        return ActDrop()
-
-    def case_ModPolicy(self, pol, packet, env):
-        return ActMod(pol.mapping)
-    
-    def case_PolImply(self, pol, packet, env):
-        if self(pol.predicate, packet, env):
-            return self(pol.policy, packet, env)
-        else:
-            return ActDrop()
-
-    def case_PolRestriction(self, pol, packet, env):
-        if self(pol.predicate, packet, env):
-            return ActDrop()
-        else:
-            return self(pol.policy, packet, env)
-
-    def case_PolUnion(self, pol, packet, env):
-        return self(pol.left, packet, env) + self(pol.right, packet, env)
-
-    def case_PolLet(self, pol, packet, env):
-        action = ActDrop()
-        for n_packet in mod_packet(self(pol.policy, packet, env), packet):
-            n_env = env.update({pol.varname: n_packet.header[pol.attr]})
-            action = ActChain(action, self(pol.body, packet, n_env))
-        return action
-
-    def case_PolComposition(self, pol, packet, env):
-        action = ActDrop()
-        for n_packet in mod_packet(self(pol.left, packet, env), packet):
-            action = ActChain(action, self(pol.right, n_packet, env.update(n_packet.header)))
-        return action
-
-class _mod_packet(Case):
-    def case_ActDrop(self, act, packet):
-        return []
-      
-    def case_ActMod(self, act, packet):
-        h = dict(packet.header)
-        for k, v in act.mapping.iteritems():
-            if v is None and k in h:
-                del h[k]
+        if mask is None:
+            prefix = bitarray()
+            mask = bitarray(32)
+            (a, b, c, d) = ipexpr.split(".")
+            mask.setall(False)
+            if a == "*":
+                mask[0:8] = True
+                prefix.extend("00000000")
             else:
-                h[k] = v
-        return [packet._replace(header=net.Header(h))]
-      
-    def case_ActChain(self, act, packet):
-        return self(act.left, packet) + self(act.right, packet)
-      
-def mod_packet(act, packet):
-    r = []
-    for packet in _mod_packet()(act, packet):
-        n_packet = packet.replace(payload=propagate_header_to_payload(packet.header, packet.payload))
-        r.append(n_packet) 
-    return r
+                prefix.frombytes(struct.pack("!B", int(a)))
+                
+            if b == "*":
+                mask[8:16] = True
+                prefix.extend("00000000")
+            else:
+                prefix.frombytes(struct.pack("!B", int(b)))
+             
+            if c == "*":
+                mask[16:24] = True
+                prefix.extend("00000000")
+            else:
+                prefix.frombytes(struct.pack("!B", int(c)))
+                
+            if d == "*":
+                mask[24:32] = True
+                prefix.extend("00000000")
+            else:
+                prefix.frombytes(struct.pack("!B", int(d)))
+            
+            return nl.Wildcard.__new__(cls, prefix, mask)
 
-# XXX                                XXX 
-# XXX super slow, and POX dependency XXX
-# XXX                                XXX
-def propagate_header_to_payload(h, data):
-    from pox.lib.packet.ethernet import ethernet
+        elif isinstance(mask, int):
+            prefix = IP(ipexpr).to_bits()
+            bmask = bitarray(32)
+            bmask.setall(True)
+            bmask[0:mask] = False
+            
+            return nl.Wildcard.__new__(cls, prefix, bmask)
+        else:
+            prefix = IP(ipexpr).to_bits()
+            mask = IP(mask).to_bits()
+            
+            mask.invert()
 
-    # TODO is this correct? when would we ever not have a payload, as
-    # the header is supposed to reflect the payload?
-    if data is None: return data
+            return nl.Wildcard.__new__(cls, prefix, mask)
 
-    packet = ethernet(data)
+# Header info
+#
+
+_common_header_info = dict(
+    switch=(Switch, MatchExact(Switch)),
+    inport=(FixedInt(16), MatchExact(FixedInt(16))),
+    outport=(FixedInt(16), MatchExact(FixedInt(16))),
+    srcmac=(MAC, MatchExact(MAC)),
+    dstmac=(MAC, MatchExact(MAC)),
+    vlan=(FixedInt(12), MatchExact(FixedInt(12))),
+    vlan_pcp=(FixedInt(3), MatchExact(FixedInt(3))),
+    srcip=(IP, IPWildcard),
+    dstip=(IP, IPWildcard),
+    srcport=(FixedInt(16), MatchExact(FixedInt(16))),
+    dstport=(FixedInt(16), MatchExact(FixedInt(16))),
+    protocol=(FixedInt(8), MatchExact(FixedInt(8))),
+    tos=(FixedInt(6), MatchExact(FixedInt(6))),
+    type=(FixedInt(16), MatchExact(FixedInt(16))))
+
+def lift_kv(k, v, i):
+    # TODO: assert that we have the right classes
     
-    for k, v in h.iteritems():
-        if k == "vlan":
-            if not isinstance(packet.next, vlan):
-                packet.next = vlan(prev = packet.next)
-                packet.next.eth_type = packet.type
-                packet.type = ethernet.VLAN_TYPE
-            packet.id = action.vlan_id
-        elif k == "dstport":
-            if isinstance(packet.next, udp) or isinstance(packet.next, tcp):
-                packet.next.dstport = action.tp_port
-        elif k == "srcport":
-            if isinstance(packet.next, udp) or isinstance(packet.next, tcp):
-                packet.next.srcport = action.tp_port
-        elif k == "tos":
-            if isinstance(packet.next, ipv4):
-                packet.next.tos = action.nw_tos
-        elif k == "dstip":
-            if isinstance(packet.next, ipv4):
-                packet.next.nw_dst = action.nw_addr
-        elif k == "srcip":
-            if isinstance(packet.next, ipv4):
-                packet.next.nw_src = action.nw_addr
-        elif k == "dstaddr":
-            packet.dst = action.dl_addr
-        elif k == "srcaddr":
-            packet.src = action.dl_addr
-        elif k == "vlan_pcp":
-            if not isinstance(packet.next, vlan):
-                packet.next = vlan(prev = packet)
-                packet.next.eth_type = packet.type
-                packet.type = ethernet.VLAN_TYPE
-            packet.pcp = action.vlan_pcp
-    return packet.pack()
+    info = _common_header_info.get(k)
+
+    if v is None or info is None or isinstance(v, nl.Matchable):
+        return (k, v)
+    else:
+        cls = info[i]
+        if is_wildcard_str(v, cls.width):
+            return (k, str_to_wildcard(v))
+        else:
+            if not isinstance(v, tuple):
+                v = (v,)
+            return (k, cls(*v))
+
+def lift_dict(d, i):
+    r = {}
+    for k, v in d.iteritems():
+        (k2, v2) = lift_kv(k, v, i)
+        r[k2] = v2
+    return r
+     
+# Predicate helpers
+#
+
+all_packets = nl.PredTop
+no_packets = nl.PredBottom
+let = nl.PolLet
+    
+def match(k, v):
+    """A matching helper."""
+    (k, v) = lift_kv(k, v, 1)
+    return nl.PredMatch(k, v)
+
+def match_missing(key):
+    return match(key, None)
+        
+def switch_p(k): return match("switch", k)
+def inport_p(k): return match("inport", k)
+def outport_p(k): return match("outport", k)
+def srcmac_p(k): return match("srcmac", k)
+def dstmac_p(k): return match("dstmac", k)
+def protocol_p(k): return match("protocol", k)
+def type_p(k): return match("type", k)
+def tos_p(k): return match("tos", k)
+def vlan_p(k): return match("vlan", k)
+def vlan_pcp_p(k): return match("vlan_pcp", k)
+def srcip_p(k): return match("srcip", k)
+def dstip_p(k): return match("dstip", k)
+def srcport_p(k): return match("srcport", k)
+def dstport_p(k): return match("dstport", k)
+
+# Action helpers
+#
+
+drop = nl.DropPolicy()
+
+class mod(nl.ModPolicy):
+    def __new__(cls, arg=None, **keys):
+        raw_mapping = util.merge_dicts(arg, keys)
+        mapping = lift_dict(raw_mapping, 0)
+            
+        return nl.ModPolicy.__new__(cls, mapping)
+
+class fwd(mod):
+    def __new__(cls, port, arg=None, **keys):
+        keys["outport"] = port
+        return mod.__new__(cls, arg, **keys) 
+
+class _flood(mod):
+    def __new__(cls, arg=None, **keys):
+        keys["outport"] = 65535 # flood
+        return mod.__new__(cls, arg, **keys) 
+
+flood = _flood()
+        
+# Monitoring helpers
+#
+
+def query(network, pred, fields=(), time=None):
+    b = nl.bucket(fields, time)
+    b.ph = network.new_policy_handle()
+    b.ph.install(pred >> fwd(b))
+    return b

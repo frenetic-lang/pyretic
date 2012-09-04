@@ -154,6 +154,13 @@ def Data(fields):
     return _Record
 
 
+def merge_dicts(d1, d2):
+    d = {}
+    d.update(d1)
+    d.update(d2)
+    return d
+
+
 # TODO optimize this
 class frozendict(object):
     __slots__ = ["_dict", "_cached_hash"]

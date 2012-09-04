@@ -77,3 +77,8 @@ def merge(*genlist):
         item = item_q.get()
         if item is StopIteration: return
         yield item
+
+def run(func, *args, **kwargs):
+    t = threading.Thread(target=func, args=args, kwargs=kwargs)
+    t.start()
+

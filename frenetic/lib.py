@@ -26,45 +26,13 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from frenetic.generators import Event
+"""Frenetic standard library"""
+
+# This module is designed for import *.
+
+from frenetic.net import *
 from frenetic.netcore_helpers import *
+from frenetic.generators import merge, run
 
-class PolicyHandle(object):
-    def __init__(self):
-        self.policy = drop
+from frenetic.pox_backend import start, launch
 
-    def install(self, pol):
-        self.policy = pol
-
-class Network(object):
-    """
-    - install
-    - switch_joins
-    - switch_parts
-    """
-
-    ph_class = PolicyHandle
-
-    def __init__(self):
-        self.switch_joins = Event()
-        self.switch_parts = Event()
-        
-        self._policy_handles = []
-
-        # Start us off with a default policy.
-        self.new_policy_handle()
-    
-    def install(self, policy):
-        self._policy_handles[0].install(policy)
-
-    # TODO do this incremental
-    def get_combined_policy(self):
-        policy = self._policy_handles[0].policy
-        for ph in self._policy_handles[1:]:
-            policy += ph.policy
-        return policy
-                
-    def new_policy_handle(self):
-        ph = self.ph_class()
-        self._policy_handles.append(ph)
-        return ph
