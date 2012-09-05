@@ -5,6 +5,7 @@ from pox.lib.packet import *
 from pox.openflow.libopenflow_01 import *
 
 from frenetic.netcore import *
+from frenetic.netcore_lib import *
 from frenetic.pox_backend import *
 
 act = mod(outport=10)
@@ -21,6 +22,16 @@ def test_header_match_involution():
 
 def test_match_header_involution():
     assert pox_match_to_pyretic_header(pyretic_header_to_pox_match(hdr)) == hdr
+
+def text_propagate():
+    ping_hdr = pox_match_to_pyretic_header(match)
+    assert propagate_header_to_payload(ping_hdr, ping_pkt) == ping_pkt.pack()
+
+    eth = "ab:cd:ef:00:00"
+    ping_pkt_2.src = EthAddr(eth)
+    
+    assert propagate_header_to_payload(ping_hdr.update(srcmac=MAC(eth)), ping_pkt) == ping_pkt_2 
+    
  
     
 # def test_compile_action():
