@@ -311,20 +311,18 @@ class mod(nl.ModPolicy):
     def __new__(cls, arg={}, **keys):
         raw_mapping = merge_dicts(arg, keys)
         mapping = lift_dict(raw_mapping, 0)
-            
         return super(mod, cls).__new__(cls, mapping)
 
-class fwd(mod):
-    def __new__(cls, port, arg={}, **keys):
-        keys["outport"] = port
-        return super(fwd, cls).__new__(cls, arg, **keys) 
+    def __call__(self, arg={}, **keys):
+        raw_mapping = merge_dicts(arg, keys)
+        mapping = lift_dict(raw_mapping, 0)
+        return self.__class__(self.mapping.update(mapping))
 
-class _flood(mod):
-    def __new__(cls, arg={}, **keys):
-        keys["outport"] = 65535 # flood
-        return super(_flood, cls).__new__(cls, arg, **keys) 
+def fwd(port, arg={}, **keys):
+    keys["outport"] = port
+    return mod(arg, **keys) 
 
-flood = _flood()
+flood = fwd(65535)
         
 ################################################################################
 # Monitoring helpers

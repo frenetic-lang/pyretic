@@ -176,16 +176,15 @@ class frozendict(object):
         
         if new_dict is not None:
             d.update(new_dict)    
-            
         d.update(kwargs)
         
-        return frozendict(d)
+        return self.__class__(d)
 
     def remove(self, *ks):
         d = self._dict.copy()
         for k in ks:
             del d[k]
-        return frozendict(d)
+        return self.__class__(d)
         
     def pop(self, *ks):
         result = []

@@ -87,6 +87,19 @@ def test_IPWildcard():
 def test_fwd():
     assert mod_packet(eval(fwd(30), p2), p2) == [p5]
 
+hflood = Header(srcip=IP("127.0.0.1"),
+                srcport=FixedInt(16)(30),
+                switch=Switch(14),
+                dstport=FixedInt(16)(30),
+                outport=FixedInt(16)(65535))
+
+p6 = p2.replace(header=hflood)
+p7 = p2.replace(header=hflood.update(srcip=IP("127.0.0.2")))
+
+def test_flood():
+    assert mod_packet(eval(flood, p2), p2) == [p6]
+    assert mod_packet(eval(flood(srcip=IP("127.0.0.2")), p2), p2) == [p7]
+    
 def test_match_ips():
     assert eval(match("srcip", "127.0.0.1"), p2)
     assert eval(match("srcip", "127.*.*.*"), p2)
