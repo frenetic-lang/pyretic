@@ -171,11 +171,13 @@ nl.FixedWidth.register(Outport)
     
 class Switch(nl.Bits(16)):
     def __init__(self, dpid):
-        if isinstance(dpid, Integral):
+        if isinstance(dpid, nl.FixedWidth):
+            b = dpid.to_bits()
+        elif isinstance(dpid, Integral):
             b = bitarray()
             b.frombytes(struct.pack("!H", dpid))
         else:
-            b = dpid
+            assert False
 
         super(Switch, self).__init__(b)
         
@@ -187,7 +189,9 @@ class Switch(nl.Bits(16)):
         
 class MAC(nl.Bits(48)):
     def __init__(self, mac):
-        if len(mac) == 6:
+        if isinstance(mac, nl.FixedWidth):
+            b = mac.to_bits()
+        elif len(mac) == 6:
             b = bitarray()
             b.frombytes(mac)
         elif isinstance(mac, basestring):
@@ -205,8 +209,7 @@ class MAC(nl.Bits(48)):
             b = bitarray()
             b.frombytes(struct.pack("!BBBBBB", *(int(s, 16) for s in m.groups())))
         else:
-            assert isinstance(mac, bitarray)
-            b = mac
+            assert False
             
         super(MAC, self).__init__(b)
 
@@ -218,15 +221,16 @@ class MAC(nl.Bits(48)):
         
 class IP(nl.Bits(32)):
     def __init__(self, ip):
-        if len(ip) == 4:
+        if isinstance(ip, nl.FixedWidth):
+            b = ip.to_bits()
+        elif len(ip) == 4:
             b = bitarray()
             b.frombytes(ip)
         elif isinstance(ip, basestring):
             b = bitarray()
             b.frombytes(socket.inet_aton(ip))
         else:
-            assert isinstance(ip, bitarray)
-            b = ip
+            assert False
         
         super(IP, self).__init__(b)
         

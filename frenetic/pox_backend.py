@@ -208,7 +208,7 @@ def pox_to_pyretic_packet(dpid, inport, packet):
     if not packet.parsed:
         raise ValueError("The packet must already be parsed.")
 
-    h = pox_match_to_pyretic_header(of.ofp_match.from_packet(packet, inport)).update(switch=dpid)
+    h = pox_match_to_pyretic_header(of.ofp_match.from_packet(packet, inport)).update(switch=nc.Switch(dpid))
     n_packet = nl.Packet(h, packet.pack())
     
     return n_packet
