@@ -26,79 +26,14 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+from frenetic.lib import *
 
-"""Generator magic"""
+def monitor(network):
+    b = bucket()
 
-from Queue import Queue
-import threading
-import weakref
+    network.install_policy(fwd(b))
 
-
-# This was using weakrefs, but for simplicity let us just use lists for now.
-class Event(object):
-    def __init__(self):
-        self.listeners = []
-
-    def notify(self, listener):
-        self.listeners.append(listener) 
-        
-    def signal(self, item):
-        for listener in self.listeners:
-            listener(item)
-    
-    def __iter__(self):
-        queue = Queue()
-        
-        self.notify(queue.put)
-        
-        def gen():
-            while True: yield queue.get()
-
-        return gen()
-
-        
-class Behavior(Event):
-    def __init__(self, value=None):
-        self.value = value
-        super(Behavior, self).__init__()
-
-    def get(self):
-        return self.value
-
-    def signal(self, value):
-        self.value = value
-        super(Behavior, self).signal(value)
-
-    set = signal
-
-
-        
-# The ever famous generator multiplexer, courtesy of 
-# http://www.dabeaz.com/generators/genmulti.py
-def merge(*genlist):
-    """Merge a list of generators."""
-    
-    item_q = Queue()
-    
-    def run_one(source):
-        for item in source: item_q.put(item)
-
-    def run_all():
-        thrlist = []
-        for source in genlist:
-            t = threading.Thread(target=run_one, args=(source,))
-            t.start()
-            thrlist.append(t)
-        for t in thrlist: t.join()
-        item_q.put(StopIteration)
-
-    threading.Thread(target=run_all).start()
-    while True:
-        item = item_q.get()
-        if item is StopIteration: return
-        yield item
-
-def run(func, *args, **kwargs):
-    t = threading.Thread(target=func, args=args, kwargs=kwargs)
-    t.start()
-
+    for pkt in b:
+        print "I see packet: ", pkt
+     
+start(monitor)

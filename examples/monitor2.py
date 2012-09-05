@@ -26,47 +26,10 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from frenetic.generators import Event
-from frenetic import netcore as nc
+from frenetic.lib import *
 
-
-class PolicyHandle(object):
-    def __init__(self):
-        self.policy = nc.drop
-
-    def install(self, pol):
-        self.policy = pol
-
-class Network(object):
-    """
-    - install
-    - switch_joins
-    - switch_parts
-    """
-
-    ph_class = PolicyHandle
-    ev_class = Event
-
-    def __init__(self):
-        self.switch_joins = self.ev_class()
-        self.switch_parts = self.ev_class()
-        
-        self._policy_handles = []
-
-        # Start us off with a default policy.
-        self.new_policy_handle()
-    
-    def install(self, policy):
-        self._policy_handles[0].install(policy)
-
-    # TODO do this incremental
-    def get_combined_policy(self):
-        policy = self._policy_handles[0].policy
-        for ph in self._policy_handles[1:]:
-            policy += ph.policy
-        return policy
-                
-    def new_policy_handle(self):
-        ph = self.ph_class()
-        self._policy_handles.append(ph)
-        return ph
+def monitor(network):
+    for pkt in query(network, all_packets):
+        print "I see packet: ", pkt
+     
+start(monitor)

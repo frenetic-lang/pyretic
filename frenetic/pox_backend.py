@@ -29,58 +29,51 @@
 from frenetic import generators
 from frenetic import netcore as nc
 from frenetic import netcore_lib as nl
-from frenetic import backend
+
 from frenetic.util import frozendict
 
 from pox.core import core
-from pox.lib.addresses import *
-from pox.lib.revent import EventMixin
+from pox.lib import revent
+
 import pox.openflow.libopenflow_01 as of
 
 
-class POXNetwork(backend.Network):
-    def __init__(self, pox_backend):
-        class POXPolicyHandle(backend.PolicyHandle):
-            def install(self2, pol):
-                backend.PolicyHandle.install(self2, pol)
-                pox_backend.netcore_policy = self.get_combined_policy()
-        self.ph_class = POXPolicyHandle 
-        backend.Network.__init__(self)
-    
-class POXBackend(EventMixin):
+class POXBackend(revent.EventMixin):
     def __init__(self, user_program):
-        self.netcore_policy = nc.drop
+        self.network = nc.Network()
         self.user_program = user_program
         self.listenTo(core)
 
     def _handle_GoingUpEvent(self, event):
         self.switch_connections = {}
-        self.pyretic_network = POXNetwork(self)
         
-        generators.run(self.user_program, self.pyretic_network)
+        generators.run(self.user_program, self.network)
 
         self.listenTo(core.openflow)
 
     def _handle_PacketIn(self, event):
         pox_pkt = event.parsed
         packet = pox_to_pyretic_packet(event.dpid, event.ofp.in_port, pox_pkt)
-        action = nl.eval(self.netcore_policy, packet)
+        action = nl.eval(self.network.get_policy(), packet)
         n_pkts = nl.mod_packet(action, packet)
         for pkt in n_pkts:
-            # if buckety:
-            #     buckety.signal(pkt)
-            self.send_packet(pkt)
+            assert "outport" in pkt.header
+            if pkt.header["outport"].is_real():
+                self.send_packet(pkt)
+            else:
+                buck = pkt.header["outport"].get_bucket()
+                buck.signal(pkt)
         
     def _handle_ConnectionUp(self, event):
         self.switch_connections[event.dpid] = event.connection
-        self.pyretic_network.switch_joins.signal(nc.Switch(event.dpid))
+        self.network.switch_joins.signal(nc.Switch(event.dpid))
         
     def _handle_ConnectionDown(self, event):
         # Post this to switch_down
         if event.dpid in self.switch_connections:
             del self.switch_connections[event.dpid]
 
-        self.pyretic_network.switch_parts.signal(nc.Switch(event.dpid))
+        self.network.switch_parts.signal(nc.Switch(event.dpid))
         
     def _handle_LinkEvent(self, event):
         # Post this somewhere
@@ -106,7 +99,7 @@ class POXBackend(EventMixin):
         msg.data = packet.payload
 
         outport = int(outport)
-        if outport == 65535:
+        if outport == nc.Outport.flood_port:
             outport = of.OFPP_FLOOD
         msg.actions.append(of.ofp_action_output(port = outport))
 
@@ -128,6 +121,8 @@ def start(f):
 
 
 def pyretic_header_to_pox_match(h):
+    from pox.lib.addresses import *
+    
     match = of.ofp_match()
 
     if "inport" in h:
@@ -219,52 +214,52 @@ def pox_to_pyretic_packet(dpid, inport, packet):
     return n_packet
 
     
-def compile_action(act):
-    """Return a list of POX actions."""
+# def compile_action(act):
+#     """Return a list of POX actions."""
 
-    c = act.get_counter()
-    actions = []
+#     c = act.get_counter()
+#     actions = []
 
-    for mapping in c.elements():
-        outport, mapping = mapping.pop("outport")
-        for k, v in mapping.iteritems():
-            if k == "switch":
-                raise ValueError
-            elif k == "inport":
-                raise ValueError
-            elif k == "vlan":
-                a = of.ofp_action_vlan_vid(vlan_vid=int(v))
-                actions.append(a)
-            elif k == "vlan_pcp":
-                a = of.ofp_action_vlan_pcp(vlan_pcp=int(v))
-                actions.append(a)
-            elif k == "srcip":
-                a = of.ofp_action_nw_addr.set_src(v.to_bits().tobytes())
-                actions.append(a)
-            elif k == "dstip":
-                a = of.ofp_action_nw_addr.set_dst(v.to_bits().tobytes())
-                actions.append(a)
-            elif k == "srcmac":
-                a = of.ofp_action_dl_addr.set_src(v.to_bits().tobytes())
-                actions.append(a)
-            elif k == "dstmac":
-                a = of.ofp_action_dl_addr.set_dst(v.to_bits().tobytes())
-                actions.append(a)
-            elif k == "srcport":
-                a = of.ofp_action_tp_port.set_src(int(v))
-                actions.append(a)
-            elif k == "dstport":
-                a = of.ofp_action_tp_port.set_dst(int(v))
-                actions.append(a)
-            else:
-                raise ValueError
+#     for mapping in c.elements():
+#         outport, mapping = mapping.pop("outport")
+#         for k, v in mapping.iteritems():
+#             if k == "switch":
+#                 raise ValueError
+#             elif k == "inport":
+#                 raise ValueError
+#             elif k == "vlan":
+#                 a = of.ofp_action_vlan_vid(vlan_vid=int(v))
+#                 actions.append(a)
+#             elif k == "vlan_pcp":
+#                 a = of.ofp_action_vlan_pcp(vlan_pcp=int(v))
+#                 actions.append(a)
+#             elif k == "srcip":
+#                 a = of.ofp_action_nw_addr.set_src(v.to_bits().tobytes())
+#                 actions.append(a)
+#             elif k == "dstip":
+#                 a = of.ofp_action_nw_addr.set_dst(v.to_bits().tobytes())
+#                 actions.append(a)
+#             elif k == "srcmac":
+#                 a = of.ofp_action_dl_addr.set_src(v.to_bits().tobytes())
+#                 actions.append(a)
+#             elif k == "dstmac":
+#                 a = of.ofp_action_dl_addr.set_dst(v.to_bits().tobytes())
+#                 actions.append(a)
+#             elif k == "srcport":
+#                 a = of.ofp_action_tp_port.set_src(int(v))
+#                 actions.append(a)
+#             elif k == "dstport":
+#                 a = of.ofp_action_tp_port.set_dst(int(v))
+#                 actions.append(a)
+#             else:
+#                 raise ValueError
         
-        outport = int(outport)
-        if outport == 65535:
-            outport = of.OFPP_FLOOD
-        send_action = of.ofp_action_output(port=outport)
-        actions.append(send_action)
-    return actions 
+#         outport = int(outport)
+#         if outport == nc.Outport.flood_port:
+#             outport = of.OFPP_FLOOD
+#         send_action = of.ofp_action_output(port=outport)
+#         actions.append(send_action)
+#     return actions 
 
 
    

@@ -38,7 +38,6 @@ from frenetic import util
 from frenetic.util import Data, Case, frozendict
 from frenetic.generators import Event
 
-
 ################################################################################
 # Structures
 ################################################################################
@@ -49,12 +48,16 @@ class Header(frozendict):
 class Packet(Data("header payload")):
     def __new__(cls, header, payload):
         return super(Packet, cls).__new__(cls, header, payload)
-        
+
+
 class Bucket(Event):
     """A safe place for packets!"""
     def __init__(self, fields, time):
         self.fields = fields
         self.time = time
+
+        super(Bucket, self).__init__()
+
         
 ################################################################################
 # Matching and wildcards
@@ -218,8 +221,8 @@ class Predicate(object):
         return PredDifference(self, other)
     def __invert__(self):
         return PredNegation(self)
-    def __rshift__(self, act):
-        return PolImply(self, act)
+    def __rshift__(self, pol):
+        return PolImply(self, pol)
 
     def __eq__(self, other):
         raise NotImplementedError
@@ -444,8 +447,9 @@ class _mod_packet(Case):
     def case_ActMod(self, act, packet):
         h = dict(packet.header)
         for k, v in act.mapping.iteritems():
-            if v is None and k in h:
-                del h[k]
+            if v is None:
+                if k in h:
+                    del h[k]
             else:
                 assert isinstance(v, FixedWidth) 
                 h[k] = v
@@ -513,5 +517,3 @@ def propagate_header_to_payload(h, data):
     return packet.pack()
 
 
-
-    

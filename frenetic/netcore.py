@@ -30,13 +30,16 @@
 
 import socket
 import struct
+from numbers import Integral
 
 from bitarray import bitarray
-
 
 from frenetic import util
 from frenetic.util import frozendict, Data, merge_dicts
 from frenetic import netcore_lib as nl
+from frenetic import generators as gs
+
+import weakref
 
 ################################################################################
 # Header types
@@ -128,10 +131,47 @@ def FixedInt(width_):
     nl.FixedWidth.register(FixedInt_)
     FixedInt_.__name__ += repr(FixedInt_.width)
     return FixedInt_
+
+
+class Outport(Data("port_or_bucket")):
+    width = 65 # TODO make this more robust?
+    flood_port = 2**(width-1)-1
+     
+    def __new__(cls, port_or_bucket):
+        # NOT allowed to init with a bitarray.
+        assert isinstance(port_or_bucket, (Integral, nl.Bucket))
+
+        return super(Outport, cls).__new__(cls, port_or_bucket)
+
+    def is_real(self):
+        return not isinstance(self.port_or_bucket, nl.Bucket)
         
+    def __repr__(self):
+        return "<%s outport %s>" % ("real" if self.is_real() else "fake", int(self))
+
+    def to_bits(self):
+        b = bitarray()
+        b.append(self.is_real())
+        b.frombytes(struct.pack("!q", int(self)))
+        return b
+
+    def get_bucket(self):
+        """Redundant, but a nice extra check."""
+        assert isinstance(self.port_or_bucket, nl.Bucket)
+        return self.port_or_bucket
+    
+    def __int__(self):
+        if self.is_real():
+            return self.port_or_bucket
+        else:
+            return id(self.port_or_bucket)
+
+nl.FixedWidth.register(Outport)
+        
+    
 class Switch(nl.Bits(16)):
     def __init__(self, dpid):
-        if isinstance(dpid, int):
+        if isinstance(dpid, Integral):
             b = bitarray()
             b.frombytes(struct.pack("!H", dpid))
         else:
@@ -199,9 +239,9 @@ class IP(nl.Bits(32)):
 
 def str_to_bits(s):
     "Make a wildcard from a string."
-    prefix = bitarray(s.replace("?", "0"))
+    bits = bitarray(s)
     
-    return nl.Wildcard(len(prefix))(prefix, mask)
+    return nl.Bits(len(bits))(bits)
 
 def is_bits_str(value, width):
     return isinstance(value, basestring) and len(value) == width and set(value) <= set("10")
@@ -214,7 +254,7 @@ def str_to_wildcard(s):
 
 def is_wildcard_str(value, width):
     return isinstance(value, basestring) and len(value) == width and set(value) <= set("?10")
-
+                   
 @util.cached
 def MatchExact(match_cls):
     class MatchExact_(nl.Wildcard(match_cls.width)):
@@ -265,7 +305,7 @@ class IPWildcard(nl.Wildcard(32)):
                 prefix.frombytes(struct.pack("!B", int(d)))
             
             return super(IPWildcard, cls).__new__(cls, prefix, mask)
-        elif isinstance(mask, int):
+        elif isinstance(mask, Integral):
             prefix = IP(ipexpr).to_bits()
             bmask = bitarray(32)
             bmask.setall(True)
@@ -285,7 +325,7 @@ class IPWildcard(nl.Wildcard(32)):
 _common_header_info = dict(
     switch=(Switch, MatchExact(Switch)),
     inport=(FixedInt(16), MatchExact(FixedInt(16))),
-    outport=(FixedInt(16), MatchExact(FixedInt(16))),
+    outport=(Outport, MatchExact(Outport)),
     srcmac=(MAC, MatchExact(MAC)),
     dstmac=(MAC, MatchExact(MAC)),
     vlan=(FixedInt(12), MatchExact(FixedInt(12))),
@@ -337,8 +377,8 @@ def lift_dict(d, i):
 # Predicates and policies
 ################################################################################
 
-all_packets = nl.PredTop
-no_packets = nl.PredBottom
+all_packets = nl.PredTop()
+no_packets = nl.PredBottom()
 let = nl.PolLet
     
 def match(k, v):
@@ -351,6 +391,8 @@ def match_missing(key):
         
 def switch_p(k): return match("switch", k)
 def inport_p(k): return match("inport", k)
+is_outport_real = match("outport", "0" + "?" * (Outport.width - 1))
+is_outport_fake = match("outport", "1" + "?" * (Outport.width - 1))
 def outport_p(k): return match("outport", k)
 def srcmac_p(k): return match("srcmac", k)
 def dstmac_p(k): return match("dstmac", k)
@@ -377,11 +419,14 @@ class mod(nl.ModPolicy):
         mapping = lift_dict(raw_mapping, 0)
         return self.__class__(self.mapping.update(mapping))
 
+    def get_act(self):
+        return nl.ActMod(self.mapping)
+
 def fwd(port, arg={}, **keys):
     keys["outport"] = port
     return mod(arg, **keys) 
 
-flood = fwd(65535)
+flood = fwd(Outport.flood_port)
         
 ################################################################################
 # Monitoring helpers
@@ -392,6 +437,58 @@ def bucket(fields=(), time=None):
 
 def query(network, pred, fields=(), time=None):
     b = nl.Bucket(fields, time)
-    b.ph = network.new_policy_handle()
-    b.ph.install(pred >> fwd(b))
+    b.sub_network = fork_sub_network(network)
+    b.sub_network.install_policy(pred >> fwd(b))
     return b
+
+################################################################################
+# Network
+################################################################################
+
+
+
+class Network(object):
+    def __init__(self):
+        self.switch_joins = gs.Event()
+        self.switch_parts = gs.Event()
+        
+        self.policy_b = gs.Behavior(drop)
+        self.sub_policies = {}
+        
+        super(Network, self).__init__()
+        
+    def install_policy(self, policy):
+        self.sub_policies[self] = policy
+        self.policy_b.set(self._aggregate_policy())
+        
+    def policy_changes(self):
+        return iter(self.policy_b)
+
+    def get_policy(self):
+        return self.policy_b.get()
+    
+    def add_sub_network(self, sub_net):
+        def listener(policy):
+            self.sub_policies[sub_net] = policy
+            self.policy_b.set(self._aggregate_policy())
+            
+        sub_net.policy_b.notify(listener)
+
+    def _aggregate_policy(self):
+        return sum(self.sub_policies.itervalues(), drop)
+        
+
+        
+def fork_sub_network(big_network):
+    network = Network()
+    network.switch_joins = big_network.switch_joins
+    network.switch_parts = big_network.switch_parts
+
+    big_network.add_sub_network(network)
+    
+    return network
+
+
+def virtualize_network():
+    pass
+        
