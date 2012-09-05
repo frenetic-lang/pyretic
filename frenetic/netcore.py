@@ -471,28 +471,33 @@ class Network(object):
     def get_policy(self):
         return self.policy_b.get()
     
-    def add_sub_network(self, sub_net):
-        def listener(policy):
-            self.sub_policies[sub_net] = policy
-            self.policy_b.set(self._aggregate_policy())
+    def add_sub_network(self, sub_net_pol_generator):
+        def listener():
+            for policy in sub_net_pol_generator:
+                self.sub_policies[sub_net_pol_generator] = policy 
+                self.policy_b.set(self._aggregate_policy())
             
-        sub_net.policy_b.notify(listener)
+        gs.run(listener)
 
     def _aggregate_policy(self):
         return sum(self.sub_policies.itervalues(), drop)
         
 
         
-def fork_sub_network(big_network):
+def  fork_sub_network(big_network):
     network = Network()
     network.switch_joins = big_network.switch_joins
     network.switch_parts = big_network.switch_parts
 
-    big_network.add_sub_network(network)
+    big_network.add_sub_network(network.policy_changes())
     
     return network
 
 
-def virtualize_network():
-    pass
-        
+def virtualize_network(big_network,view):
+    network = Network()
+    # BIG INFORMATION LEAK, PUNTING FOR NOW BUT WILL FIGURE OUT SOON
+    network.switch_joins = big_network.switch_joins
+    network.switch_parts = big_network.switch_parts
+    big_network.add_sub_network(view(policy) for policy in network.policy_changes())
+    return network
