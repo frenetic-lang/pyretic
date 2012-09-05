@@ -1,15 +1,14 @@
 
 import pytest
 
-from frenetic.net import *
+from frenetic.netcore import *
 from frenetic.netcore_lib import *
-from frenetic.netcore_helpers import *
 
 h = Header(srcip=IP("1.2.3.4"))
-p = Packet(h, 32, None)
+p = Packet(h, None)
 
-w = Wildcard(bitarray("00000000"))
-w2 = Wildcard(bitarray("00000000"), bitarray("11111111"))
+w = Wildcard(8)(bitarray("00000000"), bitarray("00000000"))
+w2 = Wildcard(8)(bitarray("00000000"), bitarray("11111111"))
 
 def test_Wildcard_match():
     assert w <= w
@@ -19,25 +18,26 @@ def test_Wildcard_intersect():
     assert w & w2 == w2 & w
 
 def test_MatchExact():
-    return MatchExact(Switch)(10).match_object(Switch(10))
+    return MatchExact(Switch)(10).match(Switch(10))
 
 
 def test_Predicate_eval():
     assert eval(PredTop(), p)
     assert not eval(PredBottom(), p)
-    assert eval(PredMatch("srcip", Wildcard(IP("1.2.3.4").to_bits())), p)
+    assert eval(PredMatch("srcip", Wildcard(32)(IP("1.2.3.4").to_bits(),
+                                                bitarray([False] * 32))), p)
     assert eval(PredMatch("srcip", IPWildcard("1.2.3.*")), p)
     assert eval(PredMatch("srcip", IPWildcard("1.2.3.4", "255.255.255.0")), p)
 
-act = ActMod({"srcport": FixedInt(16)(30)})
-pol = PredMatch("srcip", IPWildcard("1.2.3.*")) >> ModPolicy({"srcport": FixedInt(16)(30)})
+act = ActMod(frozendict({"srcport": FixedInt(16)(30)}))
+pol = PredMatch("srcip", IPWildcard("1.2.3.*")) >> mod({"srcport": FixedInt(16)(30)})
 
 def test_Action():
     assert not mod_packet(ActDrop(), p)
     assert mod_packet(act, p)[0].header["srcport"] == FixedInt(16)(30)
     assert len(mod_packet(act + act, p)) == 2
     with pytest.raises(KeyError):
-        mod_packet(ActMod({"srcip": None}), p)[0].header["srcip"]
+        mod_packet(ActMod(frozendict({"srcip": None})), p)[0].header["srcip"]
     
 def test_Policy():
     assert eval(pol, p) == act
@@ -46,7 +46,7 @@ lact = ModPolicy({"switch": Switch(10)})
 l = PolLet("x", pol, "srcport", PredMatch("x", MatchExact(FixedInt(16))(30)) >> lact)
 
 def test_Let():
-    assert eval(l, p) == ActMod({"switch": Switch(10)})
+    assert eval(l, p) == ActMod(frozendict({"switch": Switch(10)}))
 
 ipol = PredMatch("switch", MatchExact(Switch)(10)) >> ModPolicy({"switch": Switch(25)})
 cpol = l * ipol
@@ -62,7 +62,7 @@ h2 = Header(srcip=IP("127.0.0.1"),
            switch=Switch(14),
            dstport=FixedInt(16)(30))
 
-p2 = Packet(h2, 3200, None)
+p2 = Packet(h2, None)
 
 hafter = Header(srcip=IP("127.0.0.1"),
                 srcport=FixedInt(16)(30),
@@ -82,7 +82,7 @@ def test_IPWildcard():
     assert not ip != ip2
     
     assert ip2 == IPWildcard("1.2.3.8", "255.255.255.0")
-    assert not IPWildcard("255.255.255.255").match_object(IP("255.255.255.252"))
+    assert not IPWildcard("255.255.255.255").match(IP("255.255.255.252"))
 
 def test_fwd():
     assert mod_packet(eval(fwd(30), p2), p2) == [p5]

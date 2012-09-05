@@ -28,218 +28,211 @@
 
 """Netcore grammar objects and related functions."""
 
+from abc import ABCMeta, abstractmethod
+from collections import Counter
+import functools
+
 from bitarray import bitarray
 
-from collections import Counter
-
 from frenetic import util
-from frenetic.util import Record, Case, frozendict
+from frenetic.util import Data, Case, frozendict
 from frenetic.generators import Event
 
+
+################################################################################
+# Structures
+################################################################################
+
+class Header(frozendict):
+    """Expected fields:
+    switch location srcmac dstmac dltype vlan vlan_pcp srcip dstip
+    protocol srcport dstport"""
+
+class Packet(Data("header payload")):
+    """Class representing packets (insightful, huh)"""
+
+    def __new__(cls, header, payload):
+        return super(Packet, cls).__new__(cls, header, payload)
+        
+class Bucket(Event):
+    """A safe place for packets!"""
+    def __init__(self, fields, time):
+        self.fields = fields
+        self.time = time
+        
 ################################################################################
 # Matching and wildcards
 ################################################################################
 
 
 class Matchable(object):
-    """Assumption: the binary operatiors are passed in the same class as the invoking object."""
-    
-    @staticmethod
-    def top(self, length):
-        pass
+    """Assumption: the binary operators are passed in the same class as the invoking object."""
+    __metaclass__ = ABCMeta
 
+    @classmethod
+    @abstractmethod
+    def top(cls):
+        """Return the matchable greater than all other matchables of the same class. """
+
+    @abstractmethod
     def __and__(self, other):
-        pass
+        """Return the intersection of two matchables of the same class.
+        Return value is None if there is no intersection."""
+
+    @abstractmethod
+    def __le__(self, other):
+        """Return true if `other' matches every object `self' does."""
+
+    @abstractmethod
+    def match(self, other):
+        """Return true if we match `other'.""" 
+
+
+class MatchableMixin(object):
+    def disjoint_with(self, other):
+        """Return true if there is no object both matchables match."""
+        return self & other is None
     
-    def overlap(self, other):
-        pass
-            
-    def disjoint(self, other):
-        pass
+    def overlaps_with(self, other):
+        """Return true if there is an object both matchables match."""
+        return not self.overlaps_with(other)
         
-    def __cmp__(self, other):
-        pass
-    
-    def match_object(self, other):
-        """other is a something with the .to_bits() method"""
-        pass
-
-
-# TODO
-class Approx(object):
-    """Interface for things which can be approximated."""
-    
-    def overapprox(self, overapproxer):
-        pass
-
-    
-    def underapprox(self, underapproxer):
-        pass
-        
-        
-class Wildcard(Matchable, Record):
-    """Full wildcards."""
-
-    _fields = "width prefix mask"
-
-    def __new__(cls, prefix, mask=None):
-        """Create a wildcard. Prefix is a binary string.
-        Mask can either be an integer (how many bits to mask) or a binary string."""
-   
-        if mask is None:
-            mask = bitarray(len(prefix))
-            mask.setall(False)
-
-        return Record.__new__(cls, len(prefix), prefix, mask)
-        
-    # XXX is this really necessary?
-    def normalize(self):
-        """Return a bitarray, masked."""
-        return self.prefix | self.mask 
-
-    @staticmethod
-    def top(length):
-        return Wildcard(bitarray([False] * length), bitarray([True] * length))
-        
-    def match_object(self, other):
-        return other.to_bits() | self.mask == self.normalize()
-        
-    def __and__(self, other):
-        if self.overlap(other):
-            return Wildcard(self.normalize() & other.normalize(),
-                            self.mask & other.mask)
-        else:
-            return None
-
-    def overlap(self, other):
-        c_mask = self.mask | other.mask
-        return self.prefix | c_mask == other.prefix | c_mask
-        
-    def disjoint(self, other):
-        return not self.overlap(self, other)
-        
-    def _match(self, other):
-        return (self.mask & other.mask == other.mask) and \
-            (self.prefix | self.mask == other.prefix | self.mask)
-
-    def __cmp__(self, other):
-        x = self._match(other)
-        y = other._match(self)
-        
-        return x - y    
-
     def __eq__(self, other):
-        return self.normalize() == other.normalize()
+        return self <= other and other <= self
 
     def __ne__(self, other):
-        return self.normalize() != other.normalize()
+        """Implemented in terms of __eq__"""
+        return not self == other
 
-    def __lt__(self, other):
-        return cmp(self, other) < 0
 
-    def __gt__(self, other):
-        return cmp(self, other) > 0    
+class Approx(object):
+    """Interface for things which can be approximated."""
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def overapprox(self, overapproxer):
+        """Docs here."""
+
+    @abstractmethod
+    def underapprox(self, underapproxer):
+        """Docs here."""
+
         
-    def __le__(self, other):
-        return cmp(self, other) <= 0
+_wildcard_cache = {}        
+def Wildcard(width_):
+    try:
+        return _wildcard_cache[width_]
+    except KeyError:
+        @functools.total_ordering
+        class Wildcard_(MatchableMixin, Data("prefix mask")):
+            """Full wildcards."""
 
-    def __ge__(self, other):
-        return cmp(self, other) >= 0
+            width = width_
 
+            def __new__(cls, prefix, mask):
+                """Create a wildcard. Prefix is a binary string.
+                Mask can either be an integer (how many bits to mask) or a binary string."""
 
-        
+                assert len(prefix) == cls.width == len(mask) 
+
+                return super(Wildcard_, cls).__new__(cls, prefix, mask)
+
+            @classmethod
+            def top(cls):
+                prefix = bitarray(cls.width)
+                prefix.setall(False)
+                mask = bitarray(cls.width)
+                mask.setall(False)
+                return cls(prefix, mask)
+
+            def match(self, other):
+                return other.to_bits() | self.mask == self._normalize()
+
+            def __and__(self, other):
+                if self.overlaps_with(other):
+                    return self.__class__(self._normalize() & other._normalize(),
+                                          self.mask & other.mask)
+             
+            def overlaps_with(self, other):
+                c_mask = self.mask | other.mask
+                return self.prefix | c_mask == other.prefix | c_mask
+
+            def __le__(self, other):
+                return (self.mask & other.mask == other.mask) and \
+                    (self.prefix | self.mask == other.prefix | self.mask)
+
+            def _normalize(self):
+                """Return a bitarray, masked."""
+                return self.prefix | self.mask
+
+        Matchable.register(Wildcard_)
+        Wildcard_.__name__ += repr(width_)
+        _wildcard_cache[width_] = Wildcard_
+        return Wildcard_
 
 ################################################################################
 # Predicates
 ################################################################################
 
-        
-class Predicate(Record):
+class Predicate(object):
    """Top-level abstract class for predicates."""
    
    def __and__(self, other):
-      return PredIntersection(self, other)
-
+       return PredIntersection(self, other)
    def __or__(self, other):
-      return PredUnion(self, other)
-
+       return PredUnion(self, other)
    def __sub__(self, other):
-      return PredDifference(self, other)
-
+       return PredDifference(self, other)
    def __invert__(self):
-      return PredNegation(self)
-
+       return PredNegation(self)
    def __rshift__(self, act):
-      return PolImply(self, act)
+       return PolImply(self, act)
 
-        
 class PredTop(Predicate):
-  """The always-true predicate."""
-  _fields = ""
-   
-  def __repr__(self):
-    return "*"
+    """The always-true predicate."""
+    def __repr__(self):
+        return "*"
       
-   
 class PredBottom(Predicate):
-   """The always-false predicate."""
-   _fields = ""
-
-   def __repr__(self):
-      return "!*"
-
-   def _match(self, packet, env):
-      return False
-
-        
-class PredMatch(Predicate):
-   """A basic predicate matching against a single field"""
-
-   _fields = "varname pattern"
+    """The always-false predicate."""
+    def __repr__(self):
+        return "!*"
     
+class PredMatch(Predicate, Data("varname pattern")):
+   """A basic predicate matching against a single field"""
    def __repr__(self):
       return "%s:%s" % (self.varname, self.pattern)
 
+class PredUnion(Predicate, Data("left right")):
+    """A predicate representing the union of two predicates."""
+    def __repr__(self):
+        return "(%s) | (%s)" % (self.left, self.right)
         
-class PredUnion(Predicate):
-   """A predicate representing the union of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) | (%s)" % (self.left, self.right)
-        
+class PredIntersection(Predicate, Data("left right")):
+    """A predicate representing the intersection of two predicates."""
+    def __repr__(self):
+        return "(%s) & (%s)" % (self.left, self.right)
 
-class PredIntersection(Predicate):
-   """A predicate representing the intersection of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) & (%s)" % (self.left, self.right)
+class PredDifference(Predicate, Data("left right")):
+    """A predicate representing the difference of two predicates."""
+    def __repr__(self):
+        return "(%s) - (%s)" % (self.left, self.right)
 
+class PredNegation(Predicate, Data("pred")):
+    """A predicate representing the difference of two predicates."""
+    def __repr__(self):
+        return "~(%s)" % (self.pred)
 
-class PredDifference(Predicate):
-   """A predicate representing the difference of two predicates."""
-   _fields = "left right"
-    
-   def __repr__(self):
-      return "(%s) - (%s)" % (self.left, self.right)
-
-      
-class PredNegation(Predicate):
-   """A predicate representing the difference of two predicates."""
-   _fields = "pred"
-    
-   def __repr__(self):
-      return "~(%s)" % (self.pred)
-
-    
 ################################################################################
 # Actions (these are internal data structures)
 ################################################################################
 
-class Action(Record):
+class Action(object):
     def __add__(self, act):
         return ActChain(self, act)
+
+    def _set_counter(self):
+        raise NotImplementedError
 
     def get_counter(self):
         c = Counter()
@@ -248,26 +241,17 @@ class Action(Record):
 
     def __eq__(self, other):
         return self.get_counter() == other.get_counter()
-        
 
 class ActDrop(Action):
-    _fields = ""
-    
     def __repr__(self):
-        return "Nothing"
-
+        return "Drop"
     def _set_counter(self, c):
         return
-        
-        
-class ActMod(Action):
-    _fields = "mapping"
-
+    
+class ActMod(Action, Data("mapping")):
     def __new__(cls, mapping):
-        if not isinstance(mapping, frozendict):
-            mapping = frozendict(mapping)
-
-        return Action.__new__(cls, mapping)
+        assert isinstance(mapping, frozendict)
+        return super(ActMod, cls).__new__(cls, mapping)
     
     def __repr__(self):
         return repr(self.mapping)
@@ -275,13 +259,9 @@ class ActMod(Action):
     def _set_counter(self, c):
         c[self.mapping] += 1
        
-
-class ActChain(Action):
-    _fields = "left right"
-    
+class ActChain(Action, Data("left right")):
     def __repr__(self):
         return "(%s, %s)" % (self.left, self.right)
-
     def _set_counter(self, c):
         self.left._set_counter(c)
         self.right._set_counter(c)
@@ -290,73 +270,52 @@ class ActChain(Action):
 # Policies
 ################################################################################
 
-        
-class Policy(Record):
+class Policy(object):
    """Top-level abstract description of a static network program."""
-
    def __or__(self, other):
       return PolUnion(self, other)
-
    def __sub__(self, pred):
       return PolRestriction(self, pred)
-
    def __mul__(self, pol):
       return PolComposition(self, pol)
-
+      
 class DropPolicy(Policy):
     """Policy that drops everything."""
-    _fields = ""
-    
     def __repr__(self):
         return "drop"
-
-class ModPolicy(Policy):
+        
+class ModPolicy(Policy, Data("mapping")):
     """Policy that drops everything."""
-    _fields = "mapping"
-
     def __new__(cls, mapping):
         if not isinstance(mapping, frozendict):
             mapping = frozendict(mapping)
-
-        return Policy.__new__(cls, mapping)
-    
+        return super(ModPolicy, cls).__new__(cls, mapping)
     def __repr__(self):
         return repr(self.mapping)
-        
-class PolImply(Policy):
-    """Policy for mapping a single predicate to a list of actions."""
-
-    _fields = "predicate policy"
     
+class PolImply(Policy, Data("predicate policy")):
+    """Policy for mapping a single predicate to a list of actions."""
     def __repr__(self):
         return "%s >> %s" % (self.predicate, self.policy)
-        
-class PolLet(Policy):
-    _fields = "varname policy attr body"
 
+class PolLet(Policy, Data("varname policy attr body")):
     def __repr__(self):
         return "let %s <- (%s).%s in %s" % (self.varname, self.policy, self.attr, self.body)
-
-class PolComposition(Policy):
-    _fields = "left right"
-    
+        
+class PolComposition(Policy, Data("left right")):
     def __repr__(self):
         return "%s * %s" % (self.left, self.right)
 
-class PolUnion(Policy):
-    _fields = "left right"
-    
+class PolUnion(Policy, Data("left right")):
     def __repr__(self):
         return "%s + %s" % (self.left, self.right)
 
-class PolRestriction(Policy):
-    _fields =  "policy predicate"
-    
+class PolRestriction(Policy, Data("policy predicate")):
     def __repr__(self):
         return "%s - %s" % (self.predicate, self.policy)
         
 ################################################################################
-# Traversals
+# Evaluation
 ################################################################################
 
 def eval(expr, packet):
@@ -374,7 +333,7 @@ class _eval(Case):
         if pred.pattern is None:
             return pred.varname not in env
         else:
-            return pred.pattern.match_object(env[pred.varname])
+            return pred.pattern.match(env[pred.varname])
 
     def case_PredUnion(self, pred, packet, env):
         return self(pred.left, packet, env) or self(pred.right, packet, env)
@@ -422,6 +381,10 @@ class _eval(Case):
             action = ActChain(action, self(pol.right, n_packet, env.update(n_packet.header)))
         return action
 
+################################################################################
+# Action ops
+################################################################################
+        
 class _mod_packet(Case):
     def case_ActDrop(self, act, packet):
         return []
@@ -445,7 +408,10 @@ def mod_packet(act, packet):
         r.append(n_packet) 
     return r
 
-    
+################################################################################
+# Nasty hacks.
+################################################################################
+
 # XXX this is slow and we shouldn't have a dep on pox here.
 def propagate_header_to_payload(h, data):
     from pox.lib.packet import *
@@ -493,28 +459,5 @@ def propagate_header_to_payload(h, data):
     return packet.pack()
 
 
-# Structures
-#
 
-
-class Header(frozendict):
-    """Expected fields:
-    switch location srcmac dstmac dltype vlan vlan_pcp srcip dstip
-    protocol srcport dstport"""
-
-class Packet(Record):
-    """Class representing packets (insightful, huh)"""
-
-    _fields = "header size payload time"
-
-    def __new__(cls, header, size, payload, time=None):
-        time = time or util.current_time()
-        return Record.__new__(cls, header, size, payload, time)
-        
-class bucket(Event):
-    """A safe place for packets!"""
-    def __init__(self, fields=(), time=None):
-        self.fields = fields
-        self.time = time
-        
     

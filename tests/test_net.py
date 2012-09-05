@@ -1,7 +1,8 @@
 
 import pytest
 
-from frenetic.net import *
+from frenetic.netcore import *
+from frenetic.netcore_lib import *
 
 def make_header():
     return Header(switch=None, location=None, srcmac=None, dstmac=None, dltype=None,
@@ -9,7 +10,7 @@ def make_header():
 
 
 def test_Packet_strange_bug():
-    assert Packet(None, None, None) is not None
+    assert Packet(None, None) is not None
 
     
 def test_FixedInt_bitarray():

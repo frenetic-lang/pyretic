@@ -3,8 +3,7 @@ import pytest
 
 from pox.openflow.libopenflow_01 import *
 
-from frenetic.net import *
-from frenetic.netcore_helpers import *
+from frenetic.netcore import *
 from frenetic.pox_backend import *
 
 act = mod(outport=10)

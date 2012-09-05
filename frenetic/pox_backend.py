@@ -26,7 +26,9 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from frenetic import generators, netcore_lib, netcore_helpers, net, backend
+from frenetic import generators
+from frenetic import netcore as nc
+from frenetic import backend
 
 from pox.core import core
 from pox.lib.revent import EventMixin
@@ -44,7 +46,7 @@ class POXNetwork(backend.Network):
     
 class POXBackend(EventMixin):
     def __init__(self, user_program):
-        self.netcore_policy = netcore_lib.DropPolicy()
+        self.netcore_policy = nc.drop
         self.user_program = user_program
         self.listenTo(core)
 
@@ -59,8 +61,8 @@ class POXBackend(EventMixin):
     def _handle_PacketIn(self, event):
         pox_pkt = event.parsed
         packet = pox_to_pyretic_packet(event.dpid, event.ofp.in_port, pox_pkt)
-        action = netcore_lib.eval(self.netcore_policy, packet)
-        n_pkts = netcore_lib.mod_packet(action, packet)
+        action = nc.eval(self.netcore_policy, packet)
+        n_pkts = nc.mod_packet(action, packet)
         import ipdb;ipdb.set_trace()
         for pkt in n_pkts:
             # if buckety:
@@ -69,14 +71,14 @@ class POXBackend(EventMixin):
         
     def _handle_ConnectionUp(self, event):
         self.switch_connections[event.dpid] = event.connection
-        self.pyretic_network.switch_joins.signal(net.Switch(event.dpid))
+        self.pyretic_network.switch_joins.signal(nc.Switch(event.dpid))
         
     def _handle_ConnectionDown(self, event):
         # Post this to switch_down
         if event.dpid in self.switch_connections:
             del self.switch_connections[event.dpid]
 
-        self.pyretic_network.switch_parts.signal(net.Switch(event.dpid))
+        self.pyretic_network.switch_parts.signal(nc.Switch(event.dpid))
         
     def _handle_LinkEvent(self, event):
         # Post this somewhere
@@ -155,7 +157,7 @@ def pox_match_to_pyretic_header(match):
     h["tos"] = match.nw_tos
     h["srcport"] = match.tp_src
     h["dstport"] = match.tp_dst
-    return net.Header(h)
+    return nc.Header(h)
 
       
 def pox_to_pyretic_packet(dpid, inport, packet):
@@ -163,7 +165,7 @@ def pox_to_pyretic_packet(dpid, inport, packet):
         raise ValueError("The packet must already be parsed.")
 
     h = pox_match_to_pyretic_header(of.ofp_match.from_packet(packet, inport)).update(switch=dpid)
-    n_packet = net.Packet(h, None, packet.pack())
+    n_packet = nc.Packet(h, None, packet.pack())
     
     return n_packet
 

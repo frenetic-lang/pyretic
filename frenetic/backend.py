@@ -27,11 +27,12 @@
 ################################################################################
 
 from frenetic.generators import Event
-from frenetic.netcore_helpers import *
+from frenetic import netcore as nc
+
 
 class PolicyHandle(object):
     def __init__(self):
-        self.policy = drop
+        self.policy = nc.drop
 
     def install(self, pol):
         self.policy = pol
@@ -44,10 +45,11 @@ class Network(object):
     """
 
     ph_class = PolicyHandle
+    ev_class = Event
 
     def __init__(self):
-        self.switch_joins = Event()
-        self.switch_parts = Event()
+        self.switch_joins = self.ev_class()
+        self.switch_parts = self.ev_class()
         
         self._policy_handles = []
 

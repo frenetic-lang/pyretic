@@ -28,14 +28,18 @@
 
 # This module is designed for import *.
 
+import socket
+import struct
+
 from bitarray import bitarray
-from frenetic import util
+
+
+from frenetic.util import Data, merge_dicts
 from frenetic import netcore_lib as nl
 
-import weakref
-
-# Useful field types
-#
+################################################################################
+# Header types
+################################################################################
 
 def FixedInt(width_):
     class FixedInt_(int):
@@ -54,60 +58,57 @@ def FixedInt(width_):
             return bitarray(bin(self)[2:self.width+2].zfill(self.width))
 
         def __add__(self, v):
-            return FixedInt(self.width)(int.__add__(self, v))
+            return self.__class__(int.__add__(self, v))
 
         def __sub__(self, v):
-            return FixedInt(self.width)(int.__sub__(self, v))
+            return self.__class__(int.__sub__(self, v))
 
         def __mul__(self, v):
-            return FixedInt(self.width)(int.__mul__(self, v))
+            return self.__class__(int.__mul__(self, v))
 
         def __div__(self, v):
-            return FixedInt(self.width)(int.__div__(self, v))
+            return self.__class__(int.__div__(self, v))
 
         def __mod__(self, v):
-            return FixedInt(self.width)(int.__mod__(self, v))
+            return self.__class__(int.__mod__(self, v))
 
         def __and__(self, v):
-            return FixedInt(self.width)(int.__and__(self, v))
+            return self.__class__(int.__and__(self, v))
 
         def __or__(self, v):
-            return FixedInt(self.width)(int.__or__(self, v))
+            return self.__class__(int.__or__(self, v))
 
         def __xor__(self, v):
-            return FixedInt(self.width)(int.__xor__(self, v))
+            return self.__class__(int.__xor__(self, v))
 
         def __pow__(self, v):
-            return FixedInt(self.width)(int.__pow__(self, v))
+            return self.__class__(int.__pow__(self, v))
 
         def __rshift__(self, v):
-            return FixedInt(self.width)(int.__lshift__(self, v))
+            return self.__class__(int.__lshift__(self, v))
 
         def __lshift__(self, v):
-            return FixedInt(self.width)(int.__rshift__(self, v))
+            return self.__class__(int.__rshift__(self, v))
 
         def __abs__(self):
-            return FixedInt(self.width)(int.__abs__(self))
+            return self.__class__(int.__abs__(self))
 
         def __invert__(self):
-            return FixedInt(self.width)(int.__invert__(self))
+            return self.__class__(int.__invert__(self))
 
         def __pos__(self):
-            return FixedInt(self.width)(int.__pos__(self))
+            return self.__class__(int.__pos__(self))
 
         def __neg__(self):
-            return FixedInt(self.width)(int.__or__(self))
+            return self.__class__(int.__or__(self))
 
         def __repr__(self):
             return int.__repr__(self) + "#" + str(self.width)
             
     FixedInt_.__name__ += repr(FixedInt_.width)
     return FixedInt_
-    
         
-class Switch(Record):
-    _fields = "switch_int"
-
+class Switch(Data("switch_int")):
     width = 8
     
     def __repr__(self):
@@ -121,49 +122,24 @@ class Switch(Record):
         b.frombytes(struct.pack("!B", self.switch_int))
         return b
 
-class Location(Record):
-    _fields = "at port"
+class MAC(Data("macbytes")):
+    width = 48
 
-    # At is "in" or "out"
-    # Port is an int
-
-    width = 9
-
-    def __repr__(self):
-        return "<loc %s %s>" % (self.at, self.port)
-
-    # XXX double check
     def to_bits(self):
         b = bitarray()
-        b.insert(0, self.at == "out")
-        b.frombytes(struct.pack("!B", self.port))
+        b.frombytes(self.macbytes)
         return b
-        
-class MAC(Record):
-  _fields = "macbytes"
-  width = 48
 
-  def to_bits(self):
-    b = bitarray()
-    b.frombytes(self.macbytes)
-    return b
-
-# XXX what should this fundamentally be?
-class IP(Record):
-    _fields = "ipbytes"
-
+class IP(Data("ipbytes")):
     width = 32
     
     def __new__(cls, ip):
-        import socket
-        
         if len(ip) != 4:
             ip = socket.inet_aton(ip)
 
-        return Record.__new__(cls, ip)
+        return super(IP, cls).__new__(cls, ip)
         
     def __repr__(self):
-        import socket
         return socket.inet_ntoa(self.ipbytes)
        
     def to_bits(self):
@@ -171,44 +147,36 @@ class IP(Record):
         b.frombytes(self.ipbytes)
         return b
 
-# Useful wildcards
-#
+################################################################################
+# Wildcards
+################################################################################
 
 def str_to_wildcard(s):
     "Make a wildcard from a string."
-    
     prefix = bitarray(s.replace("?", "0"))
     mask = bitarray(s.replace("1", "0").replace("?", "1"))
-    return Wildcard(prefix, mask)
+    return nl.Wildcard(len(prefix))(prefix, mask)
 
 def is_wildcard_str(value, width):
     return isinstance(value, basestring) and len(value) == width and set(value) <= set("?10")
 
-_match_exact_cache = weakref.WeakKeyDictionary()
+_match_exact_cache = {}
 def MatchExact(match_cls):
-    assert hasattr(match_cls, "width")
-    
     try:
         return _match_exact_cache[match_cls]
     except:
-        class MatchExact_(nl.Wildcard):
-            width = match_cls.width
+        class MatchExact_(nl.Wildcard(match_cls.width)):
             def __new__(cls, *v):
                 bits = match_cls(*v).to_bits()
-                assert len(bits) == match_cls.width
-                return Wildcard.__new__(cls, bits)
+                return super(MatchExact_, cls).__new__(cls, bits, bitarray([False] * cls.width))
 
         MatchExact_.__name__ += match_cls.__name__
         
-        _match_exact_cache[cls] = MatchExact_
+        _match_exact_cache[match_cls] = MatchExact_
         return MatchExact_
 
-class IPWildcard(nl.Wildcard):
-    width = 32
-    
+class IPWildcard(nl.Wildcard(32)):
     def __new__(cls, ipexpr, mask=None):
-        import struct
-        
         parts = ipexpr.split("/")
 
         if len(parts) == 2:
@@ -230,44 +198,39 @@ class IPWildcard(nl.Wildcard):
                 prefix.extend("00000000")
             else:
                 prefix.frombytes(struct.pack("!B", int(a)))
-                
             if b == "*":
                 mask[8:16] = True
                 prefix.extend("00000000")
             else:
                 prefix.frombytes(struct.pack("!B", int(b)))
-             
             if c == "*":
                 mask[16:24] = True
                 prefix.extend("00000000")
             else:
                 prefix.frombytes(struct.pack("!B", int(c)))
-                
             if d == "*":
                 mask[24:32] = True
                 prefix.extend("00000000")
             else:
                 prefix.frombytes(struct.pack("!B", int(d)))
             
-            return nl.Wildcard.__new__(cls, prefix, mask)
-
+            return super(IPWildcard, cls).__new__(cls, prefix, mask)
         elif isinstance(mask, int):
             prefix = IP(ipexpr).to_bits()
             bmask = bitarray(32)
             bmask.setall(True)
             bmask[0:mask] = False
-            
-            return nl.Wildcard.__new__(cls, prefix, bmask)
+            return super(IPWildcard, cls).__new__(cls, prefix, bmask)
         else:
             prefix = IP(ipexpr).to_bits()
             mask = IP(mask).to_bits()
-            
-            mask.invert()
+            mask.invert() 
+            return super(IPWildcard, cls).__new__(cls, prefix, mask)
 
-            return nl.Wildcard.__new__(cls, prefix, mask)
 
-# Header info
-#
+################################################################################
+# Header information
+################################################################################
 
 _common_header_info = dict(
     switch=(Switch, MatchExact(Switch)),
@@ -308,8 +271,9 @@ def lift_dict(d, i):
         r[k2] = v2
     return r
      
-# Predicate helpers
-#
+################################################################################
+# Predicates and policies
+################################################################################
 
 all_packets = nl.PredTop
 no_packets = nl.PredBottom
@@ -338,35 +302,36 @@ def dstip_p(k): return match("dstip", k)
 def srcport_p(k): return match("srcport", k)
 def dstport_p(k): return match("dstport", k)
 
-# Action helpers
-#
-
 drop = nl.DropPolicy()
 
 class mod(nl.ModPolicy):
-    def __new__(cls, arg=None, **keys):
-        raw_mapping = util.merge_dicts(arg, keys)
+    def __new__(cls, arg={}, **keys):
+        raw_mapping = merge_dicts(arg, keys)
         mapping = lift_dict(raw_mapping, 0)
             
-        return nl.ModPolicy.__new__(cls, mapping)
+        return super(mod, cls).__new__(cls, mapping)
 
 class fwd(mod):
-    def __new__(cls, port, arg=None, **keys):
+    def __new__(cls, port, arg={}, **keys):
         keys["outport"] = port
-        return mod.__new__(cls, arg, **keys) 
+        return super(fwd, cls).__new__(cls, arg, **keys) 
 
 class _flood(mod):
-    def __new__(cls, arg=None, **keys):
+    def __new__(cls, arg={}, **keys):
         keys["outport"] = 65535 # flood
-        return mod.__new__(cls, arg, **keys) 
+        return super(_flood, cls).__new__(cls, arg, **keys) 
 
 flood = _flood()
         
+################################################################################
 # Monitoring helpers
-#
+################################################################################
+
+def bucket(fields=(), time=None):
+    return nl.Bucket(fields, time)
 
 def query(network, pred, fields=(), time=None):
-    b = nl.bucket(fields, time)
+    b = nl.Bucket(fields, time)
     b.ph = network.new_policy_handle()
     b.ph.install(pred >> fwd(b))
     return b
