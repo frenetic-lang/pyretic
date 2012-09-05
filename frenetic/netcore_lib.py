@@ -47,7 +47,7 @@ class Header(frozendict):
     """Expected fields:
     switch location srcmac dstmac dltype vlan vlan_pcp srcip dstip
     protocol srcport dstport"""
-
+    
 class Packet(Data("header payload")):
     """Class representing packets (insightful, huh)"""
 
@@ -395,8 +395,9 @@ class _mod_packet(Case):
             if v is None and k in h:
                 del h[k]
             else:
+                assert hasattr(v, "width") # TODO a more robust check
                 h[k] = v
-        return [packet._replace(header=Header(h))]
+        return [packet._replace(header=Header(frozendict(h)))]
       
     def case_ActChain(self, act, packet):
         return self(act.left, packet) + self(act.right, packet)
@@ -404,7 +405,8 @@ class _mod_packet(Case):
 def mod_packet(act, packet):
     r = []
     for packet in _mod_packet()(act, packet):
-        n_packet = packet.replace(payload=propagate_header_to_payload(packet.header, packet.payload))
+        payload = propagate_header_to_payload(packet.header, packet.payload)
+        n_packet = packet.replace(payload=payload)
         r.append(n_packet) 
     return r
 

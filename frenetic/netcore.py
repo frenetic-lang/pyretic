@@ -253,7 +253,10 @@ def lift_kv(k, v, i):
     
     info = _common_header_info.get(k)
 
-    if v is None or info is None or isinstance(v, nl.Matchable):
+    if v is None or isinstance(v, nl.Matchable):
+        return (k, v)
+    if info is None:
+        assert isinstance(v, nl.Matchable)
         return (k, v)
     else:
         cls = info[i]

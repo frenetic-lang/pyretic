@@ -30,8 +30,7 @@
 
 # This module is designed for import *.
 
-from frenetic.net import *
-from frenetic.netcore_helpers import *
+from frenetic.netcore import *
 from frenetic.generators import merge, run
 
 from frenetic.pox_backend import start, launch

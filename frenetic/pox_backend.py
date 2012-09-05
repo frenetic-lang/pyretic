@@ -28,9 +28,12 @@
 
 from frenetic import generators
 from frenetic import netcore as nc
+from frenetic import netcore_lib as nl
 from frenetic import backend
+from frenetic.util import frozendict
 
 from pox.core import core
+from pox.lib.addresses import *
 from pox.lib.revent import EventMixin
 import pox.openflow.libopenflow_01 as of
 
@@ -61,9 +64,8 @@ class POXBackend(EventMixin):
     def _handle_PacketIn(self, event):
         pox_pkt = event.parsed
         packet = pox_to_pyretic_packet(event.dpid, event.ofp.in_port, pox_pkt)
-        action = nc.eval(self.netcore_policy, packet)
-        n_pkts = nc.mod_packet(action, packet)
-        import ipdb;ipdb.set_trace()
+        action = nl.eval(self.netcore_policy, packet)
+        n_pkts = nl.mod_packet(action, packet)
         for pkt in n_pkts:
             # if buckety:
             #     buckety.signal(pkt)
@@ -126,16 +128,15 @@ def start(f):
 
 
 def pyretic_header_to_pox_match(h):
-    # XXX convert back.
     match = of.ofp_match()
     match.in_port = h["inport"]
-    match.dl_src = h["srcaddr"]
-    match.dl_dst = h["dstaddr"]
+    match.dl_src = EthAddr(h["srcmac"].macbytes)
+    match.dl_dst = EthAddr(h["dstmac"].macbytes)
     match.dl_type = h["type"]
     match.dl_vlan = h["vlan"]
     match.dl_vlan_pcp = h["vlan_pcp"]
-    match.nw_src = h["srcip"]
-    match.nw_dst = h["dstip"]
+    match.nw_src = IPAddr(repr(h["srcip"]))
+    match.nw_dst = IPAddr(repr(h["dstip"]))
     match.nw_proto = h["protocol"]
     match.nw_tos = h["tos"]
     match.tp_src = h["srcport"]
@@ -146,18 +147,18 @@ def pox_match_to_pyretic_header(match):
     # XXX convert here using netcore_helper
     h = dict()
     h["inport"] = match.in_port
-    h["srcaddr"] = match.dl_src
-    h["dstaddr"] = match.dl_dst
+    h["srcmac"] = match.dl_src.toRaw()
+    h["dstmac"] = match.dl_dst.toRaw()
     h["type"] = match.dl_type
     h["vlan"] = match.dl_vlan
     h["vlan_pcp"] = match.dl_vlan_pcp
-    h["srcip"] = match.nw_src
-    h["dstip"] = match.nw_dst
+    h["srcip"] = match.nw_src.toRaw()
+    h["dstip"] = match.nw_dst.toRaw()
     h["protocol"] = match.nw_proto
     h["tos"] = match.nw_tos
     h["srcport"] = match.tp_src
     h["dstport"] = match.tp_dst
-    return nc.Header(h)
+    return nl.Header(frozendict(nc.lift_dict(h, 0)))
 
       
 def pox_to_pyretic_packet(dpid, inport, packet):
@@ -165,7 +166,7 @@ def pox_to_pyretic_packet(dpid, inport, packet):
         raise ValueError("The packet must already be parsed.")
 
     h = pox_match_to_pyretic_header(of.ofp_match.from_packet(packet, inport)).update(switch=dpid)
-    n_packet = nc.Packet(h, None, packet.pack())
+    n_packet = nl.Packet(h, packet.pack())
     
     return n_packet
 
