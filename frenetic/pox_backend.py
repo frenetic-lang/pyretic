@@ -129,36 +129,84 @@ def start(f):
 
 def pyretic_header_to_pox_match(h):
     match = of.ofp_match()
-    match.in_port = h["inport"]
-    match.dl_src = EthAddr(h["srcmac"].macbytes)
-    match.dl_dst = EthAddr(h["dstmac"].macbytes)
-    match.dl_type = h["type"]
-    match.dl_vlan = h["vlan"]
-    match.dl_vlan_pcp = h["vlan_pcp"]
-    match.nw_src = IPAddr(repr(h["srcip"]))
-    match.nw_dst = IPAddr(repr(h["dstip"]))
-    match.nw_proto = h["protocol"]
-    match.nw_tos = h["tos"]
-    match.tp_src = h["srcport"]
-    match.tp_dst = h["dstport"]
+
+    if "inport" in h:
+        match.in_port = int(h["inport"])
+
+    if "srcmac" in h:
+        match.dl_src = EthAddr(h["srcmac"].to_bits().tobytes())
+    
+    if "dstmac" in h:
+        match.dl_dst = EthAddr(h["dstmac"].to_bits().tobytes())
+
+    if "type" in h:
+        match.dl_type = int(h["type"])
+
+    if "vlan" in h:
+        match.dl_vlan = int(h["vlan"])
+
+    if "vlan_pcp" in h:
+        match.dl_vlan_pcp = int(h["vlan_pcp"])
+
+    if "srcip" in h:
+        match.nw_src = IPAddr(h["srcip"].to_bits().tobytes())
+    
+    if "dstip" in h:
+        match.nw_dst = IPAddr(h["dstip"].to_bits().tobytes())
+    
+    if "protocol" in h:
+        match.nw_proto = int(h["protocol"])
+
+    if "tos" in h:
+        match.nw_tos = int(h["tos"])
+
+    if "srcport" in h:
+        match.tp_src = int(h["srcport"])
+
+    if "dstport" in h:
+        match.tp_dst = int(h["dstport"])
+    
     return match
 
 def pox_match_to_pyretic_header(match):
-    # XXX convert here using netcore_helper
-    h = dict()
-    h["inport"] = match.in_port
-    h["srcmac"] = match.dl_src.toRaw()
-    h["dstmac"] = match.dl_dst.toRaw()
-    h["type"] = match.dl_type
-    h["vlan"] = match.dl_vlan
-    h["vlan_pcp"] = match.dl_vlan_pcp
-    h["srcip"] = match.nw_src.toRaw()
-    h["dstip"] = match.nw_dst.toRaw()
-    h["protocol"] = match.nw_proto
-    h["tos"] = match.nw_tos
-    h["srcport"] = match.tp_src
-    h["dstport"] = match.tp_dst
-    return nl.Header(frozendict(nc.lift_dict(h, 0)))
+    h = {}
+    if match.in_port is not None:
+        h["inport"] = match.in_port
+
+    if match.dl_src is not None:
+        h["srcmac"] = match.dl_src.toRaw()
+
+    if match.dl_dst is not None:
+        h["dstmac"] = match.dl_dst.toRaw()
+
+    if match.dl_type is not None:
+        h["type"] = match.dl_type
+
+    if match.dl_vlan is not None:
+        h["vlan"] = match.dl_vlan
+
+    if match.dl_vlan_pcp is not None:
+        h["vlan_pcp"] = match.dl_vlan_pcp
+
+    if match.nw_src is not None:
+        h["srcip"] = match.nw_src.toRaw()
+
+    if match.nw_dst is not None:
+        h["dstip"] = match.nw_dst.toRaw()
+
+    if match.nw_proto is not None:
+        h["protocol"] = match.nw_proto
+
+    if match.nw_tos is not None:
+        h["tos"] = match.nw_tos
+
+    if match.tp_src is not None:
+        h["srcport"] = match.tp_src
+
+    if match.tp_dst is not None:
+        h["dstport"] = match.tp_dst
+        
+    return nc.header(h)
 
       
 def pox_to_pyretic_packet(dpid, inport, packet):

@@ -28,7 +28,7 @@
 
 """Netcore grammar objects and related functions."""
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 from collections import Counter
 import functools
 
@@ -44,13 +44,9 @@ from frenetic.generators import Event
 ################################################################################
 
 class Header(frozendict):
-    """Expected fields:
-    switch location srcmac dstmac dltype vlan vlan_pcp srcip dstip
-    protocol srcport dstport"""
-    
-class Packet(Data("header payload")):
-    """Class representing packets (insightful, huh)"""
+    pass
 
+class Packet(Data("header payload")):
     def __new__(cls, header, payload):
         return super(Packet, cls).__new__(cls, header, payload)
         
@@ -64,6 +60,46 @@ class Bucket(Event):
 # Matching and wildcards
 ################################################################################
 
+class FixedWidth(object):
+    __metaclass__ = ABCMeta
+
+    width = abstractproperty()
+
+    @abstractmethod
+    def to_bits(self):
+        """Convert this to a bitarray."""
+
+    @abstractmethod
+    def __eq__(self, other):
+        pass
+
+    @abstractmethod
+    def __ne__(self, other):
+        pass
+        
+@util.cached
+def Bits(width_):
+    class Bits_(object):
+        width = width_
+
+        def __init__(self, bits):
+            assert isinstance(bits, bitarray)
+            self._bits = bits
+            super(Bits_, self).__init__()
+
+        def to_bits(self):
+            return self._bits
+
+        def __eq__(self, other):
+            return self.to_bits() == other.to_bits()
+
+        def __ne__(self, other):
+            return self.to_bits() != other.to_bits()
+            
+    FixedWidth.register(Bits_)
+    Bits_.__name__ += repr(width_)
+    return Bits_
+    
 
 class Matchable(object):
     """Assumption: the binary operators are passed in the same class as the invoking object."""
@@ -87,8 +123,9 @@ class Matchable(object):
     def match(self, other):
         """Return true if we match `other'.""" 
 
-
+# XXX some of these should be requirements on matchable.
 class MatchableMixin(object):
+    """Helper"""
     def disjoint_with(self, other):
         """Return true if there is no object both matchables match."""
         return self & other is None
@@ -117,76 +154,78 @@ class Approx(object):
     def underapprox(self, underapproxer):
         """Docs here."""
 
-        
-_wildcard_cache = {}        
+@util.cached
 def Wildcard(width_):
-    try:
-        return _wildcard_cache[width_]
-    except KeyError:
-        @functools.total_ordering
-        class Wildcard_(MatchableMixin, Data("prefix mask")):
-            """Full wildcards."""
+    @functools.total_ordering
+    class Wildcard_(MatchableMixin, Data("prefix mask")):
+        """Full wildcards."""
 
-            width = width_
+        width = width_
 
-            def __new__(cls, prefix, mask):
-                """Create a wildcard. Prefix is a binary string.
-                Mask can either be an integer (how many bits to mask) or a binary string."""
+        def __new__(cls, prefix, mask):
+            """Create a wildcard. Prefix is a binary string.
+            Mask can either be an integer (how many bits to mask) or a binary string."""
 
-                assert len(prefix) == cls.width == len(mask) 
+            assert len(prefix) == cls.width == len(mask) 
 
-                return super(Wildcard_, cls).__new__(cls, prefix, mask)
+            return super(Wildcard_, cls).__new__(cls, prefix, mask)
 
-            @classmethod
-            def top(cls):
-                prefix = bitarray(cls.width)
-                prefix.setall(False)
-                mask = bitarray(cls.width)
-                mask.setall(False)
-                return cls(prefix, mask)
+        @classmethod
+        def top(cls):
+            prefix = bitarray(cls.width)
+            prefix.setall(False)
+            mask = bitarray(cls.width)
+            mask.setall(False)
+            return cls(prefix, mask)
 
-            def match(self, other):
-                return other.to_bits() | self.mask == self._normalize()
+        def match(self, other):
+            return other.to_bits() | self.mask == self._normalize()
 
-            def __and__(self, other):
-                if self.overlaps_with(other):
-                    return self.__class__(self._normalize() & other._normalize(),
-                                          self.mask & other.mask)
-             
-            def overlaps_with(self, other):
-                c_mask = self.mask | other.mask
-                return self.prefix | c_mask == other.prefix | c_mask
+        def __and__(self, other):
+            if self.overlaps_with(other):
+                return self.__class__(self._normalize() & other._normalize(),
+                                      self.mask & other.mask)
 
-            def __le__(self, other):
-                return (self.mask & other.mask == other.mask) and \
-                    (self.prefix | self.mask == other.prefix | self.mask)
+        def overlaps_with(self, other):
+            c_mask = self.mask | other.mask
+            return self.prefix | c_mask == other.prefix | c_mask
 
-            def _normalize(self):
-                """Return a bitarray, masked."""
-                return self.prefix | self.mask
+        def __le__(self, other):
+            return (self.mask & other.mask == other.mask) and \
+                (self.prefix | self.mask == other.prefix | self.mask)
 
-        Matchable.register(Wildcard_)
-        Wildcard_.__name__ += repr(width_)
-        _wildcard_cache[width_] = Wildcard_
-        return Wildcard_
+        def _normalize(self):
+            """Return a bitarray, masked."""
+            return self.prefix | self.mask
+
+    Matchable.register(Wildcard_)
+    Wildcard_.__name__ += repr(width_)
+    
+    return Wildcard_
 
 ################################################################################
 # Predicates
 ################################################################################
 
 class Predicate(object):
-   """Top-level abstract class for predicates."""
+    """Top-level abstract class for predicates."""
    
-   def __and__(self, other):
-       return PredIntersection(self, other)
-   def __or__(self, other):
-       return PredUnion(self, other)
-   def __sub__(self, other):
-       return PredDifference(self, other)
-   def __invert__(self):
-       return PredNegation(self)
-   def __rshift__(self, act):
-       return PolImply(self, act)
+    def __and__(self, other):
+        return PredIntersection(self, other)
+    def __or__(self, other):
+        return PredUnion(self, other)
+    def __sub__(self, other):
+        return PredDifference(self, other)
+    def __invert__(self):
+        return PredNegation(self)
+    def __rshift__(self, act):
+        return PolImply(self, act)
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+    def __ne__(self, other):
+        raise NotImplementedError
 
 class PredTop(Predicate):
     """The always-true predicate."""
@@ -196,7 +235,7 @@ class PredTop(Predicate):
 class PredBottom(Predicate):
     """The always-false predicate."""
     def __repr__(self):
-        return "!*"
+        return "~*"
     
 class PredMatch(Predicate, Data("varname pattern")):
    """A basic predicate matching against a single field"""
@@ -240,7 +279,14 @@ class Action(object):
         return c
 
     def __eq__(self, other):
-        return self.get_counter() == other.get_counter()
+        # Shouldn't need the sorted here. According to Python ref:
+        # Mappings (dictionaries) compare equal if and only if their sorted (key, value) lists compare equal. [5] Outcomes other than equality are resolved consistently, but are not otherwise defined. [6]
+        # But I found a case where this doesn't hold. I'll submit a bug report at some point,
+        # but for now, just hack around it. Damnit, I don't have time for this.
+        return sorted(self.get_counter()) == sorted(other.get_counter())
+
+    def __ne__(self, other):
+        return not self == other
 
 class ActDrop(Action):
     def __repr__(self):
@@ -271,14 +317,20 @@ class ActChain(Action, Data("left right")):
 ################################################################################
 
 class Policy(object):
-   """Top-level abstract description of a static network program."""
-   def __or__(self, other):
-      return PolUnion(self, other)
-   def __sub__(self, pred):
-      return PolRestriction(self, pred)
-   def __mul__(self, pol):
-      return PolComposition(self, pol)
-      
+    """Top-level abstract description of a static network program."""
+    def __add__(self, other):
+        return PolUnion(self, other)
+    def __sub__(self, pred):
+        return PolRestriction(self, pred)
+    def __mul__(self, pol):
+        return PolComposition(self, pol)
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+    def __ne__(self, other):
+        raise NotImplementedError
+    
 class DropPolicy(Policy):
     """Policy that drops everything."""
     def __repr__(self):
@@ -395,7 +447,7 @@ class _mod_packet(Case):
             if v is None and k in h:
                 del h[k]
             else:
-                assert hasattr(v, "width") # TODO a more robust check
+                assert isinstance(v, FixedWidth) 
                 h[k] = v
         return [packet._replace(header=Header(frozendict(h)))]
       

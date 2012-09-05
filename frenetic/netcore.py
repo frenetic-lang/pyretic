@@ -34,13 +34,18 @@ import struct
 from bitarray import bitarray
 
 
-from frenetic.util import Data, merge_dicts
+from frenetic import util
+from frenetic.util import frozendict, Data, merge_dicts
 from frenetic import netcore_lib as nl
 
 ################################################################################
 # Header types
 ################################################################################
 
+def header(arg={}, **kwargs):
+    return nl.Header(frozendict(lift_dict(merge_dicts(arg, kwargs), 0)))
+
+@util.cached
 def FixedInt(width_):
     class FixedInt_(int):
         width = width_
@@ -58,98 +63,148 @@ def FixedInt(width_):
             return bitarray(bin(self)[2:self.width+2].zfill(self.width))
 
         def __add__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__add__(self, v))
 
         def __sub__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__sub__(self, v))
 
         def __mul__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__mul__(self, v))
 
         def __div__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__div__(self, v))
 
         def __mod__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__mod__(self, v))
 
         def __and__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__and__(self, v))
 
         def __or__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__or__(self, v))
 
         def __xor__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__xor__(self, v))
 
         def __pow__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__pow__(self, v))
 
         def __rshift__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__lshift__(self, v))
 
         def __lshift__(self, v):
+            assert self.width == v.width
             return self.__class__(int.__rshift__(self, v))
 
         def __abs__(self):
+            assert self.width == v.width
             return self.__class__(int.__abs__(self))
 
         def __invert__(self):
+            assert self.width == v.width
             return self.__class__(int.__invert__(self))
 
         def __pos__(self):
+            assert self.width == v.width
             return self.__class__(int.__pos__(self))
 
         def __neg__(self):
+            assert self.width == v.width
             return self.__class__(int.__or__(self))
 
         def __repr__(self):
             return int.__repr__(self) + "#" + str(self.width)
-            
+
+    nl.FixedWidth.register(FixedInt_)
     FixedInt_.__name__ += repr(FixedInt_.width)
     return FixedInt_
         
-class Switch(Data("switch_int")):
-    width = 8
-    
-    def __repr__(self):
-        return "<switch %s>" % self.switch_int
+class Switch(nl.Bits(16)):
+    def __init__(self, dpid):
+        if isinstance(dpid, int):
+            b = bitarray()
+            b.frombytes(struct.pack("!H", dpid))
+        else:
+            b = dpid
 
-    def __int__(self):
-        return self.switch_int
-    
-    def to_bits(self):
-        b = bitarray()
-        b.frombytes(struct.pack("!B", self.switch_int))
-        return b
-
-class MAC(Data("macbytes")):
-    width = 48
-
-    def to_bits(self):
-        b = bitarray()
-        b.frombytes(self.macbytes)
-        return b
-
-class IP(Data("ipbytes")):
-    width = 32
-    
-    def __new__(cls, ip):
-        if len(ip) != 4:
-            ip = socket.inet_aton(ip)
-
-        return super(IP, cls).__new__(cls, ip)
+        super(Switch, self).__init__(b)
         
     def __repr__(self):
-        return socket.inet_ntoa(self.ipbytes)
-       
-    def to_bits(self):
-        b = bitarray()
-        b.frombytes(self.ipbytes)
-        return b
+        return "<switch %s>" % int(self)
 
+    def __int__(self):
+        return struct.unpack("!H", self.to_bits().tobytes())[0]
+        
+class MAC(nl.Bits(48)):
+    def __init__(self, mac):
+        if len(mac) == 6:
+            b = bitarray()
+            b.frombytes(mac)
+        elif isinstance(mac, basestring):
+            import re
+            m = re.match(r"""(?xi)
+                         ([0-9a-f]{1,2})[:-]+
+                         ([0-9a-f]{1,2})[:-]+
+                         ([0-9a-f]{1,2})[:-]+
+                         ([0-9a-f]{1,2})[:-]+
+                         ([0-9a-f]{1,2})[:-]+
+                         ([0-9a-f]{1,2})
+                         """, mac)
+            if not m:
+                raise ValueError
+            b = bitarray()
+            b.frombytes(struct.pack("!BBBBBB", *(int(s, 16) for s in m.groups())))
+        else:
+            assert isinstance(mac, bitarray)
+            b = mac
+            
+        super(MAC, self).__init__(b)
+
+    def __repr__(self):
+        bs = self.to_bits().tobytes()
+        parts = struct.unpack("!BBBBBB", bs)
+        mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
+        return mac
+        
+class IP(nl.Bits(32)):
+    def __init__(self, ip):
+        if len(ip) == 4:
+            b = bitarray()
+            b.frombytes(ip)
+        elif isinstance(ip, basestring):
+            b = bitarray()
+            b.frombytes(socket.inet_aton(ip))
+        else:
+            assert isinstance(ip, bitarray)
+            b = ip
+        
+        super(IP, self).__init__(b)
+        
+    def __repr__(self):
+        return socket.inet_ntoa(self.to_bits().tobytes())
+       
 ################################################################################
 # Wildcards
 ################################################################################
+
+def str_to_bits(s):
+    "Make a wildcard from a string."
+    prefix = bitarray(s.replace("?", "0"))
+    
+    return nl.Wildcard(len(prefix))(prefix, mask)
+
+def is_bits_str(value, width):
+    return isinstance(value, basestring) and len(value) == width and set(value) <= set("10")
 
 def str_to_wildcard(s):
     "Make a wildcard from a string."
@@ -160,20 +215,15 @@ def str_to_wildcard(s):
 def is_wildcard_str(value, width):
     return isinstance(value, basestring) and len(value) == width and set(value) <= set("?10")
 
-_match_exact_cache = {}
+@util.cached
 def MatchExact(match_cls):
-    try:
-        return _match_exact_cache[match_cls]
-    except:
-        class MatchExact_(nl.Wildcard(match_cls.width)):
-            def __new__(cls, *v):
-                bits = match_cls(*v).to_bits()
-                return super(MatchExact_, cls).__new__(cls, bits, bitarray([False] * cls.width))
+    class MatchExact_(nl.Wildcard(match_cls.width)):
+        def __new__(cls, *v):
+            bits = match_cls(*v).to_bits()
+            return super(MatchExact_, cls).__new__(cls, bits, bitarray([False] * cls.width))
 
-        MatchExact_.__name__ += match_cls.__name__
-        
-        _match_exact_cache[match_cls] = MatchExact_
-        return MatchExact_
+    MatchExact_.__name__ += match_cls.__name__
+    return MatchExact_
 
 class IPWildcard(nl.Wildcard(32)):
     def __new__(cls, ipexpr, mask=None):
@@ -250,18 +300,27 @@ _common_header_info = dict(
 
 def lift_kv(k, v, i):
     # TODO: assert that we have the right classes
-    
-    info = _common_header_info.get(k)
 
-    if v is None or isinstance(v, nl.Matchable):
+    info = _common_header_info.get(k)
+    if i == 0:
+        testcls = nl.FixedWidth
+        testfn = is_bits_str
+        convfn = str_to_bits
+    else:
+        testcls = nl.Matchable
+        testfn = is_wildcard_str
+        convfn = str_to_wildcard
+
+    if v is None or isinstance(v, testcls):
         return (k, v)
     if info is None:
-        assert isinstance(v, nl.Matchable)
+        assert isinstance(v, testcls)
         return (k, v)
     else:
         cls = info[i]
-        if is_wildcard_str(v, cls.width):
-            return (k, str_to_wildcard(v))
+        
+        if testfn(v, cls.width):
+            return (k, convfn(v))
         else:
             if not isinstance(v, tuple):
                 v = (v,)

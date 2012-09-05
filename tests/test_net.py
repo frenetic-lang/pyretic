@@ -34,16 +34,13 @@ def test_FixedInt_operators():
     
     assert i3.width == 16
 
-
-@pytest.mark.xfail
 def test_FixedInt_mismatch():
     i1 = FixedInt(16)(222)
     i2 = FixedInt(32)(111)
 
-    i1 + i2
+    with pytest.raises(Exception):
+        i1 + i2
 
-
-    
 def test_Switch():
     assert repr(Switch(2)) == "<switch 2>"
 
@@ -56,18 +53,21 @@ def test_Switch():
 
 def test_MAC():
     MAC("09-00-2B-00-00-04")
-    MAC(FixedInt(48)(3))
+    MAC(FixedInt(48)(3).to_bits())
 
-@pytest.mark.xfail
+
 def test_MAC_fail():
-    MAC(FixedInt(32)(3))
+    with pytest.raises(Exception):
+        MAC(FixedInt(32)(3).to_bits())
     
-@pytest.mark.xfail
+
 def test_MAC_fail():
-    MAC("09-00-2B-00-00")
+    with pytest.raises(Exception):
+        MAC("09-00-2B-00-00")
+
 def test_IP():
     IP("1.5.3.2")
 
-@pytest.mark.xfail
 def test_IP_fail():
-    IP("1.3.3.5heytest")
+    with pytest.raises(Exception):
+        IP("1.3.3.5heytest")

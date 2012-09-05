@@ -153,14 +153,24 @@ def Data(fields):
         _fields = fields
     return _Record
 
-
 def merge_dicts(d1, d2):
     d = {}
     d.update(d1)
     d.update(d2)
     return d
 
-
+def cached(func):
+    def wrapper(*args):
+        try:
+            return wrapper.cache[args]
+        except KeyError:
+            wrapper.cache[args] = v = func(*args)
+            return v
+    wrapper.cache = {}
+    wrapper.__name__ = func.__name__
+    wrapper.__doc__ = func.__doc__
+    return wrapper
+        
 # TODO optimize this
 class frozendict(object):
     __slots__ = ["_dict", "_cached_hash"]
@@ -236,6 +246,9 @@ class frozendict(object):
     def __eq__(self, other):
         return self._dict == other._dict
 
+    def __ne__(self, other):
+        return self._dict != other._dict
+        
     def __len__(self):
         return len(self._dict)
         
