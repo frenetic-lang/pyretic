@@ -28,12 +28,55 @@
 
 from frenetic.lib import *
 from examples.monitor import monitor
-     
+    
 
+# Static virtualization of the following network:
+#                     |1
+#  +------------------+---------------------+
+#  |                  | 1                   |
+#  |              +---+----+                |
+#  |              |  s101  |                |
+#  |  v1          |        |                |
+#  |              /--------+-               |
+#  |             / 2         \- 3           |
+#  |            /              \-           |
+#  |           /                 \- 2       |
+#  |          /  3            +----\---+    |
+#  |     +---/---+ 2       3  |        |    |
+#  |     | s102  |------------| s103   |    |
+#  |     |       |            |        |    |
+#  |     +---+---+            +----+---+    |
+#  |         | 1                   | 1      |
+#  +---------+---------------------+--------+
+#            | 2                    | 3
+                      
 def virtual_monitor(network):
 
-    v_network = virtualize_network(network,view)
-    monitor(v_network)
+    # SIGNATURE
+    v_signature = {v1:[1, 2, 3]}
 
+    # IMPLEMENTATION
+    ingress_policy = ((_.switch == 's101' & _.inport == 1 ) & modify(vsrcport = 1) | \
+                          (_.switch == 's102' & _.inport == 1) & modify(vsrcport = 2) | \
+                          (_.switch == 's103' & _.inport == 1) & modify(vsrcport = 3)) \
+                          >> modify(vswitch = 'v1')
+    internal_policy = (_.switch == 's101' & (_.vdstport == 1 & fwd(1)  | \
+                                            _.vdstport == 2 & fwd(2)  | \
+                                            _.vdstport == 3 & fwd(3)) | \
+                      _.switch == 's102' & (_.vdstport == 1 & fwd(3) | \
+                                            _.vdstport == 2 & fwd(1) | \
+                                            _.vdstport == 3 & fwd(2)) | \
+                      _.switch == 's103' & (_.vdstport == 1 & fwd(2) | \
+                                            _.vdstport == 2 & fwd(3) | \
+                                            _.vdstport == 3 & fwd(1)))
+    
+    run(monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
+
+    ## ALTERNATE, MORE EXPLICIT VERSION
+    # v_n = Network()
+    # run(monitor, v_n)
+    # network.install_sub_policies(
+    #    virtualize_policy(v_signature, ingress_policy, internal_policy, pol) 
+    #    for pol in v_n.policy_changes())
 
 start(virtual_monitor)
