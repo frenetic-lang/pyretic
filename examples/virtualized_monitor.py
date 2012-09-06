@@ -70,11 +70,11 @@ def virtual_monitor(network):
                                             _.vdstport == 2 & fwd(3) | \
                                             _.vdstport == 3 & fwd(1)))
     
-    run(monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
+    run(monitor.monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
 
     ## ALTERNATE, MORE EXPLICIT VERSION
     # v_n = Network()
-    # run(monitor, v_n)
+    # run(monitor.monitor, v_n)
     # network.install_sub_policies(
     #    virtualize_policy(v_signature, ingress_policy, internal_policy, pol) 
     #    for pol in v_n.policy_changes())
