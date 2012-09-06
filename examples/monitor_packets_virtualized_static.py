@@ -53,30 +53,31 @@ from examples import monitor_packets
 def monitor(network):
 
     # SIGNATURE
-    v_signature = {v1:[1, 2, 3]}
+    v_signature = { 'v1': [1, 2, 3] }
 
     # IMPLEMENTATION
-    ingress_policy = ((_.switch == 's101' & _.inport == 1 ) & modify(vsrcport = 1) | \
-                          (_.switch == 's102' & _.inport == 1) & modify(vsrcport = 2) | \
-                          (_.switch == 's103' & _.inport == 1) & modify(vsrcport = 3)) \
+    ingress_policy = (( (_.switch == 's101') & (_.inport == 1) ) & modify(vsrcport = 1) | \
+                          ((_.switch == 's102') & (_.inport == 1)) & modify(vsrcport = 2) | \
+                          ((_.switch == 's103') & (_.inport == 1)) & modify(vsrcport = 3)) \
                           >> modify(vswitch = 'v1')
-    internal_policy = (_.switch == 's101' & (_.vdstport == 1 & fwd(1)  | \
-                                            _.vdstport == 2 & fwd(2)  | \
-                                            _.vdstport == 3 & fwd(3)) | \
-                      _.switch == 's102' & (_.vdstport == 1 & fwd(3) | \
-                                            _.vdstport == 2 & fwd(1) | \
-                                            _.vdstport == 3 & fwd(2)) | \
-                      _.switch == 's103' & (_.vdstport == 1 & fwd(2) | \
-                                            _.vdstport == 2 & fwd(3) | \
-                                            _.vdstport == 3 & fwd(1)))
-    
-    run(monitor_packets.monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
+    internal_policy = ((_.switch == 's101') & ((_.vdstport == 1) & fwd(1)  | \
+                                            (_.vdstport == 2) & fwd(2)  | \
+                                            (_.vdstport == 3) & fwd(3)) | \
+                      (_.switch == 's102') & ((_.vdstport == 1) & fwd(3) | \
+                                            (_.vdstport == 2) & fwd(1) | \
+                                            (_.vdstport == 3) & fwd(2)) | \
+                      (_.switch == 's103') & ((_.vdstport == 1) & fwd(2) | \
+                                            (_.vdstport == 2) & fwd(3) | \
+                                            (_.vdstport == 3) & fwd(1)))
+
+    ## THIS DOESN'T WORK - NEEDS FIXING    
+    #  run(monitor_packets.monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
 
     ## ALTERNATE, MORE EXPLICIT VERSION
-    # v_n = Network()
-    # run(monitor_packets.monitor, v_n)
-    # network.install_sub_policies(
-    #    virtualize_policy(v_signature, ingress_policy, internal_policy, pol) 
-    #    for pol in v_n.policy_changes())
+    v_n = Network()
+    run(monitor_packets.monitor, v_n)
+    network.install_sub_policies(
+        virtualize_policy(v_signature, ingress_policy, internal_policy, pol) 
+        for pol in v_n.policy_changes)
 
 start(monitor)
