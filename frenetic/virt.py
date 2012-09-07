@@ -113,6 +113,9 @@ class Network(object):
         self.topology.node[switch]["ports"].add(port)
         self.topology_b.signal_mutation()
 
+    ### BUG: Should ignore virtual port downs
+    ### E.G.,  KeyError: <real port 65534>
+    ### -JOSH
     def _handle_port_downs(self, (switch, port)):
         self.topology.node[switch]["ports"].remove(port)
         self.topology_b.signal_mutation()
@@ -120,7 +123,10 @@ class Network(object):
     def _handle_link_ups(self, (s1, p1, s2, p2)):
         self.topology.add_edge(s1, s2, p1=p1, p2=p2)
         self.topology_b.signal_mutation()
-        
+
+    ### BUG: Does not check to see if endpoints have already been removed
+    ### E.G., NetworkXError: The edge <switch 1>-<switch 3> is not in the graph
+    ### -JOSH
     def _handle_link_downs(self, (s1, p1, s2, p2)):
         self.topology.remove_edge(s1, s2)
         self.topology_b.signal_mutation()
