@@ -2,12 +2,12 @@
 from frenetic.lib import *
 
 from examples import hub
-from examples import monitor
+from examples import monitor_packets
 
 def hub_and_monitor(network):
     run(hub.hub, fork_sub_network(network))
-    run(monitor.monitor, fork_sub_network(network))
-    
+    run(monitor_packets.monitor, fork_sub_network(network))
+
 main = hub_and_monitor
 
     
