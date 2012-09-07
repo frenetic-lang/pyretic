@@ -28,7 +28,7 @@
 import threading
 
 import pox.openflow.libopenflow_01 as of
-from pox.openflow.discovery import *
+import pox.openflow.discovery as discovery
 from pox.core import core
 from pox.lib import revent, addresses as packetaddr, packet as packetlib
 
@@ -40,6 +40,7 @@ class POXBackend(revent.EventMixin):
     def __init__(self, user_program, show_traces, kwargs):
         self.network = virt.Network()
         self.switch_connections = {}
+        self.active_links = {}
         self.show_traces = show_traces
         self.vlan_to_diff_db = {}
         self.diff_to_vlan_db = {}
@@ -47,7 +48,7 @@ class POXBackend(revent.EventMixin):
         
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
-            core.registerNew(Discovery)
+            core.registerNew(discovery.Discovery)
             core.openflow_discovery.addListenerByName("LinkEvent", self._handle_LinkEvent)
             self.listenTo(core.openflow_discovery)
         else:
@@ -92,19 +93,6 @@ class POXBackend(revent.EventMixin):
             self.listenTo(core.openflow_discovery)
             return EventRemove # We don't need this listener anymore
 
-    def _handle_LinkEvent(self, event):
-        print "LinkEvent: %s" % event
-        
-        sw1 = event.link.dpid1
-        sw2 = event.link.dpid2
-
-        if sw1 is None or sw2 is None: return
-
-        if event.added:
-            print "added %s->%s" % (sw1,sw2) 
-        elif event.removed:
-            print "removed %s->%s" % (sw1,sw2) 
-
     def _handle_PacketIn(self, event):
         packet = self.create_packet(event.data)
         packet = packet._replace(switch=event.dpid, inport=event.ofp.in_port)
@@ -148,6 +136,21 @@ class POXBackend(revent.EventMixin):
             self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
         elif event.deleted:
             self.network.port_downs.signal((net.Switch(event.dpid), net.Port(event.port)))
+
+    def _handle_LinkEvent(self, event):
+        sw1 = event.link.dpid1
+        p1 = event.link.port1
+        sw2 = event.link.dpid2
+        p2 = event.link.port2
+        if sw1 is None or sw2 is None: return
+        if event.added:
+            if (sw1,p1,sw2,p2) not in self.active_links:
+                self.active_links[(sw1,p1,sw2,p2)] = True 
+                self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
+        elif event.removed:
+            if (sw1,p1,sw2,p2) in self.active_links:
+                del self.active_links[(sw1,p1,sw2,p2) ]
+                self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         
     def send_packet(self, packet):
         switch = int(packet.switch)

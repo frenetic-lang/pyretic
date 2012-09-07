@@ -42,6 +42,8 @@ class Network(object):
         self.switch_parts = gs.Event()
         self.port_ups = gs.Event()
         self.port_downs = gs.Event()
+        self.link_ups = gs.Event()
+        self.link_downs = gs.Event()
         
         self.policy_b = gs.Behavior(drop)
         self.policy_changes = self.policy_b # used only for iter method
@@ -96,12 +98,14 @@ class SwitchDatabase(dict):
         self.switch_parts = gs.Event()
         self.port_ups = gs.Event()
         self.port_downs = gs.Event()
+        self.link_ups = gs.Event()
+        self.link_downs = gs.Event()
         super(SwitchDatabase, self).__init__(*args, **kwargs)
     
     def activate(self, network):
         @network.switch_joins.notify
         def handler(switch):
-            self[switch] = set()
+            self[switch] = {}
             self.switch_joins.signal(switch)
             
         @network.switch_parts.notify
@@ -113,14 +117,30 @@ class SwitchDatabase(dict):
         @network.port_ups.notify
         def handler((switch, port)):
             if switch in self:
-                self[switch].add(port)
+                self[switch][port] = None
                 self.port_ups.signal((switch, port))
             
         @network.port_downs.notify
         def handler((switch, port)):
             if switch in self and port in self[switch]:
-                self[switch].remove(port)
+                del self[switch][port]
                 self.port_downs.signal((switch, port))
+
+        @network.link_ups.notify
+        def handler((s1,p1,s2,p2)):
+            if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
+                self[s1][p1] = (s2,p2)
+                self[s2][p2] = (s1,p1)
+                print self
+                self.link_ups.signal((s1,p1,s2,p2))
+            
+        @network.link_downs.notify
+        def handler((s1,p1,s2,p2)):
+            if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
+                self[s1][p1] = None
+                self[s2][p2] = None
+                print self
+                self.link_downs.signal((s1,p1,s2,p2))
 
             
 ################################################################################
@@ -176,6 +196,8 @@ def fork_isolated_network(network, vnetwork_gen):
     sub_net.switch_parts = network.switch_parts
     sub_net.port_ups = network.port_ups
     sub_net.port_downs = network.port_downs
+    sub_net.link_ups = network.link_ups
+    sub_net.link_downs = network.link_downs
     
     t = gs.Trigger(sub_net.policy_changes)
 
@@ -290,6 +312,8 @@ class VMap(util.frozendict):
         vn.switch_parts = gs.DelayedEvent([])
         vn.port_ups = gs.DelayedEvent([])
         vn.port_downs = gs.DelayedEvent([])
+        vn.link_ups = gs.DelayedEvent([])
+        vn.link_downs = gs.DelayedEvent([])
 
         if isolate:
             vn = fork_isolated_network(vn, [(flood_policy, self.to_endpts_pred())])
