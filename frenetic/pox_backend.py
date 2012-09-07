@@ -28,6 +28,7 @@
 import threading
 
 import pox.openflow.libopenflow_01 as of
+from pox.openflow.discovery import *
 from pox.core import core
 from pox.lib import revent, addresses as packetaddr, packet as packetlib
 
@@ -46,6 +47,9 @@ class POXBackend(revent.EventMixin):
         
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
+            core.registerNew(Discovery)
+            core.openflow_discovery.addListenerByName("LinkEvent", self._handle_LinkEvent)
+            self.listenTo(core.openflow_discovery)
         else:
             # We'll wait for openflow to come up
             self.listenTo(core)
@@ -83,7 +87,23 @@ class POXBackend(revent.EventMixin):
     def _handle_ComponentRegistered (self, event):
         if event.name == "openflow":
             self.listenTo(core.openflow)
+            core.registerNew(Discovery)
+            core.openflow_discovery.addListenerByName("LinkEvent", self._handle_LinkEvent)
+            self.listenTo(core.openflow_discovery)
             return EventRemove # We don't need this listener anymore
+
+    def _handle_LinkEvent(self, event):
+        print "LinkEvent: %s" % event
+        
+        sw1 = event.link.dpid1
+        sw2 = event.link.dpid2
+
+        if sw1 is None or sw2 is None: return
+
+        if event.added:
+            print "added %s->%s" % (sw1,sw2) 
+        elif event.removed:
+            print "removed %s->%s" % (sw1,sw2) 
 
     def _handle_PacketIn(self, event):
         packet = self.create_packet(event.data)
