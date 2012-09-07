@@ -36,7 +36,7 @@ def track(network):
         yield (nx.minimum_spanning_tree(topo),topo)
 
 def monitor(network):
-    for mst,topo in spanning_tree(network):
+    for mst,topo in track(network):
         print "recalculate spanning_tree"        
         topology.pretty_print(mst.to_directed(), "minimum spanning tree")
         yield (mst,topo)
