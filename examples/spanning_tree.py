@@ -31,11 +31,14 @@ import networkx as nx
 
 from examples import monitor_topology as topology
 
-def spanning_tree(network):
+def track(network):
     for topo in network.topology_changes:
-        print "recalculate spanning_tree"
-        mst = nx.minimum_spanning_tree(topo)
-        topology.pretty_print(topo, "underlying")
-        topology.pretty_print(mst, "minimum spanning tree")
+        yield (nx.minimum_spanning_tree(topo),topo)
 
-main = spanning_tree
+def monitor(network):
+    for mst,topo in spanning_tree(network):
+        print "recalculate spanning_tree"        
+        topology.pretty_print(mst.to_directed(), "minimum spanning tree")
+        yield (mst,topo)
+
+main = monitor

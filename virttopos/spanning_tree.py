@@ -28,6 +28,7 @@
 
 from frenetic.lib import *
 import networkx as nx
+from examples import spanning_tree
 
 def egress_ports(topo, sw):
     attrs = topo.node[sw]
@@ -52,14 +53,8 @@ def topo_to_vmap_dict(topo, mst):
 
 def setup_virtual_network(network):
     def vmap_gen():
-        for topo in network.topology_changes:
-            mst = nx.minimum_spanning_tree(topo)
+        for mst,topo in spanning_tree.monitor(network):
             vmap = topo_to_vmap_dict(topo, mst)
             physical_policy = copy(outport="voutport")
             yield (vmap, physical_policy)
     return fork_virtual_network(network, make_vnetwork_gen(vmap_gen()))
-        
-    
-
-    
-
