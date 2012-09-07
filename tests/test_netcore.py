@@ -22,8 +22,8 @@ def test_MatchExact():
 
 
 def test_Predicate_eval():
-    assert eval(PredTop(), p)
-    assert not eval(PredBottom(), p)
+    assert eval(PredAll(), p)
+    assert not eval(PredNone(), p)
     assert eval(PredMatch("srcip", Wildcard(32)(IP("1.2.3.4").to_bits(),
                                                 bitarray([False] * 32))), p)
     assert eval(PredMatch("srcip", IPWildcard("1.2.3.*")), p)

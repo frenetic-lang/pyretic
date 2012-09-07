@@ -230,91 +230,79 @@ class Predicate(object):
     def __ne__(self, other):
         raise NotImplementedError
 
-class PredTop(Predicate):
+class PredAll(Predicate):
     """The always-true predicate."""
     def __repr__(self):
         return "*"
+    def eval(self, packet, env):
+        return True
       
-class PredBottom(Predicate):
+class PredNone(Predicate):
     """The always-false predicate."""
     def __repr__(self):
         return "~*"
+    def eval(self, packet, env):
+        return False
     
 class PredMatch(Predicate, Data("varname pattern")):
    """A basic predicate matching against a single field"""
    def __repr__(self):
       return "%s:%s" % (self.varname, self.pattern)
-
+    def eval(self, packet, env):
+        if self.pattern is None:
+            return self.varname not in env
+        else:
+            return self.pattern.match(env[self.varname])
+        
 class PredUnion(Predicate, Data("left right")):
     """A predicate representing the union of two predicates."""
     def __repr__(self):
         return "(%s) | (%s)" % (self.left, self.right)
+    def eval(self, packet, env):
+        return self.left.eval(packet, env) or self.right.eval(packet, env)
         
 class PredIntersection(Predicate, Data("left right")):
     """A predicate representing the intersection of two predicates."""
     def __repr__(self):
         return "(%s) & (%s)" % (self.left, self.right)
+    def eval(self, packet, env):
+        return self.left.eval(packet, env) and self.right.eval(packet, env)
 
 class PredDifference(Predicate, Data("left right")):
     """A predicate representing the difference of two predicates."""
     def __repr__(self):
         return "(%s) - (%s)" % (self.left, self.right)
+    def eval(self, packet, env):
+        return self.left.eval(packet, env) and not self.right.eval(packet, env)
 
 class PredNegation(Predicate, Data("pred")):
     """A predicate representing the difference of two predicates."""
     def __repr__(self):
         return "~(%s)" % (self.pred)
+    def eval(self, packet, env):
+        return not self.pred.eval(packet, env)
 
 ################################################################################
 # Actions (these are internal data structures)
 ################################################################################
 
-class Action(object):
-    def __add__(self, act):
-        return ActChain(self, act)
-
-    def _set_counter(self):
-        raise NotImplementedError
-
-    def get_counter(self):
-        c = Counter()
-        self._set_counter(c)
-        return c
-
-    def __eq__(self, other):
-        # Shouldn't need the sorted here. According to Python ref:
-        # Mappings (dictionaries) compare equal if and only if their sorted (key, value) lists compare equal. [5] Outcomes other than equality are resolved consistently, but are not otherwise defined. [6]
-        # But I found a case where this doesn't hold. I'll submit a bug report at some point,
-        # but for now, just hack around it. Damnit, I don't have time for this.
-        return sorted(self.get_counter()) == sorted(other.get_counter())
-
-    def __ne__(self, other):
-        return not self == other
-
-class ActDrop(Action):
-    def __repr__(self):
-        return "Drop"
-    def _set_counter(self, c):
-        return
-    
-class ActMod(Action, Data("mapping")):
-    def __new__(cls, mapping):
-        assert isinstance(mapping, frozendict)
-        return super(ActMod, cls).__new__(cls, mapping)
-    
-    def __repr__(self):
-        return repr(self.mapping)
-
-    def _set_counter(self, c):
-        c[self.mapping] += 1
-       
-class ActChain(Action, Data("left right")):
-    def __repr__(self):
-        return "(%s, %s)" % (self.left, self.right)
-    def _set_counter(self, c):
-        self.left._set_counter(c)
-        self.right._set_counter(c)
-            
+class Action(Counter):
+    def eval(self, packet):
+        packets = []
+        for moddict in self.elements():
+            header = dict(packet.header)
+            for k, v in moddict.iteritems():
+                if v is None:
+                    if k in h:
+                        del h[k]
+                else:
+                    assert isinstance(v, FixedWidth) 
+                    h[k] = v
+            header = Header(frozendict(header))
+            payload = propagate_header_to_payload(header, packet.payload)
+            packets.append(packet._replace(header=header, payload=payload))
+        return packets
+                
 ################################################################################
 # Policies
 ################################################################################
@@ -323,149 +311,81 @@ class Policy(object):
     """Top-level abstract description of a static network program."""
     def __add__(self, other):
         return PolUnion(self, other)
+    def __and__(self, other):
+        return PolRestrict(self, other)
     def __sub__(self, pred):
-        return PolRestriction(self, pred)
-    def __mul__(self, pol):
+        return PolRemove(self, pred)
+    def __rshift__(self, pol):
         return PolComposition(self, pol)
-
     def __eq__(self, other):
         raise NotImplementedError
-
     def __ne__(self, other):
         raise NotImplementedError
+    def eval(self, packet, env):
+        act = Action()
+        return self._eval(packet, env, act)
     
-class DropPolicy(Policy):
+class PolDrop(Policy):
     """Policy that drops everything."""
     def __repr__(self):
         return "drop"
-        
-class ModPolicy(Policy, Data("mapping")):
-    """Policy that drops everything."""
-    def __new__(cls, mapping):
-        if not isinstance(mapping, frozendict):
-            mapping = frozendict(mapping)
-        return super(ModPolicy, cls).__new__(cls, mapping)
+    def _eval(self, packet, env, act):
+        pass
+
+class PolPassthrough(Policy):
     def __repr__(self):
-        return repr(self.mapping)
+        return "passthrough"
+    def _eval(self, packet, env, act):
+        act.append(frozendict())
+        
+class PolModify(Policy, Data("field value")):
+    """Policy that drops everything."""
+    def __repr__(self):
+        return "modify %s <- %s" % self
+    def _eval(self, packet, env, act):
+        act.append(frozendict({self.field: self.value}))
     
-class PolImply(Policy, Data("predicate policy")):
+class PolRestrict(Policy, Data("predicate policy")):
     """Policy for mapping a single predicate to a list of actions."""
     def __repr__(self):
-        return "%s >> %s" % (self.predicate, self.policy)
+        return "%s & %s" % (self.predicate, self.policy)
+    def _eval(self, packet, env, act):
+        if self.predicate.eval(packet, env):
+            self.policy._eval(packet, env, act)
 
 class PolLet(Policy, Data("varname policy attr body")):
     def __repr__(self):
         return "let %s <- (%s).%s in %s" % (self.varname, self.policy, self.attr, self.body)
+    def _eval(self, packet, env, act):
+        act_ = Action()
+        self.policy._eval(packet, env, act_)
+        for n_packet in act_._eval(packet):
+            n_env = env.update({self.varname: n_packet.header[self.attr]})
+            self.body._eval(n_packet, n_env, act)
         
 class PolComposition(Policy, Data("left right")):
     def __repr__(self):
-        return "%s * %s" % (self.left, self.right)
-
+        return "%s >> %s" % (self.left, self.right)
+    def _eval(self, packet, env, act):
+        act_ = Action()
+        self.left._eval(packet, env, act_)
+        for n_packet in act_._eval(packet):
+            self.right._eval(n_packet, env.update(n_packet.header), act)
+            
 class PolUnion(Policy, Data("left right")):
     def __repr__(self):
-        return "%s + %s" % (self.left, self.right)
-
-class PolRestriction(Policy, Data("policy predicate")):
+        return "%s | %s" % (self.left, self.right)
+    def _eval(self, packet, env, act):
+        self.left._eval(packet, env, act)
+        self.right._eval(packet, env, act)
+        
+class PolRemove(Policy, Data("policy predicate")):
     def __repr__(self):
         return "%s - %s" % (self.predicate, self.policy)
+    def _eval(self, packet, env, act):
+        if not self.predicate._eval(packet, env):
+            self.policy._eval(packet, env, act)
         
-################################################################################
-# Evaluation
-################################################################################
-
-def eval(expr, packet):
-    """Evaluate a NetCore expression, producing an `Action`."""
-    return _eval()(expr, packet, packet.header)
-    
-class _eval(Case):
-    def case_PredTop(self, pred, packet, env):
-        return True
-      
-    def case_PredBottom(self, pred, packet, env):
-        return False
-
-    def case_PredMatch(self, pred, packet, env):
-        if pred.pattern is None:
-            return pred.varname not in env
-        else:
-            return pred.pattern.match(env[pred.varname])
-
-    def case_PredUnion(self, pred, packet, env):
-        return self(pred.left, packet, env) or self(pred.right, packet, env)
-
-    def case_PredIntersection(self, pred, packet, env):
-        return self(pred.left, packet, env) and self(pred.right, packet, env)
-
-    def case_PredDifference(self, pred, packet, env):
-        return self(pred.left, packet, env) and not self(pred.right, packet, env)
-
-    def case_PredNegation(self, pred, packet, env):
-        return not self(pred.pred, packet, env)
-      
-    def case_DropPolicy(self, pol, packet, env):
-        return ActDrop()
-
-    def case_ModPolicy(self, pol, packet, env):
-        return ActMod(pol.mapping)
-    
-    def case_PolImply(self, pol, packet, env):
-        if self(pol.predicate, packet, env):
-            return self(pol.policy, packet, env)
-        else:
-            return ActDrop()
-
-    def case_PolRestriction(self, pol, packet, env):
-        if self(pol.predicate, packet, env):
-            return ActDrop()
-        else:
-            return self(pol.policy, packet, env)
-
-    def case_PolUnion(self, pol, packet, env):
-        return self(pol.left, packet, env) + self(pol.right, packet, env)
-
-    def case_PolLet(self, pol, packet, env):
-        action = ActDrop()
-        for n_packet in mod_packet(self(pol.policy, packet, env), packet):
-            n_env = env.update({pol.varname: n_packet.header[pol.attr]})
-            action = ActChain(action, self(pol.body, packet, n_env))
-        return action
-
-    def case_PolComposition(self, pol, packet, env):
-        action = ActDrop()
-        for n_packet in mod_packet(self(pol.left, packet, env), packet):
-            action = ActChain(action, self(pol.right, n_packet, env.update(n_packet.header)))
-        return action
-
-################################################################################
-# Action ops
-################################################################################
-        
-class _mod_packet(Case):
-    def case_ActDrop(self, act, packet):
-        return []
-      
-    def case_ActMod(self, act, packet):
-        h = dict(packet.header)
-        for k, v in act.mapping.iteritems():
-            if v is None:
-                if k in h:
-                    del h[k]
-            else:
-                assert isinstance(v, FixedWidth) 
-                h[k] = v
-        return [packet._replace(header=Header(frozendict(h)))]
-      
-    def case_ActChain(self, act, packet):
-        return self(act.left, packet) + self(act.right, packet)
-      
-def mod_packet(act, packet):
-    r = []
-    for packet in _mod_packet()(act, packet):
-        payload = propagate_header_to_payload(packet.header, packet.payload)
-        n_packet = packet.replace(payload=payload)
-        r.append(n_packet) 
-    return r
-
 ################################################################################
 # Nasty hacks.
 ################################################################################

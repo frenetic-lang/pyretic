@@ -381,8 +381,8 @@ def lift_dict(d, i):
 # Predicates and policies
 ################################################################################
 
-all_packets = nl.PredTop()
-no_packets = nl.PredBottom()
+all_packets = nl.PredAll()
+no_packets = nl.PredNone()
 let = nl.PolLet
     
 def match(k, v):
@@ -410,25 +410,17 @@ def dstip_p(k): return match("dstip", k)
 def srcport_p(k): return match("srcport", k)
 def dstport_p(k): return match("dstport", k)
 
-drop = nl.DropPolicy()
+drop = nl.PolDrop()
+passthrough = nl.PolModify()
 
-class mod(nl.ModPolicy):
-    def __new__(cls, arg={}, **keys):
-        raw_mapping = merge_dicts(arg, keys)
-        mapping = lift_dict(raw_mapping, 0)
-        return super(mod, cls).__new__(cls, mapping)
+def modify(**kwargs):
+    policy = drop
+    for k, v in kwargs.iteritems():
+        policy = policy >> modify(k, v)
+    return policy
 
-    def __call__(self, arg={}, **keys):
-        raw_mapping = merge_dicts(arg, keys)
-        mapping = lift_dict(raw_mapping, 0)
-        return self.__class__(self.mapping.update(mapping))
-
-    def get_act(self):
-        return nl.ActMod(self.mapping)
-
-def fwd(port, arg={}, **keys):
-    keys["outport"] = port
-    return mod(arg, **keys) 
+def fwd(port):
+    return modify({outport : port}) 
 
 flood = fwd(Outport.flood_port)
         
@@ -440,7 +432,7 @@ def bucket(fields=(), time=None):
     return nl.Bucket(fields, time)
 
 def query(network, pred, fields=(), time=None):
-    b = nl.Bucket(fields, time)
+    b = bucket(fields, time)
     b.sub_network = fork_sub_network(network)
     b.sub_network.install_policy(pred >> fwd(b))
     return b
@@ -448,7 +440,6 @@ def query(network, pred, fields=(), time=None):
 ################################################################################
 # Network
 ################################################################################
-
 
 
 class Network(object):
@@ -470,29 +461,104 @@ class Network(object):
 
     def get_policy(self):
         return self.policy_b.get()
-    
-    def add_sub_network(self, sub_net):
-        def listener(policy):
-            self.sub_policies[sub_net] = policy
-            self.policy_b.set(self._aggregate_policy())
-            
-        sub_net.policy_b.notify(listener)
 
+    def install_sub_policies(self, sub_gen):
+        def adder():
+            for policy in sub_gen:
+                self.sub_policies[sub_gen] = policy
+                self.policy_b.set(self._aggregate_policy())
+        gs.run(adder)
+    
     def _aggregate_policy(self):
         return sum(self.sub_policies.itervalues(), drop)
         
-
+def add_sub_network(super_network, sub_network):
+    super_network.install_sub_policies(sub_network.policy_changes())
         
-def fork_sub_network(big_network):
-    network = Network()
-    network.switch_joins = big_network.switch_joins
-    network.switch_parts = big_network.switch_parts
+def fork_sub_network(network):
+    sub_net = Network()
+    sub_net.switch_joins = network.switch_joins
+    sub_net.switch_parts = network.switch_parts
 
-    big_network.add_sub_network(network)
+    add_sub_network(network, sub_net)
     
     return network
 
 
-def virtualize_network():
-    pass
-        
+################################################################################
+# Virtualization
+################################################################################
+
+def virtualize_policy(vinfo, ingress_policy, physical_policy, policy):
+    """
+    - `vinfo' is a mapping from switch to set of ports.
+    - `ingress_policy' is written in terms of the physical network, and tries to
+       detect whether a packet is at the ingress of a virtual switch. If the packet
+       is at the ingress of a virtual switch, then modify the vswitch and vsrcport of the
+       packet to be the current virtual switch and the inport we are at, respectively .
+    - `policy' is written in terms of the virtual network, and modifies the outport field.
+       We will modify the vdstport of the packet to be the outport returned.
+    - `physical_policy' is written in terms of the physical network, and tries to
+       forward packets along the fabric of the virtual switch until vdstport is reached.
+       When the packet leaves vswitch, the v* headers must be removed.
+
+       (Implementation detail: removing vswitch is sufficient).
+
+    Returns the virtualization of `policy' with respect to the other parameters.
+    """
+
+    # Utility
+    #
+
+    vswitches = sorted(vinfo)
+
+    def vlan_offset(si):
+        return sum(len(vports)**2 for vports in vswitches[:si])
+
+    max_vlan = vlan_offset(len(vswitches))
+    vlans = xrange(max_vlan)
+    
+     # Slow, but clear. There is undoubtably a faster way to do this.
+    def vheader_from_vlan(vlan):
+        for vswitch, si in enumerate(vswitches):
+            for vsrcport, spi in enumerate(vports[vswitch]):
+                for vdstport, vpi in enumerate(vports[vswitch]):
+                    if si + spi + vpi == vlan:
+                        return dict(vswitch=vswitch,
+                                    vsrcport=vsrcport,
+                                    vdstport=vdstport)
+
+
+    # vlan encoding policies
+    # 
+
+    v_headers_to_vlan = (_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
+                         | enum((_.vswitch, vswitches), # otherwise, encode.
+                             lambda si:
+                               enum((_.vsrcport, vinfo[vswitches[vi]]),
+                                    (_.vdstport, vinfo[vswitches[vi]]),
+                                    lambda spi, dpi:
+                                      modify(vlan=vlan_offset(si) + spi*dpi,
+                                             vswitch=None,
+                                             vsrcport=None,
+                                             vdstport=None))))
+   
+    vlan_to_v_headers = enum((_.vlan, vlans),
+                             lambda vlan: modify(vlan=None,
+                                                 **vheader_from_vlan(vlan)))
+
+    return (if_(_.vlan.is_missing(), # if the vlan isnt set, then we need to find out the v* headers.
+                    (ingress_policy >> # set vswitch and vsrcport
+                    # now make the virtualization transparent to the tenant's policy to get the outport
+                     let(modify(switch=_.vswitch, inport=_.vsrcport) >> policy,
+                         lambda x:
+                             # and finally set the vsrcport.
+                             modify(vdstport=x.outport))),
+                  # However, if vlan IS set, re-set the v* headers.
+                  vlan_to_v_headers )
+            # Pipe the packet with appropriate v* headers to the physical policy for processing
+            >> physical_policy
+            # and translate the v* headers to a vlan value, since the real network
+            # doesn't understand our custom headers.
+            >> v_headers_to_vlan)
+          
