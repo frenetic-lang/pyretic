@@ -57,20 +57,26 @@ def track_link_downs(network, topology, topology_changed):
             topology.remove_edge(s1,s2)
             topology_changed.signal()
 
-def monitor(network):
-    topology = nx.DiGraph()
-    topology_changed = gs.Event()
-
+def track(network, topology, topology_changed):
     run(track_switch_joins, network, topology, topology_changed)
     run(track_switch_parts, network, topology, topology_changed)
     run(track_link_ups, network, topology, topology_changed)
     run(track_link_downs, network, topology, topology_changed)
+
+
+def monitor(network):
+    topology = nx.DiGraph()
+    topology_changed = gs.Event()
+
+    run(track, network, topology, topology_changed)
 
     for t in topology_changed:
         print "topology_change!"
         for switch in topology.nodes():
             switch_edges = ', '.join([ "%s => %s[%s]" % (ports['p1'],s2,ports['p2']) for (s1,s2,ports) in topology.edges(data=True) if s1 == switch ])
             print "%s\t%s" % (switch,switch_edges)
+
+    return (topology,topology_changed)
 
 
 main = monitor
