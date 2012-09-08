@@ -2,6 +2,41 @@
 
 from mininet.topo import Topo, Node
 
+class Figure3Topo(Topo):
+    
+    def __init__(self):
+        
+        # Add default members to class.
+        super(Figure3Topo, self).__init__()
+
+        # Set Node IDs for hosts and switches
+        switch1 = 1
+        switch2 = 2 
+
+        data_server = 10
+        compute_server_1 = 11
+        compute_server_2 = 12
+        
+        # Add nodes
+        self.add_node(switch1, Node(is_switch=True))
+        self.add_node(switch2, Node(is_switch=True))
+                
+        self.add_node(data_server, Node(is_switch=False))
+        self.add_node(compute_server_1, Node(is_switch=False))
+        self.add_node(compute_server_2, Node(is_switch=False))
+
+        # Add edges
+        self.add_edge(switch1, data_server)
+        self.add_edge(switch1, computer_server_1)
+        self.add_edge(switch2, computer_server_2)
+
+        self.add_edge(switch1, switch2)
+        
+        # Consider all switches and hosts 'on'
+        self.enable_all()
+
+
+
 class YTopo(Topo):
     
     def __init__(self):
@@ -313,6 +348,7 @@ class BumpCliqueTopo(CliqueTopo):
 
 
 topos = { 'triangle': TriangleTopo,
+          'figure3' : Figure3Topo,
           'square': SquareTopo,
           'ytopo': YTopo,
           'clique': CliqueTopo,
