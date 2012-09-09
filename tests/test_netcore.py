@@ -1,11 +1,15 @@
 
 import pytest
 
+from tests.common import *
 from frenetic.netcore import *
-from frenetic.netcore_lib import *
+from frenetic.netcore import _
+from frenetic.network import *
 
-h = Header(srcip=IP("1.2.3.4"))
-p = Packet(h, None)
+
+################################################################################
+# Matchable junk
+################################################################################
 
 w = Wildcard(8)(bitarray("00000000"), bitarray("00000000"))
 w2 = Wildcard(8)(bitarray("00000000"), bitarray("11111111"))
@@ -20,68 +24,6 @@ def test_Wildcard_intersect():
 def test_MatchExact():
     return MatchExact(Switch)(10).match(Switch(10))
 
-
-def test_Predicate_eval():
-    assert eval(PredAll(), p)
-    assert not eval(PredNone(), p)
-    assert eval(PredMatch("srcip", Wildcard(32)(IP("1.2.3.4").to_bits(),
-                                                bitarray([False] * 32))), p)
-    assert eval(PredMatch("srcip", IPWildcard("1.2.3.*")), p)
-    assert eval(PredMatch("srcip", IPWildcard("1.2.3.4", "255.255.255.0")), p)
-
-act = ActMod(frozendict({"srcport": FixedInt(16)(30)}))
-pol = PredMatch("srcip", IPWildcard("1.2.3.*")) >> mod({"srcport": FixedInt(16)(30)})
-
-def test_Action():
-    assert not mod_packet(ActDrop(), p)
-    assert mod_packet(act, p)[0].header["srcport"] == FixedInt(16)(30)
-    assert len(mod_packet(act + act, p)) == 2
-    with pytest.raises(KeyError):
-        mod_packet(ActMod(frozendict({"srcip": None})), p)[0].header["srcip"]
-    
-def test_Policy():
-    assert eval(pol, p) == act
-
-lact = ModPolicy({"switch": Switch(10)})
-l = PolLet("x", pol, "srcport", PredMatch("x", MatchExact(FixedInt(16))(30)) >> lact)
-
-def test_Let():
-    assert eval(l, p) == ActMod(frozendict({"switch": Switch(10)}))
-
-ipol = PredMatch("switch", MatchExact(Switch)(10)) >> ModPolicy({"switch": Switch(25)})
-cpol = l * ipol
-
-def test_Composition():
-    assert mod_packet(eval(cpol, p), p)[0].header["switch"] == Switch(25)
-
-
-
-    
-#
-#
-
-def test_Outport():
-    assert Outport(0)  is not None
-    assert Outport(bucket()) is not None
-    with pytest.raises(Exception):
-        Outport("test")
-    
-
-h2 = Header(srcip=IP("127.0.0.1"),
-           srcport=FixedInt(16)(30),
-           switch=Switch(14),
-           dstport=FixedInt(16)(30))
-
-p2 = Packet(h2, None)
-
-hafter = header(srcip="127.0.0.1",
-                srcport=30,
-                switch=14,
-                dstport=30,
-                outport=30)
-
-p5 = p2.replace(header=hafter)
-
 ip = IPWildcard("1.2.3.*")
 ip2 = IPWildcard("1.2.3.4", "255.255.255.0")
 
@@ -94,52 +36,70 @@ def test_IPWildcard():
     assert ip2 == IPWildcard("1.2.3.8", "255.255.255.0")
     assert not IPWildcard("255.255.255.255").match(IP("255.255.255.252"))
 
+
+################################################################################
+# Predicates
+################################################################################
+
+
+def test_Predicate_eval():
+    p = packets[0]
+    assert all_packets.eval(p)
+    assert not no_packets.eval(p)
+
+    assert (_.srcip == "1.2.3.4").eval(packets[1])
+    assert (_.srcip == "1.2.3.*").eval(packets[1])
+    assert (_.srcip == IP("1.2.3.4")).eval(packets[1])
+    assert (_.srcip == IPWildcard("1.2.*.4")).eval(packets[1])
+    assert not (_.dstport == 30).eval(packets[1])
+    assert (_.dstport == Port(700)).eval(packets[1])
+
+
+def test_Action():
+    assert not drop.packets_to_send(packets[1])
+    p = modify(srcport=100, dstport=100).packets_to_send(packets[1])[0]
+    assert p.srcport == 100 and p.dstport == 100
+
+
+let_pol1 = let(modify(dstport=1), lambda p: ((_.dstport == 700) & (p.dstport == 1)) & fwd(100))
+
+def test_Let():
+    assert let_pol1.packets_to_send(packets[1])[0].outport == Port(100)
+    assert let_pol1.packets_to_send(packets[1])[0].dstport == 700
+
+comp_pol1 = modify(dstport=1) >> ((_.dstport == 1) & (_.srcport == 30) & fwd(100))
+    
+def test_Composition():
+    assert comp_pol1.packets_to_send(packets[1])[0].outport == Port(100)
+
 def test_fwd():
-    assert mod_packet(eval(fwd(30), p2), p2) == [p5]
-
-hflood = header(srcip="127.0.0.1",
-                srcport=30,
-                switch=14,
-                dstport=30,
-                outport=Outport.flood_port)
-
-p6 = p2.replace(header=hflood)
-p7 = p2.replace(header=hflood.update(srcip=IP("127.0.0.2")))
-
-def test_flood():
-    assert mod_packet(eval(flood, p2), p2) == [p6]
-    assert mod_packet(eval(flood(srcip=IP("127.0.0.2")), p2), p2) == [p7]
+    for packet in packets:
+        assert fwd(1).packets_to_send(packet)[0].outport == Port(1)
     
 def test_match_ips():
-    assert eval(match("srcip", "127.0.0.1"), p2)
-    assert eval(match("srcip", "127.*.*.*"), p2)
-    assert eval(match("srcip", "*.*.*.1"), p2)
-    assert eval(match("srcip", "127.0.0.1/32"), p2)
-    assert eval(match("srcip", "127.0.0.255/24"), p2)
-    assert not eval(match("srcip", "124.0.0.255/24"), p2)
-    assert eval(match("srcip", "127.0.0.255/24"), p2)
-    assert eval(match("srcip", ("127.0.0.255", 24)), p2)
-    assert eval(match("srcip", ("127.0.0.255", "255.255.255.0")), p2)
-    assert eval(match("srcip", "127.0.0.255/255.255.255.0"), p2)
+    assert (_.dstip == "127.0.0.1").eval(packets[1])
+    assert (_.dstip == "127.*.*.*").eval(packets[1])
+    assert (_.dstip == "*.*.*.1").eval(packets[1])
+    assert (_.dstip == "127.0.0.1/32").eval(packets[1])
+    assert (_.dstip == "127.0.0.255/24").eval(packets[1])
+    assert not (_.dstip == "124.0.0.255/24").eval(packets[1])
+    assert (_.dstip == "127.0.0.255/24").eval(packets[1])
+    assert (_.dstip == ("127.0.0.255", 24)).eval(packets[1])
+    assert (_.dstip == ("127.0.0.255", "255.255.255.0")).eval(packets[1])
+    assert (_.dstip == "127.0.0.255/255.255.255.0").eval(packets[1])
 
-    assert eval(match_missing("meow"), p2)
-    assert not eval(match_missing("srcip"), p2)
+    assert _.meow.is_missing().eval(packets[1])
+    assert not _.srcip.is_missing().eval(packets[1])
     
 def test_match_ints():    
-    assert eval(match("dstport", 30), p2)
-    assert not eval(match("dstport", 31), p2)
-    assert not eval(match("dstport", "1000100010001000"), p2)
-    assert not eval(match("dstport", "???????????????1"), p2)
-    assert     eval(match("dstport", "????????????????"), p2)
-    assert     eval(match("dstport", "???????????1111?"), p2)
-    assert     eval(match("dstport", "0000000000011110"), p2)
+    assert (_.srcport == 30).eval(packets[1])
+    assert not (_.srcport == 31).eval(packets[1])
+    assert not (_.srcport == "1000100010001000").eval(packets[1])
+    assert not (_.srcport == "???????????????1").eval(packets[1])
+    assert     (_.srcport == "????????????????").eval(packets[1])
+    assert     (_.srcport == "???????????1111?").eval(packets[1])
+    assert     (_.srcport == "0000000000011110").eval(packets[1])
     
-# def test_match_locations():
-#     pmod = mod_packet(fwd(30), p)[0]
-#     assert eval(match("location", ("out", 30)), pmod)
-#     assert not eval(match("location", ("out", 31)), pmod)
-#     assert not eval(match("location", ("in", 30)), pmod)
-#     assert eval(match("location", "100011110"), pmod)
     
 ################################################################################
 # Test networks
@@ -150,14 +110,18 @@ def test_in_place():
 
 def test_Network():
     n = Network()
-    assert eval(n.get_policy(), p6) == ActDrop()
+    assert not n.get_policy().packets_to_send(packets[0])
 
     n_fork = fork_sub_network(n)
     n_fork.install_policy(fwd(10))
 
     assert isinstance(n.get_policy(), Policy)
 
-    assert eval(n.get_policy(), p6) == mod(outport=10).get_act()
+    import time
+
+    time.sleep(1)
+
+    assert n.get_policy().packets_to_send(packets[0])[0].outport == Port(10) 
     
     
     

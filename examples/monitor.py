@@ -29,7 +29,7 @@
 from frenetic.lib import *
 
 def monitor(network):
-    b = bucket()
+    b = Bucket()
 
     network.install_policy(fwd(b))
 

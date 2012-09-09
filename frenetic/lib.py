@@ -31,7 +31,11 @@
 # This module is designed for import *.
 
 from frenetic.netcore import *
+from frenetic.netcore import _
+from frenetic.network import *
 from frenetic.generators import merge, run
 
 from frenetic.pox_backend import start, launch
 
+
+__all__ = locals().keys()
