@@ -570,8 +570,9 @@ class Network(object):
         return self.policy_b.get()
 
     def install_sub_policies(self, sub_gen):
+        it = iter(sub_gen) # Don't leave creating the iterator up to timing.
         def adder():
-            for policy in sub_gen:
+            for policy in it:
                 self.sub_policies[sub_gen] = policy
                 self.policy_b.set(self._aggregate_policy())
         gs.run(adder)

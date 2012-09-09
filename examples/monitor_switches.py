@@ -29,7 +29,7 @@
 from frenetic.lib import *
 
 def monitor(network):
-    for pkt in network.query(all_packets):
-        print "I see packet: ", pkt
-     
+    for switch in network.switch_joins:
+        print "Add switch: %s" % switch
+
 start(monitor)

@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from frenetic import generators
+from frenetic import generators as gs
 from frenetic import netcore as nc, network as net
 
 from frenetic.util import frozendict
@@ -41,37 +41,42 @@ class POXBackend(revent.EventMixin):
     def __init__(self, user_program):
         self.network = nc.Network()
         self.user_program = user_program
-        self.listenTo(core)
-
-    def _handle_GoingUpEvent(self, event):
         self.switch_connections = {}
         
-        generators.run(self.user_program, self.network)
+        if core.hasComponent("openflow"):
+            self.listenTo(core.openflow)
+        else:
+            # We'll wait for openflow to come up
+            self.listenTo(core)
 
-        self.listenTo(core.openflow)
+        gs.run(self.user_program, self.network)
+
+    def _handle_ComponentRegistered (self, event):
+        if event.name == "openflow":
+            self.listenTo(core.openflow)
+            return EventRemove # We don't need this listener anymore
 
     def _handle_PacketIn(self, event):
-        pox_pkt = event.parsed
-        packet = net.Packet(pox_pkt.pack(), switch=event.dpid, inport=event.ofp.in_port)
+        packet = net.Packet(event.data, switch=event.dpid, inport=event.ofp.in_port)
         n_pkts = self.network.get_policy().packets_to_send(packet)
+        
         for pkt in n_pkts:
-            assert "outport" in pkt.header
+            assert "outport" in pkt.header, "gotta send it somewhere"
             if pkt.outport.is_real():
                 self.send_packet(pkt)
             else:
-                buck = pkt.outport.get_bucket()
-                buck.signal(packet)
-        
+                bucket = pkt.outport.get_bucket()
+                bucket.signal(packet)
+
     def _handle_ConnectionUp(self, event):
-        self.switch_connections[event.dpid] = event.connection
-        self.network.switch_joins.signal(net.Switch(event.dpid))
+        if event.dpid not in self.switch_connections:
+            self.switch_connections[event.dpid] = event.connection
+            self.network.switch_joins.signal(net.Switch(event.dpid))
         
     def _handle_ConnectionDown(self, event):
-        # Post this to switch_down
         if event.dpid in self.switch_connections:
             del self.switch_connections[event.dpid]
-
-        self.network.switch_parts.signal(net.Switch(event.dpid))
+            self.network.switch_parts.signal(net.Switch(event.dpid))
         
     def _handle_LinkEvent(self, event):
         # Post this somewhere
@@ -100,6 +105,8 @@ class POXBackend(revent.EventMixin):
         msg.actions.append(of.ofp_action_output(port = outport))
 
         self.switch_connections[int(switch)].send(msg)
+
+        
 
 _hack_program = None
         

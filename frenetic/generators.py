@@ -87,18 +87,27 @@ def merge(*genlist):
         thrlist = []
         for source in genlist:
             t = threading.Thread(target=run_one, args=(source,))
+            t.setDaemon(True)
             t.start()
             thrlist.append(t)
         for t in thrlist: t.join()
         item_q.put(StopIteration)
 
-    threading.Thread(target=run_all).start()
+    t = threading.Thread(target=run_all)
+    t.setDaemon(True)
+    t.start()
+    
     while True:
         item = item_q.get()
         if item is StopIteration: return
         yield item
 
+def run_non_daemon(func, *args, **kwargs):
+    t = threading.Thread(target=func, args=args, kwargs=kwargs)
+    t.start()
+        
 def run(func, *args, **kwargs):
     t = threading.Thread(target=func, args=args, kwargs=kwargs)
+    t.setDaemon(True)
     t.start()
 

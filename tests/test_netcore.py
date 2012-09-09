@@ -5,6 +5,7 @@ from tests.common import *
 from frenetic.netcore import *
 from frenetic.netcore import _
 from frenetic.network import *
+from frenetic.generators import *
 
 
 ################################################################################
@@ -118,10 +119,8 @@ def test_Network():
     assert isinstance(n.get_policy(), Policy)
 
     import time
+    time.sleep(0.01)
 
-    time.sleep(1)
+    assert n.get_policy().packets_to_send(packets[0])[0].outport == Port(10)
 
-    assert n.get_policy().packets_to_send(packets[0])[0].outport == Port(10) 
-    
-    
     
