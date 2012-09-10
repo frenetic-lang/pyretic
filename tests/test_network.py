@@ -28,8 +28,12 @@
 
 import pytest
 
+
 from tests.common import *
+
+from frenetic.netcore import *
 from frenetic.network import *
+from frenetic.virt import *
 
 ################################################################################
 # Fixed width friends

@@ -27,9 +27,8 @@
 ################################################################################
 
 from frenetic import generators as gs
-from frenetic import netcore as nc, network as net
-
-from frenetic.util import frozendict
+from frenetic import network as net
+from frenetic import virt
 
 from pox.core import core
 from pox.lib import revent
@@ -39,7 +38,7 @@ import pox.openflow.libopenflow_01 as of
 
 class POXBackend(revent.EventMixin):
     def __init__(self, user_program):
-        self.network = nc.Network()
+        self.network = virt.Network()
         self.user_program = user_program
         self.switch_connections = {}
         

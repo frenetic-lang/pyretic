@@ -2,9 +2,11 @@
 import pytest
 
 from tests.common import *
+
 from frenetic.netcore import *
 from frenetic.netcore import _
 from frenetic.network import *
+from frenetic.virt import *
 from frenetic.generators import *
 
 

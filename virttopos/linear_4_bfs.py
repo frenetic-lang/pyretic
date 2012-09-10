@@ -26,15 +26,38 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-# Intended to be used with ./mininet.sh --topo triangle
+# Intended to be used with ./mininet.sh --topo linear,4
 
 from frenetic.lib import *
-from examples import monitor_packets
-from virttopos.triangle_bfs import *
-
-def monitor(network):
-    v_network = setup_virtual_network(network)
-    run(monitor_packets.monitor, v_network) 
 
 
-start(monitor)
+v_switch = Switch(1)
+v_signature = {v_switch: [Port(1), Port(2), Port(3), Port(4)]}
+
+def get_ingress_policy():
+    ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
+                       (_.switch == Switch(2)) & (_.inport == 1)  & modify(vinport = 2) | 
+                       (_.switch == Switch(3)) & (_.inport == 1)  & modify(vinport = 3))
+                      >> modify(vswitch = Switch(1)))
+    return ingress_policy
+
+def get_physical_policy():
+    physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1)  | 
+                                                  (_.voutport == 2) & fwd(2)  | 
+                                                  (_.voutport == 3) & fwd(3))
+                       
+                       |  (_.switch == Switch(2)) & ((_.voutport == 1) & fwd(2) | 
+                                                     (_.voutport == 2) & fwd(1) | 
+                                                     (_.voutport == 3) & fwd(3))
+                       
+                       |  (_.switch == Switch(3)) &  ((_.voutport == 1) & fwd(3) | 
+                                                      (_.voutport == 2) & fwd(2) | 
+                                                      (_.voutport == 3) & fwd(1)))
+    return physical_policy
+
+def setup_virtual_network(network):
+    ingress_policy = get_ingress_policy()
+    physical_policy = get_physical_policy()
+
+    v_network = fork_virtual_network(network, v_signature, ingress_policy, physical_policy)
+    return v_network
