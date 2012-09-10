@@ -228,13 +228,15 @@ FixedWidth.register(Port)
 class Switch(Bits(16)):
     def __init__(self, dpid):
         try:
-            super(Switch, self).__init__(dpid)
-        except:
+            return super(Switch, self).__init__(dpid)
+        except ValueError:
             assert isinstance(dpid, Integral)
             b = bitarray()
             b.frombytes(struct.pack("!H", dpid))
             
-            super(Switch, self).__init__(b)
+            return super(Switch, self).__init__(b)
+            
+        raise ValueError
         
     def __repr__(self):
         return "<switch %s>" % int(self)
@@ -246,28 +248,31 @@ class Switch(Bits(16)):
 class MAC(Bits(48)):
     def __init__(self, mac):
         try:
-            super(MAC, self).__init__(mac)
-        except:
-            if isinstance(mac, basestring):
-                b = bitarray()
-                if len(mac) == 6:
-                    b.frombytes(mac)
-                else:
-                    import re
-                    m = re.match(r"""(?xi)
-                                 ([0-9a-f]{1,2})[:-]+
-                                 ([0-9a-f]{1,2})[:-]+
-                                 ([0-9a-f]{1,2})[:-]+
-                                 ([0-9a-f]{1,2})[:-]+
-                                 ([0-9a-f]{1,2})[:-]+
-                                 ([0-9a-f]{1,2})
-                                 """, mac)
-                    if not m:
-                        raise ValueError
-                    else:
-                        b.frombytes(struct.pack("!BBBBBB", *(int(s, 16) for s in m.groups())))
+            return super(MAC, self).__init__(mac)
+        except ValueError:
+            assert isinstance(mac, basestring)
             
-            super(MAC, self).__init__(b)
+            b = bitarray()
+            if len(mac) == 6:
+                b.frombytes(mac)
+            else:
+                import re
+                m = re.match(r"""(?xi)
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})
+                             """, mac)
+                if not m:
+                    raise ValueError
+                else:
+                    b.frombytes(struct.pack("!BBBBBB", *(int(s, 16) for s in m.groups())))
+            
+            return super(MAC, self).__init__(b)
+            
+        raise ValueError
 
     def __repr__(self):
         bs = self.to_bits().tobytes()
@@ -279,8 +284,8 @@ class MAC(Bits(48)):
 class IP(Bits(32)):
     def __init__(self, ip):
         try:
-            super(IP, self).__init__(ip)
-        except:
+            return super(IP, self).__init__(ip)
+        except ValueError as e:
             assert isinstance(ip, basestring)
             
             b = bitarray()
@@ -290,7 +295,9 @@ class IP(Bits(32)):
             else:
                 b.frombytes(socket.inet_aton(ip))
             
-            super(IP, self).__init__(b)
+            return super(IP, self).__init__(b)
+
+        raise ValueError
         
     def __repr__(self):
         return socket.inet_ntoa(self.to_bits().tobytes())
