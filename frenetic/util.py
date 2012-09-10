@@ -270,10 +270,38 @@ class frozendict(object):
 def indent_str(s, indent=4):
     return "\n".join(indent * " " + i for i in s.splitlines())
 
-def repr_plus(ss, indent=4, sep="\n=====\n"):
+def repr_plus(ss, indent=4, sep="\n", prefix="-"):
     if isinstance(ss, basestring):
         ss = [ss]
-    return indent_str(sep.join(map(repr, ss)), indent)
+    return indent_str(sep.join(prefix + repr(s) for s in ss), indent)
     
+class ReprPlusMixin(object):
+    """must be used w/ data objects"""
+
+    _mes_attrs = None
+    _mes_drop = None
+    _repr_plus_args = ()
     
-    
+    def __repr__(self):
+        mes = self.__squash_mes__()
+        return "%s:\n%s" % (self.__class__.__name__, repr_plus(mes, *self._repr_plus_args))
+        
+    def __squash_mes__(self):
+        mes = []
+        
+        for k, v in self._asdict().iteritems():
+            if self._mes_attrs is None:
+                cls = self.__class__
+            else:
+                cls = self._mes_attrs.get(k)
+                if cls == 0:
+                    cls = self.__class__
+            if cls is not None and issubclass(v.__class__, cls):
+                mes += v.__squash_mes__()
+            elif self._mes_drop is None or not issubclass(v.__class__, self._mes_drop):
+                mes.append(v)
+
+        return mes
+        
+            
+        

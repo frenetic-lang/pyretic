@@ -255,7 +255,6 @@ class IPWildcard(Wildcard(32)):
 ################################################################################
 
 
-
 class Predicate(object):
     """Top-level abstract class for predicates."""
    
@@ -305,31 +304,27 @@ class PredMatch(Predicate, Data("varname pattern")):
             else:
                 return False
                 
-class PredUnion(Predicate, Data("left right")):
+class PredUnion(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the union of two predicates."""
-    def __repr__(self):
-        return "PredUnion:\n%s" % util.repr_plus([self.left, self.right])
+    _mes_drop = PredNone
     def _eval(self, packet, env):
         return self.left._eval(packet, env) or self.right._eval(packet, env)
         
-class PredIntersection(Predicate, Data("left right")):
+class PredIntersection(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the intersection of two predicates."""
-    def __repr__(self):
-        return "PredIntersection:\n%s" % util.repr_plus([self.left, self.right])
+    _mes_drop = PredAll
     def _eval(self, packet, env):
         return self.left._eval(packet, env) and self.right._eval(packet, env)
 
-class PredDifference(Predicate, Data("left right")):
+class PredDifference(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the difference of two predicates."""
-    def __repr__(self):
-        return "PredDifference:\n%s" % util.repr_plus([self.left, self.right])
+    _mes_attrs = {"left": 0}
     def _eval(self, packet, env):
         return self.left._eval(packet, env) and not self.right._eval(packet, env)
 
-class PredNegation(Predicate, Data("pred")):
+class PredNegation(util.ReprPlusMixin, Predicate, Data("pred")):
     """A predicate representing the difference of two predicates."""
-    def __repr__(self):
-        return "PredNegation:\n%s" % util.repr_plus(self)
+    _mes_attrs = {}
     def _eval(self, packet, env):
         return not self.pred._eval(packet, env)
 
@@ -396,50 +391,54 @@ class PolModify(Policy, Data("field value")):
     def _eval(self, packet, env, act):
         act[frozendict({self.field: self.value})] += 1
     
-class PolRestrict(Policy, Data("predicate policy")):
+class PolRestrict(util.ReprPlusMixin, Policy, Data("predicate policy")):
     """Policy for mapping a single predicate to a list of actions."""
-    def __repr__(self):
-        return "PolRestrict:\n" + util.repr_plus([self.predicate, self.policy])
+    _mes_attrs = {"predicate": PredIntersection} 
     def _eval(self, packet, env, act):
         if self.predicate._eval(packet, env):
             self.policy._eval(packet, env, act)
 
-class PolLet(Policy, Data("varname policy body")):
-    def __repr__(self):
-        return "PolLet %s:\n%s" % (self.varname, util.repr_plus([self.policy, self.body]))
+class PolLet(util.ReprPlusMixin, Policy, Data("varname policy body")):
+    _mes_attrs = {}
     def _eval(self, packet, env, act):
         act_ = Action()
         self.policy._eval(packet, env, act_)
         for n_packet in act_.eval(packet):
-            n_env = env.update({self.varname + "." + k: v
-                                for k, v in n_packet.header.iteritems()})
+            n_env = dict() 
+            for k, v in env.iteritems():
+                if not k.startswith(self.varname + "."):
+                    n_env[k] = v
+            n_env.update((self.varname + "." + k, v) for k, v in n_packet.header.iteritems())
+            n_env = frozendict(n_env)
             self.body._eval(n_packet, n_env, act)
         
-class PolComposition(Policy, Data("left right")):
-    def __repr__(self):
-        return "PolComposition:\n%s" % util.repr_plus([self.left, self.right])
+class PolComposition(util.ReprPlusMixin, Policy, Data("left right")):
+    _mes_drop = PolPassthrough
     def _eval(self, packet, env, act):
         act_ = Action()
         self.left._eval(packet, env, act_)
         for moddict, n_packet in act_.enumerate_eval(packet):
             n_act = Action()
-            n_env = env.update({"_." + k : v for k, v in n_packet.header.iteritems()})
+            n_env = dict() 
+            for k, v in env.iteritems():
+                if not k.startswith("_."):
+                    n_env[k] = v
+            n_env.update(("_." + k, v) for k, v in n_packet.header.iteritems())
+            n_env = frozendict(n_env)
             self.right._eval(n_packet, n_env, n_act)
             for moddict_, count in n_act.iteritems():
-                n_moddict = moddict_.update(moddict)
+                n_moddict = frozendict(util.merge_dicts(moddict, moddict_))
                 act[n_moddict] += count
             
-class PolUnion(Policy, Data("left right")):
-    def __repr__(self):
-        return "PolUnion:\n%s" % util.repr_plus([self.left, self.right])
-                                             
+class PolUnion(util.ReprPlusMixin, Policy, Data("left right")):
+    _mes_drop = PolDrop
     def _eval(self, packet, env, act):
         self.left._eval(packet, env, act)
         self.right._eval(packet, env, act)
         
-class PolRemove(Policy, Data("policy predicate")):
-    def __repr__(self):
-        return "PolRemove:\n%s" % util.repr_plus([self.left, self.right])
+class PolRemove(util.ReprPlusMixin, Policy, Data("policy predicate")):
+    _mes_attrs = {"predicate": PredDifference}
+    
     def _eval(self, packet, env, act):
         if not self.predicate._eval(packet, env):
             self.policy._eval(packet, env, act)
@@ -507,6 +506,7 @@ no_packets = PredNone()
 def let(policy, body):
     assert hasattr(body, "func_code"), "must be a function (literally)"
     name = body.func_code.co_varnames[0]
+    assert name != "_", "the name _ is reserved for the implicit packet"
     return PolLet(name,
                   policy,
                   body(PacketMatch(name)))
@@ -631,41 +631,41 @@ def generate_vlan_db(start_vlan, vinfo):
 def vheaders_to_vlan_policy(vlan_db):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
     
-    return (_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
+    return ((_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
             | enum((_.vswitch, vinfo.iterkeys()), # otherwise, encode.
                    lambda s:
                    enum((_.vinport, vinfo[s]),
                         (_.voutport, vinfo[s]),
-                        lambda ip, op:
-                        modify(vswitch=None,
-                               vinport=None,
-                               voutport=None,
-                               vlan=vheaders_to_vlan[(s, ip, op)]))))
+                        lambda ip, op: modify(vlan=vheaders_to_vlan[(s, ip, op)]))))
+            >> modify(vswitch=None,
+                      vinport=None,
+                      voutport=None))
     
 def vlan_to_vheaders_policy(vlan_db):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
 
     def vlan_dict_helper(vlan):
         (vswitch, vinport, voutport) = vlan_to_vheaders[vlan]
-        return modify(vlan=None, vswitch=vswitch, vinport=vinport, voutport=voutport)
+        return modify(vswitch=vswitch, vinport=vinport, voutport=voutport)
     
-    return enum((_.vlan, vlan_to_vheaders), vlan_dict_helper)
+    return (enum((_.vlan, vlan_to_vheaders.iterkeys()), vlan_dict_helper) >>
+            modify(vlan=None))
     
 def pre_vheaders_to_headers_policy(vlan_db):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
     
-    return enum((_.vswitch, vinfo.iterkeys()), 
-                lambda s:
-                enum((_.vinport, vinfo[s]),
-                     lambda ip: modify(switch=s,
-                                       inport=ip,
-                                       vswitch=None,
-                                       vinport=None)))
+    return (enum((_.vswitch, vinfo.iterkeys()), 
+                 lambda s:
+                 enum((_.vinport, vinfo[s]),
+                      lambda ip: modify(switch=s,
+                                        inport=ip)))
+            >> modify(vswitch=None,
+                      vinport=None))
 
 def headers_to_post_vheaders(vlan_db, x):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
     
-    return enum((x.vswitch, vinfo.iterkeys()),
+    return enum((x.switch, vinfo.iterkeys()),
                 lambda s:
                 enum((x.outport, vinfo[s]),
                      lambda op: modify(voutport=op)))

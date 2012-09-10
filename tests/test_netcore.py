@@ -61,17 +61,19 @@ def test_Action():
     p = modify(srcport=100, dstport=100).packets_to_send(packets[1])[0]
     assert p.srcport == 100 and p.dstport == 100
 
-
-let_pol1 = let(modify(dstport=1), lambda p: ((_.dstport == 700) & (p.dstport == 1)) & fwd(100))
-
 def test_Let():
+    let_pol1 = let(modify(dstport=1), lambda p: ((_.dstport == 700) & (p.dstport == 1)) & fwd(100))
     assert let_pol1.packets_to_send(packets[1])[0].outport == Port(100)
     assert let_pol1.packets_to_send(packets[1])[0].dstport == 700
-
-comp_pol1 = modify(dstport=1) >> ((_.dstport == 1) & (_.srcport == 30) & fwd(100))
     
 def test_Composition():
+    comp_pol1 = modify(dstport=1) >> ((_.dstport == 1) & (_.srcport == 30) & fwd(100))
     assert comp_pol1.packets_to_send(packets[1])[0].outport == Port(100)
+    
+    comp_pol2 = modify(vinport=None, vswitch=None) >> (((_.vinport == 1) | (_.vswitch == 1)) & fwd(100))
+    assert comp_pol2.packets_to_send(packets[1].update_header_fields(vswitch=1,vinport=1)) == []
+
+    
 
 def test_fwd():
     for packet in packets:
@@ -149,9 +151,14 @@ def test_virtualization():
     vn.install_policy(user_policy)
 
     import time
-    time.sleep(0.0001)
+    time.sleep(0.01)
 
-    assert n.get_policy().packets_to_send(p) == [p7]
+    pol = n.get_policy()
+    # import ipdb;ipdb.set_trace()
+    p7_ = pol.packets_to_send(p)
+    print p7
+    print p7_
+    assert p7_ == [p7]
 
     
     
