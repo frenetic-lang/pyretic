@@ -52,7 +52,7 @@ from frenetic.lib import *
 
 
 v_switch = Switch(1)
-v_signature = {v_switch: [Port(1), Port(2), Port(3)]}
+vinfo = {v_switch: [Port(1), Port(2), Port(3)]}
 
 def get_ingress_policy():
     ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
@@ -79,5 +79,5 @@ def setup_virtual_network(network):
     ingress_policy = get_ingress_policy()
     physical_policy = get_physical_policy()
 
-    v_network = fork_virtual_network(network, v_signature, ingress_policy, physical_policy)
+    v_network = fork_virtual_network(network, vinfo, ingress_policy, physical_policy)
     return v_network

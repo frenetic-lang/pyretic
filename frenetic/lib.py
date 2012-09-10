@@ -39,4 +39,4 @@ from frenetic.generators import merge, run
 from frenetic.pox_backend import start, launch
 
 
-__all__ = locals().keys()
+__all__ = [k for k in locals().keys() if not k.startswith("__")]

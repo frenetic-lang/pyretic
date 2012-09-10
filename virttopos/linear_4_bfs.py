@@ -30,34 +30,34 @@
 
 from frenetic.lib import *
 
+vmap = VMap({
+    (1, 1): (1, 1),
+    (2, 1): (1, 2),
+    (3, 1): (1, 3),
+    (4, 1): (1, 4)
+})
 
-v_switch = Switch(1)
-v_signature = {v_switch: [Port(1), Port(2), Port(3), Port(4)]}
 
-def get_ingress_policy():
-    ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
-                       (_.switch == Switch(2)) & (_.inport == 1)  & modify(vinport = 2) | 
-                       (_.switch == Switch(3)) & (_.inport == 1)  & modify(vinport = 3))
-                      >> modify(vswitch = Switch(1)))
-    return ingress_policy
+physical_policy = gen_static_physical_policy({
+    (1, 1, 1) : fwd(1),
+    (1, 1, 2) : fwd(2),
+    (1, 1, 3) : fwd(2),
+    (1, 1, 4) : fwd(2),
+    
+    (2, 1, 1) : fwd(2),
+    (2, 1, 2) : fwd(1),
+    (2, 1, 3) : fwd(3),
+    (2, 1, 4) : fwd(3),
+    
+    (3, 1, 1) : fwd(2),
+    (3, 1, 2) : fwd(2),
+    (3, 1, 3) : fwd(1),
+    (3, 1, 4) : fwd(3),
+    
+    (4, 1, 1) : fwd(2),
+    (4, 1, 2) : fwd(2),
+    (4, 1, 3) : fwd(2),
+    (4, 1, 4) : fwd(1),
+})
 
-def get_physical_policy():
-    physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1)  | 
-                                                  (_.voutport == 2) & fwd(2)  | 
-                                                  (_.voutport == 3) & fwd(3))
-                       
-                       |  (_.switch == Switch(2)) & ((_.voutport == 1) & fwd(2) | 
-                                                     (_.voutport == 2) & fwd(1) | 
-                                                     (_.voutport == 3) & fwd(3))
-                       
-                       |  (_.switch == Switch(3)) &  ((_.voutport == 1) & fwd(3) | 
-                                                      (_.voutport == 2) & fwd(2) | 
-                                                      (_.voutport == 3) & fwd(1)))
-    return physical_policy
-
-def setup_virtual_network(network):
-    ingress_policy = get_ingress_policy()
-    physical_policy = get_physical_policy()
-
-    v_network = fork_virtual_network(network, v_signature, ingress_policy, physical_policy)
-    return v_network
+setup_virtual_network = vmap.make_fork_func(physical_policy)

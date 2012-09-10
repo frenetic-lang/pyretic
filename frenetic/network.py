@@ -326,6 +326,14 @@ class Packet(Data("header payload")):
         payload = _propagate_header_to_payload(header, self.payload)
         return self.replace(header=header, payload=payload)
 
+    def __repr__(self):
+        l = []
+        size = max(map(len, self.header)) + 3
+        for k, v in self.header.iteritems():
+            l.append("%s:%s%s" % (k, " " * (size-len(k)), v))
+        return "\n".join(l)
+
+        
     def __getattr__(self, attr):
         return self.header[attr]
 

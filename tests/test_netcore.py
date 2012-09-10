@@ -106,9 +106,25 @@ def test_match_ints():
     assert     (_.srcport == "0000000000011110").eval(packets[1])
 
 
+def test_copy():
+    p = packets[1].update_header_fields(switch=10)
+    p_ = p.update_header_fields(vswitch=10)
+    assert copy_fields(vswitch=_.switch).packets_to_send(p) == [p_]
+
+
 # Test virtualization
 #
 
+def test_vlan_db():
+    from virttopos.linear_4_bfs import vmap
+    vinfo = vmap.to_vinfo()
+    vlan_db = generate_vlan_db(1, vinfo)
+
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+
+    vs = vheaders_to_vlan.values()
+    for v in vs:
+        assert vs.count(v) == 1
 
 def test_virtualization_works():
     vinfo = {Switch(1): [1, 2, 3, 4, 5]}
@@ -116,19 +132,19 @@ def test_virtualization_works():
     virtualize_policy(vdb, drop, drop, fwd(3))
 
 
-def test_virtualization():
-    from examples.virtualized_monitor import v_signature, get_ingress_policy, get_physical_policy, setup_virtual_network
+def test_tri_topos():
+    from virttopos.triangle_bfs import vinfo, get_ingress_policy, get_physical_policy, setup_virtual_network
 
-    vlan_db = generate_vlan_db(0, v_signature)
+    vlan_db = generate_vlan_db(1, vinfo)
     user_policy = fwd(3)
 
-    p = packets[2]
+    p = packets[2].update_header_fields(switch=1, inport=1)
     p2 = p.update_header_fields(vswitch=1, vinport=1)
 
     assert get_ingress_policy().packets_to_send(p) == [p2]
 
     p3 = p.update_header_fields(switch=1, inport=1)
-    assert pre_vheaders_to_headers_policy(vlan_db).packets_to_send(p2) == [p3]
+    assert pre_vheaders_to_headers_policy().packets_to_send(p2) == [p3]
 
     p4 = p3.update_header_fields(outport=3)
     assert user_policy.packets_to_send(p3) == [p4]
@@ -156,20 +172,50 @@ def test_virtualization():
     time.sleep(0.01)
 
     pol = n.get_policy()
-    # import ipdb;ipdb.set_trace()
     p7_ = pol.packets_to_send(p)
     print p7
     print p7_
     assert p7_ == [p7]
 
     
+def test_linear_topos():
+    from virttopos.linear_4_bfs import vmap, setup_virtual_network
+
+    user_policy = fwd(3)
+    
+    p = packets[2].update_header_fields(switch=1, inport=1)
+    
+    n = Network()
+    vn = setup_virtual_network(n)
+    vn.install_policy(user_policy)
+
+    import time
+    time.sleep(0.01)
+
+    pol = n.get_policy()
+
+    p_ = pol.packets_to_send(p)[0]
+
+    assert p_.outport == Port(2)
+
+    # Now lets test the second packet. Can it get to the third hop?
+    p2 = p_.update_header_fields(switch=2, outport=None, inport=2)
+
+    p2_ = pol.packets_to_send(p2)[0]
+    
+    assert p2_.outport == Port(3) 
+
+    # Third hop.
+    p3 = p_.update_header_fields(switch=3, outport=None, inport=2)
+    p3_ = pol.packets_to_send(p3)[0]
+
+    assert p3_.outport == Port(1)
+    assert p3_.vlan == 0
+    
     
 ################################################################################
 # Test networks
 ################################################################################
-
-def test_in_place():
-    pass
 
 def test_Network():
     n = Network()

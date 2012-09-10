@@ -30,11 +30,11 @@
 
 from frenetic.lib import *
 from examples import monitor_packets
-from virttopos.triangle_bfs import *
 
+from virttopos import linear_4_bfs
+                      
 def monitor(network):
-    v_network = setup_virtual_network(network)
+    v_network = linear_4_bfs.setup_virtual_network(network)
     run(monitor_packets.monitor, v_network) 
-
 
 start(monitor)

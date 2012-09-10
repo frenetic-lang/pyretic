@@ -389,7 +389,14 @@ class PolModify(Policy, Data("field value")):
         return "modify %s <- %s" % self
     def _eval(self, packet, env, act):
         act[frozendict({self.field: self.value})] += 1
-    
+
+class PolCopy(Policy, Data("field1 field2")):
+    """Policy that drops everything."""
+    def __repr__(self):
+        return "copy %s <- %s" % self
+    def _eval(self, packet, env, act):
+        act[frozendict({self.field1: env.get(self.field2, None)})] += 1
+        
 class PolRestrict(util.ReprPlusMixin, Policy, Data("predicate policy")):
     """Policy for mapping a single predicate to a list of actions."""
     _mes_attrs = {"predicate": PredIntersection} 
@@ -513,6 +520,18 @@ def let(policy, body):
 def if_(pred, t_branch, f_branch):
     return pred & t_branch | ~pred & f_branch
 
+def or_(*args):
+    k = args[0]
+    for arg in args[1:]:
+        k |= arg
+    return k
+    
+def and_(*args):
+    k = args[0]
+    for arg in args[1:]:
+        k &= arg
+    return k
+
 drop = PolDrop()
 passthrough = PolPassthrough()
 
@@ -525,8 +544,14 @@ def modify(**kwargs):
     return policy
 
 def fwd(port):
-    return modify(outport=port) 
+    return modify(outport=port)
 
+def copy_fields(**kwargs):
+    policy = passthrough
+    for k, v in kwargs.iteritems():
+        policy = policy >> PolCopy(k, v.qual_name())
+    return policy
+            
 flood = fwd(Port.flood_port)
 
 def enum(*args):
@@ -547,3 +572,7 @@ def enum(*args):
     return policy
         
 
+def is_port_real(port_match):
+    """is the port real?"""
+
+    return port_match == "0" + "?" * (Port.width - 1)

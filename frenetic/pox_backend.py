@@ -57,6 +57,7 @@ class POXBackend(revent.EventMixin):
 
     def _handle_PacketIn(self, event):
         packet = net.Packet(event.data, switch=event.dpid, inport=event.ofp.in_port)
+        
         n_pkts = self.network.get_policy().packets_to_send(packet)
         
         for pkt in n_pkts:
@@ -65,7 +66,8 @@ class POXBackend(revent.EventMixin):
                 self.send_packet(pkt)
             else:
                 bucket = pkt.outport.get_bucket()
-                bucket.signal(packet)
+                pkt = pkt.update_header_fields(outport=None)
+                bucket.signal(pkt)
 
     def _handle_ConnectionUp(self, event):
         if event.dpid not in self.switch_connections:
@@ -110,8 +112,9 @@ class POXBackend(revent.EventMixin):
 _hack_program = None
         
 def launch():
+    import pox
     backend = POXBackend(_hack_program)
-    core.register("pyretic", backend)
+    pox.pyr = backend
         
 def start(f):
     global _hack_program
