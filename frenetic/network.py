@@ -206,7 +206,7 @@ class Port(Data("port_or_bucket")):
     def to_bits(self):
         b = bitarray()
         b.append(not self.is_real())
-        b.frombytes(struct.pack("!q", int(self)))
+        b.frombytes(struct.pack("!Q", int(self)))
         return b
 
     def get_bucket(self):

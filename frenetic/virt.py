@@ -143,6 +143,21 @@ def pre_vheaders_to_headers_policy():
 
 def headers_to_post_vheaders(x):
     return copy_fields(voutport=x.outport)
+
+def flood_splitter_policy(vlan_db):
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+
+    flood_pol = drop
+    for vsw, vports in vinfo.iteritems():
+        pol = drop
+        for vport in vports:
+            vports_ = list(vports)
+            vports_.remove(vport)
+            vfwds = or_(*(modify(voutport=vport_) for vport_ in vports_))
+            pol |= and_(_.vinport == vport, vfwds)
+        flood_pol |= and_(_.vswitch == vsw, pol)
+        
+    return if_(_.voutport == Port.flood_port, flood_pol, passthrough)
     
 def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
     """
@@ -172,6 +187,7 @@ def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
                   # However, if vlan IS set, re-set the v* headers.
                   vlan_to_vheaders_policy(vlan_db))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
+            >> flood_splitter_policy(vlan_db)
             >> physical_policy
             # and translate the v* headers to a vlan value, since the real network
             # doesn't understand our custom headers.
@@ -199,20 +215,6 @@ class VMap(dict):
             ingress_policy |= and_(_.switch == sw, _.inport == inp, modify(vswitch=vsw, vinport=vip))
 
         return ingress_policy
-
-    def to_flood_splitter_policy(self):
-        vinfo = self.to_vinfo()
-
-        flood_pol = drop
-        for vsw, vports in vinfo:
-            pol = drop
-            for vport in vports:
-                vports_ = list(vports)
-                vports_.remove(vport)
-                pol |= and_(_.vinport == vport, or_(*map(fwd, vports_)))
-            flood_pol |= and_(_.vswitch == vsw, pol)
-        
-        return if_(_.voutport == Port.flood_port, flood_pol, passthrough)
 
     def to_egress_policy(self):
         pred = no_packets
