@@ -33,4 +33,4 @@ from frenetic.lib import *
 def hub(network):
     network.install_policy( ~ (_.srcip == "1.2.3.*")  & flood)
         
-start(hub)
+main = hub

@@ -32,4 +32,4 @@ def monitor(network):
     for pkt in network.query(all_packets):
         print "I see packet: ", pkt
 
-start(monitor)
+main = monitor

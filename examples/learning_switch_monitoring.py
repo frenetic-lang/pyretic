@@ -10,6 +10,6 @@ def learning_switch_monitoring(network):
     run(monitor_packets.monitor, fork_sub_network(network))
     run(monitor_switches.monitor, fork_sub_network(network))
 
-start(learning_switch_monitoring)
+main = learning_switch_monitoring
 
     

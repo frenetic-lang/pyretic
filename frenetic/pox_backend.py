@@ -37,9 +37,9 @@ import pox.openflow.libopenflow_01 as of
 
 
 class POXBackend(revent.EventMixin):
-    def __init__(self, user_program):
+    # NOT **kwargs
+    def __init__(self, user_program, kwargs):
         self.network = virt.Network()
-        self.user_program = user_program
         self.switch_connections = {}
         
         if core.hasComponent("openflow"):
@@ -47,8 +47,8 @@ class POXBackend(revent.EventMixin):
         else:
             # We'll wait for openflow to come up
             self.listenTo(core)
-
-        gs.run(self.user_program, self.network)
+        
+        gs.run(user_program, self.network, **kwargs)
 
     def _handle_ComponentRegistered (self, event):
         if event.name == "openflow":
@@ -107,15 +107,8 @@ class POXBackend(revent.EventMixin):
 
         self.switch_connections[int(switch)].send(msg)
 
-        
-
-_hack_program = None
-        
-def launch():
+def launch(module_dict, **kwargs):
     import pox
-    backend = POXBackend(_hack_program)
+    backend = POXBackend(module_dict["main"], kwargs)
     pox.pyr = backend
         
-def start(f):
-    global _hack_program
-    _hack_program = f

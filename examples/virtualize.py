@@ -26,15 +26,17 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-# Intended to be used with ./mininet.sh --topo triangle
-
 from frenetic.lib import *
-from examples import monitor_packets
 
-from virttopos import linear_4_bfs
-                      
-def monitor(network):
-    v_network = linear_4_bfs.setup_virtual_network(network)
-    run(monitor_packets.monitor, v_network) 
+def virtualize(network, virttopo, program):
+    virttopons = {}
+    programns = {}
+    execfile(virttopo, virttopons)
+    execfile(program, programns)
 
-start(monitor)
+    vn = virttopons["setup_virtual_network"](network)
+
+    programns["main"](vn)
+    
+    
+main = virtualize

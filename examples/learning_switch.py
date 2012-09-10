@@ -48,6 +48,6 @@ def learning_switch(network):
         policy |= host_p & fwd(pkt.inport)  # Do this instead.
         network.install_policy(policy)
 
-start(learning_switch)
+main = learning_switch
 
 

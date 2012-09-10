@@ -33,4 +33,4 @@ from frenetic.lib import *
 def hub(network):
     network.install_policy(modify(srcmac="00000001" * 6) >> flood)
         
-start(hub)
+main = hub

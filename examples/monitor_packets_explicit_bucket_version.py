@@ -35,5 +35,6 @@ def monitor(network):
 
     for pkt in b:
         print "I see packet: ", pkt
-     
-start(monitor)
+
+main = monitor
+

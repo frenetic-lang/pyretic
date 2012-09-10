@@ -32,4 +32,4 @@ def monitor(network):
     for switch in network.switch_joins:
         print "Add switch: %s" % switch
 
-start(monitor)
+main = monitor
