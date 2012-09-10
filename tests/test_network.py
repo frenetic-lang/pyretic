@@ -124,3 +124,13 @@ def test_packet_modify():
             assert getattr(p0, attr) == MAC("01:01:01:01:01:05")
         else:
             assert getattr(p0, attr) == getattr(packets[0], attr)
+
+def test_vlan():
+    """setting the vlan should always work"""
+    import random
+    for packet in packets:
+        r = random.randint(1, 2**12-1)
+        p1 = packet.update_header_fields(vlan=r)
+        p2 = Packet(p1.payload)
+        assert p1.vlan == r
+        assert real_packets_equal(p1, p2), "did the setting actually work?"

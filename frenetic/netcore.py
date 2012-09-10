@@ -133,6 +133,18 @@ def Wildcard(width_):
                 
             return super(Wildcard_, cls).__new__(cls, prefix, mask)
 
+        def __hash__(self):
+            return hash((self.prefix.tobytes(), self.mask.tobytes()))
+
+        def __repr__(self):
+            l = []
+            for pb, mb in zip(self.prefix, self.mask):
+                if mb:
+                    l.append("?")
+                else:
+                    l.append(str(int(pb)))
+            return "".join(l)
+        
         @classmethod
         def top(cls):
             prefix = bitarray(cls.width)
@@ -242,6 +254,8 @@ class IPWildcard(Wildcard(32)):
 # Predicates
 ################################################################################
 
+
+
 class Predicate(object):
     """Top-level abstract class for predicates."""
    
@@ -256,8 +270,6 @@ class Predicate(object):
         return PredDifference(self, other)
     def __invert__(self):
         return PredNegation(self)
-    def __rshift__(self, pol):
-        return PolImply(self, pol)
     def __eq__(self, other):
         raise NotImplementedError
     def __ne__(self, other):
@@ -269,52 +281,55 @@ class Predicate(object):
 class PredAll(Predicate):
     """The always-true predicate."""
     def __repr__(self):
-        return "*"
+        return "all_packets"
     def _eval(self, packet, env):
         return True
       
 class PredNone(Predicate):
     """The always-false predicate."""
     def __repr__(self):
-        return "~*"
+        return "no_packets"
     def _eval(self, packet, env):
         return False
     
 class PredMatch(Predicate, Data("varname pattern")):
     """A basic predicate matching against a single field"""
     def __repr__(self):
-        return "%s:%s" % (self.varname, self.pattern)
+        return "%s == %s" % (self.varname, self.pattern)
     def _eval(self, packet, env):
         if self.pattern is None:
             return self.varname not in env
         else:
-            return self.pattern.match(env[self.varname])
-        
+            if self.varname in env:
+                return self.pattern.match(env[self.varname])
+            else:
+                return False
+                
 class PredUnion(Predicate, Data("left right")):
     """A predicate representing the union of two predicates."""
     def __repr__(self):
-        return "(%s) | (%s)" % (self.left, self.right)
+        return "PredUnion:\n%s" % util.repr_plus([self.left, self.right])
     def _eval(self, packet, env):
         return self.left._eval(packet, env) or self.right._eval(packet, env)
         
 class PredIntersection(Predicate, Data("left right")):
     """A predicate representing the intersection of two predicates."""
     def __repr__(self):
-        return "(%s) & (%s)" % (self.left, self.right)
+        return "PredIntersection:\n%s" % util.repr_plus([self.left, self.right])
     def _eval(self, packet, env):
         return self.left._eval(packet, env) and self.right._eval(packet, env)
 
 class PredDifference(Predicate, Data("left right")):
     """A predicate representing the difference of two predicates."""
     def __repr__(self):
-        return "(%s) - (%s)" % (self.left, self.right)
+        return "PredDifference:\n%s" % util.repr_plus([self.left, self.right])
     def _eval(self, packet, env):
         return self.left._eval(packet, env) and not self.right._eval(packet, env)
 
 class PredNegation(Predicate, Data("pred")):
     """A predicate representing the difference of two predicates."""
     def __repr__(self):
-        return "~(%s)" % (self.pred)
+        return "PredNegation:\n%s" % util.repr_plus(self)
     def _eval(self, packet, env):
         return not self.pred._eval(packet, env)
 
@@ -326,15 +341,7 @@ class Action(Counter):
     def enumerate_eval(self, packet):
         packets = []
         for moddict in self.elements():
-            h = dict(packet.header)
-            for k, v in moddict.iteritems():
-                if v is None:
-                    if k in h:
-                        del h[k]
-                else:
-                    assert isinstance(v, FixedWidth) 
-                    h[k] = v
-            p = packet.update_header_fields(**h)
+            p = packet.update_header_fields(**moddict)
             packets.append((moddict, p))
         return packets
 
@@ -392,14 +399,14 @@ class PolModify(Policy, Data("field value")):
 class PolRestrict(Policy, Data("predicate policy")):
     """Policy for mapping a single predicate to a list of actions."""
     def __repr__(self):
-        return "%s & %s" % (self.predicate, self.policy)
+        return "PolRestrict:\n" + util.repr_plus([self.predicate, self.policy])
     def _eval(self, packet, env, act):
         if self.predicate._eval(packet, env):
             self.policy._eval(packet, env, act)
 
 class PolLet(Policy, Data("varname policy body")):
     def __repr__(self):
-        return "let %s <- (%s) in %s" % (self.varname, self.policy, self.body)
+        return "PolLet %s:\n%s" % (self.varname, util.repr_plus([self.policy, self.body]))
     def _eval(self, packet, env, act):
         act_ = Action()
         self.policy._eval(packet, env, act_)
@@ -410,7 +417,7 @@ class PolLet(Policy, Data("varname policy body")):
         
 class PolComposition(Policy, Data("left right")):
     def __repr__(self):
-        return "%s >> %s" % (self.left, self.right)
+        return "PolComposition:\n%s" % util.repr_plus([self.left, self.right])
     def _eval(self, packet, env, act):
         act_ = Action()
         self.left._eval(packet, env, act_)
@@ -424,14 +431,15 @@ class PolComposition(Policy, Data("left right")):
             
 class PolUnion(Policy, Data("left right")):
     def __repr__(self):
-        return "%s | %s" % (self.left, self.right)
+        return "PolUnion:\n%s" % util.repr_plus([self.left, self.right])
+                                             
     def _eval(self, packet, env, act):
         self.left._eval(packet, env, act)
         self.right._eval(packet, env, act)
         
 class PolRemove(Policy, Data("policy predicate")):
     def __repr__(self):
-        return "%s - %s" % (self.predicate, self.policy)
+        return "PolRemove:\n%s" % util.repr_plus([self.left, self.right])
     def _eval(self, packet, env, act):
         if not self.predicate._eval(packet, env):
             self.policy._eval(packet, env, act)
@@ -442,8 +450,11 @@ class PolRemove(Policy, Data("policy predicate")):
 
 header_to_matchable_lift = dict(
     switch=MatchExact(Switch),
+    vswitch=MatchExact(Switch),
     inport=MatchExact(Port),
     outport=MatchExact(Port),
+    vinport=MatchExact(Port),
+    voutport=MatchExact(Port),
     srcmac=MatchExact(MAC),
     dstmac=MatchExact(MAC),
     vlan=MatchExact(FixedInt(12)),
@@ -454,7 +465,7 @@ header_to_matchable_lift = dict(
     dstport=MatchExact(FixedInt(16)),
     protocol=MatchExact(FixedInt(8)),
     tos=MatchExact(FixedInt(6)),
-    type=MatchExact(FixedInt(16)))
+    type=MatchExact(FixedInt(16)),)
 
 def lift_matchable_kv(k, v):
     cls = header_to_matchable_lift.get(k)
@@ -466,13 +477,6 @@ def lift_matchable_kv(k, v):
         if not isinstance(v, tuple):
             v = (v,)
         return cls(*v)
-
-def lift_matchable_dict(d):
-    r = {}
-    for k, v in d.iteritems():
-        v2 = lift_matchable_kv(k, v)
-        r[k] = v2
-    return r
     
 ################################################################################
 # Predicates and policies
@@ -516,7 +520,8 @@ passthrough = PolPassthrough()
 def modify(**kwargs):
     policy = passthrough
     for k, v in kwargs.iteritems():
-        v = lift_fixedwidth_kv(k, v)
+        if v is not None:
+            v = lift_fixedwidth_kv(k, v)
         policy = policy >> PolModify(k, v)
     return policy
 
@@ -530,14 +535,15 @@ def enum(*args):
     fn = args[-1]
 
     fields = [ field for field, values in fnargs ]
-    values = [ values for field, values in fnargs ]
+    value_row = itertools.product(*[values for field, values in fnargs])
 
     policy = drop
-    for fieldvalues in izip(fields, product(*(enumerate(v) for v in values))):
-        pred = no_packets
-        for k, (i, v) in fieldvalues:
-            pred &= k == v
-        policy |= pred >> fn(*(i for k, (i, v) in fieldvalues))
+    
+    for vr in value_row:
+        pred = all_packets
+        for i, v in enumerate(vr):
+            pred &= fields[i] == v
+        policy |= pred & fn(*vr)
         
     return policy
         
@@ -595,21 +601,87 @@ def fork_sub_network(network):
     
     return sub_net
 
+
 ################################################################################
 # Virtualization
 ################################################################################
 
-def virtualize_policy(vinfo, ingress_policy, physical_policy, policy):
+def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
+    sub_net = Network()
+    vlan_db = generate_vlan_db(0, vinfo)
+
+    network.install_sub_policies(
+        virtualize_policy(vlan_db, ingress_policy, physical_policy, policy)
+        for policy in sub_net.policy_changes)
+    
+    return sub_net
+
+def generate_vlan_db(start_vlan, vinfo):
+    vlan_to_vheaders = {}
+    vheaders_to_vlan = {}
+    
+    for si, vswitch in enumerate(vinfo):
+        for ipi, vinport in enumerate(vinfo[vswitch]):
+            for opi, voutport in enumerate(vinfo[vswitch]):
+                vlan_to_vheaders[start_vlan + si + ipi + opi] = (vswitch, vinport, voutport)
+                vheaders_to_vlan[(vswitch, vinport, voutport)] = start_vlan + si + ipi + opi
+
+    return (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan)
+
+def vheaders_to_vlan_policy(vlan_db):
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+    
+    return (_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
+            | enum((_.vswitch, vinfo.iterkeys()), # otherwise, encode.
+                   lambda s:
+                   enum((_.vinport, vinfo[s]),
+                        (_.voutport, vinfo[s]),
+                        lambda ip, op:
+                        modify(vswitch=None,
+                               vinport=None,
+                               voutport=None,
+                               vlan=vheaders_to_vlan[(s, ip, op)]))))
+    
+def vlan_to_vheaders_policy(vlan_db):
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+
+    def vlan_dict_helper(vlan):
+        (vswitch, vinport, voutport) = vlan_to_vheaders[vlan]
+        return modify(vlan=None, vswitch=vswitch, vinport=vinport, voutport=voutport)
+    
+    return enum((_.vlan, vlan_to_vheaders), vlan_dict_helper)
+    
+def pre_vheaders_to_headers_policy(vlan_db):
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+    
+    return enum((_.vswitch, vinfo.iterkeys()), 
+                lambda s:
+                enum((_.vinport, vinfo[s]),
+                     lambda ip: modify(switch=s,
+                                       inport=ip,
+                                       vswitch=None,
+                                       vinport=None)))
+
+def headers_to_post_vheaders(vlan_db, x):
+    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+    
+    return enum((x.vswitch, vinfo.iterkeys()),
+                lambda s:
+                enum((x.outport, vinfo[s]),
+                     lambda op: modify(voutport=op)))
+        
+def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
     """
     - `vinfo' is a mapping from switch to set of ports.
+    - `start_vlan, ...` - see generate_vlan_db
     - `ingress_policy' is written in terms of the physical network, and tries to
        detect whether a packet is at the ingress of a virtual switch. If the packet
-       is at the ingress of a virtual switch, then modify the vswitch and vsrcport of the
+       is at the ingress of a virtual switch, then modify the vswitch and vinport of the
        packet to be the current virtual switch and the inport we are at, respectively .
     - `policy' is written in terms of the virtual network, and modifies the outport field.
-       We will modify the vdstport of the packet to be the outport returned.
+       We will modify the voutport of the packet to be the outport returned.
     - `physical_policy' is written in terms of the physical network, and tries to
-       forward packets along the fabric of the virtual switch until vdstport is reached.
+       forward packets along the fabric of the virtual switch until voutport is reached.
        When the packet leaves vswitch, the v* headers must be removed.
 
        (Implementation detail: removing vswitch is sufficient).
@@ -617,58 +689,16 @@ def virtualize_policy(vinfo, ingress_policy, physical_policy, policy):
     Returns the virtualization of `policy' with respect to the other parameters.
     """
 
-    # Utility
-    #
-
-    vswitches = sorted(vinfo)
-
-    def vlan_offset(si):
-        return sum(len(vports)**2 for vports in vswitches[:si])
-
-    max_vlan = vlan_offset(len(vswitches))
-    vlans = xrange(max_vlan)
-    
-     # Slow, but clear. There is undoubtably a faster way to do this.
-    def vheader_from_vlan(vlan):
-        for vswitch, si in enumerate(vswitches):
-            for vsrcport, spi in enumerate(vports[vswitch]):
-                for vdstport, vpi in enumerate(vports[vswitch]):
-                    if si + spi + vpi == vlan:
-                        return dict(vswitch=vswitch,
-                                    vsrcport=vsrcport,
-                                    vdstport=vdstport)
-
-
-    # vlan encoding policies
-    # 
-
-    v_headers_to_vlan = (_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
-                         | enum((_.vswitch, vswitches), # otherwise, encode.
-                             lambda si:
-                               enum((_.vsrcport, vinfo[vswitches[vi]]),
-                                    (_.vdstport, vinfo[vswitches[vi]]),
-                                    lambda spi, dpi:
-                                      modify(vlan=vlan_offset(si) + spi*dpi,
-                                             vswitch=None,
-                                             vsrcport=None,
-                                             vdstport=None))))
-   
-    vlan_to_v_headers = enum((_.vlan, vlans),
-                             lambda vlan: modify(vlan=None,
-                                                 **vheader_from_vlan(vlan)))
-
     return (if_(_.vlan.is_missing(), # if the vlan isnt set, then we need to find out the v* headers.
-                    (ingress_policy >> # set vswitch and vsrcport
+                    (ingress_policy >> # set vswitch and vinport
                     # now make the virtualization transparent to the tenant's policy to get the outport
-                     let(modify(switch=_.vswitch, inport=_.vsrcport) >> policy,
-                         lambda x:
-                             # and finally set the vsrcport.
-                             modify(vdstport=x.outport))),
+                     let(pre_vheaders_to_headers_policy(vlan_db) >> policy,
+                         lambda x: headers_to_post_vheaders(vlan_db, x))),
                   # However, if vlan IS set, re-set the v* headers.
-                  vlan_to_v_headers )
+                  vlan_to_vheaders_policy(vlan_db))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
             >> physical_policy
             # and translate the v* headers to a vlan value, since the real network
             # doesn't understand our custom headers.
-            >> v_headers_to_vlan)
+            >> vheaders_to_vlan_policy(vlan_db))
           

@@ -26,6 +26,8 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+# Intended to be used with ./mininet.sh --topo triangle
+
 from frenetic.lib import *
 from examples import monitor_packets
     
@@ -40,43 +42,52 @@ from examples import monitor_packets
 #  |              /--------+-               |
 #  |             / 2         \- 3           |
 #  |            /              \-           |
-#  |           /                 \- 2       |
-#  |          /  3            +----\---+    |
-#  |     +---/---+ 2       3  |        |    |
+#  |           /                 \- 3       |
+#  |          /  2            +----\---+    |
+#  |     +---/---+ 3       2  |        |    |
 #  |     | s102  |------------| s103   |    |
 #  |     |       |            |        |    |
 #  |     +---+---+            +----+---+    |
 #  |         | 1                   | 1      |
 #  +---------+---------------------+--------+
 #            | 2                    | 3
+
+
+
+v_switch = Switch(1)
+v_signature = {v_switch: [Port(1), Port(2), Port(3)]}
+
+def get_ingress_policy():
+    ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
+                       (_.switch == Switch(2)) & (_.inport == 1)  & modify(vinport = 2) | 
+                       (_.switch == Switch(3)) & (_.inport == 1)  & modify(vinport = 3))
+                      >> modify(vswitch = Switch(1)))
+    return ingress_policy
+
+def get_physical_policy():
+    physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1)  | 
+                                                  (_.voutport == 2) & fwd(2)  | 
+                                                  (_.voutport == 3) & fwd(3))
+                       
+                       |  (_.switch == Switch(2)) & ((_.voutport == 1) & fwd(2) | 
+                                                     (_.voutport == 2) & fwd(1) | 
+                                                     (_.voutport == 3) & fwd(3))
+                       
+                       |  (_.switch == Switch(3)) &  ((_.voutport == 1) & fwd(3) | 
+                                                      (_.voutport == 2) & fwd(2) | 
+                                                      (_.voutport == 3) & fwd(1)))
+    return physical_policy
+
+def setup_virtual_network(network):
+    ingress_policy = get_ingress_policy()
+    physical_policy = get_physical_policy()
+
+    v_network = fork_virtual_network(network, v_signature, ingress_policy, physical_policy)
+    return v_network
                       
 def monitor(network):
+    v_network = setup_virtual_network(network)
+    run(monitor_packets.monitor, v_network) 
 
-    # SIGNATURE
-    v_signature = {v1:[1, 2, 3]}
-
-    # IMPLEMENTATION
-    ingress_policy = ((_.switch == 's101' & _.inport == 1 ) & modify(vsrcport = 1) | \
-                          (_.switch == 's102' & _.inport == 1) & modify(vsrcport = 2) | \
-                          (_.switch == 's103' & _.inport == 1) & modify(vsrcport = 3)) \
-                          >> modify(vswitch = 'v1')
-    internal_policy = (_.switch == 's101' & (_.vdstport == 1 & fwd(1)  | \
-                                            _.vdstport == 2 & fwd(2)  | \
-                                            _.vdstport == 3 & fwd(3)) | \
-                      _.switch == 's102' & (_.vdstport == 1 & fwd(3) | \
-                                            _.vdstport == 2 & fwd(1) | \
-                                            _.vdstport == 3 & fwd(2)) | \
-                      _.switch == 's103' & (_.vdstport == 1 & fwd(2) | \
-                                            _.vdstport == 2 & fwd(3) | \
-                                            _.vdstport == 3 & fwd(1)))
-    
-    run(monitor_packets.monitor, fork_virtual_network(network, v_signature, ingress_policy, internal_policy)
-
-    ## ALTERNATE, MORE EXPLICIT VERSION
-    # v_n = Network()
-    # run(monitor_packets.monitor, v_n)
-    # network.install_sub_policies(
-    #    virtualize_policy(v_signature, ingress_policy, internal_policy, pol) 
-    #    for pol in v_n.policy_changes())
 
 start(monitor)

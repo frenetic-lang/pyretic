@@ -76,7 +76,7 @@ def test_Composition():
 def test_fwd():
     for packet in packets:
         assert fwd(1).packets_to_send(packet)[0].outport == Port(1)
-    
+
 def test_match_ips():
     assert (_.dstip == "127.0.0.1").eval(packets[1])
     assert (_.dstip == "127.*.*.*").eval(packets[1])
@@ -100,6 +100,59 @@ def test_match_ints():
     assert     (_.srcport == "????????????????").eval(packets[1])
     assert     (_.srcport == "???????????1111?").eval(packets[1])
     assert     (_.srcport == "0000000000011110").eval(packets[1])
+
+
+# Test virtualization
+#
+
+
+def test_virtualization_works():
+    vinfo = {Switch(1): [1, 2, 3, 4, 5]}
+    vdb = generate_vlan_db(0, vinfo)
+    virtualize_policy(vdb, drop, drop, fwd(3))
+
+
+def test_virtualization():
+    from examples.virtualized_monitor import v_signature, get_ingress_policy, get_physical_policy, setup_virtual_network
+
+    vlan_db = generate_vlan_db(0, v_signature)
+    user_policy = fwd(3)
+
+    p = packets[2]
+    p2 = p.update_header_fields(vswitch=1, vinport=1)
+
+    assert get_ingress_policy().packets_to_send(p) == [p2]
+
+    p3 = p.update_header_fields(switch=1, inport=1)
+    assert pre_vheaders_to_headers_policy(vlan_db).packets_to_send(p2) == [p3]
+
+    p4 = p3.update_header_fields(outport=3)
+    assert user_policy.packets_to_send(p3) == [p4]
+
+    p5 = p2.update_header_fields(voutport=3)
+    # Can't do this, need a testing mechanism for it!
+    # assert let(passthrough, lambda x: headers_to_post_vheaders(vlan_db, x)).packets_to_send(p2) 
+
+    p6 = p5.update_header_fields(outport=3)
+    assert get_physical_policy().packets_to_send(p5) == [p6]
+
+    p7 = p6.update_header_fields(vswitch=None, vinport=None, voutport=None,
+                                 vlan=vlan_db[3][(Switch(1), Port(1), Port(3))])
+    
+    vp = vheaders_to_vlan_policy(vlan_db)
+    p7_ = vp.packets_to_send(p6)
+    assert p7_ == [p7]
+    
+
+    n = Network()
+    vn = setup_virtual_network(n)
+    vn.install_policy(user_policy)
+
+    import time
+    time.sleep(0.0001)
+
+    assert n.get_policy().packets_to_send(p) == [p7]
+
     
     
 ################################################################################

@@ -60,6 +60,7 @@ class FixedWidth(object):
     @abstractmethod
     def __ne__(self, other):
         pass
+
         
 @util.cached
 def Bits(width_):
@@ -85,6 +86,9 @@ def Bits(width_):
 
         def to_bits(self):
             return self._bits
+
+        def __hash__(self):
+            return hash(self.to_bits().tobytes())
 
         def __eq__(self, other):
             return self.to_bits() == other.to_bits()
@@ -201,7 +205,7 @@ class Port(Data("port_or_bucket")):
 
     def to_bits(self):
         b = bitarray()
-        b.append(self.is_real())
+        b.append(not self.is_real())
         b.frombytes(struct.pack("!q", int(self)))
         return b
 
@@ -209,6 +213,9 @@ class Port(Data("port_or_bucket")):
         """Redundant, but a nice extra check."""
         assert isinstance(self.port_or_bucket, Bucket)
         return self.port_or_bucket
+
+    def __hash__(self):
+        return hash(self.port_or_bucket)
     
     def __int__(self):
         if self.is_real():
@@ -295,9 +302,11 @@ class IP(Bits(32)):
 class Header(frozendict):
     def __init__(self, arg={}, **kwargs):
         if isinstance(arg, basestring):
-            arg = _pox_match_to_header(of.ofp_match.from_packet(packetlib.ethernet(arg)))
+            packet = packetlib.ethernet(arg)
+            match = of.ofp_match.from_packet(packet)
+            arg = _pox_match_to_header(match)
             
-        d = lift_fixedwidth_dict(util.merge_dicts(arg, kwargs))
+        d = lift_fixedwidth_dict(util.merge_dicts_deleting(arg, kwargs))
             
         return super(Header, self).__init__(d)
 
@@ -306,7 +315,7 @@ class Packet(Data("header payload")):
         return super(Packet, cls).__new__(cls, Header(payload, **kwargs), payload)
 
     def update_header_fields(self, **kwargs):
-        header = self.header.update(kwargs)
+        header = Header(util.merge_dicts_deleting(self.header, kwargs))
         payload = _propagate_header_to_payload(header, self.payload)
         return self.replace(header=header, payload=payload)
 
@@ -329,6 +338,9 @@ header_to_fixedwidth_lift = dict(
     switch=Switch,
     inport=Port,
     outport=Port,
+    vswitch=Switch,
+    vinport=Port,
+    voutport=Port,
     srcmac=MAC,
     dstmac=MAC,
     vlan=FixedInt(12),
@@ -343,9 +355,8 @@ header_to_fixedwidth_lift = dict(
 
 def lift_fixedwidth_kv(k, v):
     cls = header_to_fixedwidth_lift.get(k)
-
     if cls is None:
-        assert isinstance(v, nl.FixedWidth)
+        assert isinstance(v, FixedWidth)
         return v
     else:
         if not isinstance(v, tuple):
@@ -354,6 +365,13 @@ def lift_fixedwidth_kv(k, v):
 
 def lift_fixedwidth_dict(d):
     r = {}
+    # Factor this logic out?
+
+    if d.get("type") == 0x8100 or "vlan" in d or "vlan_pcp" in d:
+        d["type"] = 0x8100
+        d.setdefault("vlan", 0)
+        d.setdefault("vlan_pcp", 0)
+        
     for k, v in d.iteritems():
         v2 = lift_fixedwidth_kv(k, v)
         r[k] = v2
@@ -377,12 +395,9 @@ def _header_to_pox_match(h):
 
     if "type" in h:
         match.dl_type = int(h["type"])
-
-    if "vlan" in h:
-        match.dl_vlan = int(h["vlan"])
-
-    if "vlan_pcp" in h:
-        match.dl_vlan_pcp = int(h["vlan_pcp"])
+        if match.dl_type == 0x8100:
+            match.dl_vlan = int(h["vlan"])
+            match.dl_vlan_pcp = int(h["vlan_pcp"])
 
     if "srcip" in h:
         match.nw_src = packetaddr.IPAddr(h["srcip"].to_bits().tobytes())
@@ -419,10 +434,8 @@ def _pox_match_to_header(match):
     if match.dl_type is not None:
         h["type"] = match.dl_type
 
-    if match.dl_vlan is not None:
+    if match.dl_type == 0x8100:
         h["vlan"] = match.dl_vlan
-
-    if match.dl_vlan_pcp is not None:
         h["vlan_pcp"] = match.dl_vlan_pcp
 
     if match.nw_src is not None:
@@ -446,20 +459,28 @@ def _pox_match_to_header(match):
     return h
 
 def _propagate_header_to_payload(h, data):
-
     packet = p = packetlib.ethernet(data)
     match = _header_to_pox_match(h)
 
     p.src = match.dl_src
     p.dst = match.dl_dst
-    p.type = match.dl_type
-    p = p.next
-    
-    if isinstance(p, packetlib.vlan):
-        p.eth_type = match.dl_type
+
+    # Set the VLAN
+    if match.dl_type == 0x8100:
+        if isinstance(p.next, packetlib.vlan):
+            p = p.next
+        else:
+            old_eth_type = p.type
+            p.type = 0x8100
+            p.next = packetlib.vlan(next = p.next)
+            p = p.next
+            p.eth_type = old_eth_type
         p.id = match.dl_vlan
         p.pcp = match.dl_vlan_pcp
-        p = p.next
+    else:
+        pass # XXX is this right?
+        
+    p = p.next
   
     if isinstance(p, packetlib.ipv4):
         p.srcip = match.nw_src

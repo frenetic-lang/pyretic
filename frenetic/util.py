@@ -152,6 +152,7 @@ def Data(fields):
     class _Record(Record):
         _fields = fields
     return _Record
+    
 
 def merge_dicts(d1, d2):
     d = {}
@@ -159,6 +160,20 @@ def merge_dicts(d1, d2):
     d.update(d2)
     return d
 
+
+def merge_dicts_deleting(d1, d2):
+    d = {}
+    for k, v in d1.iteritems():
+        if v is not None:
+            d[k] = v
+    for k, v in d2.iteritems():
+        if v is None and k in d:
+            del d[k]
+        else:
+            d[k] = v
+    return d
+
+    
 def cached(func):
     def wrapper(*args):
         try:
@@ -251,4 +266,14 @@ class frozendict(object):
         
     def __len__(self):
         return len(self._dict)
-        
+
+def indent_str(s, indent=4):
+    return "\n".join(indent * " " + i for i in s.splitlines())
+
+def repr_plus(ss, indent=4, sep="\n=====\n"):
+    if isinstance(ss, basestring):
+        ss = [ss]
+    return indent_str(sep.join(map(repr, ss)), indent)
+    
+    
+    
