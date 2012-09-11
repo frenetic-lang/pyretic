@@ -32,6 +32,7 @@ from frenetic.netcore import *
 from frenetic.netcore import _
 from frenetic import util
 
+
 ################################################################################
 # Network
 ################################################################################
@@ -63,9 +64,8 @@ class Network(object):
         return self.policy_b.get()
 
     def install_sub_policies(self, sub_gen):
-        it = iter(sub_gen) # Don't leave creating the iterator up to timing.
         def adder():
-            for policy in it:
+            for policy in sub_gen:
                 self.sub_policies[sub_gen] = policy
                 self.policy_b.set(self._aggregate_policy())
         gs.run(adder)
@@ -77,7 +77,9 @@ class Network(object):
         return pol
         
 def add_sub_network(super_network, sub_network):
-    super_network.install_sub_policies(sub_network.policy_changes)
+    t = gs.Trigger(sub_network.policy_changes)
+    super_network.install_sub_policies(t)
+    t.wait()
         
 def fork_sub_network(network):
     sub_net = Network()
@@ -133,16 +135,20 @@ def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
 def fork_virtual_network_gen(network, vnetwork_gen):
     sub_net = Network()
 
+    t = gs.Trigger(sub_net.policy_changes)
+
     def subgen():
         for policy, (vinfo, ingress_policy, physical_policy) in \
-            gs.merge_hold(sub_net.policy_changes, vnetwork_gen):
+            gs.merge_hold(t, vnetwork_gen):
             yield virtualize_policy(generate_vlan_db(1, vinfo),
                                     ingress_policy,
                                     physical_policy,
                                     policy)
     
     network.install_sub_policies(subgen())
-        
+    
+    t.wait()
+    
     return sub_net
 
 def generate_vlan_db(start_vlan, vinfo):
@@ -314,6 +320,8 @@ class VMap(util.frozendict):
         return self.make_fork_func_gen(lambda network: [policy])
     
 def gen_static_physical_policy(route):
+    """(sw, vsw, vop) : act"""
+    
     policy = drop
 
     for (sw, vsw, vop), act in route.iteritems():

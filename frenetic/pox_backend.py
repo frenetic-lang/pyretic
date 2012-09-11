@@ -96,9 +96,9 @@ class POXBackend(revent.EventMixin):
         
     def _handle_PortStatus(self, event):
         if event.added:
-            self.network.port_ups((net.Switch(event.dpid), Port(event.port)))
-        elif event.removed:
-            self.network.port_downs((net.Switch(event.dpid), Port(event.port)))
+            self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
+        elif event.deleted:
+            self.network.port_downs.signal((net.Switch(event.dpid), net.Port(event.port)))
         
     def send_packet(self, packet):
         switch = int(packet.switch)
@@ -114,7 +114,9 @@ class POXBackend(revent.EventMixin):
             outport = of.OFPP_FLOOD
         msg.actions.append(of.ofp_action_output(port = outport))
 
-        self.switch_connections[switch].send(msg)
+        # XXX maybe raise an error if this doesn't work?
+        if switch in self.switch_connections:
+            self.switch_connections[switch].send(msg)
 
 def launch(module_dict, show_traces=False, **kwargs):
     import pox

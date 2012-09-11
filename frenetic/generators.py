@@ -85,6 +85,24 @@ class Behavior(Event):
     set = signal
 
 
+class Trigger(object):
+    def __init__(self, gen):
+        """
+        
+        Arguments:
+        - `gen`:
+        """
+        self._gen = gen
+        self._event = threading.Event()
+        super(Trigger, self).__init__()
+
+    def __iter__(self):
+        i = iter(self._gen)
+        self._event.set()
+        return i
+
+    def wait(self):
+        self._event.wait()
         
 # The ever famous generator multiplexer, courtesy of 
 # http://www.dabeaz.com/generators/genmulti.py
@@ -128,7 +146,7 @@ def merge_hold(*genlist):
         values.append(i.next())
     yield tuple(values)
     
-    gens = map(tag, iters, xrange(len(genlist)))
+    gens = map(tag, iters, xrange(len(iters)))
     for (i, v) in merge(*gens):
         values[i] = v
         yield tuple(values)
