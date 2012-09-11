@@ -58,6 +58,17 @@ class Event(object):
 
         return gen()
 
+
+class DelayedEvent(Event):
+    def __init__(self, delayed_items):
+        self.delayed_items = delayed_items
+        super(DelayedEvent, self).__init__()
+
+    def notify(self, listener):
+        for item in self.delayed_items:
+            listener(item)
+        return super(DelayedEvent, self).notify(listener)
+
         
 class Behavior(Event):
     def __init__(self, value=None):

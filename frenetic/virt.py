@@ -40,6 +40,8 @@ class Network(object):
     def __init__(self):
         self.switch_joins = gs.Event()
         self.switch_parts = gs.Event()
+        self.port_ups = gs.Event()
+        self.port_downs = gs.Event()
         
         self.policy_b = gs.Behavior(drop)
         self.policy_changes = self.policy_b # used only for iter method
@@ -303,7 +305,12 @@ class VMap(util.frozendict):
         vinfo = self.to_vinfo()
 
         def fork(network):
-            return fork_virtual_network(network, vinfo, ingress_policy, policy >> egress_policy)
+            vn = fork_virtual_network(network, vinfo, ingress_policy, policy >> egress_policy)
+            vn.switch_joins = gs.DelayedEvent(self.to_vinfo())
+            vn.switch_parts = gs.DelayedEvent([])
+            vn.port_ups = gs.DelayedEvent([])
+            vn.port_downs = gs.DelayedEvent([])
+            return vn
 
         return fork
     

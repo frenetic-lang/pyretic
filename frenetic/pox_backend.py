@@ -94,18 +94,12 @@ class POXBackend(revent.EventMixin):
             del self.switch_connections[event.dpid]
             self.network.switch_parts.signal(net.Switch(event.dpid))
         
-    def _handle_LinkEvent(self, event):
-        # Post this somewhere
-        pass
-
     def _handle_PortStatus(self, event):
-        # Post this somewhere
-        pass
-
-    def _handle_BarrierIn(self, event):
-        # We'll use this at some point?
-        pass
-
+        if event.added:
+            self.network.port_ups((net.Switch(event.dpid), Port(event.port)))
+        elif event.removed:
+            self.network.port_downs((net.Switch(event.dpid), Port(event.port)))
+        
     def send_packet(self, packet):
         switch = int(packet.switch)
         inport = int(packet.inport)
