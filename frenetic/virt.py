@@ -165,6 +165,8 @@ def generate_vlan_db(start_vlan, vinfo):
 
     return (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan)
 
+copy_vheaders = copy_fields(outport=_.voutport, switch=_.vswitch, inport=_.vinport)
+    
 strip_vheaders = modify(vswitch=None,
                         vinport=None,
                         voutport=None)

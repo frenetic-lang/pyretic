@@ -74,7 +74,7 @@ def get_physical_policy():
                        |  (_.switch == Switch(3)) &  ((_.voutport == 1) & fwd(3) | 
                                                       (_.voutport == 2) & fwd(2) | 
                                                       (_.voutport == 3) & fwd(1)))
-    return physical_policy
+    return if_(is_port_real(_.voutport), physical_policy, copy_vheaders)
 
     
 def get_egress_policy():
