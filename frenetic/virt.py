@@ -128,27 +128,20 @@ class SwitchDatabase(dict):
 
 
 def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
-    sub_net = Network()
-    vlan_db = generate_vlan_db(1, vinfo)
-
-    network.install_sub_policies(
-        virtualize_policy(vlan_db, ingress_policy, physical_policy, policy)
-        for policy in sub_net.policy_changes)
+    return fork_virtual_network_gen(network, [(vinfo, ingress_policy, physical_policy)])
     
-    return sub_net
-
-def fork_virtual_network_dyn(network, vnetwork_gen_fn):
+def fork_virtual_network_gen(network, vnetwork_gen):
     sub_net = Network()
 
-    def wrapper():
+    def subgen():
         for policy, (vinfo, ingress_policy, physical_policy) in \
-            merge_hold(sub_net.policy_changes, vnetwork_gen_fn(network)):
+            gs.merge_hold(sub_net.policy_changes, vnetwork_gen):
             yield virtualize_policy(generate_vlan_db(1, vinfo),
                                     ingress_policy,
                                     physical_policy,
                                     policy)
     
-    network.install_sub_policies(wrapper())
+    network.install_sub_policies(subgen())
         
     return sub_net
 
@@ -298,14 +291,17 @@ class VMap(util.frozendict):
         def handler((switch, port)):
             (vswitch, vport) = self[(switch, port)]
             vnetwork.port_downs.signal((vswitch, vport))
-             
-    def make_fork_func(self, policy):
+
+    def make_fork_func_gen(self, program):
         ingress_policy = self.to_ingress_policy()
         egress_policy = self.to_egress_policy()
         vinfo = self.to_vinfo()
 
         def fork(network):
-            vn = fork_virtual_network(network, vinfo, ingress_policy, policy >> egress_policy)
+            def gen():
+                for policy in program(network):
+                    yield (vinfo, ingress_policy, policy >> egress_policy)
+            vn = fork_virtual_network_gen(network, gen())
             vn.switch_joins = gs.DelayedEvent(self.to_vinfo())
             vn.switch_parts = gs.DelayedEvent([])
             vn.port_ups = gs.DelayedEvent([])
@@ -313,6 +309,9 @@ class VMap(util.frozendict):
             return vn
 
         return fork
+        
+    def make_fork_func(self, policy):
+        return self.make_fork_func_gen(lambda network: [policy])
     
 def gen_static_physical_policy(route):
     policy = drop
