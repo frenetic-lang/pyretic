@@ -7,13 +7,13 @@ r = ["first", "second", "third", "fourth"]
 
 def delaygen1():
     yield "first"
-    time.sleep(2)
+    time.sleep(0.5)
     yield "fourth"
 
 def delaygen2():
-    time.sleep(1)
+    time.sleep(0.1)
     yield "second"
-    time.sleep(0.5)
+    time.sleep(0.25)
     yield "third"
 
 def test_merge():
@@ -23,6 +23,12 @@ def test_merge():
 
     assert l == r
     assert l2 == r
+
+def test_merge_hold():
+    l = list(merge_hold(delaygen1(), delaygen2()))
+
+    assert l == [("first", "second"), ("first", "third"), ("fourth", "third")]
+
 
 def test_Event():
     x = Event()

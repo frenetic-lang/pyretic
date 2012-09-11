@@ -32,6 +32,7 @@
 from Queue import Queue
 import threading
 import weakref
+import itertools
 
 
 # This was using weakrefs, but for simplicity let us just use lists for now.
@@ -102,6 +103,24 @@ def merge(*genlist):
         if item is StopIteration: return
         yield item
 
+
+def tag(gen, value):
+    for v in gen:
+        yield (value, v)
+        
+def merge_hold(*genlist):
+    iters = map(iter, genlist)
+    values = []
+    
+    for i in iters:
+        values.append(i.next())
+    yield tuple(values)
+    
+    gens = map(tag, iters, xrange(len(genlist)))
+    for (i, v) in merge(*gens):
+        values[i] = v
+        yield tuple(values)
+
 def run_non_daemon(func, *args, **kwargs):
     t = threading.Thread(target=func, args=args, kwargs=kwargs)
     t.start()
@@ -110,4 +129,6 @@ def run(func, *args, **kwargs):
     t = threading.Thread(target=func, args=args, kwargs=kwargs)
     t.setDaemon(True)
     t.start()
+
+
 
