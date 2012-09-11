@@ -41,9 +41,10 @@ class Event(object):
         self.listeners = []
 
     def notify(self, listener):
-        self.listeners.append(listener) 
+        self.listeners.append(listener)
+        return listener # for decorators
         
-    def signal(self, item):
+    def signal(self, item=None):
         for listener in self.listeners:
             listener(item)
     

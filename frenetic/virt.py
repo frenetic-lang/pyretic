@@ -30,6 +30,7 @@ from frenetic import generators as gs
 from frenetic.network import *
 from frenetic.netcore import *
 from frenetic.netcore import _
+from frenetic import util
 
 ################################################################################
 # Network
@@ -85,6 +86,40 @@ def fork_sub_network(network):
     
     return sub_net
 
+
+class SwitchDatabase(dict):
+    def __init__(self, *args, **kwargs):
+        self.switch_joins = gs.Event()
+        self.switch_parts = gs.Event()
+        self.port_ups = gs.Event()
+        self.port_downs = gs.Event()
+        super(SwitchDatabase, self).__init__(*args, **kwargs)
+    
+    def activate(self, network):
+        @network.switch_joins.notify
+        def handler(switch):
+            self[switch] = set()
+            self.switch_joins.signal(switch)
+            
+        @network.switch_parts.notify
+        def handler(switch):
+            if switch in self:
+                del self[switch]
+                self.switch_parts.signal(switch)
+            
+        @network.port_ups.notify
+        def handler((switch, port)):
+            if switch in self:
+                self[switch].add(port)
+                self.port_ups.signal((switch, port))
+            
+        @network.port_downs.notify
+        def handler((switch, port)):
+            if switch in self and port in self[switch]:
+                self[switch].remove(port)
+                self.port_downs.signal((switch, port))
+
+            
 ################################################################################
 # Virtualization policies 
 ################################################################################
@@ -209,12 +244,16 @@ def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
             # and translate the v* headers to a vlan value, since the real network
             # doesn't understand our custom headers.
             >> vheaders_to_vlan_policy(vlan_db))
-          
+
+
 ################################################################################
 # Virtualization helpers
 ################################################################################
 
-class VMap(dict):
+class VMap(util.frozendict):
+    """(phys switch, phys port) -> (virt switch, virt port)"""
+    
+    @util.cached
     def to_vinfo(self):
         vinfo = {}
 
@@ -225,6 +264,7 @@ class VMap(dict):
 
         return vinfo
 
+    @util.cached
     def to_ingress_policy(self):
         ingress_policy = drop
 
@@ -233,6 +273,7 @@ class VMap(dict):
 
         return ingress_policy
 
+    @util.cached
     def to_egress_policy(self):
         pred = no_packets
 
@@ -244,6 +285,18 @@ class VMap(dict):
 
         return if_(pred, strip_vheaders, passthrough)
 
+    # XXX unused for now
+    def set_network_statuses(self, switch_db, vnetwork):
+        @switch_db.port_ups.notify
+        def handler((switch, port)):
+            (vswitch, vport) = self[(switch, port)]
+            vnetwork.port_ups.signal((vswitch, vport))
+            
+        @switch_db.port_downs.notify
+        def handler((switch, port)):
+            (vswitch, vport) = self[(switch, port)]
+            vnetwork.port_downs.signal((vswitch, vport))
+             
     def make_fork_func(self, policy):
         ingress_policy = self.to_ingress_policy()
         egress_policy = self.to_egress_policy()
@@ -253,7 +306,7 @@ class VMap(dict):
             return fork_virtual_network(network, vinfo, ingress_policy, policy >> egress_policy)
 
         return fork
-
+    
 def gen_static_physical_policy(route):
     policy = drop
 
