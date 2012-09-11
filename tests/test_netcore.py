@@ -210,7 +210,7 @@ def test_linear_topos():
     p3_ = pol.packets_to_send(p3)[0]
 
     assert p3_.outport == Port(1)
-    assert p3_.vlan == 0
+    assert not hasattr(p3_, "vlan") # was the vlan successfully removed?
     
     
 ################################################################################

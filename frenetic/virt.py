@@ -85,7 +85,6 @@ def fork_sub_network(network):
     
     return sub_net
 
-
 ################################################################################
 # Virtualization policies 
 ################################################################################
@@ -98,6 +97,21 @@ def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
         virtualize_policy(vlan_db, ingress_policy, physical_policy, policy)
         for policy in sub_net.policy_changes)
     
+    return sub_net
+
+def fork_virtual_network_dyn(network, vnetwork_gen_fn):
+    sub_net = Network()
+
+    def wrapper():
+        for policy, (vinfo, ingress_policy, physical_policy) in \
+            merge_hold(sub_net.policy_changes, vnetwork_gen_fn(network)):
+            yield virtualize_policy(generate_vlan_db(1, vinfo),
+                                    ingress_policy,
+                                    physical_policy,
+                                    policy)
+    
+    network.install_sub_policies(wrapper())
+        
     return sub_net
 
 def generate_vlan_db(start_vlan, vinfo):
@@ -179,7 +193,7 @@ def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
     """
 
            # if the vlan isnt set, then we need to find out the v* headers.
-    return (if_(_.vlan.is_missing() | (_.vlan == 0), 
+    return (if_(_.vlan.is_missing(), 
                     (ingress_policy >> # set vswitch and vinport
                     # now make the virtualization transparent to the tenant's policy to get the outport
                      let(pre_vheaders_to_headers_policy() >> policy,

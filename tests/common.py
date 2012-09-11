@@ -22,8 +22,8 @@ pox_matches = []
 
 def from_payload(payload, **kwargs):
     payloads.append(payload)
-    packets.append(Packet(payload, **kwargs))
-    headers.append(Packet(payload, **kwargs).header)
+    packets.append(Packet(payload).update_header_fields(**kwargs))
+    headers.append(Packet(payload).update_header_fields(**kwargs).header)
     pox_packets.append(ethernet(payload))
     pox_matches.append(ofp_match.from_packet(ethernet(payload)))
 

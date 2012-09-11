@@ -306,43 +306,115 @@ class IP(Bits(32)):
 #
 ################################################################################
 
-class Header(frozendict):
-    def __init__(self, arg={}, **kwargs):
-        if isinstance(arg, basestring):
-            packet = packetlib.ethernet(arg)
-            match = of.ofp_match.from_packet(packet)
-            arg = _pox_match_to_header(match)
-            
-        d = lift_fixedwidth_dict(util.merge_dicts_deleting(arg, kwargs))
-            
-        return super(Header, self).__init__(d)
-
 class Packet(Data("header payload")):
-    def __new__(cls, payload, **kwargs):
-        return super(Packet, cls).__new__(cls, Header(payload, **kwargs), payload)
+    def __new__(self, data):
+        h = {}
+        p = packetlib.ethernet(data)
+
+        h["srcmac"] = p.src.toRaw()
+        h["dstmac"] = p.dst.toRaw()
+
+        p = p.next
+
+        if isinstance(p, packetlib.vlan):
+          h["vlan"] = p.id
+          h["vlan_pcp"] = p.pcp
+          p = p.next
+
+        if isinstance(p, packetlib.ipv4):
+          h["srcip"] = p.srcip.toRaw()
+          h["dstip"] = p.dstip.toRaw()
+          h["protocol"] = p.protocol
+          h["tos"] = p.tos
+          p = p.next
+
+          if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
+            h["srcport"] = p.srcport
+            h["dstport"] = p.dstport
+          elif isinstance(p, packetlib.icmp):
+            h["srcport"] = p.type
+            h["dstport"] = p.code
+        elif isinstance(p, packetlib.arp):
+          if p.opcode <= 255:
+            h["protocol"] = p.opcode
+            h["srcip"] = p.protosrc.toRaw()
+            h["dstip"] = p.protodst.toRaw()
+
+        return super(Packet, self).__new__(self, h, data)
 
     def update_header_fields(self, **kwargs):
-        header = Header(util.merge_dicts_deleting(self.header, kwargs))
-        payload = _propagate_header_to_payload(header, self.payload)
-        return self.replace(header=header, payload=payload)
+        return self._replace(header=util.merge_dicts_deleting(self.header, kwargs))
 
+    def _get_fields(self):
+        pass
+
+    def _get_type(self):
+        p = packetlib.ethernet(self._get_payload())
+        return lift_fixedwidth_kv("type", p.type)
+
+    def _has_vlan_header(self):
+        return hasattr(self, "vlan") and hasattr(self, "vlan_pcp")
+        
+    def _get_payload(self):
+        packet = p = packetlib.ethernet(self.payload)
+
+        p.src = packetaddr.EthAddr(self.srcmac.to_bits().tobytes())
+        p.dst = packetaddr.EthAddr(self.dstmac.to_bits().tobytes())
+
+        if self._has_vlan_header():
+            if isinstance(p.next, packetlib.vlan):
+                p = p.next
+            else:
+                # Make a vlan header
+                old_eth_type = p.type
+                p.type = 0x8100
+                p.next = packetlib.vlan(next = p.next)
+                p = p.next
+                p.eth_type = old_eth_type
+            p.id = int(getattr(self, "vlan", 0))
+            p.pcp = int(getattr(self, "vlan_pcp", 0))
+        else:
+            if isinstance(p.next, packetlib.vlan):
+                p.type = p.next.eth_type # Restore encapsulated eth type
+                p.next = p.next.next # Remove vlan from header
+
+        p = p.next
+
+        if isinstance(p, packetlib.ipv4):
+            p.srcip = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
+            p.dstip = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
+            p.protocol = int(self.protocol)
+            p.tos = int(self.tos)
+            p = p.next
+
+            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
+                p.srcport = int(self.srcport)
+                p.dstport = int(self.dstport)
+            elif isinstance(p, packetlib.icmp):
+                p.type = int(self.srcport)
+                p.code = int(self.dstport)
+        elif isinstance(p, packetlib.arp):
+            p.opcode = int(self.protocol)
+            p.protosrc = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
+            p.protodst = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
+
+        return p.pack()
+        
     def __repr__(self):
         l = []
         size = max(map(len, self.header)) + 3
-        for k, v in self.header.iteritems():
-            l.append("%s:%s%s" % (k, " " * (size-len(k)), v))
+        for k in sorted(self.header):
+            l.append("%s:%s%s" % (k, " " * (size - len(k)), getattr(self, k)))
         return "\n".join(l)
 
-        
     def __getattr__(self, attr):
-        return self.header[attr]
+        return lift_fixedwidth_kv(attr, self.header[attr])
 
 class Bucket(gs.Event):
     """A safe place for packets!"""
     def __init__(self, fields=[], time=None):
         self.fields = fields
         self.time = time
-
         super(Bucket, self).__init__()
 
 ################################################################################
@@ -377,143 +449,3 @@ def lift_fixedwidth_kv(k, v):
         if not isinstance(v, tuple):
             v = (v,)
         return cls(*v)
-
-def lift_fixedwidth_dict(d):
-    r = {}
-    # Factor this logic out?
-
-    if d.get("type") == 0x8100 or "vlan" in d or "vlan_pcp" in d:
-        d["type"] = 0x8100
-        d.setdefault("vlan", 0)
-        d.setdefault("vlan_pcp", 0)
-        
-    for k, v in d.iteritems():
-        v2 = lift_fixedwidth_kv(k, v)
-        r[k] = v2
-    return r
-
-################################################################################
-# Internal
-################################################################################
-
-def _header_to_pox_match(h):
-    match = of.ofp_match()
-
-    if "inport" in h:
-        match.in_port = int(h["inport"])
-
-    if "srcmac" in h:
-        match.dl_src = packetaddr.EthAddr(h["srcmac"].to_bits().tobytes())
-    
-    if "dstmac" in h:
-        match.dl_dst = packetaddr.EthAddr(h["dstmac"].to_bits().tobytes())
-
-    if "type" in h:
-        match.dl_type = int(h["type"])
-        if match.dl_type == 0x8100:
-            match.dl_vlan = int(h["vlan"])
-            match.dl_vlan_pcp = int(h["vlan_pcp"])
-
-    if "srcip" in h:
-        match.nw_src = packetaddr.IPAddr(h["srcip"].to_bits().tobytes())
-    
-    if "dstip" in h:
-        match.nw_dst = packetaddr.IPAddr(h["dstip"].to_bits().tobytes())
-    
-    if "protocol" in h:
-        match.nw_proto = int(h["protocol"])
-
-    if "tos" in h:
-        match.nw_tos = int(h["tos"])
-
-    if "srcport" in h:
-        match.tp_src = int(h["srcport"])
-
-    if "dstport" in h:
-        match.tp_dst = int(h["dstport"])
-    
-    return match
-
-def _pox_match_to_header(match):
-    h = {}
-    
-    if match.in_port is not None:
-        h["inport"] = match.in_port
-
-    if match.dl_src is not None:
-        h["srcmac"] = match.dl_src.toRaw()
-
-    if match.dl_dst is not None:
-        h["dstmac"] = match.dl_dst.toRaw()
-
-    if match.dl_type is not None:
-        h["type"] = match.dl_type
-
-    if match.dl_type == 0x8100:
-        h["vlan"] = match.dl_vlan
-        h["vlan_pcp"] = match.dl_vlan_pcp
-
-    if match.nw_src is not None:
-        h["srcip"] = match.nw_src.toRaw()
-
-    if match.nw_dst is not None:
-        h["dstip"] = match.nw_dst.toRaw()
-
-    if match.nw_proto is not None:
-        h["protocol"] = match.nw_proto
-
-    if match.nw_tos is not None:
-        h["tos"] = match.nw_tos
-
-    if match.tp_src is not None:
-        h["srcport"] = match.tp_src
-
-    if match.tp_dst is not None:
-        h["dstport"] = match.tp_dst
-        
-    return h
-
-def _propagate_header_to_payload(h, data):
-    packet = p = packetlib.ethernet(data)
-    match = _header_to_pox_match(h)
-
-    p.src = match.dl_src
-    p.dst = match.dl_dst
-
-    # Set the VLAN
-    if match.dl_type == 0x8100:
-        if isinstance(p.next, packetlib.vlan):
-            p = p.next
-        else:
-            old_eth_type = p.type
-            p.type = 0x8100
-            p.next = packetlib.vlan(next = p.next)
-            p = p.next
-            p.eth_type = old_eth_type
-        p.id = match.dl_vlan
-        p.pcp = match.dl_vlan_pcp
-    else:
-        pass # XXX is this right?
-        
-    p = p.next
-  
-    if isinstance(p, packetlib.ipv4):
-        p.srcip = match.nw_src
-        p.dstip = match.nw_dst
-        p.protocol = match.nw_proto
-        p.tos = match.nw_tos
-        p = p.next
-
-        if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-            p.srcport = match.tp_src
-            p.dstport = match.tp_dst
-        elif isinstance(p, packetlib.icmp):
-            p.type = match.tp_src
-            p.code = match.tp_dst
-    elif isinstance(p, packetlib.arp):
-        p.opcode = match.nw_proto
-        if p.opcode <= 255:
-            p.protosrc = match.nw_src
-            p.protodst = match.nw_dst
-
-    return packet.pack()

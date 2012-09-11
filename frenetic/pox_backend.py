@@ -29,6 +29,7 @@
 from frenetic import generators as gs
 from frenetic import network as net
 from frenetic import virt
+from frenetic import util
 
 from pox.core import core
 from pox.lib import revent
@@ -56,9 +57,14 @@ class POXBackend(revent.EventMixin):
             return EventRemove # We don't need this listener anymore
 
     def _handle_PacketIn(self, event):
-        packet = net.Packet(event.data, switch=event.dpid, inport=event.ofp.in_port)
+        packet = net.Packet(event.data).update_header_fields(switch=event.dpid, inport=event.ofp.in_port)
         
         n_pkts = self.network.get_policy().packets_to_send(packet)
+
+        print "incoming trace"
+        print util.repr_plus([packet] + n_pkts, sep="\n\n")
+        print
+        print
         
         for pkt in n_pkts:
             assert "outport" in pkt.header, "gotta send it somewhere"
@@ -66,6 +72,8 @@ class POXBackend(revent.EventMixin):
                 self.send_packet(pkt)
             else:
                 bucket = pkt.outport.get_bucket()
+
+                # Perform the link's function here
                 pkt = pkt.update_header_fields(outport=None)
                 bucket.signal(pkt)
 
@@ -92,13 +100,13 @@ class POXBackend(revent.EventMixin):
         pass
 
     def send_packet(self, packet):
-        switch = packet.header["switch"]
-        inport = packet.header["inport"]
-        outport = packet.header["outport"]
+        switch = packet.switch
+        inport = packet.inport
+        outport = packet.outport
         
         msg = of.ofp_packet_out()
         msg.in_port = int(inport)
-        msg.data = packet.payload
+        msg.data = packet._get_payload()
 
         outport = int(outport)
         if outport == net.Port.flood_port:
