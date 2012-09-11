@@ -60,26 +60,26 @@ def test_Predicate_eval():
 
 def test_Action():
     assert not drop.packets_to_send(packets[1])
-    p = modify(srcport=100, dstport=100).packets_to_send(packets[1])[0]
+    p = get_single_packet(modify(srcport=100, dstport=100), packets[1])
     assert p.srcport == 100 and p.dstport == 100
 
 def test_Let():
     let_pol1 = let(modify(dstport=1), lambda p: ((_.dstport == 700) & (p.dstport == 1)) & fwd(100))
-    assert let_pol1.packets_to_send(packets[1])[0].outport == Port(100)
-    assert let_pol1.packets_to_send(packets[1])[0].dstport == 700
+    assert get_single_packet(let_pol1, packets[1]).outport == Port(100)
+    assert get_single_packet(let_pol1, packets[1]).dstport == 700
     
 def test_Composition():
     comp_pol1 = modify(dstport=1) >> ((_.dstport == 1) & (_.srcport == 30) & fwd(100))
-    assert comp_pol1.packets_to_send(packets[1])[0].outport == Port(100)
+    assert get_single_packet(comp_pol1, packets[1]).outport == Port(100)
     
     comp_pol2 = modify(vinport=None, vswitch=None) >> (((_.vinport == 1) | (_.vswitch == 1)) & fwd(100))
-    assert comp_pol2.packets_to_send(packets[1].update_header_fields(vswitch=1,vinport=1)) == []
+    assert not comp_pol2.packets_to_send(packets[1].update_header_fields(vswitch=1, vinport=1)) 
 
     
 
 def test_fwd():
     for packet in packets:
-        assert fwd(1).packets_to_send(packet)[0].outport == Port(1)
+        assert get_single_packet(fwd(1), packet).outport == Port(1)
 
 def test_match_ips():
     assert (_.dstip == "127.0.0.1").eval(packets[1])
@@ -109,7 +109,7 @@ def test_match_ints():
 def test_copy():
     p = packets[1].update_header_fields(switch=10)
     p_ = p.update_header_fields(vswitch=10)
-    assert copy_fields(vswitch=_.switch).packets_to_send(p) == [p_]
+    assert get_single_packet(copy_fields(vswitch=_.switch), p) == p_
 
 
 # Test virtualization
@@ -141,27 +141,27 @@ def test_tri_topos():
     p = packets[2].update_header_fields(switch=1, inport=1)
     p2 = p.update_header_fields(vswitch=1, vinport=1)
 
-    assert get_ingress_policy().packets_to_send(p) == [p2]
+    assert get_single_packet(get_ingress_policy(), p) == p2
 
     p3 = p.update_header_fields(switch=1, inport=1)
-    assert pre_vheaders_to_headers_policy().packets_to_send(p2) == [p3]
+    assert get_single_packet(pre_vheaders_to_headers_policy(), p2) == p3
 
     p4 = p3.update_header_fields(outport=3)
-    assert user_policy.packets_to_send(p3) == [p4]
+    assert get_single_packet(user_policy, p3) == p4
 
     p5 = p2.update_header_fields(voutport=3)
     # Can't do this, need a testing mechanism for it!
-    # assert let(passthrough, lambda x: headers_to_post_vheaders(vlan_db, x)).packets_to_send(p2) 
+    # assert get_single_packet(let(passthrough, lambda x: headers_to_post_vheaders(vlan_db, x)), p2) 
 
     p6 = p5.update_header_fields(outport=3)
-    assert get_physical_policy().packets_to_send(p5) == [p6]
+    assert get_single_packet(get_physical_policy(), p5) == p6
 
     p7 = p6.update_header_fields(vswitch=None, vinport=None, voutport=None,
                                  vlan=vlan_db[3][(Switch(1), Port(1), Port(3))])
     
     vp = vheaders_to_vlan_policy(vlan_db)
-    p7_ = vp.packets_to_send(p6)
-    assert p7_ == [p7]
+    p7_ = get_single_packet(vp, p6)
+    assert p7_ == p7
     
 
     n = Network()
@@ -172,10 +172,8 @@ def test_tri_topos():
     time.sleep(0.01)
 
     pol = n.get_policy()
-    p7_ = pol.packets_to_send(p)
-    print p7
-    print p7_
-    assert p7_ == [p7]
+    p7_ = get_single_packet(pol, p)
+    assert p7_ == p7
 
     
 def test_linear_topos():
@@ -194,20 +192,20 @@ def test_linear_topos():
 
     pol = n.get_policy()
 
-    p_ = pol.packets_to_send(p)[0]
+    p_ = get_single_packet(pol, p)
 
     assert p_.outport == Port(2)
 
     # Now lets test the second packet. Can it get to the third hop?
     p2 = p_.update_header_fields(switch=2, outport=None, inport=2)
 
-    p2_ = pol.packets_to_send(p2)[0]
+    p2_ = get_single_packet(pol, p2)
     
     assert p2_.outport == Port(3) 
 
     # Third hop.
     p3 = p_.update_header_fields(switch=3, outport=None, inport=2)
-    p3_ = pol.packets_to_send(p3)[0]
+    p3_ = get_single_packet(pol, p3)
 
     assert p3_.outport == Port(1)
     assert not hasattr(p3_, "vlan") # was the vlan successfully removed?
@@ -229,6 +227,6 @@ def test_Network():
     import time
     time.sleep(0.01)
 
-    assert n.get_policy().packets_to_send(packets[0])[0].outport == Port(10)
+    assert get_single_packet(n.get_policy(), packets[0]).outport == Port(10)
 
     

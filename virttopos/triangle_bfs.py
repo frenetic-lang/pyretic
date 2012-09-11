@@ -61,6 +61,7 @@ def get_ingress_policy():
                       >> modify(vswitch = Switch(1)))
     return ingress_policy
 
+    
 def get_physical_policy():
     physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1)  | 
                                                   (_.voutport == 2) & fwd(2)  | 
@@ -75,9 +76,21 @@ def get_physical_policy():
                                                       (_.voutport == 3) & fwd(1)))
     return physical_policy
 
+    
+def get_egress_policy():
+    pred = _.outport.is_(1) & or_(
+        _.switch == 1, _.voutport == 1, 
+        _.switch == 2, _.voutport == 2, 
+        _.switch == 3, _.voutport == 3)
+
+    pred |= ~is_port_real(_.outport)
+    
+    return if_(pred, strip_vheaders, passthrough)
+    
 def setup_virtual_network(network):
     ingress_policy = get_ingress_policy()
     physical_policy = get_physical_policy()
+    egress_policy = get_egress_policy()
 
-    v_network = fork_virtual_network(network, vinfo, ingress_policy, physical_policy)
+    v_network = fork_virtual_network(network, vinfo, ingress_policy, physical_policy >> egress_policy)
     return v_network

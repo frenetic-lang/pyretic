@@ -53,21 +53,6 @@ def test_Data():
     assert hasattr(x, "foo")
     assert hasattr(x, "bar")
 
-    
-def test_Case():
-    class Branch(Data("left right")): pass
-    class Node(Data("value")): pass
-
-    tree = Branch(Branch(Node(1), Node(2)), Node(6))
-
-    class tree_len(Case):
-        def case_Node(self, node):
-            return 1
-
-        def case_Branch(self, branch):
-            return 1 + self(branch.left) + self(branch.right)
-
-    assert tree_len()(tree) == 5
 
 
 def test_frozendict():

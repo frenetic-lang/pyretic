@@ -11,6 +11,10 @@ from pox.lib.packet import *
 from pox.openflow.libopenflow_01 import *
 
 
+def get_single_packet(policy, packet):
+    l = list(policy.packets_to_send(packet).elements())
+    assert len(l) == 1
+    return l[0]
 
 
 

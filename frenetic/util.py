@@ -28,64 +28,9 @@
 # Utility functions                                                            #
 ################################################################################
 
-from time import time
-import sys as sys
-from abc import ABCMeta, abstractproperty
+
 from collections import namedtuple
 
-# XXX why this over TypeError or ValueError?
-class IllegalArgument(Exception):
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
-
-
-def current_time():
-    """current_time in seconds"""
-    return int(time())
-
-
-# XXX hacky? at least move to lib or something.
-class FRef:
-    """Reference cells"""
-    def __init__(self):
-        self.x = None
-    def get(self):
-        return self.x
-    def set(self, x):
-        self.x = x
-        pop()
-
-def add_pair(p1, p2):
-    """Addition lifted to pairs"""
-    (x1, y1) = p1 
-    (x2, y2) = p2
-    return (x1 + x2, y1 + y2)
-
-def sub_pair(p1, p2):
-    """Subtraction lifted to pairs"""
-    (x1, y1) = p1 
-    (x2, y2) = p2
-    return (x1 - x2, y1 - y2)
-
-
-# Adapted from http://peter-hoffmann.com/2010/extrinsic-visitor-pattern-python-inheritance.html
-class Case(object):
-    def __call__(self, node, *args, **kwargs):
-        meth = None
-        for cls in node.__class__.__mro__:
-            meth_name = 'case_'+cls.__name__
-            meth = getattr(self, meth_name, None)
-            if meth:
-                break
-
-        if not meth:
-            meth = self.generic_case
-        return meth(node, *args, **kwargs)
-
-    def generic_case(self, *args, **kwargs):
-        raise ValueError
 
 # Adapted from http://code.activestate.com/recipes/577629-namedtupleabc-abstract-base-class-mix-in-for-named/
 class RecordMeta(type):
@@ -158,19 +103,6 @@ def merge_dicts(d1, d2):
     d = {}
     d.update(d1)
     d.update(d2)
-    return d
-
-
-def merge_dicts_deleting(d1, d2):
-    d = {}
-    for k, v in d1.iteritems():
-        if v is not None:
-            d[k] = v
-    for k, v in d2.iteritems():
-        if v is None and k in d:
-            del d[k]
-        else:
-            d[k] = v
     return d
 
     
@@ -284,7 +216,11 @@ class ReprPlusMixin(object):
     
     def __repr__(self):
         mes = self.__squash_mes__()
-        return "%s:\n%s" % (self.__class__.__name__, repr_plus(mes, *self._repr_plus_args))
+        
+        if self._mes_attrs is None and len(mes) == 1:
+            return "%s" % repr(mes[0])
+        else:
+            return "%s:\n%s" % (self.__class__.__name__, repr_plus(mes, *self._repr_plus_args))
         
     def __squash_mes__(self):
         mes = []

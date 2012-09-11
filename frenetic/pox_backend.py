@@ -39,9 +39,10 @@ import pox.openflow.libopenflow_01 as of
 
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self, user_program, kwargs):
+    def __init__(self, user_program, show_traces, kwargs):
         self.network = virt.Network()
         self.switch_connections = {}
+        self.show_traces = show_traces
         
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
@@ -57,14 +58,21 @@ class POXBackend(revent.EventMixin):
             return EventRemove # We don't need this listener anymore
 
     def _handle_PacketIn(self, event):
-        packet = net.Packet(event.data).update_header_fields(switch=event.dpid, inport=event.ofp.in_port)
+        packet = net.Packet(event.data).update_header_fields(switch=event.dpid,
+                                                             inport=event.ofp.in_port)
         
-        n_pkts = self.network.get_policy().packets_to_send(packet)
+        n_pkts = list(self.network.get_policy().packets_to_send(packet).elements())
 
-        print "incoming trace"
-        print util.repr_plus([packet] + n_pkts, sep="\n\n")
-        print
-        print
+        if self.show_traces:
+            print "Recv"
+            print util.repr_plus([packet], sep="\n\n")
+            print
+            print
+            print "Send"
+            print util.repr_plus(n_pkts, sep="\n\n")
+            print
+            print
+            print "===================================="
         
         for pkt in n_pkts:
             assert "outport" in pkt.header, "gotta send it somewhere"
@@ -72,8 +80,7 @@ class POXBackend(revent.EventMixin):
                 self.send_packet(pkt)
             else:
                 bucket = pkt.outport.get_bucket()
-
-                # Perform the link's function here
+                # Perform the link's function here and rm outport
                 pkt = pkt.update_header_fields(outport=None)
                 bucket.signal(pkt)
 
@@ -100,23 +107,23 @@ class POXBackend(revent.EventMixin):
         pass
 
     def send_packet(self, packet):
-        switch = packet.switch
-        inport = packet.inport
-        outport = packet.outport
+        switch = int(packet.switch)
+        inport = int(packet.inport)
+        outport = int(packet.outport)
         
         msg = of.ofp_packet_out()
-        msg.in_port = int(inport)
+        msg.in_port = inport
         msg.data = packet._get_payload()
 
-        outport = int(outport)
+        outport = outport
         if outport == net.Port.flood_port:
             outport = of.OFPP_FLOOD
         msg.actions.append(of.ofp_action_output(port = outport))
 
-        self.switch_connections[int(switch)].send(msg)
+        self.switch_connections[switch].send(msg)
 
-def launch(module_dict, **kwargs):
+def launch(module_dict, show_traces=False, **kwargs):
     import pox
-    backend = POXBackend(module_dict["main"], kwargs)
+    backend = POXBackend(module_dict["main"], bool(show_traces), kwargs)
     pox.pyr = backend
         

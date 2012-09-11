@@ -306,6 +306,8 @@ class IP(Bits(32)):
 #
 ################################################################################
 
+
+
 class Packet(Data("header payload")):
     def __new__(self, data):
         h = {}
@@ -340,21 +342,19 @@ class Packet(Data("header payload")):
             h["srcip"] = p.protosrc.toRaw()
             h["dstip"] = p.protodst.toRaw()
 
-        return super(Packet, self).__new__(self, h, data)
+        return super(Packet, self).__new__(self, make_header(h), data)
 
-    def update_header_fields(self, **kwargs):
-        return self._replace(header=util.merge_dicts_deleting(self.header, kwargs))
-
-    def _get_fields(self):
-        pass
+    def update_header_fields(self, arg={}, **kwargs):
+        arg = util.merge_dicts(arg, kwargs)
+        return self._replace(header=make_header(util.merge_dicts(self.header, arg)))
 
     def _get_type(self):
         p = packetlib.ethernet(self._get_payload())
         return lift_fixedwidth_kv("type", p.type)
 
     def _has_vlan_header(self):
-        return hasattr(self, "vlan") and hasattr(self, "vlan_pcp")
-        
+        return hasattr(self, "vlan") or hasattr(self, "vlan_pcp")
+
     def _get_payload(self):
         packet = p = packetlib.ethernet(self.payload)
 
@@ -398,18 +398,22 @@ class Packet(Data("header payload")):
             p.protosrc = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
             p.protodst = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
 
-        return p.pack()
+        return packet.pack()
         
     def __repr__(self):
         l = []
         size = max(map(len, self.header)) + 3
+        l.append("Packet of type %s:" % hex(self._get_type()))
         for k in sorted(self.header):
-            l.append("%s:%s%s" % (k, " " * (size - len(k)), getattr(self, k)))
+            l.append("  %s:%s%s" % (k, " " * (size - len(k)), getattr(self, k)))
         return "\n".join(l)
 
     def __getattr__(self, attr):
-        return lift_fixedwidth_kv(attr, self.header[attr])
-
+        v = self.header.get(attr)
+        if v is None:
+            raise AttributeError
+        return v
+        
 class Bucket(gs.Event):
     """A safe place for packets!"""
     def __init__(self, fields=[], time=None):
@@ -449,3 +453,6 @@ def lift_fixedwidth_kv(k, v):
         if not isinstance(v, tuple):
             v = (v,)
         return cls(*v)
+
+def make_header(d):
+    return frozendict((k, lift_fixedwidth_kv(k, v)) for k, v in d.iteritems() if v is not None)

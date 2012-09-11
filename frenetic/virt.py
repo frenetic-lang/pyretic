@@ -89,6 +89,7 @@ def fork_sub_network(network):
 # Virtualization policies 
 ################################################################################
 
+
 def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
     sub_net = Network()
     vlan_db = generate_vlan_db(1, vinfo)
@@ -128,18 +129,20 @@ def generate_vlan_db(start_vlan, vinfo):
 
     return (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan)
 
+strip_vheaders = modify(vswitch=None,
+                        vinport=None,
+                        voutport=None)
+
 def vheaders_to_vlan_policy(vlan_db):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
     
-    return ((_.vswitch.is_missing() & modify(vlan=None) # if we are no longer virtualized, remove vlan.
+    return ((_.vswitch.is_missing() & strip_vlan # if we are no longer virtualized, remove vlan.
             | enum((_.vswitch, vinfo.iterkeys()), # otherwise, encode.
                    lambda s:
                    enum((_.vinport, vinfo[s]),
                         (_.voutport, vinfo[s]),
                         lambda ip, op: modify(vlan=vheaders_to_vlan[(s, ip, op)]))))
-            >> modify(vswitch=None,
-                      vinport=None,
-                      voutport=None))
+            >> strip_vheaders)
     
 def vlan_to_vheaders_policy(vlan_db):
     (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
@@ -149,7 +152,7 @@ def vlan_to_vheaders_policy(vlan_db):
         return modify(vswitch=vswitch, vinport=vinport, voutport=voutport)
     
     return (enum((_.vlan, vlan_to_vheaders.iterkeys()), vlan_dict_helper) >>
-            modify(vlan=None))
+            strip_vlan)
     
 def pre_vheaders_to_headers_policy():
     return copy_fields(switch=_.vswitch, inport=_.vinport) >> modify(vswitch=None,
@@ -239,7 +242,7 @@ class VMap(dict):
 
         pred |= ~is_port_real(_.outport)
 
-        return if_(pred, modify(vswitch=None, vinport=None, voutport=None), passthrough)
+        return if_(pred, strip_vheaders, passthrough)
 
     def make_fork_func(self, policy):
         ingress_policy = self.to_ingress_policy()
