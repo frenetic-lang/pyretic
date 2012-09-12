@@ -2,6 +2,49 @@
 
 from mininet.topo import Topo, Node
 
+class YTopo(Topo):
+    
+    def __init__(self):
+        
+        # Add default members to class.
+        super(YTopo, self).__init__()
+
+        # Set Node IDs for hosts and switches
+        switch1 = 1
+        switch2 = 2 
+        switch3 = 3
+        switch4 = 4
+
+        host1 = 10
+        host2 = 11
+        host3 = 12
+        host4 = 13
+        
+        # Add nodes
+        self.add_node(switch1, Node(is_switch=True))
+        self.add_node(switch2, Node(is_switch=True))
+        self.add_node(switch3, Node(is_switch=True))
+        self.add_node(switch4, Node(is_switch=True))
+        
+        self.add_node(host1, Node(is_switch=False))
+        self.add_node(host2, Node(is_switch=False))
+        self.add_node(host3, Node(is_switch=False))
+        self.add_node(host4, Node(is_switch=False))
+
+        # Add edges
+        self.add_edge(switch1, host1)
+        self.add_edge(switch1, host2)
+        self.add_edge(switch3, host3)
+        self.add_edge(switch4, host4)
+
+        self.add_edge(switch1, switch2)
+        self.add_edge(switch2, switch3)
+        self.add_edge(switch2, switch4)
+        
+        
+        # Consider all switches and hosts 'on'
+        self.enable_all()
+
 class SquareTopo(Topo):
     
     def __init__(self):
@@ -269,76 +312,8 @@ class BumpCliqueTopo(CliqueTopo):
             self.add_edge(202,endhost)
 
 
-class TreeTopo(Topo):
-
-    def __init__(self, numHosts, depth, branchingFactor):
-
-        # Add default members to class.
-        super(TreeTopo, self ).__init__()
-
-        # Create hosts and switches
-        # Hosts numbered 1..numHosts
-        # Switches numbered 101..numSwitches
-        hosts = range(1,numHosts+1)
-
-#        let: B_k = sum b^i (i=0,k)
-#        B_k+1 = B_k + b^k+1 = b^0 + b B_k = 1 + b B_k
-#        => (b-1) B_k = b^k+1 - 1
-#        => B_k = b^k+1 - 1 / (b - 1)
-        def tree_population(b,k):
-            return (b**(k+1)-1) / (b - 1)
-
-        numSwitches = tree_population(branchingFactor,depth)
-
-        switches = range(101,numSwitches+101)
-        leaves = range(tree_population(branchingFactor,depth-1)+101, numSwitches+101)
-        print len(leaves)
-        print len(switches)
-
-        # ADD NODES
-        self.add_hosts(hosts)
-        self.add_switches(switches)
-
-        # ADD LINKS
-        self.connect_endhosts(leaves,hosts)
-        self.connect_switches(switches,depth,branchingFactor)
-
-        # Consider all switches and hosts 'on'
-        self.enable_all()
-
-    def add_switches(self,switches):
-        for i in switches:
-            self.add_node(i, Node(is_switch=True))
-
-    def add_hosts(self,hosts):
-        for i in hosts:
-            self.add_node(i, Node(is_switch=False))
-
-    def connect_switches(self,switches,depth,branchingFactor):
-        # Connect Switches in tree topology
-        for s in switches[1:]:
-            print "%s->%s" % (s, switches[0] + (s % (switches[0]-1) - 2) // branchingFactor)
-            self.add_edge(s, switches[0] + (s % (switches[0]-1) - 2) // branchingFactor)
-
-    def connect_endhosts(self,leaves,hosts):
-        # Connect nodes  divide them evenly across the leaves
-        print leaves
-        s = leaves[0]
-        h = hosts[:]
-        hps = max(len(hosts) // len(leaves),1)
-        while len(h) > 0:
-            l = h[:hps]
-            h = h[hps:]
-            for j in l:
-                self.add_edge(s,j)
-            if [s] == leaves[-1:]:
-                s = leaves[0]
-            else:
-                s += 1
-
-
-
-topos = { 'triangle': lambda: TriangleTopo(),
-          'square': lambda: SquareTopo(),
+topos = { 'triangle': TriangleTopo,
+          'square': SquareTopo,
+          'ytopo': YTopo,
           'ChainTopo': ( lambda: ChainTopo(2,2) ),
           '3switch': ( lambda: CycleTopo(3,3) ) } 
