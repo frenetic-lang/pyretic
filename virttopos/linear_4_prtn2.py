@@ -72,4 +72,4 @@ physical_policy = gen_static_physical_policy({
 })
 
 def setup_virtual_network(network):
-    return vmap.fork(network, physical_policy)
+    return vmap.fork(network, [(physical_policy,)])

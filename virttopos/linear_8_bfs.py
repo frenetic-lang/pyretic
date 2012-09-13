@@ -26,39 +26,11 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-# Intended to be used with ./mininet.sh --topo linear,4
+# Use with mininet.sh --topo linear,8
 
-from frenetic.lib import *
-
-vmap = VMap({
-    (1, 1): (1, 1),
-    (2, 1): (1, 2),
-    (3, 1): (1, 3),
-    (4, 1): (1, 4)
-})
-
-
-physical_policy = gen_static_physical_policy({
-    (1, 1) : fwd(1),
-    (1, 2) : fwd(2),
-    (1, 3) : fwd(2),
-    (1, 4) : fwd(2),
-    
-    (2, 1) : fwd(2),
-    (2, 2) : fwd(1),
-    (2, 3) : fwd(3),
-    (2, 4) : fwd(3),
-    
-    (3, 1) : fwd(2),
-    (3, 2) : fwd(2),
-    (3, 3) : fwd(1),
-    (3, 4) : fwd(3),
-    
-    (4, 1) : fwd(2),
-    (4, 2) : fwd(2),
-    (4, 3) : fwd(2),
-    (4, 4) : fwd(1),
-})
+from virttopos import linear_8_to_4, linear_4_bfs
 
 def setup_virtual_network(network):
-    return vmap.fork(network, [(physical_policy,)])
+    net4 = linear_8_to_4.setup_virtual_network(network)
+    netbfs = linear_4_bfs.setup_virtual_network(net4)
+    return netbfs

@@ -26,38 +26,54 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-# Intended to be used with ./mininet.sh --topo linear,4
+# Intended to be used with ./mininet.sh --topo linear,8
 
 from frenetic.lib import *
 
 vmap = VMap({
     (1, 1): (1, 1),
-    (2, 1): (1, 2),
-    (3, 1): (1, 3),
-    (4, 1): (1, 4)
+    (2, 3): (1, 2),
+    
+    (3, 1): (2, 1),
+    (3, 2): (2, 2),
+    (4, 3): (2, 3),
+    
+    (5, 1): (3, 1),
+    (5, 2): (3, 2),
+    (6, 3): (3, 3),
+    
+    (7, 1): (4, 1),
+    (7, 2): (4, 2),
+    (8, 3): (4, 3),
 })
 
 
 physical_policy = gen_static_physical_policy({
     (1, 1) : fwd(1),
     (1, 2) : fwd(2),
-    (1, 3) : fwd(2),
-    (1, 4) : fwd(2),
-    
     (2, 1) : fwd(2),
-    (2, 2) : fwd(1),
-    (2, 3) : fwd(3),
-    (2, 4) : fwd(3),
+    (2, 2) : fwd(3),
     
-    (3, 1) : fwd(2),
+    (3, 1) : fwd(1),
     (3, 2) : fwd(2),
-    (3, 3) : fwd(1),
-    (3, 4) : fwd(3),
-    
+    (3, 3) : fwd(3),
     (4, 1) : fwd(2),
     (4, 2) : fwd(2),
-    (4, 3) : fwd(2),
-    (4, 4) : fwd(1),
+    (4, 3) : fwd(3),
+
+    (5, 1) : fwd(1),
+    (5, 2) : fwd(2),
+    (5, 3) : fwd(3),
+    (6, 1) : fwd(2),
+    (6, 2) : fwd(2),
+    (6, 3) : fwd(3),
+
+    (7, 1) : fwd(1),
+    (7, 2) : fwd(2),
+    (7, 3) : fwd(3),
+    (8, 1) : fwd(2),
+    (8, 2) : fwd(2),
+    (8, 3) : fwd(3),
 })
 
 def setup_virtual_network(network):
