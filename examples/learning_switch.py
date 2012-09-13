@@ -35,7 +35,7 @@ def learning_switch(network):
     host_to_outport = {}
 
     for pkt in network.query(all_packets, fields=["switch", "srcmac"]):
-        host_p = (_.switch == pkt.switch) & (_.dstmac == pkt.srcmac)
+        host_p = match(switch=pkt.switch, dstmac=pkt.srcmac)
         outport = host_to_outport.get((pkt.switch, pkt.srcmac))
 
         if outport == pkt.inport:

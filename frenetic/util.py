@@ -99,10 +99,10 @@ def Data(fields):
     return _Record
     
 
-def merge_dicts(d1, d2):
+def merge_dicts(*args):
     d = {}
-    d.update(d1)
-    d.update(d2)
+    for d_ in args:
+        d.update(d_)
     return d
 
     

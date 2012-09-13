@@ -46,57 +46,57 @@ from frenetic.lib import *
 
 
 def get_ingress_policy1():
-    ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
-                       (_.switch == Switch(2)) & (_.inport == 1)  & modify(vinport = 2)) 
-                      >> modify(vswitch = Switch(1)))
+    ingress_policy = ((match(switch=1, inport=1) & modify(vinport = 1) | 
+                       match(switch=2, inport=1) & modify(vinport = 2)) 
+                      >> modify(vswitch = 1))
     return ingress_policy
 
 def get_ingress_policy2():
-    ingress_policy = (((_.switch == Switch(3)) & (_.inport == 1)  & modify(vinport = 1) | 
-                       (_.switch == Switch(4)) & (_.inport == 1)  & modify(vinport = 2)) 
-                      >> modify(vswitch = Switch(2)))
+    ingress_policy = ((match(switch=3, inport=1) & modify(vinport = 1) | 
+                       match(switch=4, inport=1) & modify(vinport = 2)) 
+                      >> modify(vswitch = 2))
     return ingress_policy
 
 def get_egress_policy1():
-    egress_pred = (and_(_.switch == Switch(1), _.voutport == 1) |
-                   and_(_.switch == Switch(2), _.voutport == 2) |
-                   ~is_port_real(_.voutport))
-    return if_(egress_pred, strip_vheaders, passthrough)
+    egress_pred = (match(switch=1, voutport=1) |
+                   match(switch=2, voutport=2))
+    return if_(egress_pred, pop_vheaders)
     
 def get_egress_policy2():
-    egress_pred = (and_(_.switch == Switch(3), _.voutport == 1) |
-                   and_(_.switch == Switch(4), _.voutport == 2) |
-                   ~is_port_real(_.voutport))
-    return if_(egress_pred, strip_vheaders, passthrough)
+    egress_pred = (match(switch=3, voutport=1) |
+                   match(switch=4, voutport=2))
+    return if_(egress_pred, pop_vheaders)
 
 def get_physical_policy1():
-    physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1) | 
-                                                  (_.voutport == 2) & fwd(2)) | 
-                       (_.switch == Switch(2)) & ((_.voutport == 1) & fwd(2) | 
-                                                  (_.voutport == 2) & fwd(1) ))
+    physical_policy = (match(switch=1) & (match(voutport=1) & fwd(1)
+                                          | match(voutport=2) & fwd(2)) 
+                      | match(switch=2) & (match(voutport=1) & fwd(2)
+                                           | match(voutport=2) & fwd(1)))
 
-    return if_(is_port_real(_.voutport), physical_policy, copy_vheaders)
+    return physical_policy
     
 def get_physical_policy2():
-    physical_policy = ((_.switch == Switch(3)) & ((_.voutport == 1) & fwd(1) | 
-                                                  (_.voutport == 2) & fwd(3)) | 
-                       (_.switch == Switch(4)) & ((_.voutport == 1) & fwd(3) | 
-                                                  (_.voutport == 2) & fwd(1)))
+    physical_policy = (match(switch=3) & (match(voutport=1) & fwd(1) | 
+                                          match(voutport=2) & fwd(3)) | 
+                       match(switch=4) & (match(voutport=1) & fwd(3) | 
+                                          match(voutport=2) & fwd(1)))
 
-    return if_(is_port_real(_.voutport), physical_policy, copy_vheaders)
+    return physical_policy
     
 def setup_virtual_networks(network):
-    vinfo1 = {Switch(1): [Port(1), Port(2)]}
-    vinfo2 = {Switch(2): [Port(1), Port(2)]}
+    vinfo1 = {1: [1, 2]}
+    vinfo2 = {2: [1, 2]}
 
     ingress_policy1 = get_ingress_policy1()
+    flood_policy1 = make_flood_policy(vinfo1)
     egress_policy1 = get_egress_policy1()
     physical_policy1 = get_physical_policy1()
 
     ingress_policy2 = get_ingress_policy2()
+    flood_policy2 = make_flood_policy(vinfo2)
     egress_policy2 = get_egress_policy2()
     physical_policy2 = get_physical_policy2()
 
-    v_network1 = fork_virtual_network(network, vinfo1, ingress_policy1, physical_policy1 >> egress_policy1)
-    v_network2 = fork_virtual_network(network, vinfo2, ingress_policy2, physical_policy2 >> egress_policy2)
+    v_network1 = fork_virtual_network(network, [(ingress_policy1, physical_policy1 >> egress_policy1, flood_policy1)])
+    v_network2 = fork_virtual_network(network, [(ingress_policy2, physical_policy2 >> egress_policy2, flood_policy2)])
     return (v_network1, v_network2)

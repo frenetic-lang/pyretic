@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-# Intended to be used with ./mininet.sh --topo linear,4
+# Intended to be used with ./mininet.sh --topo ytopo
 
 from frenetic.lib import *
 
@@ -60,49 +60,48 @@ from frenetic.lib import *
 #                                                       \
 
 vmap1 = VMap({
-    (1, 1): (1, 1),
+    (1, 1): (1, 1, True),
     (1, 3): (1, 2),
     (2, 1): (2, 1),
     (2, 2): (2, 2),
-    (3, 1): (3, 1),
+    (3, 1): (3, 1, True),
     (3, 2): (3, 2),
 })
 
 vmap2 = VMap({
-    (1, 2): (1, 1),
+    (1, 2): (1, 1, True),
     (1, 3): (1, 2),
     (2, 1): (2, 1),
     (2, 3): (2, 2),
-    (4, 1): (3, 1),
+    (4, 1): (3, 1, True),
     (4, 2): (3, 2),
 })
 
-
 physical_policy1 = gen_static_physical_policy({
-    (1, 1, 1) : fwd(1),
-    (1, 1, 2) : fwd(3),
+    (1, 1) : fwd(1),
+    (1, 2) : fwd(3),
     
-    (2, 2, 1) : fwd(1),
-    (2, 2, 2) : fwd(2),
+    (2, 1) : fwd(1),
+    (2, 2) : fwd(2),
     
-    (3, 3, 1) : fwd(1),
-    (3, 3, 2) : fwd(2),
+    (3, 1) : fwd(1),
+    (3, 2) : fwd(2),
 })
 
 physical_policy2 = gen_static_physical_policy({
-    (1, 1, 1) : fwd(2),
-    (1, 1, 2) : fwd(3),
+    (1, 1) : fwd(2),
+    (1, 2) : fwd(3),
     
-    (2, 2, 1) : fwd(1),
-    (2, 2, 2) : fwd(3),
+    (2, 1) : fwd(1),
+    (2, 2) : fwd(3),
     
-    (4, 4, 1) : fwd(1),
-    (4, 4, 2) : fwd(2),
+    (4, 1) : fwd(1),
+    (4, 2) : fwd(2),
 })
 
 
 def setup_virtual_networks(network):
-    n1 = vmap1.make_fork_func(physical_policy1)(network)
-    n2 = vmap2.make_fork_func(physical_policy2)(network)
-
+    n1 = vmap1.fork(network, [(physical_policy1,)], isolate=True)
+    n2 = vmap2.fork(network, [(physical_policy2,)], isolate=True)
+    
     return (n1, n2)

@@ -50,47 +50,43 @@ from frenetic.lib import *
 #  +---------+---------------------+--------+
 #            | 2                    | 3
 
-
-v_switch = Switch(1)
-vinfo = {v_switch: [Port(1), Port(2), Port(3)]}
+vinfo = {1: [1, 2, 3]}
 
 def get_ingress_policy():
-    ingress_policy = (((_.switch == Switch(1)) & (_.inport == 1)  & modify(vinport = 1) | 
-                       (_.switch == Switch(2)) & (_.inport == 1)  & modify(vinport = 2) | 
-                       (_.switch == Switch(3)) & (_.inport == 1)  & modify(vinport = 3))
-                      >> modify(vswitch = Switch(1)))
+    ingress_policy = ((match(switch=1, inport=1) & modify(vinport = 1) | 
+                      match(switch=2, inport=1) & modify(vinport = 2) | 
+                      match(switch=3, inport=1) & modify(vinport = 3))
+                      >> modify(vswitch=1))
     return ingress_policy
 
     
 def get_physical_policy():
-    physical_policy = ((_.switch == Switch(1)) & ((_.voutport == 1) & fwd(1)  | 
-                                                  (_.voutport == 2) & fwd(2)  | 
-                                                  (_.voutport == 3) & fwd(3))
+    physical_policy = (match(switch=1) & ((match(voutport=1)) & fwd(1)  | 
+                                          (match(voutport=2)) & fwd(2)  | 
+                                          (match(voutport=3)) & fwd(3))
                        
-                       |  (_.switch == Switch(2)) & ((_.voutport == 1) & fwd(2) | 
-                                                     (_.voutport == 2) & fwd(1) | 
-                                                     (_.voutport == 3) & fwd(3))
+                       |  match(switch=2) & (match(voutport=1) & fwd(2) | 
+                                             match(voutport=2) & fwd(1) | 
+                                             match(voutport=3) & fwd(3))
                        
-                       |  (_.switch == Switch(3)) &  ((_.voutport == 1) & fwd(3) | 
-                                                      (_.voutport == 2) & fwd(2) | 
-                                                      (_.voutport == 3) & fwd(1)))
-    return if_(is_port_real(_.voutport), physical_policy, copy_vheaders)
+                       |  match(switch=3) &  (match(voutport=1) & fwd(3) | 
+                                              match(voutport=2) & fwd(2) | 
+                                              match(voutport=3) & fwd(1)))
+    return physical_policy
 
     
 def get_egress_policy():
-    pred = _.outport.is_(1) & or_(
-        _.switch == 1, _.voutport == 1, 
-        _.switch == 2, _.voutport == 2, 
-        _.switch == 3, _.voutport == 3)
+    pred = match(outport=1) & or_(match(switch=1, voutport=1), 
+                                  match(switch=2, voutport=2), 
+                                  match(switch=3, voutport=3))
 
-    pred |= ~is_port_real(_.outport)
-    
-    return if_(pred, strip_vheaders, passthrough)
+    return if_(pred, pop_vheaders)
     
 def setup_virtual_network(network):
     ingress_policy = get_ingress_policy()
+    flood_policy = make_flood_policy(vinfo)
     physical_policy = get_physical_policy()
     egress_policy = get_egress_policy()
 
-    v_network = fork_virtual_network(network, vinfo, ingress_policy, physical_policy >> egress_policy)
+    v_network = fork_virtual_network(network, [(ingress_policy, physical_policy >> egress_policy, flood_policy)])
     return v_network

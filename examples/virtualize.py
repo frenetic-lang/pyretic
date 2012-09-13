@@ -38,5 +38,4 @@ def virtualize(network, virttopo, program):
 
     programns["main"](vn)
     
-    
 main = virtualize

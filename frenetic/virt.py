@@ -29,7 +29,6 @@
 from frenetic import generators as gs
 from frenetic.network import *
 from frenetic.netcore import *
-from frenetic.netcore import _
 from frenetic import util
 
 
@@ -127,97 +126,75 @@ class SwitchDatabase(dict):
 ################################################################################
 # Virtualization policies 
 ################################################################################
-
-
-def fork_virtual_network(network, vinfo, ingress_policy, physical_policy):
-    return fork_virtual_network_gen(network, [(vinfo, ingress_policy, physical_policy)])
     
-def fork_virtual_network_gen(network, vnetwork_gen):
+def fork_virtual_network(network, vnetwork_gen):
     sub_net = Network()
-
     t = gs.Trigger(sub_net.policy_changes)
 
     def subgen():
-        for policy, (vinfo, ingress_policy, physical_policy) in \
-            gs.merge_hold(t, vnetwork_gen):
-            yield virtualize_policy(generate_vlan_db(1, vinfo),
-                                    ingress_policy,
-                                    physical_policy,
-                                    policy)
+        for policy, args in gs.merge_hold(t, vnetwork_gen):
+            yield virtualize_policy(id(sub_net), policy, *args)
     
     network.install_sub_policies(subgen())
-    
     t.wait()
     
     return sub_net
 
-def generate_vlan_db(start_vlan, vinfo):
-    vlan_to_vheaders = {}
-    vheaders_to_vlan = {}
-
-    vlan = start_vlan
-    for vswitch in vinfo:
-        for vinport in vinfo[vswitch]:
-            for voutport in vinfo[vswitch]:
-                vlan_to_vheaders[vlan] = (vswitch, vinport, voutport)
-                vheaders_to_vlan[(vswitch, vinport, voutport)] = vlan
-                vlan += 1
-
-    return (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan)
-
-copy_vheaders = copy_fields(outport=_.voutport, switch=_.vswitch, inport=_.vinport)
+pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
     
-strip_vheaders = modify(vswitch=None,
-                        vinport=None,
-                        voutport=None)
+virtual_to_physical = (copy(outport="voutport", switch="vswitch", inport="vinport") >> 
+                       pop_vheaders)
 
-def vheaders_to_vlan_policy(vlan_db):
-    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
-    
-    return ((_.vswitch.is_missing() & strip_vlan # if we are no longer virtualized, remove vlan.
-            | enum((_.vswitch, vinfo.iterkeys()), # otherwise, encode.
-                   lambda s:
-                   enum((_.vinport, vinfo[s]),
-                        (_.voutport, vinfo[s]),
-                        lambda ip, op: modify(vlan=vheaders_to_vlan[(s, ip, op)]))))
-            >> strip_vheaders)
-    
-def vlan_to_vheaders_policy(vlan_db):
-    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
+def physical_to_virtual(vtag):
+    return (modify(vtag=vtag) >>
+            copy(voutport="outport", vswitch="switch", vinport="inport") >> 
+            pop("outport", "switch", "inport"))
 
-    def vlan_dict_helper(vlan):
-        (vswitch, vinport, voutport) = vlan_to_vheaders[vlan]
-        return modify(vswitch=vswitch, vinport=vinport, voutport=voutport)
-    
-    return (enum((_.vlan, vlan_to_vheaders.iterkeys()), vlan_dict_helper) >>
-            strip_vlan)
-    
-def pre_vheaders_to_headers_policy():
-    return copy_fields(switch=_.vswitch, inport=_.vinport) >> modify(vswitch=None,
-                                                                     vinport=None)
-
-def headers_to_post_vheaders(x):
-    return copy_fields(voutport=x.outport)
-
-def flood_splitter_policy(vlan_db):
-    (vinfo, start_vlan, vlan_to_vheaders, vheaders_to_vlan) = vlan_db
-
+def make_flood_policy(vinfo):
     flood_pol = drop
     for vsw, vports in vinfo.iteritems():
         pol = drop
         for vport in vports:
             vports_ = list(vports)
             vports_.remove(vport)
-            vfwds = or_(*(modify(voutport=vport_) for vport_ in vports_))
-            pol |= and_(_.vinport == vport, vfwds)
-        flood_pol |= and_(_.vswitch == vsw, pol)
+            vfwds = or_(modify(outport=vport_) for vport_ in vports_)
+            pol |= match(inport=vport) & vfwds
+        flood_pol |= match(switch=vsw) & pol
         
-    return if_(_.voutport == Port.flood_port, flood_pol, passthrough)
+    return if_(match(outport=Port.flood_port), flood_pol)
+
+def isolate_policy(isotag, policy, flood_policy, egress_pred):
+    """policy must be flood free"""
+    policy = policy >> flood_policy
+    return ((match(isotag=None) & policy >> push("isotag") >> modify(isotag=isotag) |
+            match(isotag=isotag) & policy >> modify(isotag=isotag)) >> 
+            if_(is_bucket("outport") | egress_pred, pop("isotag")))
+
+def fork_isolated_network(network, vnetwork_gen):
+    sub_net = Network()
+    sub_net.switch_joins = network.switch_joins
+    sub_net.switch_parts = network.switch_parts
+    sub_net.port_ups = network.port_ups
+    sub_net.port_downs = network.port_downs
     
-def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
+    t = gs.Trigger(sub_net.policy_changes)
+
+    def subgen():
+        for policy, args in gs.merge_hold(t, vnetwork_gen):
+            yield isolate_policy(id(sub_net), policy, *args)
+    
+    network.install_sub_policies(subgen())
+    t.wait()
+    
+    return sub_net
+    
+def virtualize_policy(vtag,
+                      policy,
+                      ingress_policy,
+                      physical_policy,
+                      flood_policy,
+                      query_policy=virtual_to_physical):
     """
-    - `vinfo' is a mapping from switch to set of ports.
-    - `start_vlan, ...` - see generate_vlan_db
     - `ingress_policy' is written in terms of the physical network, and tries to
        detect whether a packet is at the ingress of a virtual switch. If the packet
        is at the ingress of a virtual switch, then modify the vswitch and vinport of the
@@ -233,21 +210,21 @@ def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
     Returns the virtualization of `policy' with respect to the other parameters.
     """
 
-           # if the vlan isnt set, then we need to find out the v* headers.
-    return (if_(_.vlan.is_missing(), 
-                    (ingress_policy >> # set vswitch and vinport
-                    # now make the virtualization transparent to the tenant's policy to get the outport
-                     let(pre_vheaders_to_headers_policy() >> policy,
-                         lambda x: headers_to_post_vheaders(x))),
-                  # However, if vlan IS set, re-set the v* headers.
-                  vlan_to_vheaders_policy(vlan_db))
+    # if the vlan isnt set, then we need to find out the v* headers.
+    return (if_(~match(vtag=vtag), 
+                (push("vswitch", "vinport") >>
+                 ingress_policy >> # set vswitch and vinport
+                 # now make the virtualization transparent to the tenant's policy to get the outport
+                 push("switch","inport", "outport") >>
+                 copy(switch="vswitch", inport="vinport") >>
+                 pop("vswitch", "vinport") >>
+                 policy >>
+                 flood_policy >>
+                 push("vtag", "vswitch", "vinport", "voutport") >>
+                 physical_to_virtual(vtag)))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
-            >> flood_splitter_policy(vlan_db)
-            >> physical_policy
-            # and translate the v* headers to a vlan value, since the real network
-            # doesn't understand our custom headers.
-            >> vheaders_to_vlan_policy(vlan_db))
-
+            >> case ((is_bucket("voutport"), query_policy),
+                     (all_packets, physical_policy)))
 
 ################################################################################
 # Virtualization helpers
@@ -255,83 +232,77 @@ def virtualize_policy(vlan_db, ingress_policy, physical_policy, policy):
 
 class VMap(util.frozendict):
     """(phys switch, phys port) -> (virt switch, virt port)"""
+
+    def __init__(self, init):
+        d = dict()
+        for k, args in init.items():
+            if len(args) == 2:
+                args += (False,)
+            d[k] = args
+        super(VMap, self).__init__(d)
     
-    @util.cached
     def to_vinfo(self):
         vinfo = {}
 
-        for (vsw, vp) in self.itervalues():
-            vsw = lift_fixedwidth_kv("vswitch", vsw)
-            vinp = lift_fixedwidth_kv("vinport", vp)
+        for (vsw, vp, endpt) in self.itervalues():
+            vsw = lift_fixedwidth("vswitch", vsw)
+            vinp = lift_fixedwidth("vinport", vp)
             vinfo.setdefault(vsw, []).append(vinp)
 
         return vinfo
 
-    @util.cached
+    def to_flood_policy(self):
+        return make_flood_policy(self.to_vinfo())
+    
     def to_ingress_policy(self):
         ingress_policy = drop
-
-        for (sw, inp), (vsw, vip) in self.iteritems():
-            ingress_policy |= and_(_.switch == sw, _.inport == inp, modify(vswitch=vsw, vinport=vip))
+        for (sw, inp), (vsw, vip, endpt) in self.iteritems():
+            ingress_policy |= match(switch=sw, inport=inp) & modify(vswitch=vsw, vinport=vip)
 
         return ingress_policy
-
-    @util.cached
+    
     def to_egress_policy(self):
         pred = no_packets
+        for (sw, port), (vsw, vport, endpt) in self.iteritems():
+            pred |= match(switch=sw, outport=port, vswitch=vsw, voutport=vport)
+        
+        return if_(pred, pop_vheaders)
 
-        for (sw, port), (vsw, vport) in self.iteritems():
-            pred |= and_(_.switch == sw, _.outport == port,
-                         _.vswitch == vsw, _.voutport == vport)
+    def to_endpts_pred(self):
+        pred = no_packets
+        for (vsw, vport, endpt) in self.itervalues():
+            if endpt:
+                pred |= match(switch=vsw, outport=vport)
+        return pred
 
-        pred |= ~is_port_real(_.outport)
-
-        return if_(pred, strip_vheaders, passthrough)
-
-    # XXX unused for now
-    def set_network_statuses(self, switch_db, vnetwork):
-        @switch_db.port_ups.notify
-        def handler((switch, port)):
-            (vswitch, vport) = self[(switch, port)]
-            vnetwork.port_ups.signal((vswitch, vport))
-            
-        @switch_db.port_downs.notify
-        def handler((switch, port)):
-            (vswitch, vport) = self[(switch, port)]
-            vnetwork.port_downs.signal((vswitch, vport))
-
-    def make_fork_func_gen(self, program):
+    def fork(self, network, vnetwork_gen, isolate=False):
         ingress_policy = self.to_ingress_policy()
         egress_policy = self.to_egress_policy()
-        vinfo = self.to_vinfo()
+        flood_policy = self.to_flood_policy()
 
-        def fork(network):
-            def gen():
-                for policy in program(network):
-                    yield (vinfo, ingress_policy, policy >> egress_policy)
-            vn = fork_virtual_network_gen(network, gen())
-            vn.switch_joins = gs.DelayedEvent(self.to_vinfo())
-            vn.switch_parts = gs.DelayedEvent([])
-            vn.port_ups = gs.DelayedEvent([])
-            vn.port_downs = gs.DelayedEvent([])
-            return vn
+        def gen():
+            for args in vnetwork_gen:
+                # Query is optional, don't forget
+                r = (ingress_policy, args[0] >> egress_policy, flood_policy) + args[1:]
+                yield r
+        vn = fork_virtual_network(network, gen())
+        vn.switch_joins = gs.DelayedEvent(self.to_vinfo())
+        vn.switch_parts = gs.DelayedEvent([])
+        vn.port_ups = gs.DelayedEvent([])
+        vn.port_downs = gs.DelayedEvent([])
 
-        return fork
+        if isolate:
+            vn = fork_isolated_network(vn, [(flood_policy, self.to_endpts_pred())])
+            
+        return vn
         
-    def make_fork_func(self, policy):
-        return self.make_fork_func_gen(lambda network: [policy])
-    
 def gen_static_physical_policy(route):
-    """(sw, vsw, vop) : act"""
+    """(sw, vop) : act"""
     
     policy = drop
+    for (sw, vop), act in route.iteritems():
+        policy |= match(switch=sw, voutport=vop) & act
 
-    for (sw, vsw, vop), act in route.iteritems():
-        policy |= and_(_.switch == sw,
-                       _.vswitch == vsw,
-                       _.voutport == vop,
-                       act)
-
-    return if_(is_port_real(_.voutport),
-               policy,
-               copy_fields(outport=_.voutport, switch=_.vswitch, inport=_.vinport)) 
+    return policy
+    
+               

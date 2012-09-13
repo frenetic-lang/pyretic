@@ -31,6 +31,6 @@ from frenetic.lib import *
 # ACTS EXACTLY LIKE NORMAL HUB
 # EXCEPT DOESN'T ALLOW INCOMING PACKETS FROM SUBNET 1.2.3.0/24
 def hub(network):
-    network.install_policy( ~ (_.srcip == "1.2.3.*")  & flood)
+    network.install_policy( ~ (match(srcip="1.2.3.*"))  & flood)
         
 main = hub

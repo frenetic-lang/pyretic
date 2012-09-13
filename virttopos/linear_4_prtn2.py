@@ -54,21 +54,22 @@ vmap = VMap({
 })
 
 physical_policy = gen_static_physical_policy({
-    (1, 1, 1) : fwd(1),
-    (1, 1, 2) : fwd(2),
-    (1, 1, 3) : fwd(2),
+    (1, 1) : fwd(1),
+    (1, 2) : fwd(2),
+    (1, 3) : fwd(2),
 
-    (2, 1, 1) : fwd(2),
-    (2, 1, 2) : fwd(1),
-    (2, 1, 3) : fwd(3),
+    (2, 1) : fwd(2),
+    (2, 2) : fwd(1),
+    (2, 3) : fwd(3),
 
-    (3, 2, 1) : fwd(3),
-    (3, 2, 2) : fwd(1),
-    (3, 2, 3) : fwd(2),
+    (3, 1) : fwd(3),
+    (3, 2) : fwd(1),
+    (3, 3) : fwd(2),
 
-    (4, 2, 1) : fwd(1),
-    (4, 2, 2) : fwd(2),
-    (4, 2, 3) : fwd(2),
+    (4, 1) : fwd(1),
+    (4, 2) : fwd(2),
+    (4, 3) : fwd(2),
 })
 
-setup_virtual_network = vmap.make_fork_func(physical_policy)
+def setup_virtual_network(network):
+    return vmap.fork(network, physical_policy)

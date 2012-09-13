@@ -1,4 +1,3 @@
-
 ################################################################################
 # The Frenetic Project                                                         #
 # frenetic@frenetic-lang.org                                                   #
@@ -25,20 +24,16 @@
 # LICENSE file distributed with this work for specific language governing      #
 # permissions and limitations under the License.                               #
 ################################################################################
-
-
-from abc import ABCMeta, abstractmethod, abstractproperty
-from bitarray import bitarray
+import socket
 import struct
+from abc import ABCMeta, abstractmethod, abstractproperty
 from numbers import Integral
 
-from frenetic import util, generators as gs
-from frenetic.util import frozendict, Data
+from bitarray import bitarray
 
-import pox.lib.addresses as packetaddr
-import pox.openflow.libopenflow_01 as of
-from pox.lib import packet as packetlib
-import socket
+from frenetic import util, generators as gs
+from frenetic.util import Data
+
 
 ################################################################################
 # Fixed width stuff
@@ -103,7 +98,7 @@ def Bits(width_):
 
 @util.cached
 def FixedInt(width_):
-    class FixedInt_(int):
+    class FixedInt_(long):
         width = width_
         
         def __new__(cls, value):
@@ -119,66 +114,66 @@ def FixedInt(width_):
 
         def __add__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__add__(self, v))
+            return self.__class__(long.__add__(self, v))
 
         def __sub__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__sub__(self, v))
+            return self.__class__(long.__sub__(self, v))
 
         def __mul__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__mul__(self, v))
+            return self.__class__(long.__mul__(self, v))
 
         def __div__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__div__(self, v))
+            return self.__class__(long.__div__(self, v))
 
         def __mod__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__mod__(self, v))
+            return self.__class__(long.__mod__(self, v))
 
         def __and__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__and__(self, v))
+            return self.__class__(long.__and__(self, v))
 
         def __or__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__or__(self, v))
+            return self.__class__(long.__or__(self, v))
 
         def __xor__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__xor__(self, v))
+            return self.__class__(long.__xor__(self, v))
 
         def __pow__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__pow__(self, v))
+            return self.__class__(long.__pow__(self, v))
 
         def __rshift__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__lshift__(self, v))
+            return self.__class__(long.__lshift__(self, v))
 
         def __lshift__(self, v):
             assert self.width == v.width
-            return self.__class__(int.__rshift__(self, v))
+            return self.__class__(long.__rshift__(self, v))
 
         def __abs__(self):
             assert self.width == v.width
-            return self.__class__(int.__abs__(self))
+            return self.__class__(long.__abs__(self))
 
         def __invert__(self):
             assert self.width == v.width
-            return self.__class__(int.__invert__(self))
+            return self.__class__(long.__invert__(self))
 
         def __pos__(self):
             assert self.width == v.width
-            return self.__class__(int.__pos__(self))
+            return self.__class__(long.__pos__(self))
 
         def __neg__(self):
             assert self.width == v.width
-            return self.__class__(int.__or__(self))
+            return self.__class__(long.__or__(self))
 
         def __repr__(self):
-            return int.__repr__(self) + "#" + str(self.width)
+            return long.__repr__(self) + "#" + str(self.width)
 
     FixedWidth.register(FixedInt_)
     FixedInt_.__name__ += repr(FixedInt_.width)
@@ -303,124 +298,35 @@ class IP(Bits(32)):
         return socket.inet_ntoa(self.to_bits().tobytes())
     
 ################################################################################
-#
+# Packet and tools
 ################################################################################
 
+class Packet(object):
+    __metaclass__ = ABCMeta
 
+    @abstractmethod
+    def _push(self, field):
+        pass
 
-class Packet(Data("header payload")):
-    def __new__(self, data):
-        h = {}
-        p = packetlib.ethernet(data)
+    @abstractmethod
+    def _pop(self, field):
+        pass
 
-        h["srcmac"] = p.src.toRaw()
-        h["dstmac"] = p.dst.toRaw()
+    @abstractmethod
+    def _replace(self, arg={}, **kwargs):
+        pass
 
-        p = p.next
-
-        if isinstance(p, packetlib.vlan):
-          h["vlan"] = p.id
-          h["vlan_pcp"] = p.pcp
-          p = p.next
-
-        if isinstance(p, packetlib.ipv4):
-          h["srcip"] = p.srcip.toRaw()
-          h["dstip"] = p.dstip.toRaw()
-          h["protocol"] = p.protocol
-          h["tos"] = p.tos
-          p = p.next
-
-          if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-            h["srcport"] = p.srcport
-            h["dstport"] = p.dstport
-          elif isinstance(p, packetlib.icmp):
-            h["srcport"] = p.type
-            h["dstport"] = p.code
-        elif isinstance(p, packetlib.arp):
-          if p.opcode <= 255:
-            h["protocol"] = p.opcode
-            h["srcip"] = p.protosrc.toRaw()
-            h["dstip"] = p.protodst.toRaw()
-
-        return super(Packet, self).__new__(self, make_header(h), data)
-
-    def update_header_fields(self, arg={}, **kwargs):
-        arg = util.merge_dicts(arg, kwargs)
-        return self._replace(header=make_header(util.merge_dicts(self.header, arg)))
-
-    def _get_type(self):
-        p = packetlib.ethernet(self._get_payload())
-        return lift_fixedwidth_kv("type", p.type)
-
-    def _has_vlan_header(self):
-        return hasattr(self, "vlan") or hasattr(self, "vlan_pcp")
-
-    def _get_payload(self):
-        packet = p = packetlib.ethernet(self.payload)
-
-        p.src = packetaddr.EthAddr(self.srcmac.to_bits().tobytes())
-        p.dst = packetaddr.EthAddr(self.dstmac.to_bits().tobytes())
-
-        if self._has_vlan_header():
-            if isinstance(p.next, packetlib.vlan):
-                p = p.next
-            else:
-                # Make a vlan header
-                old_eth_type = p.type
-                p.type = 0x8100
-                p.next = packetlib.vlan(next = p.next)
-                p = p.next
-                p.eth_type = old_eth_type
-            p.id = int(getattr(self, "vlan", 0))
-            p.pcp = int(getattr(self, "vlan_pcp", 0))
-        else:
-            if isinstance(p.next, packetlib.vlan):
-                p.type = p.next.eth_type # Restore encapsulated eth type
-                p.next = p.next.next # Remove vlan from header
-
-        p = p.next
-
-        if isinstance(p, packetlib.ipv4):
-            p.srcip = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
-            p.dstip = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
-            p.protocol = int(self.protocol)
-            p.tos = int(self.tos)
-            p = p.next
-
-            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-                p.srcport = int(self.srcport)
-                p.dstport = int(self.dstport)
-            elif isinstance(p, packetlib.icmp):
-                p.type = int(self.srcport)
-                p.code = int(self.dstport)
-        elif isinstance(p, packetlib.arp):
-            p.opcode = int(self.protocol)
-            p.protosrc = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
-            p.protodst = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
-
-        return packet.pack()
-        
-    def __repr__(self):
-        l = []
-        size = max(map(len, self.header)) + 3
-        l.append("Packet of type %s:" % hex(self._get_type()))
-        for k in sorted(self.header):
-            l.append("  %s:%s%s" % (k, " " * (size - len(k)), getattr(self, k)))
-        return "\n".join(l)
-
+    @abstractmethod
     def __getattr__(self, attr):
-        v = self.header.get(attr)
-        if v is None:
-            raise AttributeError
-        return v
-        
+        pass
+
 class Bucket(gs.Event):
     """A safe place for packets!"""
     def __init__(self, fields=[], time=None):
         self.fields = fields
         self.time = time
         super(Bucket, self).__init__()
-
+        
 ################################################################################
 # Lifts
 ################################################################################
@@ -432,10 +338,10 @@ header_to_fixedwidth_lift = dict(
     vswitch=Switch,
     vinport=Port,
     voutport=Port,
+    vtag=FixedInt(64),
+    isotag=FixedInt(64),
     srcmac=MAC,
     dstmac=MAC,
-    vlan=FixedInt(12),
-    vlan_pcp=FixedInt(3),
     srcip=IP,
     dstip=IP,
     srcport=FixedInt(16),
@@ -444,7 +350,7 @@ header_to_fixedwidth_lift = dict(
     tos=FixedInt(6),
     type=FixedInt(16),)
 
-def lift_fixedwidth_kv(k, v):
+def lift_fixedwidth(k, v):
     cls = header_to_fixedwidth_lift.get(k)
     if cls is None:
         assert isinstance(v, FixedWidth)
@@ -453,6 +359,3 @@ def lift_fixedwidth_kv(k, v):
         if not isinstance(v, tuple):
             v = (v,)
         return cls(*v)
-
-def make_header(d):
-    return frozendict((k, lift_fixedwidth_kv(k, v)) for k, v in d.iteritems() if v is not None)

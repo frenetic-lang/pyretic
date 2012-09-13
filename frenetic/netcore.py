@@ -32,6 +32,7 @@ import struct
 from abc import ABCMeta, abstractmethod
 from collections import Counter
 from numbers import Integral
+from itertools import chain
 
 from bitarray import bitarray
 
@@ -246,18 +247,10 @@ class IPWildcard(Wildcard(32)):
             prefix = ipexpr
                 
         return super(IPWildcard, cls).__new__(cls, prefix, mask)
-            
-       
 
 ################################################################################
 # Predicates
 ################################################################################
-
-def get_env(env, varname, field, packet):
-    if varname != "_":
-        packet = env[varname]
-    
-    return getattr(packet, field, None)
     
 class Predicate(object):
     """Top-level abstract class for predicates."""
@@ -282,59 +275,54 @@ class PredAll(Predicate):
     """The always-true predicate."""
     def __repr__(self):
         return "all_packets"
-    def eval(self, packet, env=frozendict()):
+    def eval(self, packet):
         return True
       
 class PredNone(Predicate):
     """The always-false predicate."""
     def __repr__(self):
         return "no_packets"
-    def eval(self, packet, env=frozendict()):
+    def eval(self, packet):
         return False
     
-class PredMatch(Predicate, Data("varname field pattern")):
+class PredMatch(Predicate, Data("field pattern")):
     """A basic predicate matching against a single field"""
     def __repr__(self):
-        return "%s.%s == %s" % self
-    def eval(self, packet, env=frozendict()):
-        v = get_env(env, self.varname, self.field, packet) 
-        if v is None:
-            return False
+        return "%s = %s" % self
+    def eval(self, packet):
+        v = getattr(packet, self.field, None)
+        if self.pattern is None:
+            return v is None
         else:
-            return self.pattern.match(v)
-
-class PredMissing(Predicate, Data("varname field")):
-    """A basic predicate matching against a single field"""
-    def __repr__(self):
-        return "%s.%s is missing" % self
-    def eval(self, packet, env=frozendict()):
-        v = get_env(env, self.varname, self.field, packet) 
-        return v is None
+            if v is None:
+                return False
+            else:
+                return self.pattern.match(v)
         
 class PredUnion(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the union of two predicates."""
     _mes_drop = PredNone
-    def eval(self, packet, env=frozendict()):
-        return self.left.eval(packet, env) or self.right.eval(packet, env)
+    def eval(self, packet):
+        return self.left.eval(packet) or self.right.eval(packet)
         
 class PredIntersection(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the intersection of two predicates."""
     _mes_drop = PredAll
-    def eval(self, packet, env=frozendict()):
-        return self.left.eval(packet, env) and self.right.eval(packet, env)
+    def eval(self, packet):
+        return self.left.eval(packet) and self.right.eval(packet)
 
 class PredDifference(util.ReprPlusMixin, Predicate, Data("left right")):
     """A predicate representing the difference of two predicates."""
     _mes_attrs = {"left": 0}
-    def eval(self, packet, env=frozendict()):
-        return self.left.eval(packet, env) and not self.right.eval(packet, env)
+    def eval(self, packet):
+        return self.left.eval(packet) and not self.right.eval(packet)
 
 class PredNegation(util.ReprPlusMixin, Predicate, Data("pred")):
     """A predicate representing the difference of two predicates."""
     _mes_attrs = {}
-    def eval(self, packet, env=frozendict()):
-        return not self.pred.eval(packet, env)
-                
+    def eval(self, packet):
+        return not self.pred.eval(packet)
+        
 ################################################################################
 # Policies
 ################################################################################
@@ -354,117 +342,101 @@ class Policy(object):
         raise NotImplementedError
     def __ne__(self, other):
         raise NotImplementedError
-    def packets_to_send(self, packet):
-        c = self.eval(packet)
-        pc = Counter()
-        for m, count in c.iteritems():
-            packet_ = packet.update_header_fields(m)
-            pc[packet_] += count 
-        return pc
-    
+    def eval(self, packet):
+        raise NotImplementedError
+        
 class PolDrop(Policy):
     """Policy that drops everything."""
     def __repr__(self):
         return "drop"
-    def eval(self, packet, env=frozendict()):
+    def eval(self, packet):
         return Counter()
 
 class PolPassthrough(Policy):
     def __repr__(self):
         return "passthrough"
-    def eval(self, packet, env=frozendict()):
-        return Counter([frozendict()])
+    def eval(self, packet):
+        return Counter([packet])
         
 class PolModify(Policy, Data("field value")):
     """Policy that drops everything."""
     def __repr__(self):
         return "modify %s <- %s" % self
-    def eval(self, packet, env=frozendict()):
-        return Counter([frozendict({self.field: self.value})])
-        
-class PolCopy(Policy, Data("field1 varname field2")):
+    def eval(self, packet):
+        packet = packet._replace({self.field: self.value})
+        return Counter([packet])
+
+class PolPush(Policy, Data("field")):
     """Policy that drops everything."""
     def __repr__(self):
-        return "copy %s <- %s.%s" % self
-    def eval(self, packet, env=frozendict()):
-        d = frozendict({self.field1: get_env(env, self.varname, self.field2, packet)})
-        return Counter([d])
+        return "push %s" % self.field
+    def eval(self, packet):
+        packet = packet._push(self.field)
+        return Counter([packet])
+
+class PolPop(Policy, Data("field")):
+    """Policy that drops everything."""
+    def __repr__(self):
+        return "pop %s" % self.field
+    def eval(self, packet):
+        packet = packet._pop(self.field)
+        return Counter([packet])
         
+class PolCopy(Policy, Data("field1 field2")):
+    """Policy that drops everything."""
+    def __repr__(self):
+        return "copy %s <- %s" % self
+    def eval(self, packet):
+        packet = packet._replace({self.field1: getattr(packet, self.field2, None)})
+        return Counter([packet])
+
 class PolRestrict(util.ReprPlusMixin, Policy, Data("predicate policy")):
     """Policy for mapping a single predicate to a list of actions."""
     _mes_attrs = {"predicate": PredIntersection} 
-    def eval(self, packet, env=frozendict()):
-        if self.predicate.eval(packet, env):
-            return self.policy.eval(packet, env)
+    def eval(self, packet):
+        if self.predicate.eval(packet):
+            return self.policy.eval(packet)
         else:
-            return Counter()
+            return Counter([])
 
-class PolLet(util.ReprPlusMixin, Policy, Data("varname policy body")):
-    _mes_attrs = {}
-    def eval(self, packet, env=frozendict()):
-        c = Counter()
-        pc = self.policy.eval(packet, env)
-        for pm, pcount in pc.items():
-            packet_ = packet.update_header_fields(pm)
-            env_ = env.update({self.varname: packet_})
-            # Note not packet_!
-            bc = self.body.eval(packet, env_)
-            for bm, bcount in bc.iteritems():
-                # Note no pm!
-                c[bm] += pcount * bcount
-        return c
-        
 class PolComposition(util.ReprPlusMixin, Policy, Data("left right")):
     _mes_drop = PolPassthrough
-    def eval(self, packet, env=frozendict()):
+    def eval(self, packet):
+        lc = self.left.eval(packet)
         c = Counter()
-        lc = self.left.eval(packet, env)
-        for lm, lcount in lc.iteritems():
-            packet_ = packet.update_header_fields(lm)
-            rc = self.right.eval(packet_, env)
-            for rm, rcount in rc.iteritems():
-                c[lm.update(rm)] += lcount * rcount
+        for lpacket, lcount in lc.iteritems():
+            rc = self.right.eval(lpacket)
+            for rpacket, rcount in rc.iteritems():
+                c[rpacket] = lcount * rcount 
         return c
             
 class PolUnion(util.ReprPlusMixin, Policy, Data("left right")):
     _mes_drop = PolDrop
-    def eval(self, packet, env=frozendict()):
-        l = self.left.eval(packet, env)
-        r = self.right.eval(packet, env)
-        return l + r
+    def eval(self, packet):
+        lc = self.left.eval(packet)
+        rc = self.right.eval(packet)
+        return lc + rc
         
 class PolRemove(util.ReprPlusMixin, Policy, Data("policy predicate")):
     _mes_attrs = {"predicate": PredDifference}
-    def eval(self, packet, env=frozendict()):
-        if not self.predicate.eval(packet, env):
-            return self.policy.eval(packet, env)
+    def eval(self, packet):
+        if not self.predicate.eval(packet):
+            return self.policy.eval(packet)
         else:
-            return Counter()
+            return Counter([])
 
 ################################################################################
 # Lifts
 ################################################################################
 
 header_to_matchable_lift = dict(
-    switch=MatchExact(Switch),
-    vswitch=MatchExact(Switch),
-    inport=MatchExact(Port),
-    outport=MatchExact(Port),
-    vinport=MatchExact(Port),
-    voutport=MatchExact(Port),
-    srcmac=MatchExact(MAC),
-    dstmac=MatchExact(MAC),
-    vlan=MatchExact(FixedInt(12)),
-    vlan_pcp=MatchExact(FixedInt(3)),
     srcip=IPWildcard,
-    dstip=IPWildcard,
-    srcport=MatchExact(FixedInt(16)),
-    dstport=MatchExact(FixedInt(16)),
-    protocol=MatchExact(FixedInt(8)),
-    tos=MatchExact(FixedInt(6)),
-    type=MatchExact(FixedInt(16)),)
+    dstip=IPWildcard,)
 
-def lift_matchable_kv(k, v):
+for k, v in header_to_fixedwidth_lift.iteritems():
+    header_to_matchable_lift.setdefault(k, MatchExact(v))
+
+def lift_matchable(k, v):
     cls = header_to_matchable_lift.get(k)
 
     if cls is None:
@@ -479,96 +451,97 @@ def lift_matchable_kv(k, v):
 # Predicates and policies
 ################################################################################
 
-class FieldMatch(Data("varname field")):
-    def __repr__(self):
-        return "%s.%s" % self
-    def __eq__(self, other):
-        other = lift_matchable_kv(self.field, other)
-        return PredMatch(self.varname, self.field, other)
-    def __ne__(self, other):
-        return ~(self == other)
-    def is_(self, other):
-        return self == other
-    def is_not(self, other):
-        return self == other
-    def is_missing(self):
-        return PredMissing(self.varname, self.field)
-        
-class PacketMatch(Data("varname")):
-    def __getattr__(self, attr):
-        return FieldMatch(self.varname, attr)
-
-_ = PacketMatch("_")
-
-#
-
 all_packets = PredAll()
 no_packets = PredNone()
-
-def let(policy, body):
-    assert hasattr(body, "func_code"), "must be a function (literally)"
-    name = body.func_code.co_varnames[0]
-    assert name != "_", "the name _ is reserved for the implicit packet"
-    return PolLet(name,
-                  policy,
-                  body(PacketMatch(name)))
-        
-def if_(pred, t_branch, f_branch):
-    return pred & t_branch | ~pred & f_branch
-
-def or_(*args):
-    k = args[0]
-    for arg in args[1:]:
-        k |= arg
-    return k
-    
-def and_(*args):
-    k = args[0]
-    for arg in args[1:]:
-        k &= arg
-    return k
-
 drop = PolDrop()
 passthrough = PolPassthrough()
 
-def modify(**kwargs):
-    policy = passthrough
-    for k, v in kwargs.iteritems():
-        policy = policy >> PolModify(k, v)
-    return policy
+def match(_d={}, **kwargs):
+    d = util.merge_dicts(_d, kwargs)
+    pred = all_packets
+    for k, v in d.iteritems():
+        if v is not None:
+            v = lift_matchable(k, v)
+        pred &= PredMatch(k, v)
+    return pred
 
-strip_vlan = modify(vlan=None, vlan_pcp=None)
+def is_bucket(name):
+    return match({name: "1" + "?" * (Port.width - 1)})
+    
+def if_(pred, t_branch, f_branch=passthrough):
+    return pred & t_branch | ~pred & f_branch
+
+def case(*args):
+    r = drop
+    not_pred = all_packets
+    for pred, branch in args:
+        r |= not_pred & pred & branch
+        not_pred &= ~pred
+    return r
+        
+def or_(arg=[], *args):
+    if isinstance(arg, (Predicate, Policy)):
+        arg = [arg]
+    args = chain(arg, args)
+    k = args.next()
+    for arg in args:
+        k |= arg
+    return k
+    
+def and_(arg=[], *args):
+    if isinstance(arg, (Predicate, Policy)):
+        arg = [arg]
+    args = chain(arg, args)
+    k = args.next()
+    for arg in args:
+        k &= arg
+    return k
 
 def fwd(port):
     return modify(outport=port)
 
-def copy_fields(**kwargs):
+def modify(_d={}, **kwargs):
+    d = util.merge_dicts(_d, kwargs)
     policy = passthrough
-    for k, v in kwargs.iteritems():
-        policy = policy >> PolCopy(k, v.varname, v.field)
+    for k, v in d.items():
+        policy >>= PolModify(k, v)
     return policy
-            
-flood = fwd(Port.flood_port)
 
-def enum(*args):
-    fnargs = args[:-1]
-    fn = args[-1]
-
-    fields = [ field for field, values in fnargs ]
-    value_row = itertools.product(*[values for field, values in fnargs])
-
-    policy = drop
+def clear(arg=[], **args):
+    if isinstance(arg, basestring):
+        arg = [arg]
+    args = chain(arg, args)
+    return modify({arg : None for arg in args})
     
-    for vr in value_row:
-        pred = all_packets
-        for i, v in enumerate(vr):
-            pred &= fields[i] == v
-        policy |= pred & fn(*vr)
-        
+def copy(_d={}, **kwargs):
+    d = util.merge_dicts(_d, kwargs)
+    policy = passthrough
+    for k, v in d.iteritems():
+        policy >>= PolCopy(k, v)
     return policy
-        
 
-def is_port_real(port_match):
-    """is the port real?"""
+def move(_d={}, **kwargs):
+    d = util.merge_dicts(_d, kwargs)
+    policy = copy(d)
+    policy >>= clear(d)
+    return policy
 
-    return port_match == "0" + "?" * (Port.width - 1)
+def push(arg=[], *args):
+    if isinstance(arg, basestring):
+        arg = [arg]
+    args = chain(arg, args)
+    k = passthrough
+    for arg in args:
+        k >>= PolPush(arg)
+    return k
+
+def pop(arg=[], *args):
+    if isinstance(arg, basestring):
+        arg = [arg]
+    args = chain(arg, args)
+    k = passthrough
+    for arg in args:
+        k >>= PolPop(arg)
+    return k
+
+flood = fwd(Port.flood_port)
