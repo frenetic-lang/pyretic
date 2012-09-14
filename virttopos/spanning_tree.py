@@ -28,8 +28,17 @@
 
 from frenetic.lib import *
 
-def monitor(network):
-    for switch in network.switch_joins:
-        print "Add switch: %s" % switch
+def topo_to_vmap_dict(topo):
+    d = {}
+    for sw1 in topo.nodes():
+        for sw2, attrs in topo[sw1]:
+            d[(sw1, attrs["p1"])] = (sw1, attrs["p1"])
+    return d
+        
+def setup_virtual_network(network):
+    db = NetworkDatabase(network)
+    vmap = VMap(topo_to_vmap_dict(topo) for topo in db.spanning_trees())
+    return vmap.fork(network, physical_policy)
 
-main = monitor
+    
+

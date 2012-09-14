@@ -59,49 +59,57 @@ from frenetic.lib import *
 #                                  -/                  \
 #                                                       \
 
-vmap1 = VMap({
-    (1, 1): (1, 1, True),
-    (1, 3): (1, 2),
-    (2, 1): (2, 1),
-    (2, 2): (2, 2),
-    (3, 1): (3, 1, True),
-    (3, 2): (3, 2),
-})
+vmap1 = {
+    (1, 1): [(1, 1)],
+    (1, 2): [(1, 3)],
+    
+    (2, 1): [(2, 1)],
+    (2, 2): [(2, 2)],
+    
+    (3, 1): [(3, 1)],
+    (3, 2): [(3, 2)],
+}
 
-vmap2 = VMap({
-    (1, 2): (1, 1, True),
-    (1, 3): (1, 2),
-    (2, 1): (2, 1),
-    (2, 3): (2, 2),
-    (4, 1): (3, 1, True),
-    (4, 2): (3, 2),
-})
+vmap2 = {
+    (1, 1): [(1, 2)],
+    (1, 2): [(1, 3)],
+    
+    (2, 1): [(2, 1)],
+    (2, 2): [(2, 3)],
+    
+    (3, 1): [(4, 1)],
+    (3, 2): [(4, 2)],
+}
 
-physical_policy1 = gen_static_physical_policy({
-    (1, 1) : fwd(1),
-    (1, 2) : fwd(3),
-    
-    (2, 1) : fwd(1),
-    (2, 2) : fwd(2),
-    
-    (3, 1) : fwd(1),
-    (3, 2) : fwd(2),
-})
+endpoints = [(1, 1), (3, 1)]
 
-physical_policy2 = gen_static_physical_policy({
-    (1, 1) : fwd(2),
-    (1, 2) : fwd(3),
+
+physical_policy1 = simple_route(("switch", "voutport"),
+                                ((1, 1), fwd(1)),
+                                ((1, 2), fwd(3)),
     
-    (2, 1) : fwd(1),
-    (2, 2) : fwd(3),
+                                ((2, 1), fwd(1)),
+                                ((2, 2), fwd(2)),
     
-    (4, 1) : fwd(1),
-    (4, 2) : fwd(2),
-})
+                                ((3, 1), fwd(1)),
+                                ((3, 2), fwd(2)),)
+
+physical_policy2 = simple_route(("switch", "voutport"),
+                                ((1, 1), fwd(2)),
+                                ((1, 2), fwd(3)),
+                                
+                                ((2, 1), fwd(1)),
+                                ((2, 2), fwd(3)),
+                                
+                                ((4, 1), fwd(1)),
+                                ((4, 2), fwd(2)),)
 
 
 def setup_virtual_networks(network):
-    n1 = vmap1.fork(network, [(physical_policy1,)], isolate=True)
-    n2 = vmap2.fork(network, [(physical_policy2,)], isolate=True)
+    n1 = fork_virtual_network(network, make_vnetwork_gen([(vmap1, physical_policy1)]))
+    n2 = fork_virtual_network(network, make_vnetwork_gen([(vmap2, physical_policy2)]))
+
+    iso1 = fork_isolated_network(n1, make_inetwork_gen([(vmap1, endpoints)]))
+    iso2 = fork_isolated_network(n2, make_inetwork_gen([(vmap2, endpoints)]))
     
-    return (n1, n2)
+    return (iso1, iso2)

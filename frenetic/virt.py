@@ -39,31 +39,49 @@ from networkx import nx
 
 class Network(object):
     def __init__(self):
-        self.switch_joins = gs.Event()
-        self.switch_parts = gs.Event()
-        self.port_ups = gs.Event()
-        self.port_downs = gs.Event()
-        self.link_ups = gs.Event()
-        self.link_downs = gs.Event()
         self.policy_b = gs.Behavior(drop)
-        self.policy_changes = self.policy_b # used only for iter method
         self.sub_policies = {}
+
+    #
         
-        super(Network, self).__init__()
+    def init_events(self):
+        self.topology_b = gs.Behavior(nx.DiGraph())                
+        self.events = ["switch_joins", "switch_parts",
+                       "port_ups", "port_downs",
+                       "link_ups", "link_downs"]
+        for event in self.events:
+            e = gs.Event()
+            setattr(self, event, e)
+            e.notify(getattr(self, "_handle_%s" % event))
+
+    def inherit_events(self, network):
+        self.topology_b = network.topology_b
+        self.events = network.events
+        for event in network.events:
+            setattr(self, event, getattr(network, event))
+
+    @property
+    def topology(self):
+        return self.topology_b.get()
     
-    def query(self, pred, fields=(), time=None):
-        b = Bucket(fields, time)
-        b.sub_network = fork_sub_network(self)
-        b.sub_network.install_policy(pred & fwd(b))
-        return b
+    @property
+    def topology_changes(self):
+        return iter(self.topology_b)
+
+    #
         
     def install_policy(self, policy):
         self.sub_policies[self] = policy
         self.policy_b.set(self._aggregate_policy())
-        
-    def get_policy(self):
-        return self.policy_b.get()
 
+    @property
+    def policy_changes(self):
+        return iter(self.policy_b)
+
+    @property
+    def policy(self):
+        return self.policy_b.get()
+        
     def install_sub_policies(self, sub_gen):
         def adder():
             for policy in sub_gen:
@@ -76,89 +94,62 @@ class Network(object):
         for policy in self.sub_policies.itervalues():
             pol |= policy
         return pol
+
+    #
+    # Events
+    #
+           
+    def _handle_switch_joins(self, switch):
+        self.topology.add_node(switch, ports=set())
+        self.topology_b.signal_mutation()
         
-def add_sub_network(super_network, sub_network):
-    t = gs.Trigger(sub_network.policy_changes)
-    super_network.install_sub_policies(t)
-    t.wait()
+    def _handle_switch_parts(self, switch):
+        self.topology.remove_node(switch)
+        self.topology_b.signal_mutation()
         
-def fork_sub_network(network):
-    sub_net = Network()
-    sub_net.switch_joins = network.switch_joins
-    sub_net.switch_parts = network.switch_parts
+    def _handle_port_ups(self, (switch, port)):
+        self.topology.node[switch]["ports"].add(port)
+        self.topology_b.signal_mutation()
 
-    add_sub_network(network, sub_net)
-    
-    return sub_net
+    def _handle_port_downs(self, (switch, port)):
+        self.topology.node[switch]["ports"].remove(port)
+        self.topology_b.signal_mutation()
+        
+    def _handle_link_ups(self, (s1, p1, s2, p2)):
+        self.topology.add_edge(s1, s2, p1=p1, p2=p2)
+        self.topology_b.signal_mutation()
+        
+    def _handle_link_downs(self, (s1, p1, s2, p2)):
+        self.topology.remove_edge(s1, s2)
+        self.topology_b.signal_mutation()
+
+    #
+    # Policies
+    #
+
+    def __ior__(self, policy):
+        self.install_policy(self.policy | policy)
+        return self
+        
+    def __iand__(self, policy):
+        self.install_policy(self.policy & policy)
+        return self
+
+    def __isub__(self, policy):
+        self.install_policy(self.policy - policy)
+        return self
+
+    def __irshift__(self, policy):
+        self.install_policy(self.policy >> policy)
+        return self
 
 ################################################################################
-# Databases
+# Network helpers
 ################################################################################
 
-class NetworkDatabase(object):
-    def __init__(self):
-        self.topology = nx.DiGraph()
-        self.topology_changes = gs.Event()
-    
-    def monitor(self, network):
-        @network.switch_joins.notify
-        def handler(switch):
-            self.topology.add_node(switch)
-            self.topology_changes.signal(self.topology)
-            
-        @network.switch_parts.notify
-        def handler(switch):
-            self.topology.remove_node(switch)
-            self.topology_changes.signal(self.topology)
-            
-        @network.port_ups.notify
-        def handler((switch, port)):
-            self.topology_changes.signal(self.topology)
-            
-        @network.port_downs.notify
-        def handler((switch, port)):
-            self.topology_changes.signal(self.topology)
-             
-        @network.link_ups.notify
-        def handler((s1, p1, s2, p2)):
-            self.topology.add_edge(s1, s2, (p1, p2))
-            self.topology_changes.signal(self.topology)
-            
-        @network.link_downs.notify
-        def handler((s1, p1, s2, p2)):
-            self.topology.remove_edge(s1, s2)
-            self.topology_changes.signal(self.topology)
-            
-################################################################################
-# Virtualization policies 
-################################################################################
-    
-def fork_virtual_network(network, vnetwork_gen):
-    sub_net = Network()
-    t = gs.Trigger(sub_net.policy_changes)
-
-    def subgen():
-        for policy, args in gs.merge_hold(t, vnetwork_gen):
-            yield virtualize_policy(id(sub_net), policy, *args)
-    
-    network.install_sub_policies(subgen())
-    t.wait()
-    
-    return sub_net
-
-pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
-    
-virtual_to_physical = (copy(outport="voutport", switch="vswitch", inport="vinport") >> 
-                       pop_vheaders)
-
-def physical_to_virtual(vtag):
-    return (modify(vtag=vtag) >>
-            copy(voutport="outport", vswitch="switch", vinport="inport") >> 
-            pop("outport", "switch", "inport"))
-
-def make_flood_policy(vinfo):
+def flood_splitter(sw_to_ports):
     flood_pol = drop
-    for vsw, vports in vinfo.iteritems():
+    for vsw, vports in sw_to_ports.iteritems():
         pol = drop
         for vport in vports:
             vports_ = list(vports)
@@ -166,8 +157,31 @@ def make_flood_policy(vinfo):
             vfwds = or_(modify(outport=vport_) for vport_ in vports_)
             pol |= match(inport=vport) & vfwds
         flood_pol |= match(switch=vsw) & pol
-        
     return if_(match(outport=Port.flood_port), flood_pol)
+        
+def fork_sub_network(network):
+    sub_net = Network()
+    sub_net.inherit_events(network)
+    t = gs.Trigger(sub_net.policy_changes)
+    network.install_sub_policies(t)
+    t.wait()
+    return sub_net
+
+################################################################################
+# Queries
+################################################################################
+
+def query(network, pred=all_packets, fields=(), time=None):
+    b = Bucket(fields, time)
+
+    sub_net = fork_sub_network(network)
+    sub_net.install_policy(pred & fwd(b))
+    
+    return b
+
+################################################################################
+# Isolation
+################################################################################
 
 def isolate_policy(isotag, policy, flood_policy, egress_pred):
     """policy must be flood free"""
@@ -176,26 +190,35 @@ def isolate_policy(isotag, policy, flood_policy, egress_pred):
             match(isotag=isotag) & policy >> modify(isotag=isotag)) >> 
             if_(is_bucket("outport") | egress_pred, pop("isotag")))
 
-def fork_isolated_network(network, vnetwork_gen):
+def fork_isolated_network(network, inetwork_gen):
     sub_net = Network()
-    sub_net.switch_joins = network.switch_joins
-    sub_net.switch_parts = network.switch_parts
-    sub_net.port_ups = network.port_ups
-    sub_net.port_downs = network.port_downs
-    sub_net.link_ups = network.link_ups
-    sub_net.link_downs = network.link_downs
-    
-    t = gs.Trigger(sub_net.policy_changes)
+    sub_net.inherit_events(network)
 
     def subgen():
-        for policy, args in gs.merge_hold(t, vnetwork_gen):
+        for policy, args in gs.merge_hold(t, inetwork_gen):
             yield isolate_policy(id(sub_net), policy, *args)
-    
+
+    t = gs.Trigger(sub_net.policy_changes)
     network.install_sub_policies(subgen())
     t.wait()
     
     return sub_net
-    
+
+################################################################################
+# Virtualization policies 
+################################################################################
+
+pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
+
+virtual_to_physical = (copy(outport="voutport", switch="vswitch", inport="vinport") >> 
+                       pop_vheaders)
+
+def physical_to_virtual(vtag):
+    return (modify(vtag=vtag) >>
+            copy(voutport="outport", vswitch="switch", vinport="inport") >> 
+            pop("outport", "switch", "inport"))
+
+
 def virtualize_policy(vtag,
                       policy,
                       ingress_policy,
@@ -213,8 +236,6 @@ def virtualize_policy(vtag,
        forward packets along the fabric of the virtual switch until voutport is reached.
        When the packet leaves vswitch, the v* headers must be removed.
 
-       (Implementation detail: removing vswitch is sufficient).
-
     Returns the virtualization of `policy' with respect to the other parameters.
     """
 
@@ -231,88 +252,60 @@ def virtualize_policy(vtag,
                  push("vtag", "vswitch", "vinport", "voutport") >>
                  physical_to_virtual(vtag)))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
-            >> case ((is_bucket("voutport"), query_policy),
-                     (all_packets, physical_policy)))
+            >> if_(is_bucket("voutport"), query_policy, physical_policy))
+ 
+def fork_virtual_network(network, vnetwork_gen):
+    sub_net = Network()
+    sub_net.init_events()
+        
+    def subgen():
+        for policy, args in gs.merge_hold(t, vnetwork_gen):
+            yield virtualize_policy(id(sub_net), policy, *args)
+
+    t = gs.Trigger(sub_net.policy_changes)
+    network.install_sub_policies(subgen())
+    t.wait()
+    
+    return sub_net
 
 ################################################################################
 # Virtualization helpers
 ################################################################################
 
-class VMap(util.frozendict):
-    """(phys switch, phys port) -> (virt switch, virt port)"""
-
-    def __init__(self, init):
-        d = dict()
-        for k, args in init.items():
-            if len(args) == 2:
-                args += (False,)
-            d[k] = args
-        super(VMap, self).__init__(d)
+def vmap_to_ingress_policy(vmap):
+    return or_(or_(match(switch=sw, inport=p) for (sw, p) in switches) &
+               modify(vswitch=vsw, vinport=vp)
+               for ((vsw, vp), switches) in vmap.iteritems())
     
-    def to_vinfo(self):
-        vinfo = {}
-
-        for (vsw, vp, endpt) in self.itervalues():
-            vsw = lift_fixedwidth("vswitch", vsw)
-            vinp = lift_fixedwidth("vinport", vp)
-            vinfo.setdefault(vsw, []).append(vinp)
-
-        return vinfo
-
-    def to_flood_policy(self):
-        return make_flood_policy(self.to_vinfo())
-    
-    def to_ingress_policy(self):
-        ingress_policy = drop
-        for (sw, inp), (vsw, vip, endpt) in self.iteritems():
-            ingress_policy |= match(switch=sw, inport=inp) & modify(vswitch=vsw, vinport=vip)
-
-        return ingress_policy
-    
-    def to_egress_policy(self):
-        pred = no_packets
-        for (sw, port), (vsw, vport, endpt) in self.iteritems():
-            pred |= match(switch=sw, outport=port, vswitch=vsw, voutport=vport)
-        
-        return if_(pred, pop_vheaders)
-
-    def to_endpts_pred(self):
-        pred = no_packets
-        for (vsw, vport, endpt) in self.itervalues():
-            if endpt:
-                pred |= match(switch=vsw, outport=vport)
-        return pred
-
-    def fork(self, network, vnetwork_gen, isolate=False):
-        ingress_policy = self.to_ingress_policy()
-        egress_policy = self.to_egress_policy()
-        flood_policy = self.to_flood_policy()
-
-        def gen():
-            for args in vnetwork_gen:
-                # Query is optional, don't forget
-                r = (ingress_policy, args[0] >> egress_policy, flood_policy) + args[1:]
-                yield r
-        vn = fork_virtual_network(network, gen())
-        vn.switch_joins = gs.DelayedEvent(self.to_vinfo())
-        vn.switch_parts = gs.DelayedEvent([])
-        vn.port_ups = gs.DelayedEvent([])
-        vn.port_downs = gs.DelayedEvent([])
-        vn.link_ups = gs.DelayedEvent([])
-        vn.link_downs = gs.DelayedEvent([])
-
-        if isolate:
-            vn = fork_isolated_network(vn, [(flood_policy, self.to_endpts_pred())])
-            
-        return vn
-        
-def gen_static_physical_policy(route):
-    """(sw, vop) : act"""
-    
-    policy = drop
-    for (sw, vop), act in route.iteritems():
-        policy |= match(switch=sw, voutport=vop) & act
-
-    return policy
-    
+def vmap_to_egress_policy(vmap):
+    pred = or_(or_(match(switch=sw, outport=p) for (sw, p) in switches) &
+               match(vswitch=vsw, voutport=vp) 
+               for ((vsw, vp), switches) in vmap.iteritems())
                
+    return if_(pred, pop_vheaders)
+    
+def vmap_get_sw_to_ports(vmap):
+    sw_to_ports = {}
+
+    for (vsw, vp) in vmap:
+        vsw = lift_fixedwidth("vswitch", vsw)
+        vp = lift_fixedwidth("vinport", vp)
+        sw_to_ports.setdefault(vsw, []).append(vp)
+
+    return sw_to_ports
+
+def make_vnetwork_gen(vmap_phys_gen):
+    for args in vmap_phys_gen:
+        vmap = args[0]
+        physical_policy = args[1]
+        args = args[2:]
+        flood_policy = flood_splitter(vmap_get_sw_to_ports(vmap))
+        ingress_policy = vmap_to_ingress_policy(vmap)
+        egress_policy = vmap_to_egress_policy(vmap)
+        yield (ingress_policy, physical_policy >> egress_policy, flood_policy) + args
+
+def make_inetwork_gen(vimap_phys_gen):
+    for vmap, endpoints in vimap_phys_gen:
+        flood_policy = flood_splitter(vmap_get_sw_to_ports(vmap))
+        yield flood_policy, or_(match(switch=sw, outport=p) for sw, p in endpoints)
+        

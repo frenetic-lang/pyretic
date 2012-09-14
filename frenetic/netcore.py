@@ -507,6 +507,8 @@ def modify(_d={}, **kwargs):
         policy >>= PolModify(k, v)
     return policy
 
+flood = fwd(Port.flood_port)
+
 def clear(arg=[], **args):
     if isinstance(arg, basestring):
         arg = [arg]
@@ -543,5 +545,10 @@ def pop(arg=[], *args):
     for arg in args:
         k >>= PolPop(arg)
     return k
-
-flood = fwd(Port.flood_port)
+        
+def simple_route(headers, *args):
+    policy = drop
+    headers = tuple(headers)
+    for header_preds, act in args:
+        policy |= match(dict(zip(headers, header_preds))) & act
+    return policy

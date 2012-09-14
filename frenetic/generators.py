@@ -84,7 +84,10 @@ class Behavior(Event):
 
     set = signal
 
+    def signal_mutation(self):
+        super(Behavior, self).signal(self.value)
 
+        
 class Trigger(object):
     def __init__(self, gen):
         """

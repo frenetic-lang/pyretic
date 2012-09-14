@@ -84,7 +84,7 @@ def get_egress_policy():
     
 def setup_virtual_network(network):
     ingress_policy = get_ingress_policy()
-    flood_policy = make_flood_policy(vinfo)
+    flood_policy = flood_splitter(vinfo)
     physical_policy = get_physical_policy()
     egress_policy = get_egress_policy()
 

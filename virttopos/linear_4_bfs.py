@@ -30,35 +30,32 @@
 
 from frenetic.lib import *
 
-vmap = VMap({
-    (1, 1): (1, 1),
-    (2, 1): (1, 2),
-    (3, 1): (1, 3),
-    (4, 1): (1, 4)
-})
+vmap = {(1, 1): [(1, 1)],
+        (1, 2): [(2, 1)],
+        (1, 3): [(3, 1)],
+        (1, 4): [(4, 1)]}
 
-
-physical_policy = gen_static_physical_policy({
-    (1, 1) : fwd(1),
-    (1, 2) : fwd(2),
-    (1, 3) : fwd(2),
-    (1, 4) : fwd(2),
+physical_policy = simple_route(("switch", "voutport"),
+                               ((1, 1), fwd(1)),
+                               ((1, 2), fwd(2)),
+                               ((1, 3), fwd(2)),
+                               ((1, 4), fwd(2)),
     
-    (2, 1) : fwd(2),
-    (2, 2) : fwd(1),
-    (2, 3) : fwd(3),
-    (2, 4) : fwd(3),
+                               ((2, 1), fwd(2)),
+                               ((2, 2), fwd(1)),
+                               ((2, 3), fwd(3)),
+                               ((2, 4), fwd(3)),
     
-    (3, 1) : fwd(2),
-    (3, 2) : fwd(2),
-    (3, 3) : fwd(1),
-    (3, 4) : fwd(3),
+                               ((3, 1), fwd(2)),
+                               ((3, 2), fwd(2)),
+                               ((3, 3), fwd(1)),
+                               ((3, 4), fwd(3)),
     
-    (4, 1) : fwd(2),
-    (4, 2) : fwd(2),
-    (4, 3) : fwd(2),
-    (4, 4) : fwd(1),
-})
+                               ((4, 1), fwd(2)),
+                               ((4, 2), fwd(2)),
+                               ((4, 3), fwd(2)),
+                               ((4, 4), fwd(1)))
 
 def setup_virtual_network(network):
-    return vmap.fork(network, [(physical_policy,)])
+    return fork_virtual_network(network, make_vnetwork_gen([(vmap, physical_policy)]))
+    

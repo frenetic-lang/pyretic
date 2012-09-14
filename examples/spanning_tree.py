@@ -28,10 +28,11 @@
 
 from frenetic.lib import *
 import networkx as nx
+
 from examples import monitor_topology as topology
 
 def spanning_tree(network):
-    for topo in topology.track(network):
+    for topo in network.topology_changes:
         print "recalculate spanning_tree"
         mst = nx.minimum_spanning_tree(topo.to_undirected()).to_directed()
         topology.pretty_print(topo, "underlying")

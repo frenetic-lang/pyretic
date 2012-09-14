@@ -143,7 +143,7 @@ def _test_tri_topos():
     import time
     time.sleep(0.01)
 
-    pol = n.get_policy()
+    pol = n.policy
     p7_ = get_single_packet(pol, p)
     assert p7_ == p7
 
@@ -162,7 +162,7 @@ def test_linear_topos():
     import time
     time.sleep(0.01)
 
-    pol = n.get_policy()
+    pol = n.policy
     
     p_ = get_single_packet(pol, p)
     
@@ -193,16 +193,17 @@ def test_linear_topos():
 
 def test_Network():
     n = Network()
-    assert not n.get_policy().eval(packets[0])
+    n.init_events()
+    assert not n.policy.eval(packets[0])
 
     n_fork = fork_sub_network(n)
     n_fork.install_policy(fwd(10))
 
-    assert isinstance(n.get_policy(), Policy)
+    assert isinstance(n.policy, Policy)
 
     import time
     time.sleep(0.01)
 
-    assert get_single_packet(n.get_policy(), packets[0]).outport == Port(10)
+    assert get_single_packet(n.policy, packets[0]).outport == Port(10)
 
     

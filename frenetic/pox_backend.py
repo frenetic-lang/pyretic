@@ -34,11 +34,12 @@ from pox.lib import revent, addresses as packetaddr, packet as packetlib
 
 from frenetic import generators as gs, network as net, virt, util
 
-
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
     def __init__(self, user_program, show_traces, kwargs):
         self.network = virt.Network()
+        self.network.init_events()
+        
         self.switch_connections = {}
         self.active_links = {} # XXX do we need to keep track of these?
         self.show_traces = show_traces
@@ -87,7 +88,7 @@ class POXBackend(revent.EventMixin):
         packet = self.create_packet(event.data)
         packet = packet._replace(switch=event.dpid, inport=event.ofp.in_port)
 
-        pol = self.network.get_policy()
+        pol = self.network.policy
         n_pkts = list(pol.eval(packet).elements())
 
         if self.show_traces:
@@ -112,14 +113,18 @@ class POXBackend(revent.EventMixin):
                 bucket.signal(pkt)
 
     def _handle_ConnectionUp(self, event):
-        if event.dpid not in self.switch_connections:
-            self.switch_connections[event.dpid] = event.connection
-            self.network.switch_joins.signal(net.Switch(event.dpid))
+        assert event.dpid not in self.switch_connections
+        
+        self.switch_connections[event.dpid] = event.connection
+        self.network.switch_joins.signal(net.Switch(event.dpid))
+        for port in event.ofp.ports:
+            self.network.port_ups.signal((net.Switch(event.dpid), net.Port(port)))
         
     def _handle_ConnectionDown(self, event):
-        if event.dpid in self.switch_connections:
-            del self.switch_connections[event.dpid]
-            self.network.switch_parts.signal(net.Switch(event.dpid))
+        assert event.dpid in self.switch_connections
+
+        del self.switch_connections[event.dpid]
+        self.network.switch_parts.signal(net.Switch(event.dpid))
         
     def _handle_PortStatus(self, event):
         if event.added:
@@ -132,15 +137,14 @@ class POXBackend(revent.EventMixin):
         p1 = event.link.port1
         sw2 = event.link.dpid2
         p2 = event.link.port2
-        if sw1 is None or sw2 is None: return
+        if sw1 is None or sw2 is None:
+            return
         if event.added:
-            if (sw1,p1,sw2,p2) not in self.active_links:
-                self.active_links[(sw1,p1,sw2,p2)] = True 
-                self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
+            assert (sw1, p1, sw2, p2) not in self.active_links
+            self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         elif event.removed:
-            if (sw1,p1,sw2,p2) in self.active_links:
-                del self.active_links[(sw1,p1,sw2,p2)]
-                self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
+            assert (sw1, p1, sw2, p2) in self.active_links
+            self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         
     def send_packet(self, packet):
         switch = int(packet.switch)
