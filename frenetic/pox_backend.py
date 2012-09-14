@@ -40,20 +40,16 @@ class POXBackend(revent.EventMixin):
     def __init__(self, user_program, show_traces, kwargs):
         self.network = virt.Network()
         self.switch_connections = {}
-        self.active_links = {}
+        self.active_links = {} # XXX do we need to keep track of these?
         self.show_traces = show_traces
         self.vlan_to_diff_db = {}
         self.diff_to_vlan_db = {}
         self.vlan_diff_lock = threading.RLock()
         
-        if core.hasComponent("openflow"):
-            self.listenTo(core.openflow)
-            core.registerNew(discovery.Discovery)
-            core.openflow_discovery.addListenerByName("LinkEvent", self._handle_LinkEvent)
-            self.listenTo(core.openflow_discovery)
-        else:
-            # We'll wait for openflow to come up
-            self.listenTo(core)
+        core.registerNew(discovery.Discovery)
+
+        self.listenTo(core.openflow)
+        self.listenTo(core.openflow_discovery)
         
         gs.run(user_program, self.network, **kwargs)
     
@@ -84,14 +80,6 @@ class POXBackend(revent.EventMixin):
 
     def get_packet_payload(self, packet):
         return packet._get_payload(self.vlan_from_diff)
-        
-    def _handle_ComponentRegistered (self, event):
-        if event.name == "openflow":
-            self.listenTo(core.openflow)
-            core.registerNew(Discovery)
-            core.openflow_discovery.addListenerByName("LinkEvent", self._handle_LinkEvent)
-            self.listenTo(core.openflow_discovery)
-            return EventRemove # We don't need this listener anymore
 
     def _handle_PacketIn(self, event):
         packet = self.create_packet(event.data)
@@ -149,7 +137,7 @@ class POXBackend(revent.EventMixin):
                 self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         elif event.removed:
             if (sw1,p1,sw2,p2) in self.active_links:
-                del self.active_links[(sw1,p1,sw2,p2) ]
+                del self.active_links[(sw1,p1,sw2,p2)]
                 self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         
     def send_packet(self, packet):
