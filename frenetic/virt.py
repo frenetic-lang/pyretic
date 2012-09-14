@@ -31,6 +31,7 @@ from frenetic.network import *
 from frenetic.netcore import *
 from frenetic import util
 
+from networkx import nx
 
 ################################################################################
 # Network
@@ -44,13 +45,12 @@ class Network(object):
         self.port_downs = gs.Event()
         self.link_ups = gs.Event()
         self.link_downs = gs.Event()
-        
         self.policy_b = gs.Behavior(drop)
         self.policy_changes = self.policy_b # used only for iter method
         self.sub_policies = {}
         
         super(Network, self).__init__()
-
+    
     def query(self, pred, fields=(), time=None):
         b = Bucket(fields, time)
         b.sub_network = fork_sub_network(self)
@@ -95,53 +95,39 @@ def fork_sub_network(network):
 # Databases
 ################################################################################
 
-class NetworkDatabase(dict):
-    def __init__(self, *args, **kwargs):
-        self.switch_joins = gs.Event()
-        self.switch_parts = gs.Event()
-        self.port_ups = gs.Event()
-        self.port_downs = gs.Event()
-        self.link_ups = gs.Event()
-        self.link_downs = gs.Event()
-        super(NetworkDatabase, self).__init__(*args, **kwargs)
+class NetworkDatabase(object):
+    def __init__(self):
+        self.topology = nx.DiGraph()
+        self.topology_changes = gs.Event()
     
-    def activate(self, network):
+    def monitor(self, network):
         @network.switch_joins.notify
         def handler(switch):
-            self[switch] = {}
-            self.switch_joins.signal(switch)
+            self.topology.add_node(switch)
+            self.topology_changes.signal(self.topology)
             
         @network.switch_parts.notify
         def handler(switch):
-            if switch in self:
-                del self[switch]
-                self.switch_parts.signal(switch)
+            self.topology.remove_node(switch)
+            self.topology_changes.signal(self.topology)
             
         @network.port_ups.notify
         def handler((switch, port)):
-            if switch in self:
-                self[switch][port] = None
-                self.port_ups.signal((switch, port))
+            self.topology_changes.signal(self.topology)
             
         @network.port_downs.notify
         def handler((switch, port)):
-            if switch in self and port in self[switch]:
-                del self[switch][port]
-                self.port_downs.signal((switch, port))
-
+            self.topology_changes.signal(self.topology)
+             
         @network.link_ups.notify
-        def handler((s1,p1,s2,p2)):
-            if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
-                self[s1][p1] = (s2, p2)
-                self[s2][p2] = (s1, p1)
-                self.link_ups.signal((s1 ,p1, s2, p2))
+        def handler((s1, p1, s2, p2)):
+            self.topology.add_edge(s1, s2, (p1, p2))
+            self.topology_changes.signal(self.topology)
             
         @network.link_downs.notify
-        def handler((s1,p1,s2,p2)):
-            if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
-                self[s1][p1] = None
-                self[s2][p2] = None
-                self.link_downs.signal((s1, p1, s2, p2))
+        def handler((s1, p1, s2, p2)):
+            self.topology.remove_edge(s1, s2)
+            self.topology_changes.signal(self.topology)
             
 ################################################################################
 # Virtualization policies 
