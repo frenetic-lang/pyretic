@@ -91,8 +91,11 @@ def fork_sub_network(network):
     
     return sub_net
 
+################################################################################
+# Databases
+################################################################################
 
-class SwitchDatabase(dict):
+class NetworkDatabase(dict):
     def __init__(self, *args, **kwargs):
         self.switch_joins = gs.Event()
         self.switch_parts = gs.Event()
@@ -100,7 +103,7 @@ class SwitchDatabase(dict):
         self.port_downs = gs.Event()
         self.link_ups = gs.Event()
         self.link_downs = gs.Event()
-        super(SwitchDatabase, self).__init__(*args, **kwargs)
+        super(NetworkDatabase, self).__init__(*args, **kwargs)
     
     def activate(self, network):
         @network.switch_joins.notify
@@ -129,19 +132,16 @@ class SwitchDatabase(dict):
         @network.link_ups.notify
         def handler((s1,p1,s2,p2)):
             if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
-                self[s1][p1] = (s2,p2)
-                self[s2][p2] = (s1,p1)
-                print self
-                self.link_ups.signal((s1,p1,s2,p2))
+                self[s1][p1] = (s2, p2)
+                self[s2][p2] = (s1, p1)
+                self.link_ups.signal((s1 ,p1, s2, p2))
             
         @network.link_downs.notify
         def handler((s1,p1,s2,p2)):
             if s1 in self and p1 in self[s1] and s2 in self and p2 in self[s2]:
                 self[s1][p1] = None
                 self[s2][p2] = None
-                print self
-                self.link_downs.signal((s1,p1,s2,p2))
-
+                self.link_downs.signal((s1, p1, s2, p2))
             
 ################################################################################
 # Virtualization policies 
