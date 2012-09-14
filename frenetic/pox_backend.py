@@ -48,8 +48,10 @@ class POXBackend(revent.EventMixin):
         
         core.registerNew(discovery.Discovery)
 
-        self.listenTo(core.openflow)
-        self.listenTo(core.openflow_discovery)
+        if core.hasComponent("openflow"):
+            self.listenTo(core.openflow)
+        if core.hasComponent("openflow_discovery"):
+            self.listenTo(core.openflow_discovery)
         
         gs.run(user_program, self.network, **kwargs)
     
