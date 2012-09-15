@@ -29,8 +29,7 @@
 from frenetic.lib import *
 
 def learning_switch(network):
-    policy = flood
-    network.install_policy(policy)
+    network.install_policy(flood)
 
     host_to_outport = {}
 
@@ -44,10 +43,9 @@ def learning_switch(network):
         host_to_outport[(pkt.switch, pkt.srcmac)] = pkt.inport
            
         # ADJUST POLICY AND INSTALL
-        policy -= host_p    # Don't do our old action.
-        policy |= host_p & fwd(pkt.inport)  # Do this instead.
-        network.install_policy(policy)
-
+        network -= host_p    # Don't do our old action.
+        network |= host_p & fwd(pkt.inport)  # Do this instead.
+        
 main = learning_switch
 
 
