@@ -227,7 +227,7 @@ class INetwork(Network):
         self._ingress_predicate = gs.Behavior(all_packets)
         self._egress_predicate = gs.Behavior(no_packets)
         
-        for b in [self._policy, self._egress_predicate]:
+        for b in [self._policy, self._ingress_predicate, self._egress_predicate]:
             b.notify(self._handle_changes)
         
     ingress_predicate = gs.Behavior.property("_ingress_predicate")
@@ -252,6 +252,7 @@ class INetwork(Network):
     def _aggregate_ipolicy(self):
         return isolate_policy(id(self),
                               self.policy,
+                              self.ingress_predicate,
                               self.egress_predicate)
         
     @property

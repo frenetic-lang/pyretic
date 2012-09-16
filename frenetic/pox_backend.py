@@ -129,7 +129,6 @@ class POXBackend(revent.EventMixin):
             print "===================================="
         
         for pkt in output.elements():
-            assert hasattr(pkt, "outport"), "Packet has no outport--can't send it anywhere!"
             if pkt.outport.is_real():
                 self.send_packet(pkt)
             else:
