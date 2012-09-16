@@ -43,7 +43,6 @@ class POXBackend(revent.EventMixin):
         self.network.init_events()
         
         self.switch_connections = {}
-        self.active_links = {} # XXX do we need to keep track of these?
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
         self.vlan_to_diff_db = {}
@@ -156,10 +155,8 @@ class POXBackend(revent.EventMixin):
         if sw1 is None or sw2 is None:
             return
         if event.added:
-            assert (sw1, p1, sw2, p2) not in self.active_links
             self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         elif event.removed:
-            assert (sw1, p1, sw2, p2) in self.active_links
             self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
         
     def send_packet(self, packet):
@@ -172,10 +169,6 @@ class POXBackend(revent.EventMixin):
         msg = of.ofp_packet_out()
         msg.in_port = inport
         msg.data = self.get_packet_payload(packet)
-
-        outport = outport
-        if outport == net.Port.flood_port:
-            outport = of.OFPP_FLOOD
         msg.actions.append(of.ofp_action_output(port = outport))
         
         self.switch_connections[switch].send(msg)
@@ -240,10 +233,7 @@ class POXPacket(net.Packet, util.Data("internal_header payload")):
 
     @property
     def type(self):
-        if self._make_diff():
-            type = 0x8100
-        else:
-            type = self.internal_header["type"]
+        type = self.internal_header["type"]
         return net.lift_fixedwidth("type", type)
 
     @util.cached
@@ -302,7 +292,9 @@ class POXPacket(net.Packet, util.Data("internal_header payload")):
         return packet.pack()
         
     def __repr__(self):
-        banner = "Packet of type %s:" % hex(self.type)
+        banner = "Packet of type %s:" % hex(self.type) 
+        if self._pop("switch", "inport", "outport")._make_diff():
+            banner += " (not backendable)"
         s = util.indent_str(super(POXPacket, self).__repr__())
         return banner + "\n" + s
         

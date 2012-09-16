@@ -31,7 +31,7 @@ from frenetic.lib import *
 def pretty_print(topo,title):
     print "-------%s---------" % title
     for switch in topo.nodes():
-        switch_edges = ', '.join([ "%s => %s[%s]" % (ports['p1'],s2,ports['p2']) for (s1,s2,ports) in topo.edges(data=True) if s1 == switch ])
+        switch_edges = ', '.join([ "%s => %s[%s]" % (ports[s1],s2,ports[s2]) for (s1,s2,ports) in topo.edges(data=True) if s1 == switch ])
         print "%s\t%s" % (switch,switch_edges)
 
 def monitor(network):

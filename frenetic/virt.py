@@ -34,20 +34,67 @@ from frenetic import util
 from networkx import nx
 
 import itertools
+from collections import Counter
 
 ################################################################################
 # Network
 ################################################################################
 
+def egress_points(topo):
+    for sw in topo.nodes():
+        ports = egress_ports(topo, sw)
+        if ports:
+            yield sw, ports
+    
+def egress_ports(topo, sw):
+    attrs = topo.node[sw]
+    all_ports = attrs["ports"]
+    non_egress_ports = set()
+    for attrs in topo[sw].itervalues():
+        non_egress_ports.add(attrs[sw])
+    return all_ports - non_egress_ports
+
+class FloodPol(Policy):
+    def __init__(self, network):
+        self.network = network
+        @network._topology.notify
+        def handle(topo):
+            self.mst = nx.minimum_spanning_tree(topo)
+
+    def __repr__(self):
+        return "flood"
+    
+    def eval(self, packet):
+        ports = set()
+        ports.update(egress_ports(self.network.topology, packet.switch))
+        for sw in self.mst.neighbors(packet.switch):
+            port = self.mst[packet.switch][sw][packet.switch]
+            ports.add(port)
+        packets = [packet._push(outport=port)
+                   for port in ports if port != packet.inport]
+        return Counter(packets)
+
 class Network(object):
     def __init__(self):
-        self.policy_b = gs.Behavior(drop)
-        self.sub_policies = {}
+        self._policy = gs.Behavior(drop)
+        self._sub_policies = {}
+    
+    @classmethod
+    def fork(cls, network):
+        self = cls()
+        self.inherit_events(network)
+        self.connect(network)
+        return self
 
-    #
+    def connect(self, network):
+        @self._policy.notify
+        def change(policy):
+            network.install_sub_policy(self, policy)
         
+    #
+    
     def init_events(self):
-        self.topology_b = gs.Behavior(nx.Graph())                
+        self._topology = gs.Behavior(nx.Graph())                
         self.events = ["switch_joins", "switch_parts",
                        "port_ups", "port_downs",
                        "link_ups", "link_downs"]
@@ -57,43 +104,47 @@ class Network(object):
             e.notify(getattr(self, "_handle_%s" % event))
 
     def inherit_events(self, network):
-        self.topology_b = network.topology_b
+        self._topology = network._topology
         self.events = network.events
         for event in network.events:
             setattr(self, event, getattr(network, event))
 
-    @property
-    def topology(self):
-        return self.topology_b.get()
+    #
+
+    topology = gs.Behavior.property("_topology")
     
     @property
     def topology_changes(self):
-        return itertools.chain([self.topology], iter(self.topology_b))
+        return iter(self._topology)
 
     #
         
     def install_policy(self, policy):
-        self.sub_policies[self] = policy
-        self.policy_b.set(self._aggregate_policy())
+        self.install_sub_policy(self, policy)
+        
+    def install_sub_policy(self, id, policy):
+        self._sub_policies[id] = policy
+        self._policy.set(self._aggregate_policy())
 
     @property
-    def policy_changes(self):
-        return itertools.chain([self.policy], iter(self.policy_b))
+    @util.cached
+    def flood(self):
+        return FloodPol(self)
 
+    def install_flood(self):
+        self.install_policy(self.flood)
+        
     @property
     def policy(self):
-        return self.policy_b.get()
+        return self._policy.get()
         
-    def install_sub_policies(self, sub_gen):
-        def adder():
-            for policy in sub_gen:
-                self.sub_policies[sub_gen] = policy
-                self.policy_b.set(self._aggregate_policy())
-        gs.run(adder)
+    @property
+    def policy_changes(self):
+        return iter(self._policy)
     
     def _aggregate_policy(self):
         pol = drop
-        for policy in self.sub_policies.itervalues():
+        for policy in self._sub_policies.itervalues():
             pol |= policy
         return pol
 
@@ -103,27 +154,27 @@ class Network(object):
            
     def _handle_switch_joins(self, switch):
         self.topology.add_node(switch, ports=set())
-        self.topology_b.signal_mutation()
+        self._topology.signal_mutation()
         
     def _handle_switch_parts(self, switch):
         self.topology.remove_node(switch)
-        self.topology_b.signal_mutation()
+        self._topology.signal_mutation()
         
     def _handle_port_ups(self, (switch, port)):
         self.topology.node[switch]["ports"].add(port)
-        self.topology_b.signal_mutation()
+        self._topology.signal_mutation()
 
     def _handle_port_downs(self, (switch, port)):
         self.topology.node[switch]["ports"].remove(port)
-        self.topology_b.signal_mutation()
+        self._topology.signal_mutation()
         
     def _handle_link_ups(self, (s1, p1, s2, p2)):
-        self.topology.add_edge(s1, s2, p1=p1, p2=p2)
-        self.topology_b.signal_mutation()
+        self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
+        self._topology.signal_mutation()
         
     def _handle_link_downs(self, (s1, p1, s2, p2)):
         self.topology.remove_edge(s1, s2)
-        self.topology_b.signal_mutation()
+        self._topology.signal_mutation()
 
     #
     # Policies
@@ -146,35 +197,13 @@ class Network(object):
         return self
 
 ################################################################################
-# Network helpers
-################################################################################
-
-def flood_splitter(sw_to_ports):
-    flood_pol = drop
-    for vsw, vports in sw_to_ports.iteritems():
-        pol = drop
-        for vport in vports:
-            vports_ = list(vports)
-            vports_.remove(vport)
-            vfwds = or_pol(modify(outport=vport_) for vport_ in vports_)
-            pol |= match(inport=vport) & vfwds
-        flood_pol |= match(switch=vsw) & pol
-    return if_(match(outport=Port.flood_port), flood_pol)
-        
-def fork_sub_network(network):
-    sub_net = Network()
-    sub_net.inherit_events(network)
-    network.install_sub_policies(sub_net.policy_changes)
-    return sub_net
-
-################################################################################
-# Queries
+# Helpers
 ################################################################################
 
 def query(network, pred=all_packets, fields=(), time=None):
     b = Bucket(fields, time)
 
-    sub_net = fork_sub_network(network)
+    sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))
     
     return b
@@ -183,45 +212,69 @@ def query(network, pred=all_packets, fields=(), time=None):
 # Isolation
 ################################################################################
 
-def isolate_policy(isotag, policy, flood_policy, egress_pred):
-    """policy must be flood free"""
-    policy = policy >> flood_policy
-    return ((match(isotag=None) & policy >> push(isotag=isotag) |
-            match(isotag=isotag) & policy) >> 
-            if_(is_bucket("outport") | egress_pred, pop("isotag")))
-
-def fork_isolated_network(network, inetwork_gen):
-    sub_net = Network()
-    sub_net.inherit_events(network)
-
-    def subgen():
-        for policy, args in gs.merge_hold(sub_net.policy_changes, inetwork_gen):
-            yield isolate_policy(id(sub_net), policy, *args)
+def isolate_policy(itag, policy, ingress_predicate, egress_predicate):
+    return (if_(match(itag=None) & ingress_predicate,
+                push(itag=itag)) >>
+            match(itag=itag) >>
+            policy >>
+            if_(is_bucket("outport") | egress_predicate, pop("itag")))
     
-    network.install_sub_policies(subgen())
+class INetwork(Network):
+    def __init__(self):
+        super(INetwork, self).__init__()
+        
+        self._ipolicy = gs.Behavior(drop)
+        self._ingress_predicate = gs.Behavior(all_packets)
+        self._egress_predicate = gs.Behavior(no_packets)
+        
+        for b in [self._policy, self._egress_predicate]:
+            b.notify(self._handle_changes)
+        
+    ingress_predicate = gs.Behavior.property("_ingress_predicate")
+    egress_predicate = gs.Behavior.property("_egress_predicate")
     
-    return sub_net
+    def connect(self, network):
+        """different than base"""
+        @self._ipolicy.notify
+        def change(policy):
+            network.install_sub_policy(id(self), policy)
+
+    def sync_with_topology(self):
+        @self._topology.notify
+        def handle(item):
+            self.egress_predicate = or_pred(match(switch=sw) &
+                                            or_pred(match(outport=port) for port in ports)
+                                            for sw, ports in egress_points(self.topology))
+            
+    def _handle_changes(self, item):
+        self._ipolicy.set(self._aggregate_ipolicy())
+
+    def _aggregate_ipolicy(self):
+        return isolate_policy(id(self),
+                              self.policy,
+                              self.egress_predicate)
+        
+    @property
+    def ipolicy_changes(self):
+        return iter(self._ipolicy)
 
 ################################################################################
 # Virtualization policies 
 ################################################################################
 
-pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
-
-virtual_to_physical = (pop("outport", "switch", "inport", "vtag") >>
-                       copy(outport="voutport", switch="vswitch", inport="vinport"))
-
 def physical_to_virtual(vtag):
-    return (push(vtag=vtag) >>
-            copy(voutport="outport", vswitch="switch", vinport="inport"))
-
-
+    return push(vtag=vtag) >> copy(voutport="outport",
+                                   vswitch="switch",
+                                   vinport="inport")
+virtual_to_physical = (pop("switch", "inport", "outport", "vtag") >>
+                       copy(outport="voutport", switch="vswitch", inport="vinport"))
+pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
+    
 def virtualize_policy(vtag,
                       policy,
                       ingress_policy,
                       physical_policy,
-                      flood_policy,
-                      query_policy=virtual_to_physical):
+                      query_policy):
     """
     - `ingress_policy' is written in terms of the physical network, and tries to
        detect whether a packet is at the ingress of a virtual switch. If the packet
@@ -242,61 +295,86 @@ def virtualize_policy(vtag,
                  # now make the virtualization transparent to the tenant's policy to get the outport
                  copy(switch="vswitch", inport="vinport") >>
                  policy >>
-                 flood_policy >>
                  physical_to_virtual(vtag)))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
-            >> if_(is_bucket("voutport"), query_policy, physical_policy))
- 
-def fork_virtual_network(network, vnetwork_gen):
-    sub_net = Network()
-    sub_net.init_events()
-        
-    def subgen():
-        for policy, args in gs.merge_hold(sub_net.policy_changes, vnetwork_gen):
-            yield virtualize_policy(id(sub_net), policy, *args)
-    
-    network.install_sub_policies(subgen())
-    
-    return sub_net
+            >> if_(is_bucket("voutport"),
+                   query_policy,
+                   physical_policy))
 
-################################################################################
-# Virtualization helpers
-################################################################################
-
+def add_nodes_from_vmap(vmap, graph):
+    d = {}
+    for sw, port in vmap:
+        sw = lift_fixedwidth("switch", sw)
+        port = lift_fixedwidth("inport", port)
+        d.setdefault(sw, set()).add(port)
+    for sw, ports in d.iteritems():
+        graph.add_node(sw, ports=ports)
+    
 def vmap_to_ingress_policy(vmap):
     return or_pol(or_pred(match(switch=sw, inport=p) for (sw, p) in switches) &
                   push(vswitch=vsw, vinport=vp)
                   for ((vsw, vp), switches) in vmap.iteritems())
     
-def vmap_to_egress_policy(vmap):
-    pred = or_pred(or_pred(match(switch=sw, outport=p) for (sw, p) in switches) &
+def vmap_to_egress_predicate(vmap):
+    return or_pred(or_pred(match(switch=sw, outport=p) for (sw, p) in switches) &
                    match(vswitch=vsw, voutport=vp) 
                    for ((vsw, vp), switches) in vmap.iteritems())
-               
-    return if_(pred, pop_vheaders)
+
+class VNetwork(Network):
+    def __init__(self):
+        super(VNetwork, self).__init__()
+        
+        self._vpolicy = gs.Behavior(drop)
+        self._ingress_policy = gs.Behavior(drop)
+        self._physical_policy = gs.Behavior(drop)
+        self._egress_predicate = gs.Behavior(no_packets)
+        
+        for b in [self._policy, self._ingress_policy,
+                  self._physical_policy, self._egress_predicate]:
+            b.notify(self._handle_changes)
+
+    @property
+    def vpolicy(self):
+        return self._vpolicy.get()
     
-def vmap_get_sw_to_ports(vmap):
-    sw_to_ports = {}
+    ingress_policy = gs.Behavior.property("_ingress_policy")
+    physical_policy = gs.Behavior.property("_physical_policy")
+    egress_predicate = gs.Behavior.property("_egress_predicate")
 
-    for (vsw, vp) in vmap:
-        vsw = lift_fixedwidth("vswitch", vsw)
-        vp = lift_fixedwidth("vinport", vp)
-        sw_to_ports.setdefault(vsw, []).append(vp)
+    @classmethod
+    def fork(cls, network):
+        """different than base"""
+        self = cls()
+        self.init_events()
+        self.connect(network)
+        return self
 
-    return sw_to_ports
+    def connect(self, network):
+        """different than base"""
+        @self._vpolicy.notify
+        def change(policy):
+            network.install_sub_policy(self, policy)
 
-def make_vnetwork_gen(vmap_phys_gen):
-    for args in vmap_phys_gen:
-        vmap = args[0]
-        physical_policy = args[1]
-        args = args[2:]
-        flood_policy = flood_splitter(vmap_get_sw_to_ports(vmap))
-        ingress_policy = vmap_to_ingress_policy(vmap)
-        egress_policy = vmap_to_egress_policy(vmap)
-        yield (ingress_policy, physical_policy >> egress_policy, flood_policy) + args
+    def from_vmap(self, vmap):
+        self.ingress_policy = vmap_to_ingress_policy(vmap)
+        self.egress_predicate = vmap_to_egress_predicate(vmap)
 
-def make_inetwork_gen(vimap_phys_gen):
-    for vmap, endpoints in vimap_phys_gen:
-        flood_policy = flood_splitter(vmap_get_sw_to_ports(vmap))
-        yield flood_policy, or_(match(switch=sw, outport=p) for sw, p in endpoints)
+    def _handle_changes(self, item):
+        self._vpolicy.set(self._aggregate_vpolicy())
+
+    def _aggregate_vpolicy(self):
+        return virtualize_policy(id(self),
+                                 self.policy,
+                                 self.ingress_policy,
+                                 self.physical_policy >> if_(self.egress_predicate, pop_vheaders),
+                                 virtual_to_physical)
+    @property
+    def vpolicy_changes(self):
+        return iter(self._vpolicy)
+
+        
+
+    
+
+
         

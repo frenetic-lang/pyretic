@@ -35,6 +35,9 @@ vmap = {(1, 1): [(1, 1)],
         (1, 3): [(3, 1)],
         (1, 4): [(4, 1)]}
 
+topo = nx.Graph()
+add_nodes_from_vmap(vmap, topo)
+
 physical_policy = simple_route(("switch", "voutport"),
                                ((1, 1), fwd(1)),
                                ((1, 2), fwd(2)),
@@ -57,5 +60,9 @@ physical_policy = simple_route(("switch", "voutport"),
                                ((4, 4), fwd(1)))
 
 def setup_virtual_network(network):
-    return fork_virtual_network(network, make_vnetwork_gen([(vmap, physical_policy)]))
+    vn = VNetwork.fork(network)
+    vn.physical_policy = physical_policy
+    vn.from_vmap(vmap)
+    vn.topology = topo
+    return vn
     

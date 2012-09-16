@@ -31,6 +31,6 @@ from frenetic.lib import *
 # ACTS EXACTLY LIKE NORMAL HUB
 # EXCEPT IT MODIFIES THE srcmac OF ALL PACKETS
 def hub(network):
-    network.install_policy(modify(srcmac="00000001" * 6) >> flood)
+    network.install_policy(modify(srcmac="00000001" * 6) >> network.flood)
         
 main = hub

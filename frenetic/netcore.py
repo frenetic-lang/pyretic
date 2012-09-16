@@ -33,6 +33,7 @@ from abc import ABCMeta, abstractmethod
 from collections import Counter
 from numbers import Integral
 from itertools import chain
+import networkx as nx
 
 from bitarray import bitarray
 
@@ -499,13 +500,18 @@ def and_(arg=[], *args):
         k &= arg
     return k
 
-def fwd(port):
-    return push(outport=port)
+def fwd(arg=[], *args):
+    if not hasattr(arg, "__iter__"):
+        arg = [arg]
+    pol = passthrough
+    for port in chain(arg, args):
+        pol = push(outport=port) >> pol
+    return pol
 
 def modify(_d={}, **kwargs):
     d = util.merge_dicts(_d, kwargs)
     policy = passthrough
-    for k, v in d.items():
+    for k, v in d.iteritems():
         policy >>= PolPop(k) >> PolPush(k, v)
     return policy
     
@@ -531,7 +537,7 @@ def pop(arg=[], *args):
     for arg in args:
         policy >>= PolPop(arg)
     return policy
-        
+
 def simple_route(headers, *args):
     policy = drop
     headers = tuple(headers)
@@ -539,4 +545,3 @@ def simple_route(headers, *args):
         policy |= match(dict(zip(headers, header_preds))) & act
     return policy
 
-flood = fwd(Port.flood_port)

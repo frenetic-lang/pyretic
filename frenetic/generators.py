@@ -57,8 +57,8 @@ class Event(object):
             while True: yield queue.get()
 
         return gen()
-        
-        
+
+_property = property
 class Behavior(Event):
     def __init__(self, value=None):
         self.value = value
@@ -67,6 +67,11 @@ class Behavior(Event):
     def get(self):
         return self.value
 
+    def notify(self, listener):
+        # Always let the listener know the current value.
+        listener(self.value)
+        return super(Behavior, self).notify(listener)
+        
     def signal(self, value):
         self.value = value
         super(Behavior, self).signal(value)
@@ -76,7 +81,14 @@ class Behavior(Event):
     def signal_mutation(self):
         super(Behavior, self).signal(self.value)
 
-        
+    @classmethod
+    def property(cls, name):
+        def get(self):
+            return getattr(self, name).get()
+        def set(self, value):
+            return getattr(self, name).set(value)
+        return _property(get, set)
+
         
 # The ever famous generator multiplexer, courtesy of 
 # http://www.dabeaz.com/generators/genmulti.py
@@ -131,11 +143,13 @@ def merge_hold(*genlist):
 def run_non_daemon(func, *args, **kwargs):
     t = threading.Thread(target=func, args=args, kwargs=kwargs)
     t.start()
+    return func
         
 def run(func, *args, **kwargs):
     t = threading.Thread(target=func, args=args, kwargs=kwargs)
     t.setDaemon(True)
     t.start()
+    return func
 
 
 

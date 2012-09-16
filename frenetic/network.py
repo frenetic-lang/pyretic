@@ -183,8 +183,7 @@ def FixedInt(width_):
     
 class Port(Data("port_or_bucket")):
     width = 65 # TODO make this more robust?
-    flood_port = 2**(width-1)-1
-     
+    
     def __new__(cls, port_or_bucket):
         # NOT allowed to init with a bitarray.
         if isinstance(port_or_bucket, Port):

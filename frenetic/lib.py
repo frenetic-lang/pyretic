@@ -36,3 +36,5 @@ from frenetic.virt import *
 from frenetic.generators import merge, run, tag, merge_hold
 
 from frenetic.pox_backend import launch
+
+import networkx as nx

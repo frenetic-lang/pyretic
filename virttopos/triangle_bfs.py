@@ -80,13 +80,15 @@ def get_egress_policy():
                                   match(switch=2, voutport=2), 
                                   match(switch=3, voutport=3))
 
-    return if_(pred, pop_vheaders)
+    return pred
     
 def setup_virtual_network(network):
-    ingress_policy = get_ingress_policy()
-    flood_policy = flood_splitter(vinfo)
-    physical_policy = get_physical_policy()
-    egress_policy = get_egress_policy()
+    vn = VNetwork.fork(network)
+    vn.ingress_policy = get_ingress_policy()
+    vn.physical_policy = get_physical_policy()
+    vn.egress_predicate = get_egress_policy()
+    vn.topology.add_node(Switch(1), ports=set(Port(1), Port(2), Port(3)))
+    vn.topology.signal_mutation()
+    return vn
 
-    v_network = fork_virtual_network(network, [(ingress_policy, physical_policy >> egress_policy, flood_policy)])
-    return v_network
+    

@@ -88,15 +88,14 @@ def setup_virtual_networks(network):
     vinfo2 = {2: [1, 2]}
 
     ingress_policy1 = get_ingress_policy1()
-    flood_policy1 = flood_splitter(vinfo1)
     egress_policy1 = get_egress_policy1()
     physical_policy1 = get_physical_policy1()
 
     ingress_policy2 = get_ingress_policy2()
-    flood_policy2 = flood_splitter(vinfo2)
     egress_policy2 = get_egress_policy2()
     physical_policy2 = get_physical_policy2()
 
-    v_network1 = fork_virtual_network(network, [(ingress_policy1, physical_policy1 >> egress_policy1, flood_policy1)])
-    v_network2 = fork_virtual_network(network, [(ingress_policy2, physical_policy2 >> egress_policy2, flood_policy2)])
+    v_network1 = fork_virtual_network(network, [(ingress_policy1, physical_policy1 >> egress_policy1)])
+    v_network2 = fork_virtual_network(network, [(ingress_policy2, physical_policy2 >> egress_policy2)])
+    
     return (v_network1, v_network2)
