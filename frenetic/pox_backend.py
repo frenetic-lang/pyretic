@@ -26,6 +26,7 @@
 ################################################################################
 
 import threading
+from collections import Counter
 
 import pox.openflow.libopenflow_01 as of
 import pox.openflow.discovery as discovery
@@ -35,6 +36,7 @@ from pox.lib import revent, addresses as packetaddr, packet as packetlib
 from frenetic import generators as gs, network as net, virt, util
 
 import ipdb
+
 
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
@@ -84,39 +86,49 @@ class POXBackend(revent.EventMixin):
         return packet._get_payload(self.vlan_from_diff)
 
     def _handle_PacketIn(self, event):
-        packet = self.create_packet(event.data)
-        packet = packet._push(switch=event.dpid, inport=event.ofp.in_port)
+        recv_packet = self.create_packet(event.data)
+        recv_packet = recv_packet._push(switch=event.dpid, inport=event.ofp.in_port)
 
         if self.debug_packet_in == "1":
-                ipdb.set_trace()
-                
-        if not hasattr(packet, "outport"):
-            pol = self.network.policy
+            ipdb.set_trace()
 
-            if self.debug_packet_in == "error":
-                with ipdb.launch_ipdb_on_exception():
-                    n_pkts = list(pol.eval(packet).elements())
+
+        pol = self.network.policy
+        
+        input = Counter([recv_packet])
+        output = Counter()
+        while input:
+            (p, count) = input.popitem()
+            if not hasattr(p, "outport"):
+                try:
+                    polc = pol.eval(p)
+                except:
+                    if self.debug_packet_in == "error":
+                        ipdb.pm()
+                else:
+                    for polp, polcount in polc.iteritems():
+                        assert hasattr(polp, "outport"), "generated packet w/o outport"
+                        input[polp] += count * polcount
+            elif p.outport == net.Port(0):
+                input[p._pop("outport")] += count
             else:
-                n_pkts = list(pol.eval(packet).elements())
-
-            if self.debug_packet_in == "drop" and not n_pkts:
-                ipdb.set_trace()
-                pol.eval(packet)
-        else:
-            n_pkts = [packet]
+                output[p] += count 
+            
+        if self.debug_packet_in == "drop" and not output:
+            ipdb.set_trace()
         
         if self.show_traces:
             print "Recv"
-            print util.repr_plus([packet], sep="\n\n")
+            print util.repr_plus([recv_packet], sep="\n\n")
             print
             print
             print "Send"
-            print util.repr_plus(n_pkts, sep="\n\n")
+            print util.repr_plus(output.elements(), sep="\n\n")
             print
             print
             print "===================================="
         
-        for pkt in n_pkts:
+        for pkt in output.elements():
             assert hasattr(pkt, "outport"), "Packet has no outport--can't send it anywhere!"
             if pkt.outport.is_real():
                 self.send_packet(pkt)
@@ -142,10 +154,11 @@ class POXBackend(revent.EventMixin):
         self.network.switch_parts.signal(net.Switch(event.dpid))
         
     def _handle_PortStatus(self, event):
-        if event.added:
-            self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
-        elif event.deleted:
-            self.network.port_downs.signal((net.Switch(event.dpid), net.Port(event.port)))
+        if port.port_no <= of.OFPP_MAX:
+            if event.added:
+                self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
+            elif event.deleted:
+                self.network.port_downs.signal((net.Switch(event.dpid), net.Port(event.port)))
 
     def _handle_LinkEvent(self, event):
         sw1 = event.link.dpid1

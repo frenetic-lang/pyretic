@@ -299,7 +299,9 @@ def virtualize_policy(vtag,
             # Pipe the packet with appropriate v* headers to the physical policy for processing
             >> if_(is_bucket("voutport"),
                    query_policy,
-                   physical_policy))
+                   if_(match(voutport=0),
+                       copy(outport="voutport") >> pop_vheaders,
+                       physical_policy)))
 
 def add_nodes_from_vmap(vmap, graph):
     d = {}
@@ -318,7 +320,7 @@ def vmap_to_ingress_policy(vmap):
 def vmap_to_egress_predicate(vmap):
     return or_pred(or_pred(match(switch=sw, outport=p) for (sw, p) in switches) &
                    match(vswitch=vsw, voutport=vp) 
-                   for ((vsw, vp), switches) in vmap.iteritems())
+                   for ((vsw, vp), switches) in vmap.iteritems()) 
 
 class VNetwork(Network):
     def __init__(self):
