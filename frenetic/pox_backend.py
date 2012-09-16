@@ -34,6 +34,8 @@ from pox.lib import revent, addresses as packetaddr, packet as packetlib
 
 from frenetic import generators as gs, network as net, virt, util
 
+import ipdb
+
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
     def __init__(self, user_program, show_traces, debug_packet_in, kwargs):
@@ -77,9 +79,6 @@ class POXBackend(revent.EventMixin):
 
     def create_packet(self, data):
         p = POXPacket(data, self.diff_from_vlan)
-        p = p._push("switch")
-        p = p._push("inport")
-        p = p._push("outport")
         return p
 
     def get_packet_payload(self, packet):
@@ -87,18 +86,25 @@ class POXBackend(revent.EventMixin):
 
     def _handle_PacketIn(self, event):
         packet = self.create_packet(event.data)
-        packet = packet._replace(switch=event.dpid, inport=event.ofp.in_port)
-
-        pol = self.network.policy
+        packet = packet._push(switch=event.dpid, inport=event.ofp.in_port)
 
         if self.debug_packet_in == "1":
-            import ipdb; ipdb.set_trace()
-            
-        n_pkts = list(pol.eval(packet).elements())
+                ipdb.set_trace()
+                
+        if not hasattr(packet, "outport"):
+            pol = self.network.policy
 
-        if self.debug_packet_in == "drop" and not n_pkts:
-            import ipdb; ipdb.set_trace()
-            pol.eval(packet)
+            if self.debug_packet_in == "error":
+                with ipdb.launch_ipdb_on_exception():
+                    n_pkts = list(pol.eval(packet).elements())
+            else:
+                n_pkts = list(pol.eval(packet).elements())
+
+            if self.debug_packet_in == "drop" and not n_pkts:
+                ipdb.set_trace()
+                pol.eval(packet)
+        else:
+            n_pkts = [packet]
         
         if self.show_traces:
             print "Recv"
@@ -118,7 +124,7 @@ class POXBackend(revent.EventMixin):
             else:
                 bucket = pkt.outport.get_bucket()
                 # Perform the link's function here and rm outport
-                pkt = pkt._replace(outport=None)
+                pkt = pkt._pop("outport")
                 bucket.signal(pkt)
 
     def _handle_ConnectionUp(self, event):
@@ -160,6 +166,8 @@ class POXBackend(revent.EventMixin):
         switch = int(packet.switch)
         inport = int(packet.inport)
         outport = int(packet.outport)
+
+        packet = packet._pop("switch", "inport", "outport")
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
@@ -182,10 +190,9 @@ def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
 # 
 ################################################################################
 
-pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos",
-                     "srcport", "dstport", "switch", "inport", "outport"]
+pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport"]
 
-class POXPacket(util.Data("header internal_header payload")):
+class POXPacket(net.Packet, util.Data("internal_header payload")):
     def __new__(cls, data, get_diff_from_vlan):        
         h = {}
         ih = {}
@@ -222,43 +229,13 @@ class POXPacket(util.Data("header internal_header payload")):
                 ih["protocol"] = p.opcode
                 h["srcip"] = p.protosrc.toRaw()
                 h["dstip"] = p.protodst.toRaw()
-
-        init = vlan_diff.update({k : (None,) for k in h})
-        packet = super(POXPacket, cls).__new__(cls, init, util.frozendict(ih), data)
-        return packet._replace(h)
-
-    def _get_field(self, field):
-        return self.header.get(field, ())
         
-    def _push(self, *args):
-        h = dict(self.header)
-        for field in args:
-            v = self._get_field(field)
-            h[field] = (None,) + v
-        return super(POXPacket, self)._replace(header=util.frozendict(h))
-        
-    def _pop(self, *args):
-        h = dict(self.header)
-        for field in args:
-            v = self._get_field(field)
-            assert len(v) > 0, "can't pop only value"
-            h[field] = v[1:]
-        return super(POXPacket, self)._replace(header=util.frozendict(h))
-        
-    def _replace(self, arg={}, **kwargs):
-        d = {}
-        for k, v in util.merge_dicts(arg, kwargs).iteritems():
-            assert k not in ("type", "protocol"), "these fields are not settable"
-            if v is not None:
-                v = net.lift_fixedwidth(k, v)
-            ov = self._get_field(k)
-            assert len(ov) > 0, "can't replace value that has yet to be allocated."
-            d[k] = (v,) + ov[1:]
-        return super(POXPacket, self)._replace(header=self.header.update(d))
+        packet = super(POXPacket, cls).__new__(cls, vlan_diff, util.frozendict(ih), data)
+        return packet._push(h)
 
     @property
     def protocol(self):
-        assert "protocol" in self.internal_header, "not a ip or arp packet"
+        assert "protocol" in self.internal_header, "not an ip or arp packet"
         return net.lift_fixedwidth("protocol", self.internal_header["protocol"])
 
     @property
@@ -325,18 +302,10 @@ class POXPacket(util.Data("header internal_header payload")):
         return packet.pack()
         
     def __repr__(self):
-        l = []
-        size = max(map(len, self.header)) + 3
-        l.append("Packet of type %s:" % hex(self.type))
-        for k, v in sorted(self.header.iteritems()):
-            if v:
-                l.append("  %s:%s%s" % (k, " " * (size - len(k)), v))
-        return "\n".join(l)
-    
-    def __getattr__(self, attr):
-        v = self._get_field(attr)
-        if not v or v[0] is None:
-            raise AttributeError
-        return v[0]
+        banner = "Packet of type %s:" % hex(self.type)
+        s = util.indent_str(super(POXPacket, self).__repr__())
+        return banner + "\n" + s
         
-net.Packet.register(POXPacket)
+
+    
+    

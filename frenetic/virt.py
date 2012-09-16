@@ -186,8 +186,8 @@ def query(network, pred=all_packets, fields=(), time=None):
 def isolate_policy(isotag, policy, flood_policy, egress_pred):
     """policy must be flood free"""
     policy = policy >> flood_policy
-    return ((match(isotag=None) & policy >> push("isotag") >> modify(isotag=isotag) |
-            match(isotag=isotag) & policy >> modify(isotag=isotag)) >> 
+    return ((match(isotag=None) & policy >> push(isotag=isotag) |
+            match(isotag=isotag) & policy) >> 
             if_(is_bucket("outport") | egress_pred, pop("isotag")))
 
 def fork_isolated_network(network, inetwork_gen):
@@ -208,13 +208,12 @@ def fork_isolated_network(network, inetwork_gen):
 
 pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
 
-virtual_to_physical = (copy(outport="voutport", switch="vswitch", inport="vinport") >> 
-                       pop_vheaders)
+virtual_to_physical = (pop("outport", "switch", "inport", "vtag") >>
+                       copy(outport="voutport", switch="vswitch", inport="vinport"))
 
 def physical_to_virtual(vtag):
-    return (modify(vtag=vtag) >>
-            copy(voutport="outport", vswitch="switch", vinport="inport") >> 
-            pop("outport", "switch", "inport"))
+    return (push(vtag=vtag) >>
+            copy(voutport="outport", vswitch="switch", vinport="inport"))
 
 
 def virtualize_policy(vtag,
@@ -239,15 +238,11 @@ def virtualize_policy(vtag,
 
     # if the vlan isnt set, then we need to find out the v* headers.
     return (if_(~match(vtag=vtag), 
-                (push("vswitch", "vinport") >>
-                 ingress_policy >> # set vswitch and vinport
+                (ingress_policy >> # set vswitch and vinport
                  # now make the virtualization transparent to the tenant's policy to get the outport
-                 push("switch","inport", "outport") >>
                  copy(switch="vswitch", inport="vinport") >>
-                 pop("vswitch", "vinport") >>
                  policy >>
                  flood_policy >>
-                 push("vtag", "vswitch", "vinport", "voutport") >>
                  physical_to_virtual(vtag)))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
             >> if_(is_bucket("voutport"), query_policy, physical_policy))
@@ -270,7 +265,7 @@ def fork_virtual_network(network, vnetwork_gen):
 
 def vmap_to_ingress_policy(vmap):
     return or_pol(or_pred(match(switch=sw, inport=p) for (sw, p) in switches) &
-                  modify(vswitch=vsw, vinport=vp)
+                  push(vswitch=vsw, vinport=vp)
                   for ((vsw, vp), switches) in vmap.iteritems())
     
 def vmap_to_egress_policy(vmap):

@@ -82,17 +82,7 @@ class Record(object):
     def __new__(cls, *args, **kwargs):
         return cls.__real_base__.__new__(cls, *args, **kwargs)
 
-    def asdict(self):
-        return self._asdict()
         
-    def replace(self, **kwargs):
-        return self._replace(**kwargs)
-
-    def make(self, iterable):
-        return self._make(iterable)
-
-    
-
 def Data(fields):
     class _Record(Record):
         _fields = fields

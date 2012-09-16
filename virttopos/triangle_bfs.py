@@ -53,10 +53,10 @@ from frenetic.lib import *
 vinfo = {1: [1, 2, 3]}
 
 def get_ingress_policy():
-    ingress_policy = ((match(switch=1, inport=1) & modify(vinport = 1) | 
-                      match(switch=2, inport=1) & modify(vinport = 2) | 
-                      match(switch=3, inport=1) & modify(vinport = 3))
-                      >> modify(vswitch=1))
+    ingress_policy = ((match(switch=1, inport=1) & push(vinport = 1) | 
+                      match(switch=2, inport=1) & push(vinport = 2) | 
+                      match(switch=3, inport=1) & push(vinport = 3))
+                      >> push(vswitch=1))
     return ingress_policy
 
     

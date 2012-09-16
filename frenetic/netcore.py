@@ -356,21 +356,13 @@ class PolPassthrough(Policy):
         return "passthrough"
     def eval(self, packet):
         return Counter([packet])
-        
-class PolModify(Policy, Data("field value")):
-    """Policy that drops everything."""
-    def __repr__(self):
-        return "modify %s <- %s" % self
-    def eval(self, packet):
-        packet = packet._replace({self.field: self.value})
-        return Counter([packet])
 
-class PolPush(Policy, Data("field")):
+class PolPush(Policy, Data("field value")):
     """Policy that drops everything."""
     def __repr__(self):
-        return "push %s" % self.field
+        return "push %s <- %s" % self
     def eval(self, packet):
-        packet = packet._push(self.field)
+        packet = packet._push({self.field: self.value})
         return Counter([packet])
 
 class PolPop(Policy, Data("field")):
@@ -386,7 +378,7 @@ class PolCopy(Policy, Data("field1 field2")):
     def __repr__(self):
         return "copy %s <- %s" % self
     def eval(self, packet):
-        packet = packet._replace({self.field1: getattr(packet, self.field2, None)})
+        packet = packet._push({self.field1: getattr(packet, self.field2, None)})._pop(self.field2)
         return Counter([packet])
 
 class PolRestrict(util.ReprPlusMixin, Policy, Data("predicate policy")):
@@ -508,22 +500,14 @@ def and_(arg=[], *args):
     return k
 
 def fwd(port):
-    return modify(outport=port)
+    return push(outport=port)
 
 def modify(_d={}, **kwargs):
     d = util.merge_dicts(_d, kwargs)
     policy = passthrough
     for k, v in d.items():
-        policy >>= PolModify(k, v)
+        policy >>= PolPop(k) >> PolPush(k, v)
     return policy
-
-flood = fwd(Port.flood_port)
-
-def clear(arg=[], **args):
-    if isinstance(arg, basestring):
-        arg = [arg]
-    args = chain(arg, args)
-    return modify({arg : None for arg in args})
     
 def copy(_d={}, **kwargs):
     d = util.merge_dicts(_d, kwargs)
@@ -532,29 +516,21 @@ def copy(_d={}, **kwargs):
         policy >>= PolCopy(k, v)
     return policy
 
-def move(_d={}, **kwargs):
+def push(_d={}, **kwargs):
     d = util.merge_dicts(_d, kwargs)
-    policy = copy(d)
-    policy >>= clear(d)
+    policy = passthrough
+    for k, v in d.iteritems():
+        policy >>= PolPush(k, v)
     return policy
-
-def push(arg=[], *args):
-    if isinstance(arg, basestring):
-        arg = [arg]
-    args = chain(arg, args)
-    k = passthrough
-    for arg in args:
-        k >>= PolPush(arg)
-    return k
 
 def pop(arg=[], *args):
     if isinstance(arg, basestring):
         arg = [arg]
     args = chain(arg, args)
-    k = passthrough
+    policy = passthrough
     for arg in args:
-        k >>= PolPop(arg)
-    return k
+        policy >>= PolPop(arg)
+    return policy
         
 def simple_route(headers, *args):
     policy = drop
@@ -562,3 +538,5 @@ def simple_route(headers, *args):
     for header_preds, act in args:
         policy |= match(dict(zip(headers, header_preds))) & act
     return policy
+
+flood = fwd(Port.flood_port)

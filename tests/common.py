@@ -22,12 +22,12 @@ def get_single_packet(policy, packet):
 
 def from_payload(payload, **kwargs):
     payloads.append(payload)
-    packets.append(backend.create_packet(payload)._replace(**kwargs))
+    packets.append(backend.create_packet(payload)._push("switch", "inport")._modify(**kwargs))
     pox_packets.append(ethernet(payload))
     pox_matches.append(ofp_match.from_packet(ethernet(payload)))
     
 def from_header(**kwargs):
-    p = backend.create_packet('r\xd8dQ\xc7\xa0\xfeE\x9e+8C\x08\x00E\x00\x00(\x00\x00@\x00@\x06&\xcc\n\x00\x00\x03\n\x00\x00\x02\x00\x16\xd4+\x00\x00\x00\x00e\xe5\xccsP\x14\x00\x00\x951\x00\x00')._replace(**kwargs)
+    p = backend.create_packet('r\xd8dQ\xc7\xa0\xfeE\x9e+8C\x08\x00E\x00\x00(\x00\x00@\x00@\x06&\xcc\n\x00\x00\x03\n\x00\x00\x02\x00\x16\xd4+\x00\x00\x00\x00e\xe5\xccsP\x14\x00\x00\x951\x00\x00')._modify(**kwargs)
     payload = backend.get_packet_payload(p)
     payloads.append(payload)
     packets.append(p)

@@ -109,7 +109,7 @@ def test_IP_fail():
 ################################################################################
 
 def test_packet_modify():
-    p0 = packets[0]._replace(switch=10)
+    p0 = packets[0]._push(switch=10)
 
     for attr in packets[0].header:
         if attr == "switch":
@@ -117,7 +117,7 @@ def test_packet_modify():
         elif hasattr(p0, attr):
             assert getattr(p0, attr) == getattr(packets[0], attr)
 
-    p0 = packets[0]._replace(srcmac="01:01:01:01:01:05")
+    p0 = packets[0]._modify(srcmac="01:01:01:01:01:05")
 
     for attr in packets[0].header:
         if attr == "srcmac":
@@ -131,7 +131,7 @@ def test_vlan():
     for packet in packets:
         r = random.randint(1, 2**8-1)
         p = packet._push("vswitch", "vinport")
-        p1 = p._replace(vswitch=r, vinport=r)
+        p1 = p._push(vswitch=r, vinport=r)
         payload = backend.get_packet_payload(p1)
         p2 = backend.create_packet(payload)
         assert p1.vswitch == Switch(r) == p2.vswitch

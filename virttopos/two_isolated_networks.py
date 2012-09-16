@@ -46,15 +46,15 @@ from frenetic.lib import *
 
 
 def get_ingress_policy1():
-    ingress_policy = ((match(switch=1, inport=1) & modify(vinport = 1) | 
-                       match(switch=2, inport=1) & modify(vinport = 2)) 
-                      >> modify(vswitch = 1))
+    ingress_policy = ((match(switch=1, inport=1) & push(vinport = 1) | 
+                       match(switch=2, inport=1) & push(vinport = 2)) 
+                      >> push(vswitch = 1))
     return ingress_policy
 
 def get_ingress_policy2():
-    ingress_policy = ((match(switch=3, inport=1) & modify(vinport = 1) | 
-                       match(switch=4, inport=1) & modify(vinport = 2)) 
-                      >> modify(vswitch = 2))
+    ingress_policy = ((match(switch=3, inport=1) & push(vinport = 1) | 
+                       match(switch=4, inport=1) & push(vinport = 2)) 
+                      >> push(vswitch = 2))
     return ingress_policy
 
 def get_egress_policy1():

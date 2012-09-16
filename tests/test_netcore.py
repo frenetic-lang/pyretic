@@ -63,7 +63,7 @@ def test_Composition():
     assert get_single_packet(comp_pol1, packets[1]).outport == Port(100)
     
     comp_pol2 = modify(vinport=None, vswitch=None) >> ((match(vinport=1) | match(vswitch=1)) & fwd(100))
-    assert not comp_pol2.eval(packets[1]._push("vswitch", "vinport")._replace(vswitch=1, vinport=1))
+    assert not comp_pol2.eval(packets[1]._push(vswitch=1, vinport=1))
 
     
 
@@ -97,8 +97,8 @@ def test_match_ints():
 
 
 def test_copy():
-    p = packets[1]._replace(switch=10)._push("vswitch")
-    p_ = p._replace(vswitch=10)
+    p = packets[1]._push(switch=10)
+    p_ = p._push(vswitch=10)
     assert get_single_packet(copy(vswitch="switch"), p) == p_
 
 
@@ -111,24 +111,24 @@ def _test_tri_topos():
     
     user_policy = fwd(3)
 
-    p = packets[2]._replace(switch=1, inport=1)
-    p2 = p._replace(vswitch=1, vinport=1)
+    p = packets[2]._push(switch=1, inport=1)
+    p2 = p._push(vswitch=1, vinport=1)
 
     assert get_single_packet(get_ingress_policy(), p) == p2
 
-    p3 = p._replace(switch=1, inport=1)
+    p3 = p._modify(switch=1, inport=1)
 
-    p4 = p3._replace(outport=3)
+    p4 = p3._push(outport=3)
     assert get_single_packet(user_policy, p3) == p4
 
-    p5 = p2._replace(voutport=3)
+    p5 = p2._push(voutport=3)
     # Can't do this, need a testing mechanism for it!
     # assert get_single_packet(let(passthrough, lambda x: headers_to_post_vheaders(vlan_db, x)), p2) 
 
-    p6 = p5._replace(outport=3)
+    p6 = p5._push(outport=3)
     assert get_single_packet(get_physical_policy(), p5) == p6
 
-    p7 = p6._replace(vswitch=None, vinport=None, voutport=None,
+    p7 = p6._modify(vswitch=None, vinport=None, voutport=None,
                                  vlan=vlan_db[3][(Switch(1), Port(1), Port(3))])
     
     vp = vheaders_to_vlan_policy(vlan_db)
@@ -153,7 +153,7 @@ def test_linear_topos():
 
     user_policy = fwd(3)
     
-    p = packets[2]._replace(switch=1, inport=1)
+    p = packets[2]._push(switch=1, inport=1)
     
     n = Network()
     vn = setup_virtual_network(n)
@@ -170,14 +170,14 @@ def test_linear_topos():
     assert p_.outport == Port(2)
 
     # Now lets test the second packet. Can it get to the third hop?
-    p2 = p_._replace(switch=2, outport=None, inport=2)
+    p2 = p_._modify(switch=2, outport=None, inport=2)
     p2_ = get_single_packet(pol, p2)
     
     assert p2_.switch == Switch(2)
     assert p2_.outport == Port(3) 
 
     # Third hop.
-    p3 = p2_._replace(switch=3, outport=None, inport=2)
+    p3 = p2_._modify(switch=3, outport=None, inport=2)
     p3_ = get_single_packet(pol, p3)
     
     assert p3_.switch == Switch(3)

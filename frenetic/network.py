@@ -28,6 +28,7 @@ import socket
 import struct
 from abc import ABCMeta, abstractmethod, abstractproperty
 from numbers import Integral
+from itertools import chain
 
 from bitarray import bitarray
 
@@ -301,25 +302,50 @@ class IP(Bits(32)):
 # Packet and tools
 ################################################################################
 
-class Packet(object):
-    __metaclass__ = ABCMeta
+class Packet(Data("header")):
+    def _get_field(self, field):
+        return self.header.get(field, ())
+        
+    def _push(self, d_={}, **kwargs):
+        d = util.merge_dicts(d_, kwargs)
+        h = dict(self.header)
+        for k, v in d.iteritems():
+            assert not hasattr(self.__class__, k), "field not settable"
+            if v is not None:
+                v = lift_fixedwidth(k, v)
+            h[k] = (v,) + self._get_field(k)
+        return self._replace(header=util.frozendict(h))
+        
+    def _pop(self, arg=[], *args):
+        if isinstance(arg, basestring):
+           arg = (arg,)
+        args = chain(arg, args)
+        h = dict(self.header)
+        for field in args:
+            v = self._get_field(field)
+            assert len(v) > 0, "can't pop only value"
+            h[field] = v[1:]
+        return self._replace(header=util.frozendict(h))
+        
+    def _modify(self, d_={}, **kwargs):
+        d = util.merge_dicts(d_, kwargs)
+        return self._pop(d).push(d)
 
-    @abstractmethod
-    def _push(self, field):
-        pass
-
-    @abstractmethod
-    def _pop(self, field):
-        pass
-
-    @abstractmethod
-    def _replace(self, arg={}, **kwargs):
-        pass
-
-    @abstractmethod
     def __getattr__(self, attr):
-        pass
+        v = self._get_field(attr)
+        if not v or v[0] is None:
+            raise AttributeError
+        return v[0]
 
+    def __repr__(self):
+        l = []
+        size = max(map(len, self.header)) + 3
+        for k, v in sorted(self.header.iteritems()):
+            if v:
+                l.append("%s:%s%s" % (k, " " * (size - len(k)), v))
+        return "\n".join(l)
+
+        
 class Bucket(gs.Event):
     """A safe place for packets!"""
     def __init__(self, fields=[], time=None):
