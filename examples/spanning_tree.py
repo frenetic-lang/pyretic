@@ -34,7 +34,7 @@ from examples import monitor_topology as topology
 def spanning_tree(network):
     for topo in network.topology_changes:
         print "recalculate spanning_tree"
-        mst = nx.minimum_spanning_tree(topo.to_undirected()).to_directed()
+        mst = nx.minimum_spanning_tree(topo)
         topology.pretty_print(topo, "underlying")
         topology.pretty_print(mst, "minimum spanning tree")
 

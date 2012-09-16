@@ -315,5 +315,6 @@ class BumpCliqueTopo(CliqueTopo):
 topos = { 'triangle': TriangleTopo,
           'square': SquareTopo,
           'ytopo': YTopo,
+          'clique': CliqueTopo,
           'ChainTopo': ( lambda: ChainTopo(2,2) ),
           '3switch': ( lambda: CycleTopo(3,3) ) } 

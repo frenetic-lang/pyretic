@@ -33,6 +33,8 @@ from frenetic import util
 
 from networkx import nx
 
+import itertools
+
 ################################################################################
 # Network
 ################################################################################
@@ -45,7 +47,7 @@ class Network(object):
     #
         
     def init_events(self):
-        self.topology_b = gs.Behavior(nx.DiGraph())                
+        self.topology_b = gs.Behavior(nx.Graph())                
         self.events = ["switch_joins", "switch_parts",
                        "port_ups", "port_downs",
                        "link_ups", "link_downs"]
@@ -66,7 +68,7 @@ class Network(object):
     
     @property
     def topology_changes(self):
-        return iter(self.topology_b)
+        return itertools.chain([self.topology], iter(self.topology_b))
 
     #
         
@@ -76,7 +78,7 @@ class Network(object):
 
     @property
     def policy_changes(self):
-        return iter(self.policy_b)
+        return itertools.chain([self.policy], iter(self.policy_b))
 
     @property
     def policy(self):
@@ -154,7 +156,7 @@ def flood_splitter(sw_to_ports):
         for vport in vports:
             vports_ = list(vports)
             vports_.remove(vport)
-            vfwds = or_(modify(outport=vport_) for vport_ in vports_)
+            vfwds = or_pol(modify(outport=vport_) for vport_ in vports_)
             pol |= match(inport=vport) & vfwds
         flood_pol |= match(switch=vsw) & pol
     return if_(match(outport=Port.flood_port), flood_pol)
@@ -162,9 +164,7 @@ def flood_splitter(sw_to_ports):
 def fork_sub_network(network):
     sub_net = Network()
     sub_net.inherit_events(network)
-    t = gs.Trigger(sub_net.policy_changes)
-    network.install_sub_policies(t)
-    t.wait()
+    network.install_sub_policies(sub_net.policy_changes)
     return sub_net
 
 ################################################################################
@@ -195,12 +195,10 @@ def fork_isolated_network(network, inetwork_gen):
     sub_net.inherit_events(network)
 
     def subgen():
-        for policy, args in gs.merge_hold(t, inetwork_gen):
+        for policy, args in gs.merge_hold(sub_net.policy_changes, inetwork_gen):
             yield isolate_policy(id(sub_net), policy, *args)
-
-    t = gs.Trigger(sub_net.policy_changes)
+    
     network.install_sub_policies(subgen())
-    t.wait()
     
     return sub_net
 
@@ -259,12 +257,10 @@ def fork_virtual_network(network, vnetwork_gen):
     sub_net.init_events()
         
     def subgen():
-        for policy, args in gs.merge_hold(t, vnetwork_gen):
+        for policy, args in gs.merge_hold(sub_net.policy_changes, vnetwork_gen):
             yield virtualize_policy(id(sub_net), policy, *args)
-
-    t = gs.Trigger(sub_net.policy_changes)
+    
     network.install_sub_policies(subgen())
-    t.wait()
     
     return sub_net
 
@@ -273,14 +269,14 @@ def fork_virtual_network(network, vnetwork_gen):
 ################################################################################
 
 def vmap_to_ingress_policy(vmap):
-    return or_(or_(match(switch=sw, inport=p) for (sw, p) in switches) &
-               modify(vswitch=vsw, vinport=vp)
-               for ((vsw, vp), switches) in vmap.iteritems())
+    return or_pol(or_pred(match(switch=sw, inport=p) for (sw, p) in switches) &
+                  modify(vswitch=vsw, vinport=vp)
+                  for ((vsw, vp), switches) in vmap.iteritems())
     
 def vmap_to_egress_policy(vmap):
-    pred = or_(or_(match(switch=sw, outport=p) for (sw, p) in switches) &
-               match(vswitch=vsw, voutport=vp) 
-               for ((vsw, vp), switches) in vmap.iteritems())
+    pred = or_pred(or_pred(match(switch=sw, outport=p) for (sw, p) in switches) &
+                   match(vswitch=vsw, voutport=vp) 
+                   for ((vsw, vp), switches) in vmap.iteritems())
                
     return if_(pred, pop_vheaders)
     

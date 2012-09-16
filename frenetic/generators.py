@@ -57,18 +57,7 @@ class Event(object):
             while True: yield queue.get()
 
         return gen()
-
-
-class DelayedEvent(Event):
-    def __init__(self, delayed_items):
-        self.delayed_items = delayed_items
-        super(DelayedEvent, self).__init__()
-
-    def notify(self, listener):
-        for item in self.delayed_items:
-            listener(item)
-        return super(DelayedEvent, self).notify(listener)
-
+        
         
 class Behavior(Event):
     def __init__(self, value=None):
@@ -88,24 +77,6 @@ class Behavior(Event):
         super(Behavior, self).signal(self.value)
 
         
-class Trigger(object):
-    def __init__(self, gen):
-        """
-        
-        Arguments:
-        - `gen`:
-        """
-        self._gen = gen
-        self._event = threading.Event()
-        super(Trigger, self).__init__()
-
-    def __iter__(self):
-        i = iter(self._gen)
-        self._event.set()
-        return i
-
-    def wait(self):
-        self._event.wait()
         
 # The ever famous generator multiplexer, courtesy of 
 # http://www.dabeaz.com/generators/genmulti.py
@@ -146,7 +117,10 @@ def merge_hold(*genlist):
     values = []
     
     for i in iters:
-        values.append(i.next())
+        try:
+            values.append(i.next())
+        except StopIteration:
+            pass
     yield tuple(values)
     
     gens = map(tag, iters, xrange(len(iters)))

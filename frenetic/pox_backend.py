@@ -36,13 +36,14 @@ from frenetic import generators as gs, network as net, virt, util
 
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self, user_program, show_traces, kwargs):
+    def __init__(self, user_program, show_traces, debug_packet_in, kwargs):
         self.network = virt.Network()
         self.network.init_events()
         
         self.switch_connections = {}
         self.active_links = {} # XXX do we need to keep track of these?
         self.show_traces = show_traces
+        self.debug_packet_in = debug_packet_in
         self.vlan_to_diff_db = {}
         self.diff_to_vlan_db = {}
         self.vlan_diff_lock = threading.RLock()
@@ -89,8 +90,16 @@ class POXBackend(revent.EventMixin):
         packet = packet._replace(switch=event.dpid, inport=event.ofp.in_port)
 
         pol = self.network.policy
+
+        if self.debug_packet_in == "1":
+            import ipdb; ipdb.set_trace()
+            
         n_pkts = list(pol.eval(packet).elements())
 
+        if self.debug_packet_in == "drop" and not n_pkts:
+            import ipdb; ipdb.set_trace()
+            pol.eval(packet)
+        
         if self.show_traces:
             print "Recv"
             print util.repr_plus([packet], sep="\n\n")
@@ -118,7 +127,8 @@ class POXBackend(revent.EventMixin):
         self.switch_connections[event.dpid] = event.connection
         self.network.switch_joins.signal(net.Switch(event.dpid))
         for port in event.ofp.ports:
-            self.network.port_ups.signal((net.Switch(event.dpid), net.Port(port)))
+            if port.port_no <= of.OFPP_MAX:
+                self.network.port_ups.signal((net.Switch(event.dpid), net.Port(port.port_no)))
         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switch_connections
@@ -163,9 +173,9 @@ class POXBackend(revent.EventMixin):
         self.switch_connections[switch].send(msg)
 
         
-def launch(module_dict, show_traces=False, **kwargs):
+def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
     import pox
-    backend = POXBackend(module_dict["main"], bool(show_traces), kwargs)
+    backend = POXBackend(module_dict["main"], bool(show_traces), debug_packet_in, kwargs)
     pox.pyr = backend
 
 ################################################################################

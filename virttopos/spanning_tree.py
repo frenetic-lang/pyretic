@@ -27,18 +27,39 @@
 ################################################################################
 
 from frenetic.lib import *
+import networkx as nx
 
-def topo_to_vmap_dict(topo):
+def egress_ports(topo, sw):
+    attrs = topo.node[sw]
+    all_ports = attrs["ports"]
+    non_egress_ports = set()
+    for attrs in topo[sw].itervalues():
+        non_egress_ports.add(attrs["p1"])
+    egress_ports = all_ports - non_egress_ports
+    return egress_ports
+
+def topo_to_vmap_dict(topo, mst):
     d = {}
-    for sw1 in topo.nodes():
-        for sw2, attrs in topo[sw1]:
-            d[(sw1, attrs["p1"])] = (sw1, attrs["p1"])
+    for sw, attrs in mst.nodes(data=True):
+        eports = egress_ports(topo, sw)
+        mstports = set()
+        for attrs in mst[sw].itervalues():
+            mstports.add(attrs["p1"])
+        ports = eports | mstports
+        for port in ports:
+            d[(sw, port)] = [(sw, port)]
     return d
-        
+
 def setup_virtual_network(network):
-    db = NetworkDatabase(network)
-    vmap = VMap(topo_to_vmap_dict(topo) for topo in db.spanning_trees())
-    return vmap.fork(network, physical_policy)
+    def vmap_gen():
+        for topo in network.topology_changes:
+            mst = nx.minimum_spanning_tree(topo)
+            vmap = topo_to_vmap_dict(topo, mst)
+            physical_policy = copy(outport="voutport")
+            yield (vmap, physical_policy)
+    return fork_virtual_network(network, make_vnetwork_gen(vmap_gen()))
+        
+    
 
     
 

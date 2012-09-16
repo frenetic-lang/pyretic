@@ -40,7 +40,6 @@ from frenetic import util
 from frenetic.network import *
 from frenetic.util import frozendict, Data
 
-
 ################################################################################
 # Matching and wildcards
 ################################################################################
@@ -483,16 +482,27 @@ def or_(arg=[], *args):
     if isinstance(arg, (Predicate, Policy)):
         arg = [arg]
     args = chain(arg, args)
-    k = args.next()
+    try:
+        k = args.next()
+    except StopIteration:
+        raise ValueError("must have at least len 1, use or_pol or or_pred otherwise")
     for arg in args:
         k |= arg
     return k
+
+def or_pol(arg=[], *args):
+    args = (drop,) + args
+    return or_(arg, *args)
+
+def or_pred(arg=[], *args):
+    args = (no_packets,) + args
+    return or_(arg, *args)
     
 def and_(arg=[], *args):
     if isinstance(arg, (Predicate, Policy)):
         arg = [arg]
     args = chain(arg, args)
-    k = args.next()
+    k = all_packets
     for arg in args:
         k &= arg
     return k

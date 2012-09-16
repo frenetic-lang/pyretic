@@ -8,7 +8,7 @@ from frenetic.pox_backend import *
 from pox.lib.packet import *
 from pox.openflow.libopenflow_01 import *
 
-backend = POXBackend(lambda n: None, False, {})
+backend = POXBackend(lambda n: None, False, False, {})
  
 payloads = []
 packets = []
