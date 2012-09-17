@@ -27,8 +27,8 @@ class Figure3Topo(Topo):
 
         # Add edges
         self.add_edge(switch1, data_server)
-        self.add_edge(switch1, computer_server_1)
-        self.add_edge(switch2, computer_server_2)
+        self.add_edge(switch1, compute_server_1)
+        self.add_edge(switch2, compute_server_2)
 
         self.add_edge(switch1, switch2)
         
