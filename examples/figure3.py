@@ -28,65 +28,98 @@
 
 # Intended to be used with ./mininet.sh --topo figure3
 
+#    -------
+#  -/       \-                                                        ---------
+# /           \                                                     -/         \-
+# |     h10   |                                                    /             \
+# \           --     +--------------+      2                 /-----       h11     )
+#  -\       /-  \-   |              |              /---------      \             /
+#    -------      \- |              |    /---------                 -\         /-
+#                   \+              +----                             ---------
+#                1   |       s1     |
+#                    |              |
+#                    |              |
+#                    +--------------+
+#                               \-   3     +---------------------+
+#                                 \-       |                     |               -------
+#                                   \-     |                     |            --/       \--
+#                                     \- 2 |                     |           /             \
+#                                       \- |                     |  1       /               \
+#                                         \+       s2            +-----     |               |
+#                                          |                     |     \-----      h12      /
+#                                          |                     |           \             /
+#                                          |                     |            --\       /--
+#                                          +---------------------+               -------
+#
+#
+#
+#
+
 from frenetic.lib import *
 from examples import learning_switch as ls
 from examples import simple_arp as sa
 from examples import simple_firewall as fw
 
 lswitch_vmap = {
-    (101, 1): [(1, 1)],
-    (101, 2): [(1, 2)],
-    (101, 3): [(1, 3)],    
-    (102, 1): [(2, 1)],
-    (102, 2): [(2, 2)]
+    (101, 1): [(1, 1)], # h10
+    (101, 2): [(1, 2)], # h11
+    (101, 3): [(1, 3)], # v102
+    
+    (102, 1): [(2, 1)], # h12  
+    (102, 2): [(2, 2)], # v101
 }
 
 arp_vmap = {
-    (103, 1): [(1, 1)],
-    (103, 2): [(1, 2)],
-    (103, 3): [(2, 1)]
+    (103, 1): [(1, 1)], # h10
+    (103, 2): [(1, 2)], # h11
+    (103, 3): [(2, 1)]  # h12
 }
 
 firewall_vmap = {
-    (201, 1): [(101, 1),(103,1)],
-    (201, 2): [(101, 2),(102,1),(103,2),(103,3)]
+    (201, 1): [(101, 1), (103, 1)], # h10
+    (201, 2): [(101, 2), (102, 1), (103, 2), (103, 3)] # h11, h12
 }
 
 def figure_3_views(network):
-    lswitch_vn = VNetwork.fork(network)
+    isolated_lswitch_vn = INetwork.fork(network)
+    isolated_lswitch_vn.sync_with_topology()
+    isolated_lswitch_vn.ingress_predicate -= match(type = 0x806)
+    
+    lswitch_vn = VNetwork.fork(isolated_lswitch_vn)
     lswitch_vn.from_vmap(lswitch_vmap)
     lswitch_vtopo = nx.Graph()
-    lswitch_vtopo.add_node(Switch(101),ports={Port(1),Port(2),Port(3)})
-    lswitch_vtopo.add_node(Switch(102),ports={Port(1),Port(2)})
+    add_nodes_from_vmap(lswitch_vmap, lswitch_vtopo)
+    lswitch_vtopo.add_edge(Switch(101), Switch(102), {Switch(101): Port(3), Switch(102): Port(2)})
     lswitch_vn.topology = lswitch_vtopo
-    lswitch_vn.physical_policy = network.flood
-    isolated_lswitch_vn = INetwork(lswitch_vn)
-    isolated_lswitch_vn.synch_w_topology()
-    isolated_lswitch_vn.ingress_predicate -= match(protocol ='ARP')    
+    lswitch_vn.physical_policy = isolated_lswitch_vn.flood
 
-    arp_vn = VNetwork.fork(network)
+    isolated_arp_vn = INetwork.fork(network)
+    isolated_arp_vn.sync_with_topology()
+    isolated_arp_vn.ingress_predicate &= match(type = 0x806)
+
+    arp_vn = VNetwork.fork(isolated_arp_vn)
     arp_vn.from_vmap(arp_vmap)
     arp_vtopo = nx.Graph()
-    arp_vtopo.add_node(Switch(103),ports={Port(1),Port(2),Port(3)})
+    add_nodes_from_vmap(arp_vmap, arp_vtopo)
     arp_vn.topology = arp_vtopo
-    arp_vn.physical_policy = network.flood
-    isolated_arp_vn = INetwork(arp_vn)
-    isolated_arp_vn.synch_w_topology()
-    isolated_arp_vn.ingress_predicate &= match(protocol = 'ARP')
-    
+    arp_vn.physical_policy = isolated_arp_vn.flood
+
     firewall_vn = VNetwork()
-    firewall_vn.connect(isolated_lswitch_vn)
-    firewall_vn.connect(isolated_arp_vn)
+    firewall_vn.init_events()
+    firewall_vn.connect(lswitch_vn)
+    firewall_vn.connect(arp_vn)
     firewall_vn.from_vmap(firewall_vmap)
     firewall_vtopo = nx.Graph()
-    firewall_vtopo.add_node(Switch(201),ports={Port(1),Port(2)})
+    add_nodes_from_vmap(firewall_vmap, firewall_vtopo)
     firewall_vn.topology = firewall_vtopo
-    firewall_vn.physical_policy = network.flood
-    
-    return (isolated_lswitch_vn, isolated_arp_vn, firewall_vn)
+    firewall_vn.physical_policy = lswitch_vn.flood | arp_vn.flood
+
+    return lswitch_vn, arp_vn, firewall_vn
 
 def run_figure3(network):
-    lswitch_view,arp_view,firewall_view = figure_3_views(network)
+    lswitch_view, arp_view, firewall_view = figure_3_views(network)
     run(ls.learning_switch, lswitch_view)
     run(sa.arp, arp_view)
     run(fw.firewall, firewall_view)
+
+main = run_figure3

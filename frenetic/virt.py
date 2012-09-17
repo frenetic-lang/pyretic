@@ -213,9 +213,9 @@ def query(network, pred=all_packets, fields=(), time=None):
 def isolate_policy(itag, policy, ingress_predicate, egress_predicate):
     return (if_(match(itag=None) & ingress_predicate,
                 push(itag=itag)) >>
-            match(itag=itag) >>
-            policy >>
-            if_(is_bucket("outport") | egress_predicate, pop("itag")))
+            (match(itag=itag) &
+             (policy >>
+              if_(is_bucket("outport") | egress_predicate, pop("itag")))))
     
 class INetwork(Network):
     def __init__(self):
@@ -239,10 +239,10 @@ class INetwork(Network):
 
     def sync_with_topology(self):
         @self._topology.notify
-        def handle(item):
+        def handle(topology):
             self.egress_predicate = or_pred(match(switch=sw) &
                                             or_pred(match(outport=port) for port in ports)
-                                            for sw, ports in egress_points(self.topology))
+                                            for sw, ports in egress_points(topology))
             
     def _handle_changes(self, item):
         self._ipolicy.set(self._aggregate_ipolicy())
@@ -252,6 +252,10 @@ class INetwork(Network):
                               self.policy,
                               self.ingress_predicate,
                               self.egress_predicate)
+
+    @property
+    def ipolicy(self):
+        return self._ipolicy.get()
         
     @property
     def ipolicy_changes(self):
@@ -316,11 +320,15 @@ def vmap_to_ingress_policy(vmap):
                   push(vswitch=vsw, vinport=vp)
                   for ((vsw, vp), switches) in vmap.iteritems())
     
-def vmap_to_egress_predicate(vmap):
-    return or_pred(or_pred(match(switch=sw, outport=p) for (sw, p) in switches) &
-                   match(vswitch=vsw, voutport=vp) 
-                   for ((vsw, vp), switches) in vmap.iteritems()) 
-
+def vmap_to_egress_policy(vmap):
+    matches_egress = []
+    valid_match_egress = []
+    for ((vsw, vp), switches) in vmap.iteritems():
+        switch_pred = or_pred(match(switch=sw, outport=p) for (sw, p) in switches)
+        matches_egress.append(switch_pred)
+        valid_match_egress.append(match(vswitch=vsw, voutport=vp) & switch_pred)
+    return if_(or_pred(matches_egress), or_pred(valid_match_egress) & pop_vheaders, passthrough)
+        
 class VNetwork(Network):
     def __init__(self):
         super(VNetwork, self).__init__()
@@ -328,10 +336,10 @@ class VNetwork(Network):
         self._vpolicy = gs.Behavior(drop)
         self._ingress_policy = gs.Behavior(drop)
         self._physical_policy = gs.Behavior(drop)
-        self._egress_predicate = gs.Behavior(no_packets)
+        self._egress_policy = gs.Behavior(no_packets)
         
         for b in [self._policy, self._ingress_policy,
-                  self._physical_policy, self._egress_predicate]:
+                  self._physical_policy, self._egress_policy]:
             b.notify(self._handle_changes)
 
     @property
@@ -340,7 +348,7 @@ class VNetwork(Network):
     
     ingress_policy = gs.Behavior.property("_ingress_policy")
     physical_policy = gs.Behavior.property("_physical_policy")
-    egress_predicate = gs.Behavior.property("_egress_predicate")
+    egress_policy = gs.Behavior.property("_egress_policy")
 
     @classmethod
     def fork(cls, network):
@@ -358,7 +366,7 @@ class VNetwork(Network):
 
     def from_vmap(self, vmap):
         self.ingress_policy = vmap_to_ingress_policy(vmap)
-        self.egress_predicate = vmap_to_egress_predicate(vmap)
+        self.egress_policy = vmap_to_egress_policy(vmap)
 
     def _handle_changes(self, item):
         self._vpolicy.set(self._aggregate_vpolicy())
@@ -367,7 +375,7 @@ class VNetwork(Network):
         return virtualize_policy(id(self),
                                  self.policy,
                                  self.ingress_policy,
-                                 self.physical_policy >> if_(self.egress_predicate, pop_vheaders),
+                                 self.physical_policy >> self.egress_policy,
                                  virtual_to_physical)
     @property
     def vpolicy_changes(self):
