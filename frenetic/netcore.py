@@ -501,7 +501,7 @@ def and_(arg=[], *args):
     return k
 
 def fwd(arg=[], *args):
-    if not hasattr(arg, "__iter__"):
+    if isinstance(arg, (basestring, Integral, Port, Bucket)):
         arg = [arg]
     pol = passthrough
     for port in chain(arg, args):

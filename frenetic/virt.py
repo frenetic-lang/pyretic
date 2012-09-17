@@ -202,10 +202,8 @@ class Network(object):
 
 def query(network, pred=all_packets, fields=(), time=None):
     b = Bucket(fields, time)
-
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))
-    
     return b
 
 ################################################################################
@@ -237,7 +235,7 @@ class INetwork(Network):
         """different than base"""
         @self._ipolicy.notify
         def change(policy):
-            network.install_sub_policy(id(self), policy)
+            network.install_sub_policy(self, policy)
 
     def sync_with_topology(self):
         @self._topology.notify

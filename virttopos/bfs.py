@@ -29,27 +29,24 @@
 from frenetic.lib import *
 import networkx as nx
 
-def topo_to_vmap_dict(topo):
-    d = {}
+def topo_to_vmap(topo):
+    vmap = {}
     port_ind = 1
-    for sw, attrs in topo.nodes(data=True):
-        eports = egress_ports(topo, sw)
+    for sw, eports in egress_points(topo):
         for port in eports:
-            if not (sw, port) in d.values():
-                d[(Switch(1), Port(port_ind))] = [(sw, port)]
-                port_ind += 1
-    return d
-
+            vmap[(Switch(1), Port(port_ind))] = [(sw, port)]
+            port_ind += 1
+    return vmap
+  
 def setup_virtual_network(network):
     vn = VNetwork.fork(network)
     @run
     def vmap_gen():
         for topo in network.topology_changes:
-            vmap = topo_to_vmap_dict(topo)
-            vports = {port for sw,port in vmap.keys()}
+            vmap = topo_to_vmap(topo)
+            vtopo = nx.Graph()
+            add_nodes_from_vmap(vmap, vtopo)
             vn.physical_policy = network.flood
             vn.from_vmap(vmap)
-            vtopo = nx.Graph()
-            vtopo.add_node(Switch(1),ports=vports)
             vn.topology = vtopo
     return vn
