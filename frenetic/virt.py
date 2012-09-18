@@ -310,9 +310,7 @@ def virtualize_policy(vtag,
             # Pipe the packet with appropriate v* headers to the physical policy for processing
             >> if_(is_bucket("voutport"),
                    query_policy,
-                   if_(match(voutport=0),
-                       copy(outport="voutport") >> pop_vheaders,
-                       physical_policy)))
+                   physical_policy))
 
 def add_nodes_from_vmap(vmap, graph):
     d = {}

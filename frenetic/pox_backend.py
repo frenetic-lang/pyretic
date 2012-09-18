@@ -92,32 +92,19 @@ class POXBackend(revent.EventMixin):
         if self.debug_packet_in == "1":
             ipdb.set_trace()
 
-
         pol = self.network.policy
         
-        input = Counter([recv_packet])
-        output = Counter()
-        while input:
-            (p, count) = input.popitem()
-            if not hasattr(p, "outport"):
-                try:
-                    polc = pol.eval(p)
-                except:
-                    if self.debug_packet_in == "error":
-                        ipdb.pm()
-                    else:
-                        raise
-                else:
-                    for polp, polcount in polc.iteritems():
-                        assert hasattr(polp, "outport"), "generated packet w/o outport"
-                        input[polp] += count * polcount
-            elif p.outport == net.Port(0):
-                input[p._pop("outport")] += count
+        try:
+            output = pol.eval(p)
+        except:
+            if self.debug_packet_in == "error":
+                ipdb.pm()
             else:
-                output[p] += count 
+                raise
             
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
+            output = pol.eval(p) # So we can step through it
         
         if self.show_traces:
             print "Recv"

@@ -554,4 +554,3 @@ def simple_route(headers, *args):
         policy |= match(dict(zip(headers, header_preds))) & act
     return policy
 
-loopback = fwd(0)
