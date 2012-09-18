@@ -582,6 +582,18 @@ class if_(Policy):
         else:
             return self.f_branch.eval(packet)
 
+class debug(Policy):
+    def __init__(self, policy):
+        self.policy = policy
+        
+    def __repr__(self):
+        return "***debug***\n%s" % self.policy
+        
+    def eval(self, packet):
+        import ipdb
+        ipdb.set_trace()
+        return self.policy.eval(packet)
+
 class simple_route(Policy):
     def eval(self, packet):
         policy = drop
