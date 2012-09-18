@@ -94,17 +94,12 @@ class POXBackend(revent.EventMixin):
 
         pol = self.network.policy
         
-        try:
-            output = pol.eval(p)
-        except:
-            if self.debug_packet_in == "error":
-                ipdb.pm()
-            else:
-                raise
-            
+        with ipdb.launch_ipdb_on_exception():
+            output = pol.eval(recv_packet)
+        
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = pol.eval(p) # So we can step through it
+            output = pol.eval(recv_packet) # So we can step through it
         
         if self.show_traces:
             print "Recv"
@@ -142,7 +137,7 @@ class POXBackend(revent.EventMixin):
         self.network.switch_parts.signal(net.Switch(event.dpid))
         
     def _handle_PortStatus(self, event):
-        if port.port_no <= of.OFPP_MAX:
+        if event.port.port_no <= of.OFPP_MAX:
             if event.added:
                 self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
             elif event.deleted:

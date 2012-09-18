@@ -30,6 +30,7 @@ from frenetic import generators as gs
 from frenetic.network import *
 from frenetic.netcore import *
 from frenetic import util
+from frenetic.util import singleton, Data
 
 from networkx import nx
 
@@ -54,7 +55,7 @@ def egress_ports(topo, sw):
         non_egress_ports.add(attrs[sw])
     return all_ports - non_egress_ports
 
-class FloodPol(Policy):
+class flood(Policy):
     def __init__(self, network):
         self.network = network
         @network._topology.notify
@@ -62,7 +63,7 @@ class FloodPol(Policy):
             self.mst = nx.minimum_spanning_tree(topo)
     
     def __repr__(self):
-        return "flood"
+        return "flood %s" % self.network
     
     def eval(self, packet):
         if packet.switch in self.network.topology.nodes():
@@ -137,7 +138,7 @@ class Network(object):
     @property
     @util.cached
     def flood(self):
-        return FloodPol(self)
+        return flood(self)
 
     def install_flood(self):
         self.install_policy(self.flood)
@@ -218,12 +219,22 @@ def query(network, pred=all_packets, fields=(), time=None):
 # Isolation
 ################################################################################
 
-def isolate_policy(itag, policy, ingress_predicate, egress_predicate):
-    return (if_(match(itag=None) & ingress_predicate,
-                push(itag=itag)) >>
-            (match(itag=itag) &
-             (policy >>
-              if_(is_bucket("outport") | egress_predicate, pop("itag")))))
+class isolate_policy(Policy, Data("itag policy ingress_predicate egress_predicate")):
+    def __repr__(self):
+        return "isolate_policy %s\n%s" % (self.itag, util.repr_plus(["POLICY",
+                                                                     self.policy,
+                                                                     "INGRESS PREDICATE",
+                                                                     self.ingress_predicate,
+                                                                     "EGRESS PREDICATE",
+                                                                     self.egress_predicate]))
+    
+    def eval(self, packet):
+        pol = (if_(match(itag=None) & self.ingress_predicate,
+                   push(itag=self.itag)) >>
+               (match(itag=self.itag) &
+                (self.policy >>
+                 if_(is_bucket("outport") | self.egress_predicate, pop("itag")))))
+        return pol.eval(packet)
     
 class INetwork(Network):
     def __init__(self):
@@ -248,8 +259,8 @@ class INetwork(Network):
     def sync_with_topology(self):
         @self._topology.notify
         def handle(topology):
-            self.egress_predicate = or_pred(match(switch=sw) &
-                                            or_pred(match(outport=port) for port in ports)
+            self.egress_predicate = union(match(switch=sw) &
+                                            union(match(outport=port) for port in ports)
                                             for sw, ports in egress_points(topology))
             
     def _handle_changes(self, item):
@@ -273,44 +284,59 @@ class INetwork(Network):
 # Virtualization policies 
 ################################################################################
 
-def physical_to_virtual(vtag):
-    return push(vtag=vtag) >> copy(voutport="outport",
-                                   vswitch="switch",
-                                   vinport="inport")
-virtual_to_physical = (pop("switch", "inport", "outport", "vtag") >>
-                       copy(outport="voutport", switch="vswitch", inport="vinport"))
-pop_vheaders = pop("vswitch", "vinport", "voutport", "vtag")
-    
-def virtualize_policy(vtag,
-                      policy,
-                      ingress_policy,
-                      physical_policy,
-                      query_policy):
-    """
-    - `ingress_policy' is written in terms of the physical network, and tries to
-       detect whether a packet is at the ingress of a virtual switch. If the packet
-       is at the ingress of a virtual switch, then modify the vswitch and vinport of the
-       packet to be the current virtual switch and the inport we are at, respectively .
-    - `policy' is written in terms of the virtual network, and modifies the outport field.
-       We will modify the voutport of the packet to be the outport returned.
-    - `physical_policy' is written in terms of the physical network, and tries to
-       forward packets along the fabric of the virtual switch until voutport is reached.
-       When the packet leaves vswitch, the v* headers must be removed.
+class physical_to_virtual(Policy, Data("vtag")):
+    def __repr__(self):
+        return "physical_to_virtual %s" % self.vtag
+        
+    def eval(self, packet):
+        pol = (push(vtag=self.vtag) >> copy(voutport="outport",
+                                            vswitch="switch",
+                                            vinport="inport"))
+        return pol.eval(packet)
 
-    Returns the virtualization of `policy' with respect to the other parameters.
-    """
+@singleton
+class virtual_to_physical(Policy):
+    def __repr__(self):
+        return "virtual_to_physical"
+        
+    def eval(self, packet):
+         pol = (pop("switch", "inport", "outport", "vtag") >>
+                copy(outport="voutport", switch="vswitch", inport="vinport"))
+         return pol.eval(packet)
 
-    # if the vlan isnt set, then we need to find out the v* headers.
-    return (if_(~match(vtag=vtag), 
-                (ingress_policy >> # set vswitch and vinport
-                 # now make the virtualization transparent to the tenant's policy to get the outport
-                 copy(switch="vswitch", inport="vinport") >>
-                 policy >>
-                 physical_to_virtual(vtag)))
-            # Pipe the packet with appropriate v* headers to the physical policy for processing
-            >> if_(is_bucket("voutport"),
-                   query_policy,
-                   physical_policy))
+@singleton
+class pop_vheaders(Policy):
+    def __repr__(self):
+        return "pop_vheaders"
+        
+    def eval(self, packet):
+        pol = pop("vswitch", "vinport", "voutport", "vtag")
+        return pol.eval(packet)
+
+class virtualize_policy(Policy, Data("vtag policy ingress_policy physical_policy query_policy")):
+    def __repr__(self):
+        return "virtualize_policy %s\n%s" % (self.vtag, util.repr_plus(["POLICY",
+                                                                        self.policy,
+                                                                        "INGRESS POLICY", 
+                                                                        self.ingress_policy,
+                                                                        "PHYSICAL POLICY", 
+                                                                        self.physical_policy,
+                                                                        "QUERY POLICY",
+                                                                        self.query_policy]))
+        
+    def eval(self, packet):
+        # if the vlan isnt set, then we need to find out the v* headers.
+        pol = (if_(~match(vtag=self.vtag), 
+                    (self.ingress_policy >> # set vswitch and vinport
+                     # now make the virtualization transparent to the tenant's policy to get the outport
+                     copy(switch="vswitch", inport="vinport") >>
+                     self.policy >>
+                     physical_to_virtual(self.vtag)))
+                # Pipe the packet with appropriate v* headers to the physical policy for processing
+                >> if_(is_bucket("voutport"),
+                       self.query_policy,
+                       self.physical_policy))
+        return pol.eval(packet)
 
 def add_nodes_from_vmap(vmap, graph):
     d = {}
@@ -322,18 +348,25 @@ def add_nodes_from_vmap(vmap, graph):
         graph.add_node(sw, ports=ports)
     
 def vmap_to_ingress_policy(vmap):
-    return or_pol(or_pred(match(switch=sw, inport=p) for (sw, p) in switches) &
-                  push(vswitch=vsw, vinport=vp)
-                  for ((vsw, vp), switches) in vmap.iteritems())
+    ingress_policy = parallel(push(vswitch=vsw, vinport=vp) &
+                            union(match(switch=sw, inport=p) for (sw, p) in switches)
+                            for ((vsw, vp), switches) in vmap.iteritems())
+    return ingress_policy
 
+def rmap_to_ingress_policy(rmap):
+    return if_(~match(outport=None),
+               parallel(match(switch=sw, outport=p) &
+                      parallel(modify(outport=outport) for outport in outports)
+                      for ((sw, p), outports) in rmap.iteritems()))
+    
 def vmap_to_egress_policy(vmap):
     matches_egress = []
     valid_match_egress = []
     for ((vsw, vp), switches) in vmap.iteritems():
-        switch_pred = or_pred(match(switch=sw, outport=p) for (sw, p) in switches)
+        switch_pred = union(match(switch=sw, outport=p) for (sw, p) in switches)
         matches_egress.append(switch_pred)
         valid_match_egress.append(match(vswitch=vsw, voutport=vp) & switch_pred)
-    return if_(or_pred(matches_egress), or_pred(valid_match_egress) & pop_vheaders, passthrough)
+    return if_(union(matches_egress), union(valid_match_egress) & pop_vheaders, passthrough)
         
 class VNetwork(Network):
     def __init__(self):
@@ -370,8 +403,8 @@ class VNetwork(Network):
         def change(policy):
             network.install_sub_policy(self, policy)
 
-    def from_vmap(self, vmap, redirect_map={}):
-        self.ingress_policy = vmap_to_ingress_policy(vmap, redirect_map)
+    def from_maps(self, vmap, rmap={}):
+        self.ingress_policy = vmap_to_ingress_policy(vmap) >> rmap_to_ingress_policy(rmap)
         self.egress_policy = vmap_to_egress_policy(vmap)
 
     def _handle_changes(self, item):

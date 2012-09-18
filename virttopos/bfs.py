@@ -47,6 +47,6 @@ def setup_virtual_network(network):
             vtopo = nx.Graph()
             add_nodes_from_vmap(vmap, vtopo)
             vn.physical_policy = network.flood
-            vn.from_vmap(vmap)
+            vn.from_maps(vmap)
             vn.topology = vtopo
     return vn

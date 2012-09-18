@@ -80,7 +80,7 @@ firewall_vmap = {
     (201, 2): [(101, 2), (102, 1), (103, 2), (103, 3)] # h11, h12
 }
 
-firewall_redirect_map = {
+firewall_rmap = {
     (101, 1) : [1, 2],
     (101, 2) : [2],
     (101, 3) : [2],
@@ -94,7 +94,7 @@ def figure_3_views(network):
     isolated_lswitch_vn.ingress_predicate -= match(type = 0x806)
     
     lswitch_vn = VNetwork.fork(isolated_lswitch_vn)
-    lswitch_vn.from_vmap(lswitch_vmap)
+    lswitch_vn.from_maps(lswitch_vmap)
     lswitch_vtopo = nx.Graph()
     add_nodes_from_vmap(lswitch_vmap, lswitch_vtopo)
     lswitch_vtopo.add_edge(Switch(101), Switch(102), {Switch(101): Port(3), Switch(102): Port(2)})
@@ -108,7 +108,7 @@ def figure_3_views(network):
     isolated_arp_vn.ingress_predicate &= match(type = 0x806)
 
     arp_vn = VNetwork.fork(isolated_arp_vn)
-    arp_vn.from_vmap(arp_vmap)
+    arp_vn.from_maps(arp_vmap)
     arp_vtopo = nx.Graph()
     add_nodes_from_vmap(arp_vmap, arp_vtopo)
     arp_vn.topology = arp_vtopo
@@ -118,7 +118,7 @@ def figure_3_views(network):
 
     firewall_vn = VNetwork()
     firewall_vn.init_events()
-    firewall_vn.from_vmap(firewall_vmap, firewall_redirect_map)
+    firewall_vn.from_maps(firewall_vmap, firewall_rmap)
     firewall_vtopo = nx.Graph()
     add_nodes_from_vmap(firewall_vmap, firewall_vtopo)
     firewall_vn.topology = firewall_vtopo

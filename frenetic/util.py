@@ -230,4 +230,6 @@ class ReprPlusMixin(object):
         return mes
         
             
-        
+def singleton(f):
+    return f()
+    

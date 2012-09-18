@@ -328,7 +328,7 @@ class Packet(Data("header")):
         
     def _modify(self, d_={}, **kwargs):
         d = util.merge_dicts(d_, kwargs)
-        return self._pop(d).push(d)
+        return self._pop(d)._push(d)
 
     def __getattr__(self, attr):
         v = self._get_field(attr)

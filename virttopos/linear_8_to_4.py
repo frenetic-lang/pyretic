@@ -78,6 +78,6 @@ physical_policy = simple_route(("switch", "voutport"),
 def setup_virtual_network(network):
     vn = VNetwork.fork(network)
     vn.physical_policy = physical_policy
-    vn.from_vmap(vmap)
+    vn.from_maps(vmap)
     return vn
     
