@@ -105,6 +105,8 @@ class POXBackend(revent.EventMixin):
                 except:
                     if self.debug_packet_in == "error":
                         ipdb.pm()
+                    else:
+                        raise
                 else:
                     for polp, polcount in polc.iteritems():
                         assert hasattr(polp, "outport"), "generated packet w/o outport"

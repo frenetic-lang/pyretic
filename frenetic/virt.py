@@ -60,29 +60,37 @@ class FloodPol(Policy):
         @network._topology.notify
         def handle(topo):
             self.mst = nx.minimum_spanning_tree(topo)
-
+    
     def __repr__(self):
         return "flood"
     
     def eval(self, packet):
-        ports = set()
-        ports.update(egress_ports(self.network.topology, packet.switch))
-        for sw in self.mst.neighbors(packet.switch):
-            port = self.mst[packet.switch][sw][packet.switch]
-            ports.add(port)
-        packets = [packet._push(outport=port)
-                   for port in ports if port != packet.inport]
-        return Counter(packets)
+        if packet.switch in self.network.topology.nodes():
+            ports = set()
+            ports.update(egress_ports(self.network.topology, packet.switch))
+            for sw in self.mst.neighbors(packet.switch):
+                port = self.mst[packet.switch][sw][packet.switch]
+                ports.add(port)
+            packets = [packet._push(outport=port)
+                       for port in ports if port != packet.inport]
+            return Counter(packets)
+        else:
+            return Counter()
 
 class Network(object):
     def __init__(self):
         self._policy = gs.Behavior(drop)
         self._sub_policies = {}
-    
+
     @classmethod
-    def fork(cls, network):
+    def clone(cls, network):
         self = cls()
         self.inherit_events(network)
+        return self
+        
+    @classmethod
+    def fork(cls, network):
+        self = cls.clone(network)
         self.connect(network)
         return self
 
@@ -181,19 +189,19 @@ class Network(object):
     #
 
     def __ior__(self, policy):
-        self.install_policy(self.policy | policy)
+        self.install_policy(self._sub_policies[self] | policy)
         return self
         
     def __iand__(self, policy):
-        self.install_policy(self.policy & policy)
+        self.install_policy(self._sub_policies[self] & policy)
         return self
 
     def __isub__(self, policy):
-        self.install_policy(self.policy - policy)
+        self.install_policy(self._sub_policies[self] - policy)
         return self
 
     def __irshift__(self, policy):
-        self.install_policy(self.policy >> policy)
+        self.install_policy(self._sub_policies[self] >> policy)
         return self
 
 ################################################################################
@@ -319,7 +327,7 @@ def vmap_to_ingress_policy(vmap):
     return or_pol(or_pred(match(switch=sw, inport=p) for (sw, p) in switches) &
                   push(vswitch=vsw, vinport=vp)
                   for ((vsw, vp), switches) in vmap.iteritems())
-    
+
 def vmap_to_egress_policy(vmap):
     matches_egress = []
     valid_match_egress = []
@@ -364,8 +372,8 @@ class VNetwork(Network):
         def change(policy):
             network.install_sub_policy(self, policy)
 
-    def from_vmap(self, vmap):
-        self.ingress_policy = vmap_to_ingress_policy(vmap)
+    def from_vmap(self, vmap, redirect_map={}):
+        self.ingress_policy = vmap_to_ingress_policy(vmap, redirect_map)
         self.egress_policy = vmap_to_egress_policy(vmap)
 
     def _handle_changes(self, item):
@@ -381,9 +389,39 @@ class VNetwork(Network):
     def vpolicy_changes(self):
         return iter(self._vpolicy)
 
+
+################################################################################
+# 
+################################################################################
+
+class ComposedNetwork(object):
+    def __init__(self, *args):
+        self._networks = args
+        self._sub_policies = {}
+        self._cpolicy = gs.Behavior(drop)
+
+        for network in self._networks:
+            network.connect(self)
         
+        super(ComposedNetwork, self).__init__()
 
-    
+    def connect(self, network):
+        """different than base"""
+        @self._cpolicy.notify
+        def change(policy):
+            network.install_sub_policy(self, policy)
 
+    def install_sub_policy(self, id, policy):
+        self._sub_policies[id] = policy
+        self._cpolicy.set(self._aggregate_policy())
 
-        
+    def _aggregate_policy(self):
+        pol = passthrough
+        for network in self._networks:
+            policy = self._sub_policies.get(network, passthrough)
+            pol = pol >> policy
+        return pol
+
+    @property
+    def cpolicy(self):
+        return self._cpolicy.get()

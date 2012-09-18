@@ -80,6 +80,14 @@ firewall_vmap = {
     (201, 2): [(101, 2), (102, 1), (103, 2), (103, 3)] # h11, h12
 }
 
+firewall_redirect_map = {
+    (101, 1) : [1, 2],
+    (101, 2) : [2],
+    (101, 3) : [2],
+    (102, 1) : [2],
+    (102, 3) : [1, 2]
+}
+
 def figure_3_views(network):
     isolated_lswitch_vn = INetwork.fork(network)
     isolated_lswitch_vn.sync_with_topology()
@@ -93,6 +101,8 @@ def figure_3_views(network):
     lswitch_vn.topology = lswitch_vtopo
     lswitch_vn.physical_policy = isolated_lswitch_vn.flood
 
+    #
+    
     isolated_arp_vn = INetwork.fork(network)
     isolated_arp_vn.sync_with_topology()
     isolated_arp_vn.ingress_predicate &= match(type = 0x806)
@@ -104,22 +114,32 @@ def figure_3_views(network):
     arp_vn.topology = arp_vtopo
     arp_vn.physical_policy = isolated_arp_vn.flood
 
+    #
+
     firewall_vn = VNetwork()
     firewall_vn.init_events()
-    firewall_vn.connect(lswitch_vn)
-    firewall_vn.connect(arp_vn)
-    firewall_vn.from_vmap(firewall_vmap)
+    firewall_vn.from_vmap(firewall_vmap, firewall_redirect_map)
     firewall_vtopo = nx.Graph()
     add_nodes_from_vmap(firewall_vmap, firewall_vtopo)
     firewall_vn.topology = firewall_vtopo
     firewall_vn.physical_policy = lswitch_vn.flood | arp_vn.flood
 
-    return lswitch_vn, arp_vn, firewall_vn
+    # We do not want to directly connect a learning switch to the lswitch_vn,
+    # As we want learning switch packets to go through the firewall.
+    lswitch_pre_vn = Network.clone(lswitch_vn)
+    # Same.
+    arp_pre_vn = Network.clone(arp_vn)
+
+    # Instead, connect these cloned networks to the firewall, and connect THAT to the lswitch_vn.
+    ComposedNetwork(lswitch_pre_vn, firewall_vn).connect(lswitch_vn)
+    ComposedNetwork(arp_pre_vn, firewall_vn).connect(arp_vn)
+    
+    return lswitch_pre_vn, arp_pre_vn, firewall_vn
 
 def run_figure3(network):
     lswitch_view, arp_view, firewall_view = figure_3_views(network)
     run(ls.learning_switch, lswitch_view)
     run(sa.arp, arp_view)
     run(fw.firewall, firewall_view)
-
+    
 main = run_figure3

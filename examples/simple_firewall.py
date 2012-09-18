@@ -29,8 +29,8 @@
 from frenetic.lib import *
 
 def firewall(network):
-    bad_traffic = match(srcip='128.5.9.7')
-    network -= bad_traffic
+    bad_traffic = match(srcip='10.0.0.10')
+    network.install_policy(passthrough - bad_traffic)
 
 main = firewall
 

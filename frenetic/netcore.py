@@ -500,6 +500,15 @@ def and_(arg=[], *args):
         k &= arg
     return k
 
+def compose(arg=[], *args):
+    if isinstance(arg, (Predicate, Policy)):
+        arg = [arg]
+    args = chain(arg, args)
+    k = passthrough
+    for arg in args:
+        k >>= arg
+    return k
+    
 def fwd(arg=[], *args):
     if isinstance(arg, (basestring, Integral, Port, Bucket)):
         arg = [arg]
@@ -545,3 +554,4 @@ def simple_route(headers, *args):
         policy |= match(dict(zip(headers, header_preds))) & act
     return policy
 
+loopback = fwd(0)
