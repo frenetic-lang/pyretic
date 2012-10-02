@@ -26,34 +26,40 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+# Intended to be used with ./mininet.sh --topo
+
 from frenetic.lib import *
-import networkx as nx
 
-def topo_to_vmap_dict(topo, mst):
-    d = {}
-    for sw, attrs in mst.nodes(data=True):
-        eports = egress_ports(topo, sw)
-        mstports = set()
-        for attrs in mst[sw].itervalues():
-            mstports.add(attrs[sw])
-        ports = eports | mstports
-        for port in ports:
-            d[(sw, port)] = [(sw, port)]
-    return d
+topology = nx.Graph()
+topology.add_node(Switch(1), ports={Port(1), Port(2)})
+topology.add_node(Switch(2), ports={Port(1), Port(2)})
+topology.add_node(Switch(3), ports={Port(1), Port(2)})
 
-def setup_virtual_network(network):
-    vn = VNetwork.fork(network)
-    @run
-    def vmap_gen():
-        for topo in network.topology_changes:
-            mst = nx.minimum_spanning_tree(topo)
-            vn.physical_policy = copy(outport="voutport") >> pop("vtag", "vswitch", "vinport")
-            vn.from_vmap(topo_to_vmap_dict(topo, mst))
-            vn.topology = mst
-    return vn
-    
-        
-    
+def ingress_policy():
+    return (match(at=None, switch=1, inport=1) & push(vswitch=1, vinport=1) |
+            match(at="vswitch 1, vinport 2") & (push(vswitch=1, vinport=2) >> pop("at")) |
+            match(at="vswitch 2, vinport 1") & (push(vswitch=2, vinport=1) >> pop("at")) |
+            match(at="vswitch 2, vinport 2") & (push(vswitch=2, vinport=2) >> pop("at")) |
+            match(at="vswitch 3, vinport 1") & (push(vswitch=3, vinport=1) >> pop("at")) |
+            match(at=None, switch=1, inport=2) & push(vswitch=3, vinport=2))
 
-    
+def physical_policy(redo):
+    return parallel(match(vswitch=1, voutport=1) & fwd(1),
+                    match(vswitch=1, voutport=2) & (push(at="vswitch 2, vinport 1") >> redo),
+                    match(vswitch=2, voutport=1) & (push(at="vswitch 1, vinport 2") >> redo),
+                    match(vswitch=2, voutport=2) & (push(at="vswitch 3, vinport 1") >> redo),
+                    match(vswitch=3, voutport=1) & (push(at="vswitch 2, vinport 2") >> redo),
+                    match(vswitch=3, voutport=2) & fwd(2))
 
+def egress_policy():
+    return pop_vheaders
+
+def run_figure1(network):
+    vnetwork = VNetwork.fork(network)
+    vnetwork.ingress_policy = ingress_policy
+    vnetwork.physical_policy = physical_policy
+    vnetwork.egress_policy = egress_policy
+    vnetwork.topology = topology
+    run(gateway, vnetwork)
+
+main = run_figure1

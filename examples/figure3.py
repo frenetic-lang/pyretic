@@ -75,31 +75,13 @@ arp_vmap = {
     (103, 3): [(2, 1)]  # h12
 }
 
-firewall_vmap = {
-    (201, 1): [(101, 1), (103, 1)], # h10
-    (201, 2): [(101, 2), (102, 1), (103, 2), (103, 3)] # h11, h12
-}
-
-firewall_rmap = {
-    (101, 1) : [1, 2],
-    (101, 2) : [2],
-    (101, 3) : [2],
-    
-    (102, 1) : [2],
-    (102, 2) : [1, 2],
-    
-    (103, 1) : [1],
-    (103, 2) : [2],
-    (103, 3) : [2],
-}
-
 def figure_3_views(network):
     isolated_lswitch_vn = INetwork.fork(network)
     isolated_lswitch_vn.sync_with_topology()
     isolated_lswitch_vn.ingress_predicate -= match(type = 0x806)
     
     lswitch_vn = VNetwork.fork(isolated_lswitch_vn)
-    lswitch_vn.from_maps(lswitch_vmap)
+    lswitch_vn.from_vmap(lswitch_vmap)
     lswitch_vtopo = nx.Graph()
     add_nodes_from_vmap(lswitch_vmap, lswitch_vtopo)
     lswitch_vtopo.add_edge(Switch(101), Switch(102), {Switch(101): Port(3), Switch(102): Port(2)})
@@ -113,38 +95,17 @@ def figure_3_views(network):
     isolated_arp_vn.ingress_predicate &= match(type = 0x806)
 
     arp_vn = VNetwork.fork(isolated_arp_vn)
-    arp_vn.from_maps(arp_vmap)
+    arp_vn.from_vmap(arp_vmap)
     arp_vtopo = nx.Graph()
     add_nodes_from_vmap(arp_vmap, arp_vtopo)
     arp_vn.topology = arp_vtopo
     arp_vn.physical_policy = isolated_arp_vn.flood
 
-    #
-
-    firewall_vn = VNetwork()
-    firewall_vn.init_events()
-    firewall_vn.from_maps(firewall_vmap, firewall_rmap)
-    firewall_vtopo = nx.Graph()
-    add_nodes_from_vmap(firewall_vmap, firewall_vtopo)
-    firewall_vn.topology = firewall_vtopo
-    firewall_vn.physical_policy = lswitch_vn.flood | arp_vn.flood
-
-    # We do not want to directly connect a learning switch to the lswitch_vn,
-    # As we want learning switch packets to go through the firewall.
-    lswitch_pre_vn = Network.clone(lswitch_vn)
-    # Same.
-    arp_pre_vn = Network.clone(arp_vn)
-
-    # Instead, connect these cloned networks to the firewall, and connect THAT to the lswitch_vn.
-    ComposedNetwork(lswitch_pre_vn, firewall_vn).connect(lswitch_vn)
-    ComposedNetwork(arp_pre_vn, firewall_vn).connect(arp_vn)
-    
-    return lswitch_pre_vn, arp_pre_vn, firewall_vn
+    return lswitch_vn, arp_vn
 
 def run_figure3(network):
-    lswitch_view, arp_view, firewall_view = figure_3_views(network)
+    lswitch_view, arp_view = figure_3_views(network)
     run(ls.learning_switch, lswitch_view)
     run(sa.arp, arp_view)
-    run(fw.firewall, firewall_view)
     
 main = run_figure3
