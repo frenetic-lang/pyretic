@@ -310,8 +310,6 @@ class Packet(Data("header")):
         h = dict(self.header)
         for k, v in d.iteritems():
             assert not hasattr(self.__class__, k), "field not settable"
-            if v is not None:
-                v = lift_fixedwidth(k, v)
             h[k] = (v,) + self._get_field(k)
         return self._replace(header=util.frozendict(h))
         

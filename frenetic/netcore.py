@@ -328,11 +328,12 @@ class match(Predicate):
     
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
-            v = getattr(packet, field, None)
+            v = getattr(packet, field, None))
             if v is None:
                 if pattern is not None:
                     return False
             else:
+                v = lift_fixedwidth(field, v)
                 if pattern is None or not pattern.match(v):
                     return False
         return True
