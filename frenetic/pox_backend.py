@@ -78,17 +78,95 @@ class POXBackend(revent.EventMixin):
             assert diff is not None, "use of vlan that pyretic didn't allocate! not allowed."
             return diff
 
-    def create_packet(self, data):
-        p = POXPacket(data, self.diff_from_vlan)
-        return p
+    def create_packet(self, switch, inport, data):
+        h = {}
+        h["switch"] = switch
+        h["inport"] = inport
+        
+        p = packetlib.ethernet(data)
+        h["srcmac"] = net.MAC(p.src.toRaw())
+        h["dstmac"] = net.MAC(p.dst.toRaw())
+        h["type"] = p.type
+
+        p = p.next
+        if isinstance(p, packetlib.vlan):
+            vlan_diff = self.diff_from_vlan(p.id, p.pcp)
+            h["type"] = p.eth_type
+            p = p.next
+        else:
+            vlan_diff = util.frozendict()
+
+        if isinstance(p, packetlib.ipv4):
+            h["srcip"] = net.IP(p.srcip.toRaw())
+            h["dstip"] = net.IP(p.dstip.toRaw())
+            h["protocol"] = p.protocol
+            h["tos"] = p.tos
+            p = p.next
+
+            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
+                h["srcport"] = p.srcport
+                h["dstport"] = p.dstport
+            elif isinstance(p, packetlib.icmp):
+                h["srcport"] = p.type
+                h["dstport"] = p.code
+        elif isinstance(p, packetlib.arp):
+            if p.opcode <= 255:
+                h["protocol"] = p.opcode
+                h["srcip"] = p.protosrc.toRaw()
+                h["dstip"] = p.protodst.toRaw()
+
+        h["payload"] = data
+        
+        packet = net.Packet(vlan_diff)
+        return packet.pushmany(h)
 
     def get_packet_payload(self, packet):
-        return packet._get_payload(self.vlan_from_diff)
+        p_begin = p = packetlib.ethernet(packet["payload"])
+
+        p.src = packetaddr.EthAddr(packet["srcmac"].to_bits().tobytes())
+        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bits().tobytes())
+
+        diff = get_packet_diff(packet)
+        if diff:
+            if isinstance(p.next, packetlib.vlan):
+                p = p.next
+            else:
+                # Make a vlan header
+                old_eth_type = p.type
+                p.type = 0x8100
+                p.next = packetlib.vlan(next=p.next)
+                p = p.next
+                p.eth_type = old_eth_type
+            p.id, p.pcp = self.vlan_from_diff(diff)
+        else:
+            if isinstance(p.next, packetlib.vlan):
+                p.type = p.next.eth_type # Restore encapsulated eth type
+                p.next = p.next.next # Remove vlan from header
+
+        p = p.next
+        if isinstance(p, packetlib.ipv4):
+            p.srcip = packetaddr.IPAddr(packet["srcip"].to_bits().tobytes())
+            p.dstip = packetaddr.IPAddr(packet["dstip"].to_bits().tobytes())
+            p.protocol = packet["protocol"]
+            p.tos = packet["tos"]
+
+            p = p.next
+            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
+                p.srcport = packet["srcport"]
+                p.dstport = packet["dstport"]
+            elif isinstance(p, packetlib.icmp):
+                p.type = packet["srcport"]
+                p.code = packet["dstport"]
+        elif isinstance(p, packetlib.arp):
+            p.opcode = packet["protocol"]
+            p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bits().tobytes())
+            p.protodst = packetaddr.IPAddr(packet["dstip"].to_bits().tobytes())
+
+        return p_begin.pack()
 
     def _handle_PacketIn(self, event):
-        recv_packet = self.create_packet(event.data)
-        recv_packet = recv_packet._push(switch=event.dpid, inport=event.ofp.in_port)
-
+        recv_packet = self.create_packet(event.dpid, event.ofp.in_port, event.data)
+        
         if self.debug_packet_in == "1":
             ipdb.set_trace()
 
@@ -113,35 +191,36 @@ class POXBackend(revent.EventMixin):
             print "===================================="
         
         for pkt in output.elements():
-            if pkt.outport.is_real():
+            outport = pkt["outport"]
+            if not isinstance(outport, net.Bucket):
                 self.send_packet(pkt)
             else:
-                bucket = pkt.outport.get_bucket()
+                bucket = outport
                 # Perform the link's function here and rm outport
-                pkt = pkt._pop("outport")
+                pkt = pkt.pop("outport")
                 bucket.signal(pkt)
 
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switch_connections
         
         self.switch_connections[event.dpid] = event.connection
-        self.network.switch_joins.signal(net.Switch(event.dpid))
+        self.network.switch_joins.signal(event.dpid)
         for port in event.ofp.ports:
             if port.port_no <= of.OFPP_MAX:
-                self.network.port_ups.signal((net.Switch(event.dpid), net.Port(port.port_no)))
+                self.network.port_ups.signal((event.dpid, port.port_no))
         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switch_connections
 
         del self.switch_connections[event.dpid]
-        self.network.switch_parts.signal(net.Switch(event.dpid))
+        self.network.switch_parts.signal(event.dpid)
         
     def _handle_PortStatus(self, event):
         if event.port.port_no <= of.OFPP_MAX:
             if event.added:
-                self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
+                self.network.port_ups.signal((event.dpid, event.port))
             elif event.deleted:
-                self.network.port_downs.signal((net.Switch(event.dpid), net.Port(event.port)))
+                self.network.port_downs.signal((event.dpid, event.port))
 
     def _handle_LinkEvent(self, event):
         sw1 = event.link.dpid1
@@ -151,16 +230,16 @@ class POXBackend(revent.EventMixin):
         if sw1 is None or sw2 is None:
             return
         if event.added:
-            self.network.link_ups.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
+            self.network.link_ups.signal((sw1, p1, sw2, p2))
         elif event.removed:
-            self.network.link_downs.signal((net.Switch(sw1), net.Port(p1), net.Switch(sw2), net.Port(p2)))
+            self.network.link_downs.signal((sw1, p1, sw2, p2))
         
     def send_packet(self, packet):
-        switch = int(packet.switch)
-        inport = int(packet.inport)
-        outport = int(packet.outport)
+        switch = packet["switch"]
+        inport = packet["inport"]
+        outport = packet["outport"]
 
-        packet = packet._pop("switch", "inport", "outport")
+        packet = packet.pop("switch", "inport", "outport")
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
@@ -181,119 +260,15 @@ def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
 
 pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport"]
 
-class POXPacket(net.Packet, util.Data("internal_header payload")):
-    def __new__(cls, data, get_diff_from_vlan):        
-        h = {}
-        ih = {}
-        p = packetlib.ethernet(data)
-
-        h["srcmac"] = p.src.toRaw()
-        h["dstmac"] = p.dst.toRaw()
-        ih["type"] = p.type
-
-        p = p.next
-
-        if isinstance(p, packetlib.vlan):
-            vlan_diff = get_diff_from_vlan(p.id, p.pcp)
-            ih["type"] = p.eth_type
-            p = p.next
-        else:
-            vlan_diff = util.frozendict()
-
-        if isinstance(p, packetlib.ipv4):
-            h["srcip"] = p.srcip.toRaw()
-            h["dstip"] = p.dstip.toRaw()
-            ih["protocol"] = p.protocol
-            h["tos"] = p.tos
-            p = p.next
-
-            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-                h["srcport"] = p.srcport
-                h["dstport"] = p.dstport
-            elif isinstance(p, packetlib.icmp):
-                h["srcport"] = p.type
-                h["dstport"] = p.code
-        elif isinstance(p, packetlib.arp):
-            if p.opcode <= 255:
-                ih["protocol"] = p.opcode
-                h["srcip"] = p.protosrc.toRaw()
-                h["dstip"] = p.protodst.toRaw()
-        
-        packet = super(POXPacket, cls).__new__(cls, vlan_diff, util.frozendict(ih), data)
-        return packet._push(h)
-
-    @property
-    def protocol(self):
-        assert "protocol" in self.internal_header, "not an ip or arp packet"
-        return net.lift_fixedwidth("protocol", self.internal_header["protocol"])
-
-    @property
-    def type(self):
-        type = self.internal_header["type"]
-        return net.lift_fixedwidth("type", type)
-
-    @util.cached
-    def _make_diff(self):
-        diff = {}
-        for k, v in self.header.iteritems():
-            if k not in pox_valid_headers and v:
-                diff[k] = v
-            elif len(v) > 1:
-                diff[k] = v[1:]
-        return util.frozendict(diff)
-        
-    def _get_payload(self, vlan_from_diff):
-        packet = p = packetlib.ethernet(self.payload)
-
-        p.src = packetaddr.EthAddr(self.srcmac.to_bits().tobytes())
-        p.dst = packetaddr.EthAddr(self.dstmac.to_bits().tobytes())
-
-        if self._make_diff():
-            if isinstance(p.next, packetlib.vlan):
-                p = p.next
-            else:
-                # Make a vlan header
-                old_eth_type = p.type
-                p.type = 0x8100
-                p.next = packetlib.vlan(next = p.next)
-                p = p.next
-                p.eth_type = old_eth_type
-
-            p.id, p.pcp = vlan_from_diff(self._make_diff())
-        else:
-            if isinstance(p.next, packetlib.vlan):
-                p.type = p.next.eth_type # Restore encapsulated eth type
-                p.next = p.next.next # Remove vlan from header
-
-        p = p.next
-
-        if isinstance(p, packetlib.ipv4):
-            p.srcip = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
-            p.dstip = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
-            p.protocol = int(self.protocol)
-            p.tos = int(self.tos)
-            p = p.next
-
-            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-                p.srcport = int(self.srcport)
-                p.dstport = int(self.dstport)
-            elif isinstance(p, packetlib.icmp):
-                p.type = int(self.srcport)
-                p.code = int(self.dstport)
-        elif isinstance(p, packetlib.arp):
-            p.opcode = int(self.protocol)
-            p.protosrc = packetaddr.IPAddr(self.srcip.to_bits().tobytes())
-            p.protodst = packetaddr.IPAddr(self.dstip.to_bits().tobytes())
-
-        return packet.pack()
-        
-    def __repr__(self):
-        banner = "Packet of type %s:" % hex(self.type) 
-        if self._pop("switch", "inport", "outport")._make_diff():
-            banner += " (not backendable)"
-        s = util.indent_str(super(POXPacket, self).__repr__())
-        return banner + "\n" + s
-        
+@util.cached
+def get_packet_diff(packet):
+    diff = {}
+    for k, v in packet.header.items():
+        if k not in pox_valid_headers and v:
+            diff[k] = v
+        elif len(v) > 1:
+            diff[k] = v[1:]
+    return util.frozendict(diff)
 
     
     

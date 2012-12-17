@@ -30,6 +30,7 @@
 
 
 from collections import namedtuple
+from functools import wraps
 
 
 # Adapted from http://code.activestate.com/recipes/577629-namedtupleabc-abstract-base-class-mix-in-for-named/
@@ -87,25 +88,17 @@ def Data(fields):
     class _Record(Record):
         _fields = fields
     return _Record
-    
 
-def merge_dicts(*args):
-    d = {}
-    for d_ in args:
-        d.update(d_)
-    return d
-
-    
-def cached(func):
+        
+def cached(f):
+    @wraps(f)
     def wrapper(*args):
         try:
             return wrapper.cache[args]
         except KeyError:
-            wrapper.cache[args] = v = func(*args)
+            wrapper.cache[args] = v = f(*args)
             return v
     wrapper.cache = {}
-    wrapper.__name__ = func.__name__
-    wrapper.__doc__ = func.__doc__
     return wrapper
         
 # TODO optimize this

@@ -39,25 +39,33 @@ from bitarray import bitarray
 
 from frenetic import util
 from frenetic.network import *
-from frenetic.util import frozendict, Data, singleton, merge_dicts
+from frenetic.util import frozendict, singleton
 
 ################################################################################
 # Matching and wildcards
 ################################################################################
 
 class Matchable(object):
-    """Assumption: the binary operators are passed in the same class as the invoking object."""
+    """Assumption: the binary operators are passed in the same class as the
+    invoking object.
+
+    """
     __metaclass__ = ABCMeta
 
     @classmethod
     @abstractmethod
     def top(cls):
-        """Return the matchable greater than all other matchables of the same class. """
+        """Return the matchable greater than all other matchables of the same
+        class.
+
+        """
 
     @abstractmethod
     def __and__(self, other):
-        """Return the intersection of two matchables of the same class.
-        Return value is None if there is no intersection."""
+        """Return the intersection of two matchables of the same class.  Return
+        value is None if there is no intersection.
+
+        """
 
     @abstractmethod
     def __le__(self, other):
@@ -67,6 +75,7 @@ class Matchable(object):
     def match(self, other):
         """Return true if we match `other'.""" 
 
+        
 # XXX some of these should be requirements on matchable.
 class MatchableMixin(object):
     """Helper"""
@@ -98,6 +107,7 @@ class Approx(object):
     def underapprox(self, underapproxer):
         """Docs here."""
 
+        
 @util.cached
 def Wildcard(width_):
     @functools.total_ordering
@@ -121,14 +131,8 @@ def Wildcard(width_):
                 mask = bmask
             elif isinstance(prefix, Wildcard_):
                 (prefix, mask) = prefix.prefix, prefix.mask
-            else:
-                if isinstance(prefix, FixedWidth):
-                    prefix = prefix.to_bits()
-                if isinstance(mask, FixedWidth):
-                    mask = mask.to_bits()
-                elif mask is None:
-                    mask = bitarray([False] * len(prefix))
-                
+            elif mask is None:
+                mask = bitarray([False] * len(prefix))
                 assert len(prefix) == cls.width == len(mask), "mask and prefix must be same length"
                 
             return super(Wildcard_, cls).__new__(cls, prefix, mask)
@@ -178,22 +182,7 @@ def Wildcard(width_):
     
     return Wildcard_
 
-@util.cached
-def MatchExact(match_cls):
-    class MatchExact_(Wildcard(match_cls.width)):
-        def __new__(cls, *v):
-            try:
-                # XXX ugh.
-                w = super(MatchExact_, cls).__new__(cls, *v)
-                assert w is not None
-                return w
-            except:
-                bits = match_cls(*v).to_bits()
-                return super(MatchExact_, cls).__new__(cls, bits) 
-
-    MatchExact_.__name__ += match_cls.__name__
-    return MatchExact_
-
+    
 class IPWildcard(Wildcard(32)):
     def __new__(cls, ipexpr, mask=None):
         if isinstance(ipexpr, basestring):
@@ -248,27 +237,33 @@ class IPWildcard(Wildcard(32)):
                 
         return super(IPWildcard, cls).__new__(cls, prefix, mask)
 
+
+class Exact(object):
+    def __init__(self, obj):
+        self.obj = obj
+
+    def match(self, other):
+        return self.obj == other
+
+        
 ################################################################################
 # Lifts
 ################################################################################
 
-header_to_matchable_lift = dict(
-    srcip=IPWildcard,
-    dstip=IPWildcard,)
+_header_to_matchclass = {}
 
-for k, v in header_to_fixedwidth_lift.iteritems():
-    header_to_matchable_lift.setdefault(k, MatchExact(v))
+def register_header(header, matchclass):
+    _header_to_matchclass[header] = matchclass
 
-def lift_matchable(k, v):
-    cls = header_to_matchable_lift.get(k)
+def matchable_for_header(header):
+    return _header_to_matchclass.get(header, Exact)
 
-    if cls is None:
-        assert isinstance(v, Matchable)
-        return v
-    else:
-        if not isinstance(v, tuple):
-            v = (v,)
-        return cls(*v)
+
+register_header("srcmac", Wildcard(48))
+register_header("dstmac", Wildcard(48))
+register_header("srcip", IPWildcard)
+register_header("dstip", IPWildcard)
+
     
 ################################################################################
 # Predicates
@@ -278,112 +273,135 @@ class Predicate(object):
     """Top-level abstract class for predicates."""
    
     def __and__(self, other):
-        if isinstance(other, Policy):
-            return restrict(self, other)
-        else:
-            return intersect([self, other])
+        return intersect([self, other])
+            
     def __or__(self, other):
         return union([self, other])
+
+    def __getitem__(self, policy):
+        return restrict(policy, self)
+        
     def __sub__(self, other):
         return difference(self, other)
+
     def __invert__(self):
         return negate(self)
+
     def __eq__(self, other):
         raise NotImplementedError
+
     def __ne__(self, other):
         raise NotImplementedError
 
+
+class DerivedPredicate(Predicate):
+    def get_predicate(self):
+        raise NotImplementedError
+    
+    def __repr__(self):
+        return repr(self.get_predicate())
+
+    def eval(self, packet):
+        return self.get_predicate().eval(packet)
+
+        
 @singleton
 class all_packets(Predicate):
     """The always-true predicate."""
     def __repr__(self):
-        return "all_packets"
+        return "all packets"
+        
     def eval(self, packet):
         return True
-      
+
+        
+@singleton
 class no_packets(Predicate):
     """The always-false predicate."""
     def __repr__(self):
-        return "no_packets"
+        return "no packets"
+        
     def eval(self, packet):
         return False
 
-class is_bucket(Predicate, Data("field")):
+        
+class is_bucket(Predicate):
+    def __init__(self, field):
+        self.field = field
+        
     def eval(self, packet):
-        return match({self.field: "1" + "?" * (Port.width - 1)}).eval(packet)
-
+        return isinstance(packet[self.field], Bucket)
+        
     def __repr__(self):
         return "is_bucket %s" % self.field
-    
+
+        
 class match(Predicate):
     """A basic predicate matching against a single field"""
-    def __init__(self, _d={}, **kwargs):
-        self.map = m = merge_dicts(_d, kwargs)
-        for k, v in m.items():
-            if v is not None:
-                m[k] = lift_matchable(k, v)
-
+    
+    def __init__(self, *args, **kwargs):
+        self.map = {}
+        for (k, v) in dict(*args, **kwargs).iteritems():
+            self.map[k] = matchable_for_header(k)(v)
+                     
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
     
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
-            v = getattr(packet, field, None))
-            if v is None:
-                if pattern is not None:
+            v = packet.get_stack(field)
+            if v:
+                if pattern is None or not pattern.match(v[0]):
                     return False
             else:
-                v = lift_fixedwidth(field, v)
-                if pattern is None or not pattern.match(v):
+                if pattern is not None:
                     return False
         return True
+
         
 class union(Predicate):
     """A predicate representing the union of two predicates."""
-    def __init__(self, arg=[], *args):
-        if isinstance(arg, Policy):
-            arg = [arg]
 
-        self.predicates = []
-        for predicate in chain(arg, args):
-            if isinstance(predicate, union):
-                self.predicates.extend(predicate.predicates)
-            elif not isinstance(predicate, no_packets.__class__):
-                self.predicates.append(predicate)
+    def __init__(self, predicates):
+        self.predicates = predicates
         
     def __repr__(self):
         return "union:\n%s" % util.repr_plus(self.predicates)
         
     def eval(self, packet):
         return any(predicate.eval(packet) for predicate in self.predicates)
+
         
 class intersect(Predicate):
     """A predicate representing the intersection of two predicates."""
-    def __init__(self, arg=[], *args):
-        if isinstance(arg, Policy):
-            arg = [arg]
-            
-        self.predicates = []
-        for predicate in chain(arg, args):
-            if isinstance(predicate, intersect):
-                self.predicates.extend(predicate.predicates)
-            elif not isinstance(predicate, all_packets.__class__):
-                self.predicates.append(predicate)
 
+    def __init__(self, predicates):
+        self.predicates = predicates
+        
     def __repr__(self):
         return "intersect:\n%s" % util.repr_plus(self.predicates)
     
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
-class difference(Predicate, Data("left right")):
+        
+class difference(Predicate, Data("base_predicate diff_predicates")):
     """A predicate representing the difference of two predicates."""
+
+    def __new__(cls, base_predicate, diff_predicates):
+        return super(difference, cls).__new__(cls,
+                                              base_predicate,
+                                              list(diff_predicates))
+    
     def __repr__(self):
-        return "difference:\n%s" % util.repr_plus([self.left, self.right])
+        return "difference:\n%s" % util.repr_plus([self.base_predicate,
+                                                   self.diff_predicates])
         
     def eval(self, packet):
-        return self.left.eval(packet) and not self.right.eval(packet)
+        return self.base_predicate.eval(packet) and not any(pred.eval(packet)
+                                                            for pred in self.diff_predicates)
 
+        
 class negate(Predicate, Data("predicate")):
     """A predicate representing the difference of two predicates."""
     def __repr__(self):
@@ -391,6 +409,7 @@ class negate(Predicate, Data("predicate")):
     
     def eval(self, packet):
         return not self.predicate.eval(packet)
+
         
 ################################################################################
 # Policies
@@ -400,21 +419,34 @@ class Policy(object):
     """Top-level abstract description of a static network program."""
     def __or__(self, other):
         return parallel([self, other])
-    def __and__(self, pred):
-        assert isinstance(pred, Predicate)
-        return restrict(pred, self)
+        
     def __sub__(self, pred):
-        assert isinstance(pred, Predicate)
         return remove(self, pred)
+
     def __rshift__(self, pol):
         return compose([self, pol])
+
     def __eq__(self, other):
         raise NotImplementedError
+
     def __ne__(self, other):
         raise NotImplementedError
+
     def eval(self, packet):
         raise NotImplementedError
 
+
+class DerivedPolicy(Policy):
+    def get_policy(self):
+        raise NotImplementedError
+        
+    def __repr__(self):
+        return repr(self.get_policy())
+
+    def eval(self, packet):
+        return self.get_policy().eval(packet)
+
+        
 @singleton
 class drop(Policy):
     """Policy that drops everything."""
@@ -424,6 +456,7 @@ class drop(Policy):
     def eval(self, packet):
         return Counter()
 
+        
 @singleton
 class passthrough(Policy):
     def __repr__(self):
@@ -432,20 +465,24 @@ class passthrough(Policy):
     def eval(self, packet):
         return Counter([packet])
 
+        
 class modify(Policy):
     """Policy that drops everything."""
-    def __init__(self, _d={}, **kwargs):
-        self.map = merge_dicts(_d, kwargs)
+                                            
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
 
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
         
     def eval(self, packet):
-        packet = packet._modify(self.map)
+        packet = packet.modifymany(self.map)
         return Counter([packet])
 
+        
 class fwd(Policy):
-    """Policy that drops everything."""
+    """Forward"""
+    
     def __init__(self, port):
         self.port = port
 
@@ -453,71 +490,69 @@ class fwd(Policy):
         return "fwd %s" % self.port
     
     def eval(self, packet):
-        packet = packet._push(outport=self.port)
+        packet = packet.push(outport=self.port)
         return Counter([packet])
+
         
 class push(Policy):
     """Policy that drops everything."""
-    def __init__(self, _d={}, **kwargs):
-        self.map = merge_dicts(_d, kwargs)
+    
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
 
     def __repr__(self):
         return "push:\n%s" % util.repr_plus(self.map.items())
         
     def eval(self, packet):
-        packet = packet._push(self.map)
+        packet = packet.pushmany(self.map)
         return Counter([packet])
 
+        
 class pop(Policy):
     """Policy that drops everything."""
-    def __init__(self, arg=[], *args):
-        if isinstance(arg, basestring):
-            arg = [arg]
-        self.fields = list(chain(arg, args))
+    
+    def __init__(self, fields):
+        self.fields = set(fields)
 
     def __repr__(self):
         return "pop:\n%s" % util.repr_plus(self.fields)
         
     def eval(self, packet):
-        packet = packet._pop(self.fields)
+        packet = packet.popmany(self.fields)
         return Counter([packet])
+
         
 class copy(Policy):
-    def __init__(self, _d={}, **kwargs):
-        self.map = merge_dicts(_d, kwargs)
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
 
     def __repr__(self):
         return "copy:\n%s" % util.repr_plus(self.map.items())
   
     """Policy that drops everything."""
     def eval(self, packet):
-        pushes = {field1: getattr(packet, field2, None) for (field1, field2) in self.map.iteritems()}
+        pushes = {}
+        for (dstfield, srcfield) in self.map.iteritems():
+            pushes[srcfield] = packet[dstfield]
         pops = self.map.values()
-        packet = packet._push(pushes)._pop(pops)
+        packet = packet.pushmany(pushes).popmany(pops)
         return Counter([packet])
 
-class restrict(Policy, Data("predicate policy")):
+        
+class restrict(Policy, Data("policy predicate")):
     """Policy for mapping a single predicate to a list of actions."""
     def __repr__(self):
-        return "restrict:\n%s" % util.repr_plus([self.predicate, self.policy])
+        return "restrict:\n%s" % util.repr_plus([self.predicate,
+                                                 self.policy])
         
     def eval(self, packet):
         if self.predicate.eval(packet):
             return self.policy.eval(packet)
         else:
-            return Counter([])
+            return Counter()
 
-class compose(Policy):
-    def __init__(self, arg=[], *args):
-        if isinstance(arg, Policy):
-            arg = [arg]
-        self.policies = []
-        for policy in chain(arg, args):
-            if isinstance(policy, compose):
-                self.policies.extend(policy.policies)
-            elif not isinstance(policy, passthrough.__class__):
-                self.policies.append(policy)
-
+            
+class compose(Policy, Data("policies")):
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
   
@@ -531,18 +566,9 @@ class compose(Policy):
                     c[rpacket] = lcount * rcount
             lc = c
         return lc
-            
-class parallel(Policy):
-    def __init__(self, arg=[], *args):
-        if isinstance(arg, Policy):
-            arg = [arg]
-        self.policies = []
-        for policy in chain(arg, args):
-            if isinstance(policy, parallel):
-                self.policies.extend(policy.policies)
-            elif not isinstance(policy, drop.__class__):
-                self.policies.append(policy)
+
         
+class parallel(Policy, Data("policies")):
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
         
@@ -552,6 +578,7 @@ class parallel(Policy):
             rc = policy.eval(packet)
             c.update(rc)
         return c
+
         
 class remove(Policy, Data("policy predicate")):
     def __repr__(self):
@@ -563,6 +590,7 @@ class remove(Policy, Data("policy predicate")):
         else:
             return Counter()
 
+            
 class if_(Policy):
     def __init__(self, pred, t_branch, f_branch=passthrough):
         self.pred = pred
@@ -583,18 +611,21 @@ class if_(Policy):
         else:
             return self.f_branch.eval(packet)
 
-class debug(Policy):
-    def __init__(self, policy):
+            
+class breakpoint(Policy):
+    def __init__(self, policy, condition=lambda ps: True):
         self.policy = policy
+        self.condition = condition
         
     def __repr__(self):
-        return "***debug***\n%s" % self.policy
+        return "***debug***\n%s" % util.repr_plus([self.policy])
         
     def eval(self, packet):
         import ipdb
         ipdb.set_trace()
         return self.policy.eval(packet)
 
+        
 class simple_route(Policy):
     def eval(self, packet):
         policy = drop
@@ -603,3 +634,48 @@ class simple_route(Policy):
             policy |= match(dict(zip(headers, header_preds))) & act
         return policy.eval(packet)
 
+        
+class flood(Policy):
+    def __init__(self, network):
+        self.network = network
+        @network._topology.notify
+        def handle(topo):
+            self.mst = nx.minimum_spanning_tree(topo)
+    
+    def __repr__(self):
+        return "flood %s" % self.network
+    
+    def eval(self, packet):
+        switch = packet["switch"]
+        inport = packet["inport"]
+        if switch in self.network.topology.nodes():
+            ports = set()
+            ports.update(egress_ports(self.network.topology, switch))
+            for sw in self.mst.neighbors(switch):
+                port = self.mst[switch][sw][switch]
+                ports.add(port)
+            packets = [packet.push(outport=port)
+                       for port in ports if port != inport]
+            return Counter(packets)
+        else:
+            return Counter()
+
+def egress_points(topo):
+    for sw in topo.nodes():
+        ports = egress_ports(topo, sw)
+        if ports:
+            yield sw, ports
+    
+def egress_ports(topo, sw):
+    attrs = topo.node[sw]
+    all_ports = attrs["ports"]
+    non_egress_ports = set()
+    for attrs in topo[sw].itervalues():
+        non_egress_ports.add(attrs[sw])
+    return all_ports - non_egress_ports
+    
+def query(network, pred=all_packets, fields=(), time=None):
+    b = Bucket(fields, time)
+    sub_net = Network.fork(network)
+    sub_net.install_policy(pred & fwd(b))
+    return b
