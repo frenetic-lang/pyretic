@@ -123,8 +123,8 @@ class POXBackend(revent.EventMixin):
     def get_packet_payload(self, packet):
         p_begin = p = packetlib.ethernet(packet["payload"])
 
-        p.src = packetaddr.EthAddr(packet["srcmac"].to_bits().tobytes())
-        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bits().tobytes())
+        p.src = packetaddr.EthAddr(unicode(packet["srcmac"]))
+        p.dst = packetaddr.EthAddr(unicode(packet["dstmac"]))
 
         diff = get_packet_diff(packet)
         if diff:
@@ -145,8 +145,8 @@ class POXBackend(revent.EventMixin):
 
         p = p.next
         if isinstance(p, packetlib.ipv4):
-            p.srcip = packetaddr.IPAddr(packet["srcip"].to_bits().tobytes())
-            p.dstip = packetaddr.IPAddr(packet["dstip"].to_bits().tobytes())
+            p.srcip = packetaddr.IPAddr(packet["srcip"])
+            p.dstip = packetaddr.IPAddr(packet["dstip"])
             p.protocol = packet["protocol"]
             p.tos = packet["tos"]
 
@@ -159,8 +159,8 @@ class POXBackend(revent.EventMixin):
                 p.code = packet["dstport"]
         elif isinstance(p, packetlib.arp):
             p.opcode = packet["protocol"]
-            p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bits().tobytes())
-            p.protodst = packetaddr.IPAddr(packet["dstip"].to_bits().tobytes())
+            p.protosrc = packetaddr.IPAddr(packet["srcip"])
+            p.protodst = packetaddr.IPAddr(packet["dstip"])
 
         return p_begin.pack()
 
