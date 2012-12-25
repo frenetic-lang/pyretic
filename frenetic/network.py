@@ -129,6 +129,12 @@ class MAC(object):
         mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
         return mac
 
+    def __eq__(self,other):
+        try:
+            return self.bits == other.bits
+        except:
+            return False
+
         
 ################################################################################
 # Packet and tools
@@ -343,7 +349,6 @@ class UniqueBucket(Bucket):
         super(UniqueBucket, self).__init__(fields,time)
 
     def filter_queue(self):
-        print self.fields
         while(True):
             pkt = self.queue.get()
 
