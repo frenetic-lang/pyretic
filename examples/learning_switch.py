@@ -52,16 +52,12 @@ def learning_switch(network):
 
         ## ONLY NEEDED TO KEEP THE POLICY FROM BLOWING UP FROM REDUNDANT RESTRICTS
         if host_to_outport.get((pkt['switch'], pkt['srcmac'])) == pkt['inport']:
-            print "outport already set"
             continue
 
         host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
-        print "outport is " + str(pkt['inport'])
 
         network -= host_p    # Don't do our old action.
-### W/ THE FOLLOWING LINE COMMENTED, THIS POLICY SHOULD SOON STOP FORWARDING ANY PACKETS
-### YET CURRENTLY IT KEEP ON CHUGGING AWAY...
-#        network |= host_p & fwd(pkt['inport'])  # Do this instead.
+        network |= host_p & fwd(pkt['inport'])  # Do this instead.
 
         print "network %s\npolicy: %s" % (network, network.policy)
 
