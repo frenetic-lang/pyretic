@@ -26,23 +26,33 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+
+#######################################################################
+# TO RUN EXAMPLE                                                      #
+# ------------------------------------------------------------------- #
+# start mininet:  sudo mn --switch ovsk --controller remote --mac     #
+# run controller: pox.py --no-cli pyretic/examples/learning_switch.py #
+# test:           pingall                                             #
+#######################################################################
+
+
 from frenetic.lib import *
 
 def learning_switch(network):
     network.install_flood()
 
     host_to_outport = {}
-    for pkt in query(network, all_packets, fields=["switch", "srcmac"]):
-        host_p = match(switch=pkt.switch, dstmac=pkt.srcmac)
-        outport = host_to_outport.get((pkt.switch, pkt.srcmac))
+    for pkt in query(network, all_packets, fields=['switch', 'srcmac']):
+        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
+        outport = host_to_outport.get((pkt['switch'], pkt['srcmac']))
 
-        if outport == pkt.inport:
+        if outport == pkt['inport']:
             continue
 
-        host_to_outport[(pkt.switch, pkt.srcmac)] = pkt.inport
+        host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
 
         network -= host_p    # Don't do our old action.
-        network |= host_p & fwd(pkt.inport)  # Do this instead.
+        network |= host_p & fwd(pkt['inport'])  # Do this instead.
         
 main = learning_switch
 
