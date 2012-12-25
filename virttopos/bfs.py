@@ -49,4 +49,10 @@ def setup_virtual_network(network):
             vn.physical_policy = network.flood
             vn.from_maps(vmap)
             vn.topology = vtopo
+            print "------------ underlying network ---------------"
+            print "switches = %s" % topo.nodes(data=True)
+            print "links =    %s" % topo.edges(data=True)
+            print "------------ abstracted network ---------------"
+            print "switches = %s" % vtopo.nodes(data=True)
+            print "links =    %s" % vtopo.edges(data=True)
     return vn
