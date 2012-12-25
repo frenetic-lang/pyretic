@@ -38,7 +38,7 @@ from frenetic import util, generators as gs
 from frenetic.util import Data
 
 import networkx as nx
-
+from Queue import Queue
 
 ################################################################################
 # Fixed width stuff
@@ -334,3 +334,37 @@ class Bucket(gs.Event):
         self.fields = fields
         self.time = time
         super(Bucket, self).__init__()
+
+
+class UniqueBucket(Bucket):
+    """A safe place for unique packets!"""
+    def __init__(self, fields=[], time=None):
+        self.seen = {}
+        super(UniqueBucket, self).__init__(fields,time)
+
+    def filter_queue(self):
+        print self.fields
+        while(True):
+            pkt = self.queue.get()
+
+            # MAKE KEY (YES, I KNOW A STRING IS LAME)
+            k = ''
+            for field in self.fields:
+                k += str(pkt[field]) + '-' 
+
+            # RETURN PACKET IF NOT QUERIED FIELDS NOT YET SEEN    
+            # OTHERWISE CONTINUE WAITING
+            if not k in self.seen:
+                self.seen[k] = True
+                break
+        return pkt
+
+    def __iter__(self):
+        self.queue = Queue()
+        
+        self.notify(self.queue.put)
+        
+        def gen():
+            while True: yield self.filter_queue()
+
+        return gen()

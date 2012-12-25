@@ -690,3 +690,9 @@ def query(network, pred=all_packets, fields=(), time=None):
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))
     return b
+
+def query_unique(network, pred=all_packets, fields=(), time=None):
+    b = UniqueBucket(fields, time)
+    sub_net = Network.fork(network)
+    sub_net.install_policy(pred & fwd(b))    
+    return b
