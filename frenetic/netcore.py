@@ -245,6 +245,8 @@ class Exact(object):
     def match(self, other):
         return self.obj == other
 
+    def __repr__(self):
+        return str(self.obj)
         
 ################################################################################
 # Lifts
@@ -344,6 +346,7 @@ class is_bucket(Predicate):
 
         
 class match(Predicate):
+    # THIS DESCRIPTION SEEMS INCORRECT - JREICH..."
     """A basic predicate matching against a single field"""
     
     def __init__(self, *args, **kwargs):

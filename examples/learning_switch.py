@@ -26,33 +26,45 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-
-#######################################################################
-# TO RUN EXAMPLE                                                      #
-# ------------------------------------------------------------------- #
-# start mininet:  sudo mn --switch ovsk --controller remote --mac     #
-# run controller: pox.py --no-cli pyretic/examples/learning_switch.py #
-# test:           pingall                                             #
-#######################################################################
-
+############################################################################################################################
+# TO TEST EXAMPLE                                                                                                          #
+# -------------------------------------------------------------------                                                      #
+# start mininet:  sudo mn --switch ovsk --controller remote --mac --topo linear,3                                          #
+# run controller: pox.py --no-cli pyretic/examples/hub.py                                                                  #
+# start xterms:   xterm h1 h2 h3                                                                                           #
+# start tcpdump:  in each xterm,                                                                                           #
+# > IFACE=`ifconfig | head -n 1 | awk '{print $1}'`; tcpdump -XX -vvv -t -n -i $IFACE not ether proto 0x88cc > $IFACE.dump #
+# test:           run h1 ping -c 2 h3, examine tcpdumps and confirm that h2 does not see packets on second go around       #
+############################################################################################################################
 
 from frenetic.lib import *
 
 def learning_switch(network):
     network.install_flood()
 
-    host_to_outport = {}
-    for pkt in query(network, all_packets, fields=['switch', 'srcmac']):
-        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
-        outport = host_to_outport.get((pkt['switch'], pkt['srcmac']))
+    print "network %s\npolicy: %s" % (network, network.policy)
 
-        if outport == pkt['inport']:
+    host_to_outport = {}
+
+    for pkt in query_unique(network, all_packets, fields=['switch', 'srcmac']):
+
+        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
+
+        ## ONLY NEEDED TO KEEP THE POLICY FROM BLOWING UP FROM REDUNDANT RESTRICTS
+        if host_to_outport.get((pkt['switch'], pkt['srcmac'])) == pkt['inport']:
+            print "outport already set"
             continue
 
         host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
+        print "outport is " + str(pkt['inport'])
 
         network -= host_p    # Don't do our old action.
-        network |= host_p & fwd(pkt['inport'])  # Do this instead.
+### W/ THE FOLLOWING LINE COMMENTED, THIS POLICY SHOULD SOON STOP FORWARDING ANY PACKETS
+### YET CURRENTLY IT KEEP ON CHUGGING AWAY...
+#        network |= host_p & fwd(pkt['inport'])  # Do this instead.
+
+        print "network %s\npolicy: %s" % (network, network.policy)
+
         
 main = learning_switch
 
