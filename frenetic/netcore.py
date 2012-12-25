@@ -273,7 +273,10 @@ class Predicate(object):
     """Top-level abstract class for predicates."""
    
     def __and__(self, other):
-        return intersect([self, other])
+        if isinstance(other,Predicate):
+            return intersect([self, other])
+        else:
+            return other.__and__(self)
             
     def __or__(self, other):
         return union([self, other])
@@ -417,9 +420,13 @@ class negate(Predicate, Data("predicate")):
 
 class Policy(object):
     """Top-level abstract description of a static network program."""
+
     def __or__(self, other):
         return parallel([self, other])
         
+    def __and__(self, pred):
+        return restrict(self, pred)
+
     def __sub__(self, pred):
         return remove(self, pred)
 
