@@ -353,10 +353,24 @@ class match(Predicate):
         self.map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
             self.map[k] = matchable_for_header(k)(v)
-                     
+
+    ## THIS IS A HACK, MEANT AS ANOTHER WAY OF INITING A MATCH OBJECT
+    def set_field(self, k, v):
+        self.map[k] = matchable_for_header(k)(v)
+                             
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
-    
+
+    def __hash__(self):
+        h = repr(self)
+        return hash(h)
+
+    def __eq__(self,other):
+        try:
+            hash(self) == hash(other)
+        except:
+            return False
+
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
             v = packet.get_stack(field)
@@ -695,7 +709,7 @@ def query(network, pred=all_packets, fields=(), time=None):
     return b
 
 def query_unique(network, pred=all_packets, fields=(), time=None):
-    b = UniqueBucket(fields, time)
     sub_net = Network.fork(network)
+    b = UniqueBucket(sub_net, fields, time)
     sub_net.install_policy(pred & fwd(b))    
     return b

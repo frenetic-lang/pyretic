@@ -344,24 +344,31 @@ class Bucket(gs.Event):
 
 class UniqueBucket(Bucket):
     """A safe place for unique packets!"""
-    def __init__(self, fields=[], time=None):
+    def __init__(self, network, fields=[], time=None):
         self.seen = {}
+        self.network = network
         super(UniqueBucket, self).__init__(fields,time)
 
     def filter_queue(self):
+        from frenetic.netcore import match
+        
+        # MAKE PREDICATE
+        pred = None
+
         while(True):
             pkt = self.queue.get()
 
-            # MAKE KEY (YES, I KNOW A STRING IS LAME)
-            k = ''
+            pred = match()
             for field in self.fields:
-                k += str(pkt[field]) + '-' 
+                pred.set_field(field,pkt[field])
 
             # RETURN PACKET IF NOT QUERIED FIELDS NOT YET SEEN    
             # OTHERWISE CONTINUE WAITING
-            if not k in self.seen:
-                self.seen[k] = True
+            if not hash(pred) in self.seen:
+                self.seen[hash(pred)] = True
+                self.network -= pred
                 break
+
         return pkt
 
     def __iter__(self):
