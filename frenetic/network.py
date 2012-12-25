@@ -46,15 +46,22 @@ import networkx as nx
 
 class IP(object):
     def __init__(self, ip):
+
+        # already a IP object
         if isinstance(ip, IP):
             self.bits = ip.bits
+
+        # otherwise will be in byte or string encoding
         else:
             assert isinstance(ip, basestring)
             
             b = bitarray()
 
+            # byte encoding
             if len(ip) == 4:
                 b.frombytes(ip)
+
+            # string encoding
             else:
                 b.frombytes(socket.inet_aton(ip))
 
@@ -63,20 +70,34 @@ class IP(object):
     def to_bits(self):
         return self.bits
         
+    def to_bytes(self):
+        return self.bits.tobytes()
+
+    def fromRaw(self):
+        return self.to_bytes()
+
     def __repr__(self):
-        return socket.inet_ntoa(self.to_bits().tobytes())
+        return socket.inet_ntoa(self.to_bytes())
     
 
 class MAC(object):
     def __init__(self, mac):
+
+        # already a MAC object
         if isinstance(mac, MAC):
             self.bits = mac.bits
+
+        # otherwise will be in byte or string encoding
         else:
             assert isinstance(mac, basestring)
             
             b = bitarray()
+
+            # byte encoding
             if len(mac) == 6:
                 b.frombytes(mac)
+
+            # string encoding
             else:
                 import re
                 m = re.match(r"""(?xi)
@@ -97,9 +118,14 @@ class MAC(object):
     def to_bits(self):
         return self.bits
 
+    def to_bytes(self):
+        return self.bits.tobytes()
+
+    def fromRaw(self):
+        return self.to_bytes()
+
     def __repr__(self):
-        bs = self.to_bits().tobytes()
-        parts = struct.unpack("!BBBBBB", bs)
+        parts = struct.unpack("!BBBBBB", self.to_bytes())
         mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
         return mac
 
