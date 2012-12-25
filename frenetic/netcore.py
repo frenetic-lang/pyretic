@@ -258,9 +258,13 @@ def register_header(header, matchclass):
 def matchable_for_header(header):
     return _header_to_matchclass.get(header, Exact)
 
-
-register_header("srcmac", Wildcard(48))
-register_header("dstmac", Wildcard(48))
+### JREICH - disabled incorrect registration calls
+### Wildcard takes a binary encoding, but srcmac/dstmac fields are ':' delimited hex strings
+### call should be - register_header("srcmac", MACWildcard)
+### class MACWildcard(Wildcard(48)) must be implemented first
+### Not a priority as wildcard matching on MAC addresses not needed for current examples
+#register_header("srcmac", Wildcard(48))
+#register_header("dstmac", Wildcard(48))
 register_header("srcip", IPWildcard)
 register_header("dstip", IPWildcard)
 
