@@ -271,22 +271,22 @@ register_header("dstip", IPWildcard)
     
 class Predicate(object):
     """Top-level abstract class for predicates."""
-   
+        
+    def __sub__(self, other):
+        return difference(self, other)
+
     def __and__(self, other):
         if isinstance(other,Predicate):
             return intersect([self, other])
         else:
             return other.__and__(self)
-            
+       
     def __or__(self, other):
         return union([self, other])
 
     def __getitem__(self, policy):
         return restrict(policy, self)
         
-    def __sub__(self, other):
-        return difference(self, other)
-
     def __invert__(self):
         return negate(self)
 
@@ -421,15 +421,15 @@ class negate(Predicate, Data("predicate")):
 class Policy(object):
     """Top-level abstract description of a static network program."""
 
-    def __or__(self, other):
-        return parallel([self, other])
-        
-    def __and__(self, pred):
-        return restrict(self, pred)
-
     def __sub__(self, pred):
         return remove(self, pred)
 
+    def __and__(self, pred):
+        return restrict(self, pred)
+
+    def __or__(self, other):
+        return parallel([self, other])
+        
     def __rshift__(self, pol):
         return compose([self, pol])
 
@@ -545,7 +545,18 @@ class copy(Policy):
         packet = packet.pushmany(pushes).popmany(pops)
         return Counter([packet])
 
+
+class remove(Policy, Data("policy predicate")):
+    def __repr__(self):
+        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
         
+    def eval(self, packet):
+        if not self.predicate.eval(packet):
+            return self.policy.eval(packet)
+        else:
+            return Counter()
+        
+
 class restrict(Policy, Data("policy predicate")):
     """Policy for mapping a single predicate to a list of actions."""
     def __repr__(self):
@@ -558,7 +569,19 @@ class restrict(Policy, Data("policy predicate")):
         else:
             return Counter()
 
-            
+                    
+class parallel(Policy, Data("policies")):
+    def __repr__(self):
+        return "parallel:\n%s" % util.repr_plus(self.policies)
+        
+    def eval(self, packet):
+        c = Counter()
+        for policy in self.policies:
+            rc = policy.eval(packet)
+            c.update(rc)
+        return c
+
+
 class compose(Policy, Data("policies")):
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
@@ -573,29 +596,6 @@ class compose(Policy, Data("policies")):
                     c[rpacket] = lcount * rcount
             lc = c
         return lc
-
-        
-class parallel(Policy, Data("policies")):
-    def __repr__(self):
-        return "parallel:\n%s" % util.repr_plus(self.policies)
-        
-    def eval(self, packet):
-        c = Counter()
-        for policy in self.policies:
-            rc = policy.eval(packet)
-            c.update(rc)
-        return c
-
-        
-class remove(Policy, Data("policy predicate")):
-    def __repr__(self):
-        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
-        
-    def eval(self, packet):
-        if not self.predicate.eval(packet):
-            return self.policy.eval(packet)
-        else:
-            return Counter()
 
             
 class if_(Policy):
