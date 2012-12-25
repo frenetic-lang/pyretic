@@ -347,7 +347,7 @@ class is_bucket(Predicate):
         
 class match(Predicate):
     # THIS DESCRIPTION SEEMS INCORRECT - JREICH..."
-    """A basic predicate matching against a single field"""
+    """A set of field matches (one per field)"""
     
     def __init__(self, *args, **kwargs):
         self.map = {}
