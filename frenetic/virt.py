@@ -42,8 +42,7 @@ from collections import Counter
 # Isolation
 ################################################################################
 
-class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate"
-                                         "egress_predicate")):
+class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate egress_predicate")):
     def __repr__(self):
         return "isolate_policy %s\n%s" % (self.itag,
                                           util.repr_plus(["POLICY",
@@ -136,9 +135,8 @@ class pop_vheaders(DerivedPolicy):
     def get_policy(self):
         return pop("vswitch", "vinport", "voutport", "vtag")
 
-        
-class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy"
-                                            "physical_policy_fn query_policy_fn")):
+    
+class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical_policy_fn query_policy_fn")):
     def __repr__(self):
         return "virtualize_policy %s\n%s" % (self.vtag, util.repr_plus(["POLICY",
                                                                         self.policy,
