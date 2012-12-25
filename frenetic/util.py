@@ -185,7 +185,7 @@ class frozendict(object):
 def indent_str(s, indent=4):
     return "\n".join(indent * " " + i for i in s.splitlines())
 
-def repr_plus(ss, indent=4, sep="\n", prefix="-"):
+def repr_plus(ss, indent=4, sep="\n", prefix=""):
     if isinstance(ss, basestring):
         ss = [ss]
     return indent_str(sep.join(prefix + repr(s) for s in ss), indent)

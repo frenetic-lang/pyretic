@@ -50,6 +50,7 @@ class POXBackend(revent.EventMixin):
         self.vlan_to_diff_db = {}
         self.diff_to_vlan_db = {}
         self.vlan_diff_lock = threading.RLock()
+        self.packetno = 0
         
         core.registerNew(discovery.Discovery)
 
@@ -165,6 +166,17 @@ class POXBackend(revent.EventMixin):
         return p_begin.pack()
 
     def _handle_PacketIn(self, event):
+
+        if self.show_traces:
+            self.packetno += 1
+            print "-------- POX/OF RECV %d ---------------" % self.packetno
+            print event.connection
+            print event.ofp
+            print "port\t%s" % event.port
+            print "data\t%s" % packetlib.ethernet(event.data)
+            print "dpid\t%s" % event.dpid
+            print
+
         recv_packet = self.create_packet(event.dpid, event.ofp.in_port, event.data)
         
         if self.debug_packet_in == "1":
@@ -180,15 +192,12 @@ class POXBackend(revent.EventMixin):
             output = pol.eval(recv_packet) # So we can step through it
         
         if self.show_traces:
-            print "Recv"
+            print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
             print util.repr_plus([recv_packet], sep="\n\n")
             print
-            print
-            print "Send"
+            print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
             print util.repr_plus(output.elements(), sep="\n\n")
             print
-            print
-            print "===================================="
         
         for pkt in output.elements():
             outport = pkt["outport"]
@@ -246,6 +255,12 @@ class POXBackend(revent.EventMixin):
         msg.data = self.get_packet_payload(packet)
         msg.actions.append(of.ofp_action_output(port = outport))
         
+        if self.show_traces:
+            print "========= POX/OF SEND ================"
+            print msg
+            print packetlib.ethernet(msg._get_data())
+            print
+
         self.switch_connections[switch].send(msg)
 
         
