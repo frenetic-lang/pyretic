@@ -26,6 +26,16 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+##############################################################################################################################
+# TO TEST EXAMPLE                                                                                                            #
+# -------------------------------------------------------------------                                                        #
+# start mininet:  sudo mn -c; sudo mn --switch ovsk --controller remote --mac --topo tree,3,3                                #
+# run controller: pox.py --no-cli pyretic/examples/monitor_topology.py                                                       #
+# watch topology: a new topology will be printed each time a switch, port, or link registers                                 #
+# test:           change topology by running 'link sX sY down', or restart mininet w/ new topology args                      #
+##############################################################################################################################
+
+
 from frenetic.lib import *
 
 def pretty_print(topo,title):
