@@ -306,12 +306,26 @@ class Network(object):
         self._topology.signal_mutation()
         
     def _handle_link_ups(self, (s1, p1, s2, p2)):
-        self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
-        self._topology.signal_mutation()
+        try:
+            port_mapping = self.topology[s1][s2]
+            if port_mapping[s1] == p1 and port_mapping[s2] == p2:
+                pass # THE LINK BETWEEN THESE SWITCHES HASN'T CHANGED AT ALL
+            else:
+                # THE LINK BETWEEN THESE SWITCHES HAS MOVED PORT(S)!
+                self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
+                self._topology.signal_mutation()
+        except KeyError:
+            # NO LINK CURRENTLY EXISTS BETWEEN THESE SWITCHES
+            self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
+            self._topology.signal_mutation()
         
     def _handle_link_downs(self, (s1, p1, s2, p2)):
-        self.topology.remove_edge(s1, s2)
-        self._topology.signal_mutation()
+        try:
+            self.topology.remove_edge(s1, s2)
+            self._topology.signal_mutation()
+        except nx.NetworkXError:
+            pass  # LINK HAS ALREADY BEEN REMOVED
+
 
     #
     # Policies
