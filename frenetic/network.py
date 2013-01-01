@@ -204,14 +204,15 @@ class Packet(object):
 
         
 class Network(object):
-    def __init__(self):
+    def __init__(self,backend):
         from frenetic.netcore import drop
         self._policy = gs.Behavior(drop)
         self._sub_policies = {}
+        self.backend = backend
 
     @classmethod
     def clone(cls, network):
-        self = cls()
+        self = cls(network.backend)
         self.inherit_events(network)
         return self
         
@@ -253,6 +254,9 @@ class Network(object):
         return iter(self._topology)
 
     #
+
+    def inject_packet(self, packet):
+        self.backend.send_packet(packet)
         
     def install_policy(self, policy):
         self.install_sub_policy(self, policy)
