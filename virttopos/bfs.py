@@ -34,7 +34,7 @@ def topo_to_vmap(topo):
     port_ind = 1
     for sw, eports in egress_points(topo):
         for port in eports:
-            vmap[(Switch(1), Port(port_ind))] = [(sw, port)]
+            vmap[1, port_ind] = [(sw, port)]
             port_ind += 1
     return vmap
   
