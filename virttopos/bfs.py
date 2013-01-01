@@ -28,6 +28,7 @@
 
 from frenetic.lib import *
 import networkx as nx
+import sys
 
 def topo_to_vmap(topo):
     vmap = {}
@@ -39,6 +40,7 @@ def topo_to_vmap(topo):
     return vmap
   
 def setup_virtual_network(network):
+    sys.setrecursionlimit(1500)
     vn = VNetwork.fork(network)
     @run
     def vmap_gen():
