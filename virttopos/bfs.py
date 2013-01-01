@@ -47,7 +47,7 @@ def setup_virtual_network(network):
             vtopo = nx.Graph()
             add_nodes_from_vmap(vmap, vtopo)
             vn.physical_policy = network.flood
-            vn.from_maps(vmap)
+            vn.from_vmap(vmap)
             vn.topology = vtopo
             print "------------ underlying network ---------------"
             print "switches = %s" % topo.nodes(data=True)
