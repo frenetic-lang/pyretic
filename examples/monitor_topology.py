@@ -29,10 +29,28 @@
 from frenetic.lib import *
 
 def pretty_print(topo,title):
-    print "-------%s---------" % title
+    edge_str = {}
+    egress_str = {}
+    switch_str_maxlen = len('switch')
+    edge_str_maxlen = len('switch edges')
+    egress_str_maxlen = len('egress ports')
     for switch in topo.nodes():
-        switch_edges = ', '.join([ "%s => %s[%s]" % (ports[s1],s2,ports[s2]) for (s1,s2,ports) in topo.edges(data=True) if s1 == switch ])
-        print "%s\t%s" % (switch,switch_edges)
+        edge_str[switch] = ', '.join([ "%s[%s] --- %s[%s]" % (s1,ports[s1],s2,ports[s2]) for (s1,s2,ports) in topo.edges(data=True) if s1 == switch or s2 == switch])
+        egress_str[switch] = ', '.join([ "%s[%s]---" % (switch,p) for p in egress_ports(topo,switch)])
+
+    if len(topo.nodes()) > 0:
+        edge_str_maxlen =  max( [len(ed) for ed in edge_str.values()] + [edge_str_maxlen] )
+        egress_str_maxlen =  max( [len(eg) for eg in egress_str.values()] + [egress_str_maxlen] )
+
+    table_width = switch_str_maxlen + 5 + edge_str_maxlen + 5 + egress_str_maxlen + 3
+    print "%s" % title.rjust(table_width/2+1,'-').ljust(table_width,'-')
+    print "%s  |  %s  |  %s  |" % ('switch','switch edges'.rjust(edge_str_maxlen/2+1).ljust(edge_str_maxlen),'egress ports'.rjust(egress_str_maxlen/2+1).ljust(egress_str_maxlen),)        
+    print ''.rjust(table_width,'-')
+    for switch in topo.nodes():
+        edge_str[switch] = edge_str[switch].ljust(edge_str_maxlen)
+        egress_str[switch] = egress_str[switch].ljust(egress_str_maxlen)
+        print "%s  |  %s  |  %s  |" % (str(switch).ljust(switch_str_maxlen),edge_str[switch],egress_str[switch])
+    print ''.rjust(table_width,'-')
 
 def monitor(network):
     for topology in network.topology_changes:
