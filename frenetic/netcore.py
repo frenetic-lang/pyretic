@@ -688,20 +688,32 @@ class flood(Policy):
         else:
             return Counter()
 
+# I THINK THIS GENERATOR IS LIKELY ERRONEOUS
+# COMPARE TO CODE FOR egress_ports - JREICH
 def egress_points(topo):
     for sw in topo.nodes():
         ports = egress_ports(topo, sw)
         if ports:
             yield sw, ports
-    
-def egress_ports(topo, sw):
-    attrs = topo.node[sw]
-    all_ports = attrs["ports"]
-    non_egress_ports = set()
+
+def interior_ports(topo, sw):
+    interior = set()
     for attrs in topo[sw].itervalues():
-        non_egress_ports.add(attrs[sw])
-    return all_ports - non_egress_ports
-    
+        interior.add(attrs[sw])
+    return interior
+
+def egress_ports(topo, sw=None):
+    if sw is None:
+        ports = set()
+        for sw in topo.nodes():
+            ports |= {(sw,port) for port in  egress_ports(topo, sw)}
+        return ports
+    else:
+        attrs = topo.node[sw]
+        all_ports = attrs["ports"]
+        non_egress_ports = interior_ports(topo,sw)
+        return all_ports - non_egress_ports
+
 def query(network, pred=all_packets, fields=(), time=None):
     b = Bucket(fields, time)
     sub_net = Network.fork(network)
