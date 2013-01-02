@@ -37,9 +37,15 @@
 
 
 from frenetic.lib import *
+from examples import monitor_topology
 
-def monitor(network):
+def calculate_spanning_tree(network):
     for topo in network.topology_changes:
-        print topo
-        
-main = monitor
+        mst = topo.minimum_spanning_tree()
+        print "MST:\n%s" % mst
+       
+def example(network):
+    run(monitor_topology.monitor, Network.fork(network))
+    run(calculate_spanning_tree, Network.fork(network))
+ 
+main = example

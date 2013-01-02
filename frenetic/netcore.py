@@ -33,7 +33,6 @@ from abc import ABCMeta, abstractmethod
 from collections import Counter
 from numbers import Integral
 from itertools import chain
-import networkx as nx
 
 from bitarray import bitarray
 
@@ -668,7 +667,7 @@ class flood(Policy):
         self.network = network
         @network._topology.notify
         def handle(topo):
-            self.mst = nx.minimum_spanning_tree(topo)
+            self.mst = topo.minimum_spanning_tree()
     
     def __repr__(self):
         return "flood %s" % self.network
@@ -688,31 +687,6 @@ class flood(Policy):
         else:
             return Counter()
 
-# I THINK THIS GENERATOR IS LIKELY ERRONEOUS
-# COMPARE TO CODE FOR egress_ports - JREICH
-def egress_points(topo):
-    for sw in topo.nodes():
-        ports = egress_ports(topo, sw)
-        if ports:
-            yield sw, ports
-
-def interior_ports(topo, sw):
-    interior = set()
-    for attrs in topo[sw].itervalues():
-        interior.add(attrs[sw])
-    return interior
-
-def egress_ports(topo, sw=None):
-    if sw is None:
-        ports = set()
-        for sw in topo.nodes():
-            ports |= {(sw,port) for port in  egress_ports(topo, sw)}
-        return ports
-    else:
-        attrs = topo.node[sw]
-        all_ports = attrs["ports"]
-        non_egress_ports = interior_ports(topo,sw)
-        return all_ports - non_egress_ports
 
 def query(network, pred=all_packets, fields=(), time=None):
     b = Bucket(fields, time)

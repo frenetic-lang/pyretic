@@ -32,8 +32,6 @@ from frenetic.netcore import *
 from frenetic import util
 from frenetic.util import singleton, Data
 
-from networkx import nx
-
 import itertools
 from collections import Counter
 
@@ -85,7 +83,7 @@ class INetwork(Network):
         def handle(topology):
             self.egress_predicate = union(match(switch=sw) &
                                             union(match(outport=port) for port in ports)
-                                            for sw, ports in egress_points(topology))
+                                            for sw, ports in topology.egress_ports())
             
     def _handle_changes(self, item):
         self._ipolicy.set(self._aggregate_ipolicy())

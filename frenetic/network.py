@@ -202,6 +202,99 @@ class Packet(object):
                 l.append("%s:%s%s" % (k, " " * (size - len(k)), v))
         return "\n".join(l)
 
+
+class Location(object):
+    def __init__(self,switch,port):
+        self.switch = switch
+        self.port = port
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
+    def __eq__(self,other):
+        return self.switch == other.switch and self.port == other.port
+
+    def __repr__(self):
+        return "%s[%s]" % (self.switch,self.port)
+
+
+class Topology(nx.Graph):
+
+    def interior_ports(self, sw):
+        interior = set()
+        for attrs in self[sw].itervalues():
+            interior.add(Location(sw,attrs[sw]))
+        return interior
+
+    def egress_ports(self, sw=None):
+        if sw is None:
+            ports = set()
+            for sw in self.nodes():
+                ports |= self.egress_ports(sw)
+            return ports
+        else:
+            attrs = self.node[sw]
+            all_ports = {Location(sw,p) for p in attrs["ports"]}
+            non_egress_ports = self.interior_ports(sw)
+            return all_ports - non_egress_ports
+
+    def minimum_spanning_tree(self):
+        
+        # GET MST Graph()
+        nx_mst = nx.minimum_spanning_tree(self)
+
+        # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
+        nx_mst_links = nx_mst.edges(data=True)
+        for (s1,s2,data) in self.edges(data=True):
+            if not (s1,s2,data) in nx_mst_links:
+                to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
+                for loc in to_remove:
+                    old_ports = nx_mst.node[loc.switch]['ports'] 
+                    new_ports = old_ports - {loc.port}
+                    nx_mst.node[loc.switch]['ports'] = new_ports
+                
+        # RETURN THE MST TOPOLOGY
+        return Topology(nx_mst)
+
+    def __repr__(self):
+        output_str = ''
+        edge_str = {}
+        egress_str = {}
+        switch_str_maxlen = len('switch')
+        edge_str_maxlen = len('internal links')
+        egress_str_maxlen = len('egress ports')
+        for switch in self.nodes():
+            edge_str[switch] = \
+                ', '.join([ "%s[%s] --- %s[%s]" % (s1,ports[s1],s2,ports[s2]) \
+                                for (s1,s2,ports) in self.edges(data=True) \
+                                if s1 == switch or s2 == switch])
+            egress_str[switch] = \
+                ', '.join([ "%s---" % l for l in self.egress_ports(switch)])
+
+        if len(self.nodes()) > 0:
+            edge_str_maxlen = \
+                max( [len(ed) for ed in edge_str.values()] + [edge_str_maxlen] )
+            egress_str_maxlen = \
+                max( [len(eg) for eg in egress_str.values()] + [egress_str_maxlen] )
+
+        table_width = switch_str_maxlen + 5 + edge_str_maxlen + 5 + egress_str_maxlen + 3
+        output_str += '\n'.rjust(table_width+1,'-')
+        #output_str += "%s\n" % title.rjust(table_width/2+1,'-').ljust(table_width,'-')
+        output_str += "%s  |  %s  |  %s  |\n" % \
+            ('switch','switch edges'.rjust(edge_str_maxlen/2+1).ljust(edge_str_maxlen),\
+                 'egress ports'.rjust(egress_str_maxlen/2+1).ljust(egress_str_maxlen),)        
+        output_str += '\n'.rjust(table_width+1,'-')
+        for switch in self.nodes():
+            edge_str[switch] = edge_str[switch].ljust(edge_str_maxlen)
+            egress_str[switch] = egress_str[switch].ljust(egress_str_maxlen)
+            output_str += "%s  |  %s  |  %s  |\n" % \
+                (str(switch).ljust(switch_str_maxlen),edge_str[switch],egress_str[switch])
+        output_str += ''.rjust(table_width,'-')
+        return output_str
+
+    def __str__(self):
+        return self.__repr__()
+
         
 class Network(object):
     def __init__(self,backend):
@@ -230,7 +323,7 @@ class Network(object):
     #
     
     def init_events(self):
-        self._topology = gs.Behavior(nx.Graph())                
+        self._topology = gs.Behavior(Topology())                
         self.events = ["switch_joins", "switch_parts",
                        "port_ups", "port_downs",
                        "link_ups", "link_downs"]
