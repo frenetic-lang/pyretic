@@ -27,13 +27,12 @@
 ################################################################################
 
 from frenetic.lib import *
-import networkx as nx
 import sys
 
 def topo_to_vmap(topo):
     vmap = {}
     port_ind = 1
-    for sw, eports in egress_points(topo):
+    for sw, eports in topo.egress_points():
         for port in eports:
             vmap[1, port_ind] = [(sw, port)]
             port_ind += 1
@@ -46,7 +45,7 @@ def setup_virtual_network(network):
     def vmap_gen():
         for topo in network.topology_changes:
             vmap = topo_to_vmap(topo)
-            vtopo = nx.Graph()
+            vtopo = Topology()
             add_nodes_from_vmap(vmap, vtopo)
             vn.physical_policy = network.flood
             vn.from_vmap(vmap)

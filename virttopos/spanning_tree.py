@@ -27,12 +27,11 @@
 ################################################################################
 
 from frenetic.lib import *
-import networkx as nx
 
 def topo_to_vmap_dict(topo, mst):
     d = {}
     for sw, attrs in mst.nodes(data=True):
-        eports = egress_ports(topo, sw)
+        eports = topo.egress_ports(sw)
         mstports = set()
         for attrs in mst[sw].itervalues():
             mstports.add(attrs[sw])
@@ -46,7 +45,7 @@ def setup_virtual_network(network):
     @run
     def vmap_gen():
         for topo in network.topology_changes:
-            mst = nx.minimum_spanning_tree(topo)
+            mst = topo.minimum_spanning_tree()
             vn.physical_policy = copy(outport="voutport") >> pop("vtag", "vswitch", "vinport")
             vn.from_vmap(topo_to_vmap_dict(topo, mst))
             vn.topology = mst
