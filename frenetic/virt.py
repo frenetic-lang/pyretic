@@ -182,8 +182,8 @@ def vmap_to_egress_policy(vmap):
     return if_(union(matches_egress), union(valid_match_egress) & pop_vheaders, passthrough)
         
 class VNetwork(Network):
-    def __init__(self):
-        super(VNetwork, self).__init__()
+    def __init__(self,backend):
+        super(VNetwork, self).__init__(backend)
         
         self._vpolicy = gs.Behavior(drop)
         self._ingress_policy = gs.Behavior(drop)
@@ -205,7 +205,7 @@ class VNetwork(Network):
     @classmethod
     def fork(cls, network):
         """different than base"""
-        self = cls()
+        self = cls(network.backend)
         self.init_events()
         self.connect(network)
         return self
