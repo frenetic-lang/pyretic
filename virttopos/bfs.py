@@ -32,10 +32,9 @@ import sys
 def topo_to_vmap(topo):
     vmap = {}
     port_ind = 1
-    for sw, eports in topo.egress_points():
-        for port in eports:
-            vmap[1, port_ind] = [(sw, port)]
-            port_ind += 1
+    for loc in topo.egress_ports():
+        vmap[1, port_ind] = [(loc.switch, loc.port)]
+        port_ind += 1
     return vmap
   
 def setup_virtual_network(network):
