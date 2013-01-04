@@ -38,6 +38,7 @@ from frenetic import util, generators as gs
 from frenetic.util import Data
 
 import networkx as nx
+from frenetic.graph_util import * 
 from Queue import Queue
 
 ################################################################################
@@ -220,6 +221,9 @@ class Location(object):
 
 class Topology(nx.Graph):
 
+    def is_connected(self):
+        return nx.is_connected(self)
+
     def interior_ports(self, sw):
         interior = set()
         for attrs in self[sw].itervalues():
@@ -234,28 +238,98 @@ class Topology(nx.Graph):
             return ports
         else:
             attrs = self.node[sw]
-            all_ports = {Location(sw,p) for p in attrs["ports"]}
+            try:
+                all_ports = {Location(sw,p) for p in attrs["ports"]}
+            except KeyError:
+                all_ports = set(l)
             non_egress_ports = self.interior_ports(sw)
             return all_ports - non_egress_ports
 
-    @classmethod
-    def minimum_spanning_tree(cls,topology):
-        
-        # GET MST Graph()
-        self = cls(nx.minimum_spanning_tree(topology))
+    ### TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY
+    def copy_attributes(self,initial_topo):
+        for s,data in initial_topo.nodes(data=True):
+            try:
+                if self.node[s] == data:
+                    # matching node data
+                    pass
+                else:
+                    # reconcile node data
+                    for (k,v) in data.items():
+                        self.node[s][k] = v
+            except KeyError:
+                # removed node
+                pass
 
         # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
-        mst_links = self.edges(data=True)
-        for (s1,s2,data) in topology.edges(data=True):
-            if not (s1,s2,data) in mst_links:
+        for (s1,s2,data) in initial_topo.edges(data=True):
+            try:
+                if self[s1][s2] == data:
+                    # matching edge data
+                    pass
+                else:
+                    # copying edge data
+                    for (k,v) in data.items():
+                        self[s1][s2][k] = v
+            except: 
+                # no edge to copy
+                pass
+
+    ### TAKES A TRANSFORMED TOPOLOGY AND UPDATES ITS ATTRIBUTES
+    def reconcile_attributes(self,initial_topo):
+        # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
+        for (s1,s2,data) in initial_topo.edges(data=True):
+            try:
+                if self[s1][s2] == data:
+                    # matching edge data
+                    pass
+                else:
+                    raise Exception("NON-MATCHING EDGE DATA")
+            except: 
+               # removed edge, reconcile node ports"
                 to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
                 for loc in to_remove:
                     old_ports = self.node[loc.switch]['ports'] 
                     new_ports = old_ports - {loc.port}
                     self.node[loc.switch]['ports'] = new_ports
-                
-        # RETURN THE MST TOPOLOGY
+
+    @classmethod
+    def difference(cls,topo1,topo2):
+        try:
+            self = cls(nx.difference(topo1,topo2))
+        except nx.NetworkXError:
+            return None
+
+        if len(self.edges()) == 0:
+            return None
+
+        self.copy_attributes(topo1)
+        self.reconcile_attributes(topo1)
         return self
+
+    ### A RANDOMIZED MINIMUM SPANNING TREE
+    @classmethod
+    def minimum_spanning_tree(cls,topology):
+        self = cls(Kruskal(topology))
+        self.copy_attributes(topology)
+        self.reconcile_attributes(topology)
+        return self
+
+    ### HEURISTIC. PICKS A RANDOM MST, REMOVES FROM TOPOLOGY, ADD TO SET
+    ### WHILE TOPOLOGY STILL CONNECTED, LOOP
+    @classmethod
+    def disjoint_minimum_spanning_tree_set(cls,topology):
+        msts = set()
+        remainder = topology.copy()
+        if remainder is None or len(remainder) == 0 or not remainder.is_connected():
+            return msts
+        mst = (cls.minimum_spanning_tree(remainder))
+        msts.add(mst)
+        remainder = Topology.difference(remainder,mst)
+        while(not remainder is None and remainder.is_connected()):
+            mst = (cls.minimum_spanning_tree(remainder))
+            msts.add(mst)
+            remainder = Topology.difference(remainder,mst)
+        return msts
 
     def __repr__(self):
         output_str = ''
