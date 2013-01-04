@@ -1,35 +1,30 @@
 
-
 from mininet.topo import Topo
 
 class ChainTopo(Topo):
  
-    def __init__(self, numHost_Ids, numSwitch_Ids):
+    def __init__(self, numSwitches, numClients, numServers=0):
 
         # Add default members to class.
         super(ChainTopo, self ).__init__()
 
-        # Create host_ids and switch_ids
-        # Host_Ids numbered 1..numHost_Ids
-        # Switch_Ids numbered 1..numSwitch_Ids
-        host_ids = range(1,numHost_Ids+1)
-        switch_ids = range(1,numSwitch_Ids+1)
+        switch_inds = range(1,numSwitches+1)
+        self.add_switches(switch_inds)
+        self.connect_switches(switch_inds)
 
-        # ADD NODES
-        self.add_hosts(host_ids)
-        self.add_switches(switch_ids)
+        client_ids = ['h'+str(i) for i in range(1,numClients+1)]
+        server_ids = ['hs'+str(i) for i in range(1,numServers+1)]
 
-        # ADD LINKS
-        self.connect_switches(switch_ids)
-        self.connect_hosts(switch_ids,host_ids)
+        self.add_hosts(client_ids + server_ids)
+        self.connect_hosts(switch_inds,client_ids,server_ids)
 
-    def add_switches(self,switch_ids):
-        for i in switch_ids:
+    def add_switches(self,switch_inds):
+        for i in switch_inds:
             self.addSwitch('s'+str(i))
 
     def add_hosts(self,host_ids):
         for i in host_ids:
-            self.addHost('h'+str(i))
+            self.addHost(i)
 
     def connect_switches(self,switch_ids):
 
@@ -37,150 +32,109 @@ class ChainTopo(Topo):
         if len(switch_ids) < 2:
             return
 
-        # Connect Switch_Ids in chain topology
+        # Connect switches in chain topology
         for s in switch_ids[:-1]:
             self.addLink('s'+str(s), 's'+str(s+1))
 
-    def connect_hosts(self,switch_ids,host_ids):
-        # Connect nodes, divide them evenly across the switch_ids
-        s = switch_ids[0]
-        h = host_ids[:]
-        hps = max(len(host_ids) // len(switch_ids),1)
+    def connect_hosts(self,switch_inds,client_ids,server_ids):
+        # Connect nodes, divide them evenly across the switch_inds
+        s = switch_inds[0]
+        h = client_ids + server_ids
+        hps = max(len(h) // len(switch_inds),1)
         while len(h) > 0:
             l = h[:hps]
             h = h[hps:]
             for j in l:
-                self.addLink('s'+str(s),'h'+str(j))
-            if [s] == switch_ids[-1:]:
-                s = switch_ids[0]
+                self.addLink('s'+str(s),j)
+            if [s] == switch_inds[-1:]:
+                s = switch_inds[0]
             else:
                 s += 1
 
+
 class CycleTopo(ChainTopo):
 
-    def __init__(self, numHosts, numSwitches):
-
-        # Add default members to class.
-        super(CycleTopo, self ).__init__(numHosts,numSwitches)
-
-    def connect_switches(self,switch_ids):
+    def connect_switches(self,switch_inds):
 
         # Topology trivial if less than 2 switches
-        if len(switch_ids) < 2:
+        if len(switch_inds) < 2:
             return
 
         # Connect Switches in cycle topology
-        for s in switch_ids:
-            self.addLink('s'+str(s), 's'+str(1 + s % len(switch_ids)))
+        for s in switch_inds:
+            self.addLink('s'+str(s), 's'+str(1 + s % len(switch_inds)))
 
 
 class CliqueTopo(ChainTopo):
 
-    def __init__(self, numHosts, numSwitches):
-
-        # Add default members to class.
-        super(CliqueTopo, self ).__init__(numHosts,numSwitches)
-
-    def connect_switches(self,switches):
+    def connect_switches(self,switch_inds):
         # Topology trivial if less than 2 switches
-        if len(switches) < 2:
+        if len(switch_inds) < 2:
             return
 
         # Connect Switches in clique topology
-        for s1 in self.switches():
-            for s2 in self.switches():
+        for s1 in switch_inds:
+            for s2 in switch_inds:
                 if s2 <= s1:
                     continue
-                self.addLink(s1, s2)
-
-
+                self.addLink('s'+str(s1), 's'+str(s2))
 
 
 class BumpChainTopo(ChainTopo):
 
-    def __init__(self, numClients, numServers, numSwitches):
+    def add_switches(self,switch_inds):
+        super(BumpChainTopo, self ).add_switches(switch_inds)
+        self.addSwitch('s101')
+        self.addSwitch('s102')
 
-        # Add default members to class.
-        super(BumpChainTopo, self ).__init__(0,numSwitches)
+    def connect_switches(self,switch_inds):
+        super(BumpChainTopo, self ).connect_switches(switch_inds)
+        self.addLink('s101','s'+str(switch_inds[0]))
+        self.addLink('s102','s'+str(switch_inds[-1]))
 
-    def add_switches(self,switches):
-        super(BumpChainTopo, self ).add_switches(switches)
-        self.addSwitch('server_switch')
-        self.addSwitch('client_switch')
-
-    def add_clients(self,host_ids):
-        for i in host_ids:
-            self.addHost('h'+str(i))
-
-    def connect_switches(self,switches):
-
-        super(BumpChainTopo, self ).connect_switches(switches)
-        self.addLink('server_switch','s'+str(switches[0]))
-        self.addLink('client_switch','s'+str(switches[-1]))
-
-    def connect_hosts(self,switches,hosts):
-        servers, clients = splitServersClients(hosts)
-
-        for host in servers:
-            self.addLink('server_switch','h'+str(host))
-
-        for host in clients:
-            self.addLink('client_switch','h'+str(host))
-
+    def connect_hosts(self,switch_inds,client_ids,server_ids):
+        for client_id in client_ids:
+            self.addLink('s101',client_id)
+        for server_id in server_ids:
+            self.addLink('s102',server_id)
 
 
 class BumpCycleTopo(CycleTopo):
 
-    def __init__(self, numHosts, numSwitches):
+    def add_switches(self,switch_inds):
+        super(BumpCycleTopo, self ).add_switches(switch_inds)
+        self.addSwitch('s101')
+        self.addSwitch('s102')
 
-        # Add default members to class.
-        super(BumpCycleTopo, self ).__init__(numHosts,numSwitches)
+    def connect_switches(self,switch_inds):
+        super(BumpCycleTopo, self ).connect_switches(switch_inds)
+        self.addLink('s101','s'+str(switch_inds[0]))
+        self.addLink('s102','s'+str(switch_inds[len(switch_inds) // 2]))
 
-    def add_switches(self,switches):
-        super(BumpCycleTopo, self ).add_switches(switches)
-        self.add_node(101, Node(is_switch=True))
-        self.add_node(102, Node(is_switch=True))
-
-    def connect_switches(self,switches):
-        super(BumpCycleTopo, self ).connect_switches(switches)
-        self.addLink(101,switches[0])
-        self.addLink(102,switches[len(switches)// 2])
-
-    def connect_hosts(self,switches,hosts):
-        servers, clients = splitServersClients(hosts)
-
-        for host in servers:
-            self.addLink(101,host)
-
-        for host in clients:
-            self.addLink(102,host)
+    def connect_hosts(self,switch_inds,client_ids,server_ids):
+        for client_id in client_ids:
+            self.addLink('s101',client_id)
+        for server_id in server_ids:
+            self.addLink('s102',server_id)
 
 
 class BumpCliqueTopo(CliqueTopo):
 
-    def __init__(self, numHosts, numSwitches):
+    def add_switches(self,switch_inds):
+        super(BumpCliqueTopo, self ).add_switches(switch_inds)
+        self.addSwitch('s101')
+        self.addSwitch('s102')
 
-        # Add default members to class.
-        super(BumpCliqueTopo, self ).__init__(numHosts,numSwitches)
+    def connect_switches(self,switch_inds):
+        super(BumpCliqueTopo, self ).connect_switches(switch_inds)
+        self.addLink('s101','s'+str(switch_inds[0]))
+        self.addLink('s102','s'+str(switch_inds[len(switch_inds) // 2]))
 
-    def add_switches(self,switches):
-        super(BumpCliqueTopo, self ).add_switches(switches)
-        self.add_node(201, Node(is_switch=True))
-        self.add_node(202, Node(is_switch=True))
-
-    def connect_switches(self,switches):
-        super(BumpCliqueTopo, self ).connect_switches(switches)
-        self.addLink(201,switches[0])
-        self.addLink(202,switches[len(switches)// 2])
-
-    def connect_hosts(self,switches,hosts):
-        servers, clients = splitServersClients(hosts)
-
-        for host in servers:
-            self.addLink(201,host)
-
-        for host in clients:
-            self.addLink(202,host)
+    def connect_hosts(self,switch_inds,client_ids,server_ids):
+        for client_id in client_ids:
+            self.addLink('s101',client_id)
+        for server_id in server_ids:
+            self.addLink('s102',server_id)
 
 
 ### ONE-OFF TOPOS FOR EXAMPLES
@@ -251,6 +205,8 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'clique': CliqueTopo,
           'cycle': CycleTopo,
           'bump_chain': BumpChainTopo,
+          'bump_cycle': BumpCycleTopo,
+          'bump_clique': BumpCliqueTopo,
           'figure3' : Figure3Topo,
           'ytopo': YTopo
 }
