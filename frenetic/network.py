@@ -241,7 +241,7 @@ class Topology(nx.Graph):
             try:
                 all_ports = {Location(sw,p) for p in attrs["ports"]}
             except KeyError:
-                all_ports = set(l)
+                all_ports = set()
             non_egress_ports = self.interior_ports(sw)
             return all_ports - non_egress_ports
 
