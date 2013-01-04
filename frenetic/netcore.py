@@ -675,7 +675,7 @@ class flood(Policy):
     def eval(self, packet):
         switch = packet["switch"]
         inport = packet["inport"]
-        if switch in self.network.topology.nodes():
+        if switch in self.network.topology.nodes() and switch in self.mst:
             ports = set()
             ports.update({loc.port for loc in self.network.topology.egress_ports(switch)})
             for sw in self.mst.neighbors(switch):
