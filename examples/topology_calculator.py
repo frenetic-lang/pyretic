@@ -41,7 +41,7 @@ from examples import monitor_topology
 
 def calculate_spanning_tree(network):
     for topo in network.topology_changes:
-        mst = topo.minimum_spanning_tree()
+        mst = Topology.minimum_spanning_tree(topo)
         print "MST:\n%s" % mst
        
 def example(network):

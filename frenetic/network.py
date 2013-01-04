@@ -238,23 +238,24 @@ class Topology(nx.Graph):
             non_egress_ports = self.interior_ports(sw)
             return all_ports - non_egress_ports
 
-    def minimum_spanning_tree(self):
+    @classmethod
+    def minimum_spanning_tree(cls,topology):
         
         # GET MST Graph()
-        nx_mst = nx.minimum_spanning_tree(self)
+        self = cls(nx.minimum_spanning_tree(topology))
 
         # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
-        nx_mst_links = nx_mst.edges(data=True)
-        for (s1,s2,data) in self.edges(data=True):
-            if not (s1,s2,data) in nx_mst_links:
+        mst_links = self.edges(data=True)
+        for (s1,s2,data) in topology.edges(data=True):
+            if not (s1,s2,data) in mst_links:
                 to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
                 for loc in to_remove:
-                    old_ports = nx_mst.node[loc.switch]['ports'] 
+                    old_ports = self.node[loc.switch]['ports'] 
                     new_ports = old_ports - {loc.port}
-                    nx_mst.node[loc.switch]['ports'] = new_ports
+                    self.node[loc.switch]['ports'] = new_ports
                 
         # RETURN THE MST TOPOLOGY
-        return Topology(nx_mst)
+        return self
 
     def __repr__(self):
         output_str = ''

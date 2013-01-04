@@ -667,7 +667,7 @@ class flood(Policy):
         self.network = network
         @network._topology.notify
         def handle(topo):
-            self.mst = topo.minimum_spanning_tree()
+            self.mst = Topology.minimum_spanning_tree(topo)
     
     def __repr__(self):
         return "flood %s" % self.network
