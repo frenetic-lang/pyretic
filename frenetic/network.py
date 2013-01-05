@@ -79,7 +79,15 @@ class IP(object):
 
     def __repr__(self):
         return socket.inet_ntoa(self.to_bytes())
-    
+
+    def __hash__(self):
+        return hash(repr(self))    
+
+    def __eq__(self,other):
+        try:
+            return self.bits == other.bits
+        except:
+            return False
 
 class MAC(object):
     def __init__(self, mac):
@@ -129,6 +137,9 @@ class MAC(object):
         parts = struct.unpack("!BBBBBB", self.to_bytes())
         mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
         return mac
+
+    def __hash__(self):
+        return hash(repr(self))
 
     def __eq__(self,other):
         try:
@@ -547,8 +558,8 @@ class UniqueBucket(Bucket):
 
             # RETURN PACKET IF NOT QUERIED FIELDS NOT YET SEEN    
             # OTHERWISE CONTINUE WAITING
-            if not hash(pred) in self.seen:
-                self.seen[hash(pred)] = True
+            if not pred in self.seen:
+                self.seen[pred] = True
                 self.network -= pred
                 break
 

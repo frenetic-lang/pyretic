@@ -345,26 +345,24 @@ class is_bucket(Predicate):
 
         
 class match(Predicate):
-    # THIS DESCRIPTION SEEMS INCORRECT - JREICH..."
     """A set of field matches (one per field)"""
     
     def __init__(self, *args, **kwargs):
-        self.map = {}
+        init_map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
-            self.map[k] = matchable_for_header(k)(v)
+            init_map[k] = matchable_for_header(k)(v)
+        self.map = util.frozendict(init_map)
 
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
 
+    ### WE DON'T TRUST FROZENDICT HASH YET
     def __hash__(self):
-        h = repr(self)
-        return hash(h)
+        return hash(repr(self))
 
+    ### WE DON'T TRUST FROZENDICT EQ
     def __eq__(self,other):
-        try:
-            hash(self) == hash(other)
-        except:
-            return False
+        return hash(self) == hash(other)
 
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
@@ -493,14 +491,15 @@ class modify(Policy):
     """Policy that drops everything."""
                                             
     def __init__(self, *args, **kwargs):
-       self.map = {}
+       init_map = {}
        for (k, v) in dict(*args, **kwargs).iteritems():
            if k == 'srcip' or k == 'dstip':
-               self.map[k] = IP(v) 
+               init_map[k] = IP(v) 
            elif k == 'srcmac' or k == 'dstmac':
-               self.map[k] = MAC(v)
+               init_map[k] = MAC(v)
            else:
-               self.map[k] = v
+               init_map[k] = v
+       self.map = util.frozendict(init_map)
 
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
