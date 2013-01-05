@@ -543,9 +543,7 @@ class UniqueBucket(Bucket):
         while(True):
             pkt = self.queue.get()
 
-            pred = match()
-            for field in self.fields:
-                pred.set_field(field,pkt[field])
+            pred = match([(field,pkt[field]) for field in self.fields])
 
             # RETURN PACKET IF NOT QUERIED FIELDS NOT YET SEEN    
             # OTHERWISE CONTINUE WAITING

@@ -353,10 +353,6 @@ class match(Predicate):
         for (k, v) in dict(*args, **kwargs).iteritems():
             self.map[k] = matchable_for_header(k)(v)
 
-    ## THIS IS A HACK, MEANT AS ANOTHER WAY OF INITING A MATCH OBJECT
-    def set_field(self, k, v):
-        self.map[k] = matchable_for_header(k)(v)
-                             
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
 

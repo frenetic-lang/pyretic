@@ -80,8 +80,7 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
 ### THIS IS A HACK AND SHOULD BE FIXED
 def arp(network):
 
-    arp_packets = match()
-    arp_packets.set_field('type',ARP_TYPE)
+    arp_packets = match([('type',ARP_TYPE)])
 
     request_packets = {}
     known_ips = {}
