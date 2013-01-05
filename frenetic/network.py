@@ -224,26 +224,26 @@ class Topology(nx.Graph):
     def is_connected(self):
         return nx.is_connected(self)
 
-    def interior_ports(self, sw):
+    def interior_locations(self, sw):
         interior = set()
         for attrs in self[sw].itervalues():
             interior.add(Location(sw,attrs[sw]))
         return interior
 
-    def egress_ports(self, sw=None):
+    def egress_locations(self, sw=None):
         if sw is None:
-            ports = set()
+            locations = set()
             for sw in self.nodes():
-                ports |= self.egress_ports(sw)
-            return ports
+                locations |= self.egress_locations(sw)
+            return locations
         else:
             attrs = self.node[sw]
             try:
-                all_ports = {Location(sw,p) for p in attrs["ports"]}
+                all_locations = {Location(sw,p) for p in attrs["ports"]}
             except KeyError:
-                all_ports = set()
-            non_egress_ports = self.interior_ports(sw)
-            return all_ports - non_egress_ports
+                all_locations = set()
+            non_egress_locations = self.interior_locations(sw)
+            return all_locations - non_egress_locations
 
     ### TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY
     def copy_attributes(self,initial_topo):
@@ -344,7 +344,7 @@ class Topology(nx.Graph):
                                 for (s1,s2,ports) in self.edges(data=True) \
                                 if s1 == switch or s2 == switch])
             egress_str[switch] = \
-                ', '.join([ "%s---" % l for l in self.egress_ports(switch)])
+                ', '.join([ "%s---" % l for l in self.egress_locations(switch)])
 
         if len(self.nodes()) > 0:
             edge_str_maxlen = \

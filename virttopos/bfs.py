@@ -32,7 +32,7 @@ import sys
 def topo_to_vmap(topo):
     vmap = {}
     port_ind = 1
-    for loc in topo.egress_ports():
+    for loc in topo.egress_locations():
         vmap[1, port_ind] = [(loc.switch, loc.port)]
         port_ind += 1
     return vmap

@@ -59,7 +59,7 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
         response_packet = response_packet.push(dstmac=dstmac)
 
     if response_packet['inport'] == outport:
-        fake_inports = [p for p in interior_ports(network.topology, switch)] 
+        fake_inports = [l.port for l in network.topology.interior_locations(switch)] 
         response_packet = response_packet.pop('inport')
         try:
             response_packet = response_packet.push(inport=fake_inports[0])
@@ -97,7 +97,7 @@ def arp(network):
         dstmac = str(pkt['dstmac'])
         dstip  = str(pkt['dstip'])
 
-        known_ips[str(srcip)] = (switch,inport)
+        known_ips[str(srcip)] = Location(switch,inport)
 
         if dstmac == 'ff:ff:ff:ff:ff:ff':
             request_packets[dstip] = pkt
@@ -119,20 +119,20 @@ def arp(network):
                         print pkt
 
                 outstanding_requests[str(srcip)][dstip] = True
-                for (switch,outport) in egress_ports(network.topology) - {(switch,inport)}:
+                for loc in network.topology.egress_locations() - {Location(switch,inport)}:
                     request_packet = Packet(pkt.header)
                     request_packet = request_packet.pop('switch')
-                    request_packet = request_packet.push(switch=switch)
-                    request_packet = request_packet.push(outport=outport)
+                    request_packet = request_packet.push(switch=loc.switch)
+                    request_packet = request_packet.push(outport=loc.port)
                     
-                    if request_packet['inport'] == outport:
-                        fake_inports = [p for p in interior_ports(network.topology, switch)] 
+                    if request_packet['inport'] == loc.port:
+                        fake_inports = [l.port for l in network.topology.interior_locations(loc.switch)] 
                         request_packet = request_packet.pop('inport')
                         try:
                             request_packet = request_packet.push(inport=fake_inports[0])
                         except IndexError:
                             print "All ports on switch %s are currently reported as egress ports!\nWill try incrementing the inport.\n(bug in some switches does not allow packets to be sent out the same outport as they reportedly came in...)"
-                            request_packet = request_packet.push(inport=outport+1)
+                            request_packet = request_packet.push(inport=loc.port+1)
 
 
                     if VERBOSE_LEVEL > 0:
@@ -151,8 +151,8 @@ def arp(network):
                         print pkt
 
                 response_packets[str(srcip)] = pkt
-                switch,outport = known_ips[dstip]
-                send_response(network,pkt,switch,outport)
+                loc = known_ips[dstip]
+                send_response(network,pkt,loc.switch,loc.port)
             except:
 
                 if VERBOSE_LEVEL > 1:

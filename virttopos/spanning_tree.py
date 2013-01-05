@@ -31,13 +31,13 @@ from frenetic.lib import *
 def topo_to_vmap_dict(topo, mst):
     d = {}
     for sw, attrs in mst.nodes(data=True):
-        eports = topo.egress_ports(sw)
-        mstports = set()
+        elocs = topo.egress_locations(sw)
+        mstlocs = set()
         for attrs in mst[sw].itervalues():
-            mstports.add(attrs[sw])
-        ports = eports | mstports
-        for port in ports:
-            d[(sw, port)] = [(sw, port)]
+            mstlocs.add(attrs[sw])
+        locs = elocs | {Location(sw,p) for p in mstlocs}
+        for loc in locs:
+            d[(loc.switch,loc.port)] = [(loc.switch, loc.port)]
     return d
 
 def setup_virtual_network(network):

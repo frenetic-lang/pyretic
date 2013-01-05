@@ -81,9 +81,8 @@ class INetwork(Network):
     def sync_with_topology(self):
         @self._topology.notify
         def handle(topology):
-            self.egress_predicate = union(match(switch=sw) &
-                                            union(match(outport=port) for port in ports)
-                                            for sw, ports in topology.egress_ports())
+            self.egress_predicate = union(match(switch=l.switch,outport=l.port) 
+                                          for l in topology.egress_locations())
             
     def _handle_changes(self, item):
         self._ipolicy.set(self._aggregate_ipolicy())
