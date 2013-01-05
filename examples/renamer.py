@@ -44,10 +44,10 @@ def renamer_and_forwarder(network):
     inst_ip = '10.0.0.2'
 
     srvc_to_client_pred = match(srcip=inst_ip)
-    srvc_to_client_mod = modify(srcip=IP(srvc_ip))
+    srvc_to_client_mod = modify(srcip=srvc_ip)
 
     client_to_srvc_pred = match(dstip=srvc_ip) 
-    client_to_srvc_mod = modify(dstip=IP(inst_ip))
+    client_to_srvc_mod = modify(dstip=inst_ip)
 
     pol = network.flood
     pol -= srvc_to_client_pred

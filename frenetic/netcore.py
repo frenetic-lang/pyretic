@@ -493,7 +493,14 @@ class modify(Policy):
     """Policy that drops everything."""
                                             
     def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
+       self.map = {}
+       for (k, v) in dict(*args, **kwargs).iteritems():
+           if k == 'srcip' or k == 'dstip':
+               self.map[k] = IP(v) 
+           elif k == 'srcmac' or k == 'dstmac':
+               self.map[k] = MAC(v)
+           else:
+               self.map[k] = v
 
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
