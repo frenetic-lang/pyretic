@@ -39,10 +39,10 @@
 
 from frenetic.lib import *
 
-def learning_switch(network):
-    network.install_flood()
+def do_learning(network,ls):
+    print "go learning switch go"
+    
     host_to_outport = {}
-
     for pkt in query_unique(network, all_packets, fields=['switch', 'srcmac']):
 
         host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
@@ -53,9 +53,22 @@ def learning_switch(network):
 
         host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
 
-        network -= host_p    # Don't do our old action.
-        network |= host_p & fwd(pkt['inport'])  # Do this instead.
+        ls_pol = ls.get() 
+        ls_pol -= host_p    # Don't do our old action.
+        ls_pol |= host_p & fwd(pkt['inport'])  # Do this instead.
+        ls.set(ls_pol)
+
+def learning_switch(network):
+    learning_switch_state = gs.Behavior(network.flood)                
+    run(do_learning, network, learning_switch_state)
+    return learning_switch_state
+
+def example(network):
+    for policy in learning_switch(network):
+        print "policy"
+        print policy
+        network.install_policy(policy)
         
-main = learning_switch
+main = example
 
 

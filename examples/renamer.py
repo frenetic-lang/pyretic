@@ -35,10 +35,12 @@
 ##############################################################################################################################
 
 from frenetic.lib import *
+from examples import hub
+from examples import learning_switch
 
 # RENAMES PACKETS TO/FROM 10.0.0.2
 # FWDS BY FLOODING - WILL CHANGE
-def renamer_and_forwarder(network):
+def renamer(network):
 
     srvc_ip = '10.0.0.100'
     inst_ip = '10.0.0.2'
@@ -49,19 +51,25 @@ def renamer_and_forwarder(network):
     client_to_srvc_pred = match(dstip=srvc_ip) 
     client_to_srvc_mod = modify(dstip=inst_ip)
 
-    pol = network.flood
-    pol -= srvc_to_client_pred
-    pol |= srvc_to_client_pred & srvc_to_client_mod >> network.flood
-    pol -= client_to_srvc_pred
-    pol |= client_to_srvc_pred & client_to_srvc_mod >> network.flood
-
-    # pol = passthrough
+    # pol = network.flood
     # pol -= srvc_to_client_pred
-    # pol |= srvc_to_client_pred & srvc_to_client_mod 
+    # pol |= srvc_to_client_pred & srvc_to_client_mod >> network.flood
     # pol -= client_to_srvc_pred
-    # pol |= client_to_srvc_pred & client_to_srvc_mod
-    # pol >>= network.flood
+    # pol |= client_to_srvc_pred & client_to_srvc_mod >> network.flood
+  
+    pol = passthrough
+    pol -= srvc_to_client_pred
+    pol |= srvc_to_client_pred & srvc_to_client_mod 
+    pol -= client_to_srvc_pred
+    pol |= client_to_srvc_pred & client_to_srvc_mod
+    return pol
 
-    network.install_policy(pol)
+def example(network):
+#    network.install_policy(renamer(network) >> hub.hub(network))
+    for static_pol in learning_switch.learning_switch(network):
+        network.install_policy(renamer(network) >> static_pol)
+        print "-----------------------"
+        print network.policy
+
         
-main = renamer_and_forwarder
+main = example
