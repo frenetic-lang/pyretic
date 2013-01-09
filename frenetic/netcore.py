@@ -701,3 +701,9 @@ def query_unique(network, pred=all_packets, fields=(), time=None):
     b = UniqueBucket(sub_net, fields, time)
     sub_net.install_policy(pred & fwd(b))    
     return b
+
+class DynamicPolicy(gs.Behavior):
+
+    def eval(self, packet):
+        return self.value.eval(packet)
+

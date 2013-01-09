@@ -64,12 +64,11 @@ def renamer(network):
     pol |= client_to_srvc_pred & client_to_srvc_mod
     return pol
 
+
 def example(network):
-#    network.install_policy(renamer(network) >> hub.hub(network))
-    for static_pol in learning_switch.learning_switch(network):
-        network.install_policy(renamer(network) >> static_pol)
-        print "-----------------------"
-        print network.policy
+#   policy = renamer(network) >> hub.hub(network)
+    policy = renamer(network) >> learning_switch.learning_switch(network)
+    network.install_policy(policy)
 
         
 main = example
