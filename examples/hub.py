@@ -44,6 +44,6 @@ def hub(network):
     return network.flood
 
 def example(network):
-    network.install_policy(hub(network))
+    network.install_policy_func(hub)
         
 main = example

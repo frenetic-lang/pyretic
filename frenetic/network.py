@@ -435,7 +435,10 @@ class Network(object):
 
     def inject_packet(self, packet):
         self.backend.send_packet(packet)
-        
+    
+    def install_policy_func(self, policy_func):
+        self.install_policy(policy_func(self))
+
     def install_policy(self, policy):
         self.install_sub_policy(self, policy)
         

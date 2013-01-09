@@ -38,12 +38,12 @@
 import collections
 
 from frenetic.lib import *
-from examples import hub_restricted
+from examples import hub
 
 
 ARP_TYPE = 2054
 VERBOSE_LEVEL = 1
-
+ARP = match([('type',ARP_TYPE)])
 
 ### THIS IS A BIT LAZY, WE COPY PACKET AND ONLY OVERRIDE NECESSARY FIELDS
 def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
@@ -80,14 +80,12 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
 ### THIS IS A HACK AND SHOULD BE FIXED
 def arp(network):
 
-    arp_packets = match([('type',ARP_TYPE)])
-
     request_packets = {}
     known_ips = {}
     response_packets = {}
     outstanding_requests = collections.defaultdict(dict)
 
-    for pkt in query(network, arp_packets):
+    for pkt in query(network, ARP):
 
         switch = pkt['switch']
         inport = pkt['inport']
@@ -159,14 +157,9 @@ def arp(network):
                     print pkt
                 pass
 
-
-        
-
-            
-    
-
+                
 def example(network):
-    run(hub_restricted.hub, Network.fork(network))
+    run(network.install_policy(hub.hub(network) - ARP), Network.fork(network))
     run(arp, Network.fork(network))
 
 main = example

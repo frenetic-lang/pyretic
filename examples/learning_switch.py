@@ -62,7 +62,7 @@ def learning_switch(network):
 
 
 def example(network):
-    network.install_policy(learning_switch(network))
+    network.install_policy_func(learning_switch)
         
 main = example
 
