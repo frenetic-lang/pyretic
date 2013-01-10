@@ -164,7 +164,15 @@ class Packet(object):
     
     def __init__(self, state):
         self.header = util.frozendict(state)
-        
+
+    def available_fields(self):
+        available = []
+        for field in self.header:
+            v = self.get_stack(field)
+            if v:
+                available.append(field)
+        return available
+                
     def get_stack(self, field):
         return self.header.get(field, ())
     
@@ -542,45 +550,66 @@ class Network(object):
 
 class Bucket(gs.Event):
     """A safe place for packets!"""
-    def __init__(self, fields=[], time=None):
+    def __init__(self, fields=[]):
         self.fields = fields
-        self.time = time
         super(Bucket, self).__init__()
 
 
-
-class UniqueBucket(Bucket):
-    """A safe place for unique packets!"""
-    def __init__(self, network, fields=[], time=None):
+class LimitBucket(Bucket):
+    """A safe place for limiting packets!"""
+    def __init__(self, network, fields=[], limit=None):
         self.seen = {}
         self.network = network
-        super(UniqueBucket, self).__init__(fields,time)
+        self.limit = limit
+        super(LimitBucket, self).__init__(fields)
 
+    # YIELD ONLY THE FIRST limit MATCHING PACKETS
+    # UPDATE BUCKET FORWARDING POLICY TO STOP FORWARDING PACKETS ALREADY SEEN limit TIMES
     def filter_queue(self):
         from frenetic.netcore import match
         
-        # MAKE PREDICATE
         pred = None
-
         while(True):
+            # GET PACKET
             pkt = self.queue.get()
 
-            pred = match([(field,pkt[field]) for field in self.fields])
+            # MATCH ON PROVIDED FIELDS
+            if self.fields: 
+                pred = match([(field,pkt[field]) for field in self.fields])
+            # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
+            else:
+                pred = match([(field,pkt[field]) 
+                              for field in pkt.available_fields()])
 
-            # RETURN PACKET IF NOT QUERIED FIELDS NOT YET SEEN    
-            # OTHERWISE CONTINUE WAITING
+            # IF NOT SEEN, CREATE AN ENTRY
             if not pred in self.seen:
-                self.seen[pred] = True
-                self.network -= pred
-                break
+                self.seen[pred] = 1
+            # OTHERWISE INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+            else:
+                self.seen[pred] += 1
 
+            # STOP FORWARDING MATCHING PACKETS TO THIS BUCKET IF WE'VE HIT THE LIMIT
+            if self.seen[pred] == self.limit:
+                self.network -= pred
+
+            # IF WE HAVEN'T YET RETURNED LIMIT PACKETS, BREAK THE LOOP 
+            if self.seen[pred] <= self.limit:
+                break
+            
         return pkt
 
     def __iter__(self):
-        self.queue = Queue()
         
+        # IF NO VALID LIMIT SPECIFIED, WE ASSUME INFINITE
+        # AND ACT LIKE AN UNLIMITED BUCKET
+        if self.limit is None or self.limit == 0:
+            return super(LimitBucket,self).__iter__()
+
+        # OTHERWISE, WE SET UP OUR QUEUE AND PUT A NEW PACKET IN EVERYTIME ONE ARRIVES
+        self.queue = Queue()
         self.notify(self.queue.put)
         
+        # AND YIELD PACKETS ACCORDING TO filter_queue
         def gen():
             while True: yield self.filter_queue()
 
@@ -589,24 +618,42 @@ class UniqueBucket(Bucket):
 
 class CountingBucket(Bucket):
     """A safe place for couting packets!"""
-    def __init__(self, time=None):
+    def __init__(self, interval=None):
         self.lock = threading.Lock()
         self.count = 0
-        super(CountingBucket, self).__init__((),time)
+        self.interval = interval
+        super(CountingBucket, self).__init__([])
 
+    # THREADSAFE INCREMENT OF COUNTER
     def inc(self,packet):
         self.lock.acquire()
         self.count += 1
         self.lock.release()
+        return self.count
 
     def __iter__(self):
-        import time
+
+        # IF NO INTERVAL SELECTED, YIELD count ON EVERY UPDATE
+        if self.interval is None:
+
+            # CONVERT GENERATOR OF PACKETS TO GENERATOR OF COUNTS
+            # USING THE inc METHOD
+            def convert_gen(gen):
+                for y in gen:
+                    yield self.inc(y)
+
+            return convert_gen(
+                super(CountingBucket,self).__iter__())
+
+        # OTHERWISE WE UPDATE count AS PACKETS ARRIVE
         self.notify(self.inc)
         
+        # AND YIELD count EVERY interval SECONDS
         def gen():
+            import time
             while True:
                 yield self.count
-                if not self.time is None:
-                    time.sleep(self.time)
-
+                time.sleep(self.interval)
+                
         return gen()
+    

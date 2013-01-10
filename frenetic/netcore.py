@@ -718,20 +718,23 @@ class flood(Policy):
             return Counter()
 
 
-def query(network, pred=all_packets, fields=(), time=None):
-    b = Bucket(fields, time)
+def query(network, pred=all_packets, fields=[]):
+    b = Bucket(fields)
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))
     return b
 
-def query_unique(network, pred=all_packets, fields=(), time=None):
+def query_limit(network, pred=all_packets, limit=None, fields=[]):
     sub_net = Network.fork(network)
-    b = UniqueBucket(sub_net, fields, time)
+    b = LimitBucket(sub_net, fields, limit)
     sub_net.install_policy(pred & fwd(b))    
     return b
 
-def query_count(network, pred=all_packets, time=None):
-    b = CountingBucket(time)
+def query_unique(network, pred=all_packets, fields=[]):
+    return query_limit(network, pred, 1, fields)
+    
+def query_count(network, pred=all_packets, interval=None):
+    b = CountingBucket(interval)
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))    
     return b
