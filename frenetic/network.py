@@ -71,7 +71,10 @@ class IP(object):
 
     def to_bits(self):
         return self.bits
-        
+
+    def to01(self):
+        return self.bits.to01()
+
     def to_bytes(self):
         return self.bits.tobytes()
 
@@ -127,6 +130,9 @@ class MAC(object):
         
     def to_bits(self):
         return self.bits
+
+    def to01(self):
+        return self.bits.to01()
 
     def to_bytes(self):
         return self.bits.tobytes()

@@ -222,18 +222,30 @@ class IPWildcard(Wildcard(32)):
                 else:
                     prefix.frombytes(struct.pack("!B", int(d)))
             elif isinstance(mask, Integral):
-                prefix = IP(ipexpr)
+                prefix = IP(ipexpr).to_bits()
                 bmask = bitarray(32)
                 bmask.setall(True)
                 bmask[0:mask] = False
                 mask = bmask
             elif isinstance(mask, basestring):
-                prefix = IP(ipexpr)
+                prefix = IP(ipexpr).to_bits()
                 mask = IP(mask).to_bits()
                 mask.invert()
-        else:
+
+        elif isinstance(ipexpr, IP):
+            prefix = ipexpr.to_bits()
+
+        elif isinstance(ipexpr, bitarray):
             prefix = ipexpr
-                
+
+        else:
+            raise TypeError('unsupported expression type')
+         
+        # TYPE CONVERSION TO MATCH SUPER
+        if not mask is None:
+            mask = mask.to01()
+        prefix = prefix.to01()
+
         return super(IPWildcard, cls).__new__(cls, prefix, mask)
 
 
@@ -260,10 +272,8 @@ def matchable_for_header(header):
     return _header_to_matchclass.get(header, Exact)
 
 ### JREICH - disabled incorrect registration calls
-### Wildcard takes a binary encoding, but srcmac/dstmac fields are ':' delimited hex strings
-### call should be - register_header("srcmac", MACWildcard)
-### class MACWildcard(Wildcard(48)) must be implemented first
-### Not a priority as wildcard matching on MAC addresses not needed for current examples
+### type mistmatch between src/dstmac which are MAC
+### and Wildcard which takes binary string
 #register_header("srcmac", Wildcard(48))
 #register_header("dstmac", Wildcard(48))
 register_header("srcip", IPWildcard)
