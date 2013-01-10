@@ -137,7 +137,7 @@ class POXBackend(revent.EventMixin):
         self.network.switch_parts.signal(net.Switch(event.dpid))
         
     def _handle_PortStatus(self, event):
-        if event.port.port_no <= of.OFPP_MAX:
+        if event.port <= of.OFPP_MAX:
             if event.added:
                 self.network.port_ups.signal((net.Switch(event.dpid), net.Port(event.port)))
             elif event.deleted:
