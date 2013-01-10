@@ -40,6 +40,8 @@ import networkx as nx
 from frenetic.graph_util import * 
 from Queue import Queue
 
+import threading
+
 ################################################################################
 # Fixed width stuff
 ################################################################################
@@ -540,6 +542,7 @@ class Bucket(gs.Event):
         super(Bucket, self).__init__()
 
 
+
 class UniqueBucket(Bucket):
     """A safe place for unique packets!"""
     def __init__(self, network, fields=[], time=None):
@@ -574,5 +577,30 @@ class UniqueBucket(Bucket):
         
         def gen():
             while True: yield self.filter_queue()
+
+        return gen()
+
+
+class CountingBucket(Bucket):
+    """A safe place for couting packets!"""
+    def __init__(self,fields=[], time=None):
+        self.lock = threading.Lock()
+        self.count = 0
+        super(CountingBucket, self).__init__(fields,time)
+
+    def inc(self,packet):
+        self.lock.acquire()
+        self.count += 1
+        self.lock.release()
+
+    def __iter__(self):
+        import time
+        self.notify(self.inc)
+        
+        def gen():
+            while True:
+                yield self.count
+                if not self.time is None:
+                    time.sleep(self.time)
 
         return gen()

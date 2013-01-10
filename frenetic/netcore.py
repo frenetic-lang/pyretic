@@ -720,6 +720,13 @@ def query_unique(network, pred=all_packets, fields=(), time=None):
     sub_net.install_policy(pred & fwd(b))    
     return b
 
+def query_count(network, pred=all_packets, fields=(), time=None):
+    b = CountingBucket(fields, time)
+    sub_net = Network.fork(network)
+    sub_net.install_policy(pred & fwd(b))    
+    return b
+
+
 class DynamicPolicy(gs.Behavior):
     """DynamicPolicy is a Behavior of policies, that evolves with respect to a given network, according to given logic, and starting from a given initial value."""
 
