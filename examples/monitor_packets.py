@@ -28,10 +28,18 @@
 
 from frenetic.lib import *
 
-def monitor(network):
-    for pkt in query_limit(network, all_packets, 2):
+def monitor_packets(network):
+    for pkt in query(network, all_packets):
         print "I see packet:"
         print pkt
         print "---------------"
 
-main = monitor
+def monitor_packet_count(network):
+    for count in query_count(network, all_packets,2.5):
+        print "I've seen %d packets!" % count
+
+def example(network):
+    run(monitor_packets, Network.fork(network))
+    run(monitor_packet_count, Network.fork(network))
+
+main = example
