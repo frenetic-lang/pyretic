@@ -29,7 +29,7 @@
 from frenetic.lib import *
 
 def monitor(network):
-    for pkt in query_count(network, all_packets,(), 2.5):
+    for pkt in query_count(network, all_packets, 2.5):
         print "# packets seen:",
         print pkt
 

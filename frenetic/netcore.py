@@ -720,8 +720,8 @@ def query_unique(network, pred=all_packets, fields=(), time=None):
     sub_net.install_policy(pred & fwd(b))    
     return b
 
-def query_count(network, pred=all_packets, fields=(), time=None):
-    b = CountingBucket(fields, time)
+def query_count(network, pred=all_packets, time=None):
+    b = CountingBucket(time)
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))    
     return b

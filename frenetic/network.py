@@ -583,10 +583,10 @@ class UniqueBucket(Bucket):
 
 class CountingBucket(Bucket):
     """A safe place for couting packets!"""
-    def __init__(self,fields=[], time=None):
+    def __init__(self, time=None):
         self.lock = threading.Lock()
         self.count = 0
-        super(CountingBucket, self).__init__(fields,time)
+        super(CountingBucket, self).__init__((),time)
 
     def inc(self,packet):
         self.lock.acquire()
