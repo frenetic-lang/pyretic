@@ -110,7 +110,7 @@ class Approx(object):
 @util.cached
 def Wildcard(width_):
     @functools.total_ordering
-    class Wildcard_(MatchableMixin, Data("prefix mask")):
+    class Wildcard_(MatchableMixin, util.Data("prefix mask")):
         """Full wildcards."""
 
         width = width_
@@ -380,7 +380,7 @@ class union(Predicate):
     """A predicate representing the union of two predicates."""
 
     def __init__(self, predicates):
-        self.predicates = predicates
+        self.predicates = list(predicates)
         
     def __repr__(self):
         return "union:\n%s" % util.repr_plus(self.predicates)
@@ -393,7 +393,7 @@ class intersect(Predicate):
     """A predicate representing the intersection of two predicates."""
 
     def __init__(self, predicates):
-        self.predicates = predicates
+        self.predicates = list(predicates)
         
     def __repr__(self):
         return "intersect:\n%s" % util.repr_plus(self.predicates)
@@ -402,14 +402,13 @@ class intersect(Predicate):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
         
-class difference(Predicate, Data("base_predicate diff_predicates")):
+class difference(Predicate):
     """A predicate representing the difference of two predicates."""
 
-    def __new__(cls, base_predicate, diff_predicates):
-        return super(difference, cls).__new__(cls,
-                                              base_predicate,
-                                              list(diff_predicates))
-    
+    def __init__(self, base_predicate, diff_predicates):
+        self.base_predicate = base_predicate
+        self.diff_predicates = list(diff_predicates)
+        
     def __repr__(self):
         return "difference:\n%s" % util.repr_plus([self.base_predicate,
                                                    self.diff_predicates])
@@ -419,8 +418,12 @@ class difference(Predicate, Data("base_predicate diff_predicates")):
                                                             for pred in self.diff_predicates)
 
         
-class negate(Predicate, Data("predicate")):
+class negate(Predicate):
     """A predicate representing the difference of two predicates."""
+
+    def __init__(self, predicate):
+        self.predicate = predicate
+        
     def __repr__(self):
         return "negate:\n%s" % util.repr_plus([self.predicate])
     
@@ -562,13 +565,17 @@ class copy(Policy):
     def eval(self, packet):
         pushes = {}
         for (dstfield, srcfield) in self.map.iteritems():
-            pushes[srcfield] = packet[dstfield]
+            pushes[dstfield] = packet[srcfield]
         pops = self.map.values()
         packet = packet.pushmany(pushes).popmany(pops)
         return Counter([packet])
 
 
-class remove(Policy, Data("policy predicate")):
+class remove(Policy):
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+    
     def __repr__(self):
         return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
         
@@ -579,8 +586,13 @@ class remove(Policy, Data("policy predicate")):
             return Counter()
         
 
-class restrict(Policy, Data("policy predicate")):
+class restrict(Policy):
     """Policy for mapping a single predicate to a list of actions."""
+
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+        
     def __repr__(self):
         return "restrict:\n%s" % util.repr_plus([self.predicate,
                                                  self.policy])
@@ -592,7 +604,10 @@ class restrict(Policy, Data("policy predicate")):
             return Counter()
 
                     
-class parallel(Policy, Data("policies")):
+class parallel(Policy):
+    def __init__(self, policies):
+        self.policies = list(policies)
+    
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
         
@@ -604,7 +619,10 @@ class parallel(Policy, Data("policies")):
         return c
 
 
-class compose(Policy, Data("policies")):
+class compose(Policy):
+    def __init__(self, policies):
+        self.policies = list(policies)
+    
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
   

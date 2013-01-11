@@ -166,7 +166,6 @@ class POXBackend(revent.EventMixin):
         return p_begin.pack()
 
     def _handle_PacketIn(self, event):
-
         if self.show_traces:
             self.packetno += 1
             print "-------- POX/OF RECV %d ---------------" % self.packetno

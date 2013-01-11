@@ -35,7 +35,6 @@ from itertools import chain
 from bitarray import bitarray
 
 from frenetic import util, generators as gs
-from frenetic.util import Data
 
 import networkx as nx
 from frenetic.graph_util import * 

@@ -46,7 +46,7 @@ def setup_virtual_network(network):
     def vmap_gen():
         for topo in network.topology_changes:
             mst = Topology.minimum_spanning_tree(topo)
-            vn.physical_policy = copy(outport="voutport") >> pop("vtag", "vswitch", "vinport")
+            vn.physical_policy = copy(outport="voutport") >> pop(["vtag", "vswitch", "vinport"])
             vn.from_vmap(topo_to_vmap_dict(topo, mst))
             vn.topology = mst
     return vn
