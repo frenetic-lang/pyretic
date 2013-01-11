@@ -45,7 +45,7 @@ def monitor(network):
         print policy
         
 def example(network):
-    run(monitor, Network.fork(network))
+    run(monitor, network)
     run(learning_switch.learning_switch, Network.fork(network))
 
 main = example
