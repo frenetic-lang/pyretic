@@ -27,6 +27,7 @@
 ################################################################################
 
 from frenetic.lib import *
+from examples.hub import hub
 
 def monitor_packets(network):
     for pkt in query(network, all_packets):
@@ -37,9 +38,18 @@ def monitor_packets(network):
 def monitor_packet_count(network):
     for count in query_count(network, all_packets,2.5):
         print "I've seen %d packets!" % count
+        
+def monitor_grouped_packet_count(network):
+    group_by = ['srcmac','dstmac','switch','srcip']
+    for count in query_count(network, all_packets,4,group_by):
+        print "count grouped by %s" % group_by
+        for (k,v) in count.items():
+            print "%d:  %s" % (v,k)
 
 def example(network):
+    run(network.install_policy(hub(network)), Network.fork(network))
     run(monitor_packets, Network.fork(network))
     run(monitor_packet_count, Network.fork(network))
+    run(monitor_grouped_packet_count, Network.fork(network))
 
 main = example

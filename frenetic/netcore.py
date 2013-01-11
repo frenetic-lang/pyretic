@@ -737,8 +737,8 @@ def query_limit(network, pred=all_packets, limit=None, fields=[]):
 def query_unique(network, pred=all_packets, fields=[]):
     return query_limit(network, pred, 1, fields)
     
-def query_count(network, pred=all_packets, interval=None):
-    b = CountingBucket(interval)
+def query_count(network, pred=all_packets, interval=None, group_by=[]):
+    b = CountingBucket(interval,group_by)
     sub_net = Network.fork(network)
     sub_net.install_policy(pred & fwd(b))    
     return b

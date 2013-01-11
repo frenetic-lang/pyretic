@@ -575,12 +575,12 @@ class LimitBucket(Bucket):
                 pred = match([(field,pkt[field]) 
                               for field in pkt.available_fields()])
 
-            # IF NOT SEEN, CREATE AN ENTRY
-            if not pred in self.seen:
-                self.seen[pred] = 1
-            # OTHERWISE INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
-            else:
+
+            # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+            try:
                 self.seen[pred] += 1
+            except KeyError:
+                self.seen[pred] = 1
 
             # STOP FORWARDING MATCHING PACKETS TO THIS BUCKET IF WE'VE HIT THE LIMIT
             if self.seen[pred] == self.limit:
@@ -612,18 +612,31 @@ class LimitBucket(Bucket):
 
 class CountingBucket(Bucket):
     """A safe place for couting packets!"""
-    def __init__(self, interval=None):
+    def __init__(self, interval=None, group_by=[]):
         self.lock = threading.Lock()
-        self.count = 0
         self.interval = interval
+        self.group_by = group_by
+        if group_by:
+            self.count = {}
+        else:
+            self.count = 0
         super(CountingBucket, self).__init__([])
 
     # THREADSAFE INCREMENT OF COUNTER
-    def inc(self,packet):
-        self.lock.acquire()
-        self.count += 1
-        self.lock.release()
-        return self.count
+    def inc(self,pkt):
+        if self.group_by:
+            from frenetic.netcore import match
+            pred = match([(field,pkt[field]) for field in self.group_by])
+            try:
+                self.count[pred] += 1
+            except KeyError:
+                self.count[pred] = 1
+            return self.count
+        else:
+            self.lock.acquire()
+            self.count += 1
+            self.lock.release()
+            return self.count
 
     def __iter__(self):
 
