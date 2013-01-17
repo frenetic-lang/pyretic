@@ -88,6 +88,7 @@ class IP(object):
         except:
             return False
 
+            
 class MAC(object):
     def __init__(self, mac):
 
@@ -220,7 +221,7 @@ class Location(object):
         self.port = port
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(repr(self))
 
     def __eq__(self,other):
         return self.switch == other.switch and self.port == other.port
@@ -230,7 +231,6 @@ class Location(object):
 
 
 class Topology(nx.Graph):
-
     def is_connected(self):
         return nx.is_connected(self)
 
@@ -375,10 +375,7 @@ class Topology(nx.Graph):
                 (str(switch).ljust(switch_str_maxlen),edge_str[switch],egress_str[switch])
         output_str += ''.rjust(table_width,'-')
         return output_str
-
-    def __str__(self):
-        return self.__repr__()
-
+        
         
 class Network(object):
     def __init__(self,backend):
