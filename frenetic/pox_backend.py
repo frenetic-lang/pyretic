@@ -272,9 +272,8 @@ def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
 # 
 ################################################################################
 
-### REICH - ADDED HEADERS W/ SEEM LIKE THEY SHOULD BE "VALID" 
-###         NOT CLEAR PRECISELY WHAT get_packet_diff IS SUPPOSED TO BE DOING
-pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport", "protocol", "type", "payload"]
+pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
+                     "type", "protocol", "payload"]
 
 @util.cached
 def get_packet_diff(packet):
