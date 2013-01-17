@@ -27,32 +27,30 @@
 ################################################################################
 
 from frenetic.lib import *
-import networkx as nx
+import sys
 
 def topo_to_vmap(topo):
     vmap = {}
     port_ind = 1
-    for sw, eports in egress_points(topo):
-        for port in eports:
-            vmap[(Switch(1), Port(port_ind))] = [(sw, port)]
-            port_ind += 1
+    for loc in topo.egress_locations():
+        vmap[1, port_ind] = [(loc.switch, loc.port)]
+        port_ind += 1
     return vmap
   
 def setup_virtual_network(network):
+    sys.setrecursionlimit(1500)
     vn = VNetwork.fork(network)
     @run
     def vmap_gen():
         for topo in network.topology_changes:
             vmap = topo_to_vmap(topo)
-            vtopo = nx.Graph()
+            vtopo = Topology()
             add_nodes_from_vmap(vmap, vtopo)
             vn.physical_policy = network.flood
             vn.from_vmap(vmap)
             vn.topology = vtopo
             print "------------ underlying network ---------------"
-            print "switches = %s" % topo.nodes(data=True)
-            print "links =    %s" % topo.edges(data=True)
+            print topo
             print "------------ abstracted network ---------------"
-            print "switches = %s" % vtopo.nodes(data=True)
-            print "links =    %s" % vtopo.edges(data=True)
+            print vtopo
     return vn

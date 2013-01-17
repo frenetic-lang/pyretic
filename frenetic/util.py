@@ -30,6 +30,7 @@
 
 
 from collections import namedtuple
+from functools import wraps
 
 
 # Adapted from http://code.activestate.com/recipes/577629-namedtupleabc-abstract-base-class-mix-in-for-named/
@@ -87,25 +88,17 @@ def Data(fields):
     class _Record(Record):
         _fields = fields
     return _Record
-    
 
-def merge_dicts(*args):
-    d = {}
-    for d_ in args:
-        d.update(d_)
-    return d
-
-    
-def cached(func):
+        
+def cached(f):
+    @wraps(f)
     def wrapper(*args):
         try:
             return wrapper.cache[args]
         except KeyError:
-            wrapper.cache[args] = v = func(*args)
+            wrapper.cache[args] = v = f(*args)
             return v
     wrapper.cache = {}
-    wrapper.__name__ = func.__name__
-    wrapper.__doc__ = func.__doc__
     return wrapper
         
 # TODO optimize this
@@ -177,6 +170,7 @@ class frozendict(object):
         try:
             return self._cached_hash
         except AttributeError:
+            ### THIS DOESN'T APPEAR TO RETURN IDENTIAL HASHES FOR SETS OF IDENTICALLY HASHING DICT ITEMS...
             h = self._cached_hash = hash(frozenset(self._dict.items()))
             return h
         
@@ -192,7 +186,7 @@ class frozendict(object):
 def indent_str(s, indent=4):
     return "\n".join(indent * " " + i for i in s.splitlines())
 
-def repr_plus(ss, indent=4, sep="\n", prefix="-"):
+def repr_plus(ss, indent=4, sep="\n", prefix=""):
     if isinstance(ss, basestring):
         ss = [ss]
     return indent_str(sep.join(prefix + repr(s) for s in ss), indent)

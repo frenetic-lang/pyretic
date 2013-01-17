@@ -37,10 +37,10 @@ topology.add_node(Switch(3), ports={Port(1), Port(2)})
 
 def ingress_policy():
     return (match(at=None, switch=1, inport=1) & push(vswitch=1, vinport=1) |
-            match(at="vswitch 1, vinport 2") & (push(vswitch=1, vinport=2) >> pop("at")) |
-            match(at="vswitch 2, vinport 1") & (push(vswitch=2, vinport=1) >> pop("at")) |
-            match(at="vswitch 2, vinport 2") & (push(vswitch=2, vinport=2) >> pop("at")) |
-            match(at="vswitch 3, vinport 1") & (push(vswitch=3, vinport=1) >> pop("at")) |
+            match(at="vswitch 1, vinport 2") & (push(vswitch=1, vinport=2) >> pop(["at"])) |
+            match(at="vswitch 2, vinport 1") & (push(vswitch=2, vinport=1) >> pop(["at"])) |
+            match(at="vswitch 2, vinport 2") & (push(vswitch=2, vinport=2) >> pop(["at"])) |
+            match(at="vswitch 3, vinport 1") & (push(vswitch=3, vinport=1) >> pop(["at"])) |
             match(at=None, switch=1, inport=2) & push(vswitch=3, vinport=2))
 
 def physical_policy(redo):

@@ -26,16 +26,26 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+##############################################################################################################################
+# TO TEST EXAMPLE                                                                                                            #
+# -------------------------------------------------------------------                                                        #
+# start mininet:  sudo mn -c; sudo mn --switch ovsk --controller remote --mac --topo tree,3,3                                #
+# run controller: pox.py --no-cli pyretic/examples/monitor_topology.py                                                       #
+# watch topology: a new topology will be printed each time a switch, port, or link registers                                 #
+# test:           change topology by running 'link sX sY down', or restart mininet w/ new topology args                      #
+##############################################################################################################################
+
+
 from frenetic.lib import *
-import networkx as nx
+from examples import learning_switch
 
-from examples import monitor_topology as topology
+def monitor(network):
+    for policy in network.policy_changes:
+        print "-------- POLICY CHANGE --------"
+        print policy
+        
+def example(network):
+    run(monitor, network)
+    run(learning_switch.learning_switch, Network.fork(network))
 
-def spanning_tree(network):
-    for topo in network.topology_changes:
-        print "recalculate spanning_tree"
-        mst = nx.minimum_spanning_tree(topo)
-        topology.pretty_print(topo, "underlying")
-        topology.pretty_print(mst, "minimum spanning tree")
-
-main = spanning_tree
+main = example
