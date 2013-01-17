@@ -138,9 +138,6 @@ class MAC(object):
     def to_bytes(self):
         return self.bits.tobytes()
 
-    def fromRaw(self):
-        return self.to_bytes()
-
     def __repr__(self):
         parts = struct.unpack("!BBBBBB", self.to_bytes())
         mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
