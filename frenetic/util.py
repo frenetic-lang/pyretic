@@ -170,7 +170,6 @@ class frozendict(object):
         try:
             return self._cached_hash
         except AttributeError:
-            ### THIS DOESN'T APPEAR TO RETURN IDENTIAL HASHES FOR SETS OF IDENTICALLY HASHING DICT ITEMS...
             h = self._cached_hash = hash(frozenset(self._dict.items()))
             return h
         

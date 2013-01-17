@@ -85,7 +85,7 @@ class IP(object):
         return socket.inet_ntoa(self.to_bytes())
 
     def __hash__(self):
-        return hash(repr(self))    
+        return hash(self.to_bytes())    
 
     def __eq__(self,other):
         try:
@@ -147,7 +147,7 @@ class MAC(object):
         return mac
 
     def __hash__(self):
-        return hash(repr(self))
+        return hash(self.to_bytes())
 
     def __eq__(self,other):
         try:
@@ -237,7 +237,7 @@ class Location(object):
         self.port = port
 
     def __hash__(self):
-        return hash(repr(self))
+        return hash((self.switch, self.port))
 
     def __eq__(self,other):
         return self.switch == other.switch and self.port == other.port

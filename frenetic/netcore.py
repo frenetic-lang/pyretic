@@ -256,8 +256,14 @@ class Exact(object):
     def match(self, other):
         return self.obj == other
 
+    def __hash__(self):
+        return hash(self.obj)
+
+    def __eq__(self, other):
+        return self.obj == other.obj 
+        
     def __repr__(self):
-        return str(self.obj)
+        return repr(self.obj)
         
 ################################################################################
 # Lifts
@@ -365,14 +371,12 @@ class match(Predicate):
 
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
-
-    ### WE DON'T TRUST FROZENDICT HASH YET
+    
     def __hash__(self):
-        return hash(repr(self))
-
-    ### WE DON'T TRUST FROZENDICT EQ
-    def __eq__(self,other):
-        return hash(self) == hash(other)
+        return hash(self.map)
+    
+    def __eq__(self, other):
+        return self.map == other.map
 
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
