@@ -50,9 +50,7 @@ def setup_virtual_network(network):
             vn.from_vmap(vmap)
             vn.topology = vtopo
             print "------------ underlying network ---------------"
-            print "switches = %s" % topo.nodes(data=True)
-            print "links =    %s" % topo.edges(data=True)
+            print topo
             print "------------ abstracted network ---------------"
-            print "switches = %s" % vtopo.nodes(data=True)
-            print "links =    %s" % vtopo.edges(data=True)
+            print vtopo
     return vn

@@ -35,39 +35,32 @@
 ##############################################################################################################################
 
 from frenetic.lib import *
-from examples import hub
-from examples import learning_switch
+from examples.hub import hub
+from examples.learning_switch import learning_switch
 
-# RENAMES PACKETS TO/FROM 10.0.0.2
-# FWDS BY FLOODING - WILL CHANGE
-def renamer(network):
+# RENAMES PACKETS TO/FROM 10.0.0.2/10.0.0.100 
+def renamer(client_ip,instance_ip,service_ip):
 
-    srvc_ip = '10.0.0.100'
-    inst_ip = '10.0.0.2'
+    service_to_client_pred = match(srcip=instance_ip,dstip=client_ip)
+    service_to_client_mod = modify(srcip=service_ip)
 
-    srvc_to_client_pred = match(srcip=inst_ip)
-    srvc_to_client_mod = modify(srcip=srvc_ip)
-
-    client_to_srvc_pred = match(dstip=srvc_ip) 
-    client_to_srvc_mod = modify(dstip=inst_ip)
-
-    # pol = network.flood
-    # pol -= srvc_to_client_pred
-    # pol |= srvc_to_client_pred & srvc_to_client_mod >> network.flood
-    # pol -= client_to_srvc_pred
-    # pol |= client_to_srvc_pred & client_to_srvc_mod >> network.flood
+    client_to_service_pred = match(srcip=client_ip,dstip=service_ip) 
+    client_to_service_mod = modify(dstip=instance_ip)
   
     pol = passthrough
-    pol -= srvc_to_client_pred
-    pol |= srvc_to_client_pred & srvc_to_client_mod 
-    pol -= client_to_srvc_pred
-    pol |= client_to_srvc_pred & client_to_srvc_mod
+    pol -= service_to_client_pred | client_to_service_pred
+    pol |= service_to_client_pred & service_to_client_mod | client_to_service_pred & client_to_service_mod
+    
     return pol
 
 
 def example(network):
-#   policy = renamer(network) >> hub.hub(network)
-    policy = renamer(network) >> learning_switch.learning_switch(network)
+    service_ip  = '10.0.0.100'
+    client_ip   = '10.0.0.1'
+    instance_ip = '10.0.0.2'
+
+#   policy = renamer(network) >> hub(network)
+    policy = renamer(client_ip,instance_ip,service_ip) >> learning_switch(network)
     network.install_policy(policy)
 
         
