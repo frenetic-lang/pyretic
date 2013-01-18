@@ -3,7 +3,7 @@
 "Monitor multiple hosts using popen()/pmonitor()"
 
 from mininet.net import Mininet
-from mininet.topo import SingleSwitchTopo
+from mininet.topo import SingleSwitchTopo, LinearTopo
 from mininet.node import Host, OVSKernelSwitch, RemoteController
 from mininet.util import pmonitor
 from mininet.cli import CLI
@@ -25,7 +25,9 @@ def httpTest( N=2 ):
 #    call('controller ptcp: &', shell=True)
 
     ## SET UP TOPOLOGY
-    topo = SingleSwitchTopo( N )
+    topo = LinearTopo( N )        ## (tcp parse) warning TCP data offset too long or too short
+#    topo = SingleSwitchTopo( N ) ## SILENT STALL
+
 
     ## SET UP MININET INSTANCE AND START
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
