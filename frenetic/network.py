@@ -389,6 +389,8 @@ class Topology(nx.Graph):
         output_str += ''.rjust(table_width,'-')
         return output_str
         
+    def __str__(self):
+        return repr(self)
         
 class Network(object):
     def __init__(self,backend):
