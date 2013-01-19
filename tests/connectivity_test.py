@@ -26,7 +26,7 @@ TOPOS = { 'minimal': lambda: SingleSwitchTopo( k=2 ),
           'tree': TreeTopo }
 
 
-def testSwitching(net,verbose):
+def ping_all(net,verbose,ping_type,count):
 
     ## GET THE HOST AND SERVER NAMES
     hosts = net.hosts
@@ -35,11 +35,20 @@ def testSwitching(net,verbose):
     popens = {}
     
     results = {}
-    test = ['ping', '-c', '3']
+    if ping_type == 'ICMP':
+        test = ['ping', '-c', '3']
+    elif ping_type == 'TCP80SYN':
+        test = ['hping3', '-c', count,'-S' ,'-p' ,'80']
+    else:
+        test = ['ping', '-c', count]
+
+    print "ping using %s" % test
 
     ## CLIENT REQUEST
     for h1 in hosts:
         for h2 in hosts:
+            if h1 == h2:
+                continue
             popens[h1.name+':'+h2.name] = h1.popen(test + [h2.IP()], stdout=PIPE, stderr=STDOUT)
 
     ## MONITOR OUTPUT
@@ -115,6 +124,11 @@ def parseArgs():
     opts.add_option( '--verbosity', '-v', type='choice',
                      choices=['quiet','verbose'], default = 'quiet',
                      help = '|'.join( ['quiet','verbose'] )  )
+    opts.add_option( '--ping-type', '-p', type='choice',
+                     choices=['ICMP','TCP80SYN'], default = 'ICMP',
+                     help = '|'.join( ['ICMP','TCP80SYN'] )  )
+    opts.add_option( '--count', '-c', action="store", type="string", 
+                     dest="count", default='1', help = 'number of ping attempts'  )
     options, args = opts.parse_args()
     return (options, args)
 
@@ -137,7 +151,7 @@ def main():
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
 
-    results = testSwitching(net,verbose)
+    results = ping_all(net,verbose,options.ping_type,options.count)
     connectivity = fullConnectivity(net,results)
     
     ## SHUTDOWN MININET
