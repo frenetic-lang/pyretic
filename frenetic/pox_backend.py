@@ -262,7 +262,15 @@ class POXBackend(revent.EventMixin):
             print packetlib.ethernet(msg._get_data())
             print
 
-        self.switch_connections[switch].send(msg)
+        ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
+        try:
+            self.switch_connections[switch].send(msg)
+        except RuntimeError, e:
+            print "ERROR:send_packet: %s to switch %d" % (str(e),switch)
+            # TODO - ATTEMPT TO RECONNECT SOCKET
+        except KeyError, e:
+            print "ERROR:send_packet: No connection to switch %d available" % switch
+            # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
         
 def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
