@@ -498,8 +498,11 @@ class Network(object):
         self._topology.signal_mutation()
 
     def _handle_port_downs(self, (switch, port)):
-        self.topology.node[switch]["ports"].remove(port)
-        self._topology.signal_mutation()
+        try:
+            self.topology.node[switch]["ports"].remove(port)
+            self._topology.signal_mutation()
+        except KeyError:
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
         
     def _handle_link_ups(self, (s1, p1, s2, p2)):
         try:
