@@ -64,9 +64,12 @@ def fullConnectivity(net,results):
     passed = True
     for h1 in hosts:
         for h2 in hosts:
-            if results[h1.name][h2.name] == 0:
-                passed = False
-                break
+            try:
+                if results[h1.name][h2.name] == 0:
+                    passed = False
+                    break
+            except KeyError:
+                pass    
     
     return passed
 
