@@ -1,4 +1,4 @@
-from networkx import *
+import networkx as nx
 from sets import *
 import random 
 

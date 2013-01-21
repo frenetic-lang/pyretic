@@ -41,6 +41,9 @@
 from frenetic.lib import *
 
 def hub(network):
-    network.install_flood()
+    return network.flood
 
-main = hub
+def example(network):
+    network.install_policy_func(hub)
+        
+main = example

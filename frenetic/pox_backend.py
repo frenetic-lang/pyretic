@@ -123,7 +123,7 @@ class POXBackend(revent.EventMixin):
 
     def get_packet_payload(self, packet):
         p_begin = p = packetlib.ethernet(packet["payload"])
-
+        
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
         p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
 
@@ -163,7 +163,9 @@ class POXBackend(revent.EventMixin):
             p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
             p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
 
-        return p_begin.pack()
+        payload = p_begin.pack()
+
+        return payload
 
     def _handle_PacketIn(self, event):
         if self.show_traces:
