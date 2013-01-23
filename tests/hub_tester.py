@@ -35,11 +35,6 @@ def parseArgs():
     opts = OptionParser( description=desc, usage=usage )
     opts.add_option( '--verbose', '-v', action="store_true", dest="verbose")
     opts.add_option( '--quiet', '-q', action="store_true", dest="quiet")
-    opts.add_option( '--clients', '-c', action="store", type="string", 
-                     dest="clients", default='2', help = 'number of clients'  )
-    opts.add_option( '--servers', '-s', action="store", type="string", 
-                     dest="servers", default='2', help = 'number of servers'  )
-
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
         opts.error("options -q and -v are mutually exclusive")
@@ -54,8 +49,8 @@ def main():
         flags = ['-q']
 
     # GET PATHS
-    controller_src_path = os.path.expanduser('~/pyretic/examples/static_load_balancer.py')
-    unit_test_path = os.path.expanduser('~/pyretic/tests/load_balancer_unit_test.py')
+    controller_src_path = os.path.expanduser('~/pyretic/examples/hub.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/connectivity_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -64,8 +59,7 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     # STARTUP CONTROLLER
-    controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path, 
-                        '--clients='+options.clients, '--servers='+options.servers], 
+    controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path], 
                        env=env,
                        stdout=PIPE, 
                        stderr=STDOUT)
@@ -75,7 +69,7 @@ def main():
     sleep(1)
 
     # TEST EACH TOPO
-    topos = ['bump_clique,1,'+options.clients+','+options.servers, 'bump_clique,2,'+options.clients+','+options.servers]
+    topos = ['single,2','single,16','linear,2','linear,8','tree,2,2','tree,3,2','cycle,3,3','clique,4,4','clique,5,5']
 
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + flags
