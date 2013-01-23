@@ -1,6 +1,7 @@
 import os as os
 import sys as sys
 import re as re
+from time import sleep
 
 # SET PYTHONPATH FOR ROOT USER
 sys.path.append('/home/mininet/pox')

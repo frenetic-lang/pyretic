@@ -81,6 +81,10 @@ def main():
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
 
+    # WAIT FOR CONTROLLER TO HOOK UP
+    # TODO - PARAMETERIZE WAIT BASED ON NUMBER OF LINKS
+    sleep(10)
+
     results = ping_all(net,options.verbose,options.ping_type,options.count,options.ping_pattern,['10.0.0.100'])
     connectivity = clientServerConnectivity(net.hosts[:num_clients],net.hosts[-num_servers:],'10.0.0.100',results)
 
