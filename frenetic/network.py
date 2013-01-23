@@ -631,7 +631,8 @@ class CountingBucket(Bucket):
     def inc(self,pkt):
         if self.group_by:
             from frenetic.netcore import match
-            pred = match([(field,pkt[field]) for field in self.group_by])
+            groups = set(self.group_by) & set(pkt.available_fields())
+            pred = match([(field,pkt[field]) for field in groups])
             try:
                 self.count[pred] += 1
             except KeyError:
