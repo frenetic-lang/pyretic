@@ -37,7 +37,7 @@ from frenetic import generators as gs, network as net, virt, util
 
 import ipdb
 
-
+            
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
     def __init__(self, user_program, show_traces, debug_packet_in, kwargs):
@@ -210,12 +210,64 @@ class POXBackend(revent.EventMixin):
                 pkt = pkt.pop("outport")
                 bucket.signal(pkt)
 
+
+    def active_ofp_port_config(self,configs):
+        active = []
+        for (config,bit) in of.ofp_port_config_rev_map.items():
+            if configs & bit:
+                active.append(config)
+        return active
+
+    def active_ofp_port_state(self,states):
+        """get active ofp port state values
+        NOTE: POX's doesn't match ofp_port_state_rev_map"""
+        active = []
+        for (state,bit) in of.ofp_port_state_rev_map.items():
+            if states & bit:
+                active.append(state)
+        return active
+
+    def active_ofp_port_features(self,features):
+        active = []
+        for (feature,bit) in of.ofp_port_features_rev_map.items():
+            if features & bit:
+                active.append(feature)
+        return active
+
+    def inspect_ofp_phy_port(self,port,prefix=""):
+        print "%sport_no:     " % prefix, 
+        port_id = port.port_no
+        for name,port_no in of.ofp_port_rev_map.iteritems():
+            if port.port_no == port_no:
+                port_id = name
+        print port_id
+        print "%shw_addr:     " % prefix, 
+        print port.hw_addr
+        print "%sname:        " % prefix, 
+        print port.name
+        print "%sconfig:      " % prefix, 
+        print self.active_ofp_port_config(port.config)
+        # POX DOESN'T FOLLOW OPENFLOW SPEC HERE
+        print "%sstate:       " % prefix, 
+        print self.active_ofp_port_state(port.state)
+        print "%scurr:        " % prefix, 
+        print self.active_ofp_port_features(port.curr)
+        print "%sadvertised:  " % prefix, 
+        print self.active_ofp_port_features(port.advertised)
+        print "%ssupported:   " % prefix, 
+        print self.active_ofp_port_features(port.supported)
+        print "%speer:        " % prefix, 
+        print self.active_ofp_port_features(port.peer)
+
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switch_connections
         
         self.switch_connections[event.dpid] = event.connection
         self.network.switch_joins.signal(event.dpid)
+        # port type is ofp_phy_port
         for port in event.ofp.ports:
+            self.inspect_ofp_phy_port(port,' ')
+        
             if port.port_no <= of.OFPP_MAX:
                 self.network.port_ups.signal((event.dpid, port.port_no))
         
@@ -226,6 +278,8 @@ class POXBackend(revent.EventMixin):
         self.network.switch_parts.signal(event.dpid)
         
     def _handle_PortStatus(self, event):
+        self.inspect_ofp_phy_port(event.ofp.desc,'  ')
+
         if event.port <= of.OFPP_MAX:
             if event.added:
                 self.network.port_ups.signal((event.dpid, event.port))
