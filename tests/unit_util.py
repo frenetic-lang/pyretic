@@ -152,22 +152,23 @@ def ping_all_parallel(net,verbose,ping_type,count,extra_ips=[]):
         for h2 in hosts:
             if h1 == h2:
                 continue
-            popens[h2.name] = h1.popen(test + [h2.IP()], stdout=PIPE, stderr=STDOUT)
+            popens[h1.name+':'+h2.name] = h1.popen(test + [h2.IP()], stdout=PIPE, stderr=STDOUT)
         for ip in extra_ips:
-            popens[ip] = h1.popen(test + [ip], stdout=PIPE, stderr=STDOUT)
+            popens[h1.name+':'+ip] = h1.popen(test + [ip], stdout=PIPE, stderr=STDOUT)
 
     ## MONITOR OUTPUT
-    for name, line in pmonitor( popens, timeoutms=5000 ):
-        if name and line:
+    for pair, line in pmonitor( popens, timeoutms=5000 ):
+        if pair and line:
             if re.search('packets transmitted', line):
-                if verbose: print "%s->%s\t%s" % (h1.name,name,line),
+                (h1_name,h2_name) = pair.split(':')
+                if verbose: print "%s->%s\t%s" % (h1_name,h2_name,line),
                 stats = line.split(',')
                 for stat in stats:
                     if re.search('packet loss', stat):
                         success = 1 - float(stat.split()[0][:-1])/100
-                        if not h1.name in results:
-                            results[h1.name] = {}
-                        results[h1.name][name] = success
+                        if not h1_name in results:
+                            results[h1_name] = {}
+                        results[h1_name][h2_name] = success
     
     return results
 
