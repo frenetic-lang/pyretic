@@ -355,6 +355,23 @@ class Topology(nx.Graph):
             remainder = Topology.difference(remainder,mst)
         return msts
 
+    @classmethod
+    def all_pairs_shortest_path(cls,topology):
+        location_paths = {}
+        switch_paths = nx.all_pairs_shortest_path(topology)
+        for s1, paths in switch_paths.items():
+            location_paths[s1] = {}
+            for s2, path in paths.items():
+                location_paths[s1][s2] = []
+                cur = s1
+                for nxt in path + [s2]:
+                    if cur != nxt:
+                        ports = topology[cur][nxt]
+                        loc = Location(cur,ports[cur])
+                        location_paths[s1][s2].append(loc)
+                    cur = nxt
+        return location_paths
+
     def __repr__(self):
         output_str = ''
         edge_str = {}
