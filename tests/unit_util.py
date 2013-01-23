@@ -25,6 +25,16 @@ TOPOS = { 'minimal': lambda: SingleSwitchTopo( k=2 ),
           'single': SingleSwitchTopo,
           'tree': TreeTopo }
 
+def ping_all(net,verbose,ping_type,count,pattern='sequential',extra_ips=[]):
+    if pattern == 'sequential':
+        return ping_all_sequential(net,verbose,ping_type,count,extra_ips)
+    elif pattern == 'intermediate':
+        return ping_all_intermediate(net,verbose,ping_type,count,extra_ips)
+    elif pattern == 'parallel':
+        return ping_all_parallel(net,verbose,ping_type,count,extra_ips)
+    else:
+        raise RuntimeError('ERROR:ping_all: invalid option ' + pattern)
+
 
 def ping_all_sequential(net,verbose,ping_type,count,extra_ips=[]):
     """pings each host pair, one at a time.

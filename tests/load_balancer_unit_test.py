@@ -48,6 +48,9 @@ def parseArgs():
     opts.add_option( '--ping-type', '-p', type='choice',
                      choices=['ICMP','TCP80SYN'], default = 'ICMP',
                      help = '|'.join( ['ICMP','TCP80SYN'] )  )
+    opts.add_option( '--ping-pattern', '-P', type='choice',
+                     choices=['sequential','intermediate','parallel'], default = 'sequential' ,
+                     help = '|'.join( ['sequential','intermediate','parallel'] )  )
     opts.add_option( '--count', '-n', action="store", type="string", 
                      dest="count", default='1', help = 'number of ping attempts'  )
     opts.add_option( '--clients', '-c', action="store", type="string", 
@@ -78,7 +81,7 @@ def main():
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
 
-    results = ping_all_sequential(net,options.verbose,options.ping_type,options.count,['10.0.0.100'])
+    results = ping_all(net,options.verbose,options.ping_type,options.count,options.ping_pattern,['10.0.0.100'])
     connectivity = clientServerConnectivity(net.hosts[:num_clients],net.hosts[-num_servers:],'10.0.0.100',results)
 
     if not options.quiet:
