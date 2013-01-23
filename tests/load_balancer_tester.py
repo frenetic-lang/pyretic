@@ -21,17 +21,9 @@ class subprocess_output(Thread):
             print line,
             sleep(0.1)
 
-
 def parseArgs():
     """Parse command-line args and return options object.
     returns: opts parse options dict"""
-    if '--custom' in sys.argv:
-        index = sys.argv.index( '--custom' )
-        if len( sys.argv ) > index + 1:
-            filename = sys.argv[ index + 1 ]
-            self.parseCustomFile( filename )
-        else:
-            raise Exception( 'Custom file name not found' )
 
     desc = ( "The %prog utility creates Mininet network from the\n"
              "command line. It can create parametrized topologies,\n"
@@ -44,10 +36,6 @@ def parseArgs():
     opts.add_option( '--verbosity', '-v', type='choice',
                      choices=['quiet','verbose'], default = 'quiet',
                      help = '|'.join( ['quiet','verbose'] )  )
-    opts.add_option( '--controller', '-c', action="store", type="string", 
-                     dest="controller_src", default='hub.py', help = 'the pyretic controller to use'  )
-    opts.add_option( '--unit-test', '-u', action="store", type="string", 
-                     dest="unit_test", default='connectivity_test.py', help = 'the unit test to use'  )
 
     options, args = opts.parse_args()
     return (options, args)
@@ -61,8 +49,8 @@ def main():
         verbose = []
 
     # GET PATHS
-    unit_test_path = os.path.realpath(options.unit_test)
-    controller_src_path = os.path.realpath(options.controller_src)
+    controller_src_path = os.path.expanduser('~/pyretic/examples/static_load_balancer.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/lb_connectivity_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -71,7 +59,7 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     # STARTUP CONTROLLER
-    controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path], 
+    controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path, '--clients=5', '--servers=3'], 
                        env=env,
                        stdout=PIPE, 
                        stderr=STDOUT)
@@ -81,7 +69,7 @@ def main():
     sleep(1)
 
     # TEST EACH TOPO
-    topos = ['single,2','single,4','single,16','linear,2','linear,4','linear,8','tree,2,2','tree,2,3','tree,3,2']
+    topos = ['bump_clique,1,5,3']
 
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + verbose

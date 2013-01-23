@@ -70,19 +70,32 @@ def ping_all(net,verbose,ping_type,count,extra_ips=[]):
     return results
 
 
-def fullConnectivity(hosts,results):
+def clientServerConnectivity(clients,servers,canonical_ip,results):
 
-    for h1 in hosts:
-        for h2 in hosts:
+    for c1 in clients:
+        for c2 in clients:
             try:
-                # IF ALL PINGS FAILED FOR ANY HOST PAIR
+                # IF ALL PINGS FAILED FOR ANY CLIENT PAIR
                 # CONNECTIVITY FAILS
-                if results[h1.name][h2.name] == 0:
+                if results[c1.name][c2.name] == 0:
                     return False
             except KeyError:
                 pass    
-    
+
+        missing = 0
+        for s in servers:
+            if results[c1.name][s.name] == 0:
+                missing += 1
+        # EXACTLY ONE SERVER SHOULD BE UNREACHABLE
+        if missing != 1:
+            return False
+
+        # AND SHOULD RESPOND AS THE CANONICAL IP
+        if results[c1.name][canonical_ip] == 0:
+                return False
+
     return True
+
 
 
 def addDictOption( opts, choicesDict, default, name, helpStr=None ):
@@ -168,8 +181,8 @@ def main():
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
 
-    results = ping_all(net,verbose,options.ping_type,options.count)
-    connectivity = fullConnectivity(net.hosts,results)
+    results = ping_all(net,verbose,options.ping_type,options.count,['10.0.0.100'])
+    connectivity = clientServerConnectivity(net.hosts[:5],net.hosts[-3:],'10.0.0.100',results)
 
     ## SHUTDOWN MININET
     net.stop()
