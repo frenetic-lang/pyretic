@@ -48,19 +48,35 @@ def topo_to_vmap_dict(topo, mst):
             d[(loc.switch,loc.port)] = [(loc.switch, loc.port)]
     return d
 
+
+def one_to_one_fabric_policy(vmap):
+    fabric_policy = drop
+    # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
+    for (vswitch1,vport1),[(pswitch1,pport1)] in vmap.items():
+        for (vswitch2,vport2),[(pswitch2,pport2)] in vmap.items():
+            # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
+            if vswitch1 != vswitch2:
+                continue
+            # FORWARD OUT THE CORRECT PHYSICAL PORT
+            fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2) & fwd(pport2)
+    return fabric_policy
+
+
+
 def setup_virtual_network(network):
     vn = VNetwork.fork(network)
     @run
     def vmap_gen():
         for topo in network.topology_changes:
-            mst = Topology.minimum_spanning_tree(topo)
-            vn.physical_policy = copy(outport="voutport") >> pop(["vtag", "vswitch", "vinport"])
-            vn.from_vmap(topo_to_vmap_dict(topo, mst))
-            vn.topology = mst
+            vtopo = Topology.minimum_spanning_tree(topo)
+            vmap = topo_to_vmap_dict(topo, vtopo)
+            vn.physical_policy = one_to_one_fabric_policy(vmap)
+            vn.from_vmap(vmap)
+            vn.topology = vtopo
             print "------------ underlying network ---------------"
             print topo
             print "------------ abstracted network ---------------"
-            print mst
+            print vtopo
     return vn
     
         
