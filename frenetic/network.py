@@ -249,7 +249,8 @@ class Topology(nx.Graph):
 
     def interior_locations(self, sw):
         interior = set()
-        for attrs in self[sw].itervalues():
+        # result could be incorrect if self[sw] changes during execution
+        for attrs in self[sw].values():   
             interior.add(Location(sw,attrs[sw]))
         return interior
 
