@@ -40,14 +40,14 @@ def monitor_packet_count(network):
         print "I've seen %d packets!" % count
         
 def monitor_grouped_packet_count(network):
-    group_by = ['srcmac','dstmac','switch','srcip']
+    group_by = ['srcmac','dstmac','switch','srcip','vlan_tos']
     for count in query_count(network, all_packets,4,group_by):
         print "count grouped by %s" % group_by
         for (k,v) in count.items():
             print "%d:  %s" % (v,k)
 
 def example(network):
-    run(network.install_policy(hub(network)), Network.fork(network))
+    run(hub, Network.fork(network))
     run(monitor_packets, Network.fork(network))
     run(monitor_packet_count, Network.fork(network))
     run(monitor_grouped_packet_count, Network.fork(network))
