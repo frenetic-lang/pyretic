@@ -26,6 +26,14 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+############################################################################################################################
+# TO TEST EXAMPLE                                                                                                          #
+# -------------------------------------------------------------------                                                      #
+# start mininet:  ./pyretic/mininet.sh --switch ovsk --topo=clique,4,4                                                     #
+# run controller: pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/learning_switch.py --virttopo=pyretic/virttopos/spanning_tree.py
+############################################################################################################################
+
+
 from frenetic.lib import *
 
 def topo_to_vmap_dict(topo, mst):
@@ -49,6 +57,10 @@ def setup_virtual_network(network):
             vn.physical_policy = copy(outport="voutport") >> pop(["vtag", "vswitch", "vinport"])
             vn.from_vmap(topo_to_vmap_dict(topo, mst))
             vn.topology = mst
+            print "------------ underlying network ---------------"
+            print topo
+            print "------------ abstracted network ---------------"
+            print mst
     return vn
     
         
