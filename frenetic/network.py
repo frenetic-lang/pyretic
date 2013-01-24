@@ -269,6 +269,9 @@ class Topology(nx.Graph):
             non_egress_locations = self.interior_locations(sw)
             return all_locations - non_egress_locations
 
+    def copy(self):
+        return Topology(self.copy())
+
     ### TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY
     def copy_attributes(self,initial_topo):
         for s,data in initial_topo.nodes(data=True):
@@ -312,10 +315,26 @@ class Topology(nx.Graph):
                # removed edge, reconcile node ports"
                 to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
                 for loc in to_remove:
-                    old_ports = self.node[loc.switch]['ports'] 
-                    new_ports = old_ports - {loc.port}
-                    self.node[loc.switch]['ports'] = new_ports
+                    try:
+                        old_ports = self.node[loc.switch]['ports'] 
+                        new_ports = old_ports - {loc.port}
+                        self.node[loc.switch]['ports'] = new_ports
+                    except KeyError:
+                        pass                # node removed
 
+    def remove_nodes_from(self,switches=[]):
+        self.remove_nodes_from(switches)
+        self.reconcile_attributes(initial_topo)
+        return self
+
+    @classmethod
+    def filter_out_nodes(cls,initial_topo,switches=[]):
+        try:
+            self = initial_topo.copy()
+        except nx.NetworkXError:
+            return node
+        return self.remove_nodes_from(switches)
+        
     @classmethod
     def difference(cls,topo1,topo2):
         try:
