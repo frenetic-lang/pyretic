@@ -45,7 +45,7 @@ def topo_to_vmap_dict(topo, mst):
             mstlocs.add(attrs[sw])
         locs = elocs | {Location(sw,p) for p in mstlocs}
         for loc in locs:
-            d[(loc.switch,loc.port)] = [(loc.switch, loc.port)]
+            d[(loc.switch,loc.port_no)] = [(loc.switch, loc.port_no)]
     return d
 
 
@@ -70,7 +70,8 @@ def setup_virtual_network(network):
         for topo in network.topology_changes:
             vtopo = Topology.minimum_spanning_tree(topo)
             vmap = topo_to_vmap_dict(topo, vtopo)
-            vn.physical_policy = one_to_one_fabric_policy(vmap)
+            vn.physical_policy = network.flood  # THIS SHOULD WORK, BUT CURRENTLY DOESN'T
+#            vn.physical_policy = one_to_one_fabric_policy(vmap)
             vn.from_vmap(vmap)
             vn.topology = vtopo
             print "------------ underlying network ---------------"

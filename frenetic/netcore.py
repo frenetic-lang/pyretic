@@ -710,13 +710,13 @@ class flood(Policy):
         switch = packet["switch"]
         inport = packet["inport"]
         if switch in self.network.topology.nodes() and switch in self.mst:
-            ports = set()
-            ports.update({loc.port for loc in self.network.topology.egress_locations(switch)})
+            port_nos = set()
+            port_nos.update({loc.port_no for loc in self.network.topology.egress_locations(switch)})
             for sw in self.mst.neighbors(switch):
-                port = self.mst[switch][sw][switch]
-                ports.add(port)
-            packets = [packet.push(outport=port)
-                       for port in ports if port != inport]
+                port_no = self.mst[switch][sw][switch]
+                port_nos.add(port_no)
+            packets = [packet.push(outport=port_no)
+                       for port_no in port_nos if port_no != inport]
             return Counter(packets)
         else:
             return Counter()

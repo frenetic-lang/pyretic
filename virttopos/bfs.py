@@ -39,32 +39,32 @@ import sys
 
 def topo_to_vmap(topo):
     vmap = {}
-    port_ind = 1
+    port_no = 1
     for loc in topo.egress_locations():
-        vmap[1, port_ind] = [(loc.switch, loc.port)]
-        port_ind += 1
+        vmap[1, port_no] = [(loc.switch, loc.port_no)]
+        port_no += 1
     return vmap
 
 def shortest_path_policy(topo,vmap):
     fabric_policy = drop
     paths = Topology.all_pairs_shortest_path(topo)
     # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
-    for (vswitch1,vport1),[(pswitch1,pport1)] in vmap.items():
-        for (vswitch2,vport2),[(pswitch2,pport2)] in vmap.items():
+    for (vswitch1,vport_no1),[(pswitch1,pport_no1)] in vmap.items():
+        for (vswitch2,vport_no2),[(pswitch2,pport_no2)] in vmap.items():
             # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
             if vswitch1 != vswitch2:
                 continue
             # IF IDENTICAL VIRTUAL LOCATIONS, THEN WE KNOW FABRIC POLICY IS JUST TO FORWARD OUT MATCHING PHYSICAL PORT
-            if vport1 == vport2:
-                fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2,switch=pswitch2) & fwd(pport2)
+            if vport_no1 == vport_no2:
+                fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2) & fwd(pport_no2)
             # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
             # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
             # FINALLY ADD A RULE THAT FORWARDS OUT THE CORRECT PHYSICAL PORT AT THE LAST PHYSICAL SWITCH ON THE PATH
             else:
                 try:
                     for loc in paths[pswitch1][pswitch2]:
-                        fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2,switch=loc.switch) & fwd(loc.port)
-                    fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2,switch=pswitch2) & fwd(pport2)
+                        fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=loc.switch) & fwd(loc.port_no)
+                    fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2) & fwd(pport_no2)
                 except KeyError:
                     pass
     return fabric_policy
@@ -74,6 +74,7 @@ def setup_virtual_network(network):
     vn = VNetwork.fork(network)
     @run
     def vmap_gen():
+        counter = 0
         for topo in network.topology_changes:
             vtopo = Topology()
             vmap = topo_to_vmap(topo)
@@ -82,9 +83,9 @@ def setup_virtual_network(network):
             vn.physical_policy = shortest_path_policy(topo,vmap)
             vn.from_vmap(vmap)
             vn.topology = vtopo
-            print "------------ underlying network ---------------"
+            print "------------ underlying network %d ---------------" % counter
             print topo
-            print "------------ abstracted network ---------------"
+            print "------------ abstracted network %d ---------------" % counter
             print vtopo
-
+            counter += 1
     return vn

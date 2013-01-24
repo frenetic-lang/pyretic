@@ -55,14 +55,10 @@ class POXBackend(revent.EventMixin):
         self.diff_to_vlan_db = {}
         self.vlan_diff_lock = threading.RLock()
         self.packetno = 0
-        
-#        core.registerNew(discovery.Discovery)
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
-#        if core.hasComponent("openflow_discovery"):
-#            self.listenTo(core.openflow_discovery)
-        
+
         gs.run(user_program, self.network, **kwargs)
     
     def vlan_from_diff(self, diff):
@@ -176,6 +172,141 @@ class POXBackend(revent.EventMixin):
             self.listenTo(core.openflow)
             return EventRemove # We don't need this listener anymore
 
+    def active_ofp_port_config(self,configs):
+        active = []
+        for (config,bit) in of.ofp_port_config_rev_map.items():
+            if configs & bit:
+                active.append(config)
+        return active
+
+    def active_ofp_port_state(self,states):
+        """get active ofp port state values
+        NOTE: POX's doesn't match ofp_port_state_rev_map"""
+        active = []
+        for (state,bit) in of.ofp_port_state_rev_map.items():
+            if states & bit:
+                active.append(state)
+        return active
+
+    def active_ofp_port_features(self,features):
+        active = []
+        for (feature,bit) in of.ofp_port_features_rev_map.items():
+            if features & bit:
+                active.append(feature)
+        return active
+
+    def inspect_ofp_phy_port(self,port,prefix=""):
+        print "%sport_no:     " % prefix, 
+        port_id = port.port_no
+        for name,port_no in of.ofp_port_rev_map.iteritems():
+            if port.port_no == port_no:
+                port_id = name
+        print port_id
+        print "%shw_addr:     " % prefix, 
+        print port.hw_addr
+        print "%sname:        " % prefix, 
+        print port.name
+        print "%sconfig:      " % prefix, 
+        print self.active_ofp_port_config(port.config)
+        print "%sstate:       " % prefix, 
+        print self.active_ofp_port_state(port.state)
+        print "%scurr:        " % prefix, 
+        print self.active_ofp_port_features(port.curr)
+        print "%sadvertised:  " % prefix, 
+        print self.active_ofp_port_features(port.advertised)
+        print "%ssupported:   " % prefix, 
+        print self.active_ofp_port_features(port.supported)
+        print "%speer:        " % prefix, 
+        print self.active_ofp_port_features(port.peer)
+
+    def create_discovery_packet (self, dpid, portNum, portAddr):
+        """ Create LLDP packet """
+        
+        discovery_packet = lldp()
+        
+        cid = chassis_id()
+        # Maybe this should be a MAC.  But a MAC of what?  Local port, maybe?
+        cid.fill(cid.SUB_LOCAL, bytes('dpid:' + hex(long(dpid))[2:-1]))
+        discovery_packet.add_tlv(cid)
+        
+        pid = port_id()
+        pid.fill(pid.SUB_PORT, str(portNum))
+        discovery_packet.add_tlv(pid)
+        
+        ttlv = ttl()
+        ttlv.fill(0)
+        discovery_packet.add_tlv(ttlv)
+        
+        sysdesc = system_description()
+        sysdesc.fill(bytes('dpid:' + hex(long(dpid))[2:-1]))
+        discovery_packet.add_tlv(sysdesc)
+        
+        discovery_packet.add_tlv(end_tlv())
+        
+        eth = ethernet()
+        eth.src = portAddr
+        eth.dst = NDP_MULTICAST
+        eth.set_payload(discovery_packet)
+        eth.type = ethernet.LLDP_TYPE
+        
+        po = of.ofp_packet_out(action = of.ofp_action_output(port=portNum),
+                               data = eth.pack())
+    #    log.info("discovery_packet_created")    
+        return po.pack()
+
+    def inject_discovery_packet(self,dpid, port):
+        hw_addr = self.switches[dpid]['ports'][port]
+        packet = self.create_discovery_packet(dpid, port, hw_addr)
+        core.openflow.sendToDPID(dpid, packet)
+
+    def _handle_ConnectionUp(self, event):
+        assert event.dpid not in self.switches
+        
+        self.switches[event.dpid] = {}
+        self.switches[event.dpid]['connection'] = event.connection
+        self.switches[event.dpid]['ports'] = {}
+
+        msg = of.ofp_flow_mod(match = of.ofp_match())
+        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+        self.switches[event.dpid]['connection'].send(msg)
+
+        self.network.switch_joins.signal(event.dpid)
+
+        # port type is ofp_phy_port
+        for port in event.ofp.ports:
+            if port.port_no <= of.OFPP_MAX:
+                self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
+                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state):
+                    self.network.port_joins.signal((event.dpid, port.port_no,'DOWN'))
+                else:
+                    self.network.port_joins.signal((event.dpid, port.port_no,'UP'))
+        
+    def _handle_ConnectionDown(self, event):
+        assert event.dpid in self.switches
+
+        del self.switches[event.dpid]
+        self.network.switch_parts.signal(event.dpid)
+        
+    def _handle_PortStatus(self, event):
+        if event.port <= of.OFPP_MAX:
+            if event.added:
+                self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
+                self.network.port_joins.signal((event.dpid, event.port))
+                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(event.ofp.desc.state):
+                    self.network.port_joins.signal((event.dpid, port.port_no,'DOWN'))
+                else:
+                    self.network.port_joins.signal((event.dpid, port.port_no,'UP'))
+            elif event.deleted:
+                del self.switches[event.dpid]['ports'][event.port] 
+                self.network.port_parts.signal((event.dpid, event.port))
+            elif event.modified:
+                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(event.ofp.desc.state):
+                    self.network.port_downs.signal((event.dpid, event.port))
+                else:
+                    self.network.port_ups.signal((event.dpid, event.port))
+            else:
+                raise RuntimeException("Unknown port status event")
+
     def handle_lldp(self,packet,event):
 
         if not packet.next:
@@ -264,12 +395,9 @@ class POXBackend(revent.EventMixin):
             print 'Loop detected; received our own LLDP event'
             return
 
-        print (originatorDPID, originatorPort, event.dpid, event.port)
-
+        self.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
         return
-
 #    return EventHalt # Probably nobody else needs this event
-
 
     def _handle_PacketIn(self, event):
 
@@ -278,15 +406,15 @@ class POXBackend(revent.EventMixin):
             self.handle_lldp(packet,event)
             return
 
-#        if self.show_traces:
-        self.packetno += 1
-        print "-------- POX/OF RECV %d ---------------" % self.packetno
-        print event.connection
-        print event.ofp
-        print "port\t%s" % event.port
-        print "data\t%s" % packetlib.ethernet(event.data)
-        print "dpid\t%s" % event.dpid
-        print
+        if self.show_traces:
+            self.packetno += 1
+            print "-------- POX/OF RECV %d ---------------" % self.packetno
+            print event.connection
+            print event.ofp
+            print "port\t%s" % event.port
+            print "data\t%s" % packetlib.ethernet(event.data)
+            print "dpid\t%s" % event.dpid
+            print
 
         recv_packet = self.create_packet(event.dpid, event.ofp.in_port, event.data)
         
@@ -320,147 +448,6 @@ class POXBackend(revent.EventMixin):
                 pkt = pkt.pop("outport")
                 bucket.signal(pkt)
 
-
-    def active_ofp_port_config(self,configs):
-        active = []
-        for (config,bit) in of.ofp_port_config_rev_map.items():
-            if configs & bit:
-                active.append(config)
-        return active
-
-    def active_ofp_port_state(self,states):
-        """get active ofp port state values
-        NOTE: POX's doesn't match ofp_port_state_rev_map"""
-        active = []
-        for (state,bit) in of.ofp_port_state_rev_map.items():
-            if states & bit:
-                active.append(state)
-        return active
-
-    def active_ofp_port_features(self,features):
-        active = []
-        for (feature,bit) in of.ofp_port_features_rev_map.items():
-            if features & bit:
-                active.append(feature)
-        return active
-
-    def inspect_ofp_phy_port(self,port,prefix=""):
-        print "%sport_no:     " % prefix, 
-        port_id = port.port_no
-        for name,port_no in of.ofp_port_rev_map.iteritems():
-            if port.port_no == port_no:
-                port_id = name
-        print port_id
-        print "%shw_addr:     " % prefix, 
-        print port.hw_addr
-        print "%sname:        " % prefix, 
-        print port.name
-        print "%sconfig:      " % prefix, 
-        print self.active_ofp_port_config(port.config)
-        # POX DOESN'T FOLLOW OPENFLOW SPEC HERE
-        print "%sstate:       " % prefix, 
-        print self.active_ofp_port_state(port.state)
-        print "%scurr:        " % prefix, 
-        print self.active_ofp_port_features(port.curr)
-        print "%sadvertised:  " % prefix, 
-        print self.active_ofp_port_features(port.advertised)
-        print "%ssupported:   " % prefix, 
-        print self.active_ofp_port_features(port.supported)
-        print "%speer:        " % prefix, 
-        print self.active_ofp_port_features(port.peer)
-
-    def create_discovery_packet (self, dpid, portNum, portAddr):
-        """ Create LLDP packet """
-        
-        discovery_packet = lldp()
-        
-        cid = chassis_id()
-        # Maybe this should be a MAC.  But a MAC of what?  Local port, maybe?
-        cid.fill(cid.SUB_LOCAL, bytes('dpid:' + hex(long(dpid))[2:-1]))
-        discovery_packet.add_tlv(cid)
-        
-        pid = port_id()
-        pid.fill(pid.SUB_PORT, str(portNum))
-        discovery_packet.add_tlv(pid)
-        
-        ttlv = ttl()
-        ttlv.fill(0)
-        discovery_packet.add_tlv(ttlv)
-        
-        sysdesc = system_description()
-        sysdesc.fill(bytes('dpid:' + hex(long(dpid))[2:-1]))
-        discovery_packet.add_tlv(sysdesc)
-        
-        discovery_packet.add_tlv(end_tlv())
-        
-        eth = ethernet()
-        eth.src = portAddr
-        eth.dst = NDP_MULTICAST
-        eth.set_payload(discovery_packet)
-        eth.type = ethernet.LLDP_TYPE
-        
-        po = of.ofp_packet_out(action = of.ofp_action_output(port=portNum),
-                               data = eth.pack())
-    #    log.info("discovery_packet_created")    
-        return po.pack()
-
-    def inject_discovery_packet(self,dpid, port):
-        hw_addr = self.switches[dpid]['ports'][port]
-        packet = self.create_discovery_packet(dpid, port, hw_addr)
-        core.openflow.sendToDPID(dpid, packet)
-
-
-    def _handle_ConnectionUp(self, event):
-        assert event.dpid not in self.switches
-        
-        self.switches[event.dpid] = {}
-        self.switches[event.dpid]['connection'] = event.connection
-        self.switches[event.dpid]['ports'] = {}
-
-        msg = of.ofp_flow_mod(match = of.ofp_match())
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        self.switches[event.dpid]['connection'].send(msg)
-
-        self.network.switch_joins.signal(event.dpid)
-
-        # port type is ofp_phy_port
-        for port in event.ofp.ports:
-#            self.inspect_ofp_phy_port(port,' ')
-        
-            if port.port_no <= of.OFPP_MAX:
-                self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
-                self.network.port_ups.signal((event.dpid, port.port_no))               
-                self.inject_discovery_packet(event.dpid,port.port_no)
-
-    def _handle_ConnectionDown(self, event):
-        assert event.dpid in self.switches
-
-        del self.switches[event.dpid]
-        self.network.switch_parts.signal(event.dpid)
-        
-    def _handle_PortStatus(self, event):
-#        self.inspect_ofp_phy_port(event.ofp.desc,'  ')
-
-        if event.port <= of.OFPP_MAX:
-            if event.added:
-                self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
-                self.network.port_ups.signal((event.dpid, event.port))
-            elif event.deleted:
-                self.network.port_downs.signal((event.dpid, event.port))
-                del self.switches[event.dpid]['ports'][event.port] 
-
-    def _handle_LinkEvent(self, event):
-        sw1 = event.link.dpid1
-        p1 = event.link.port1
-        sw2 = event.link.dpid2
-        p2 = event.link.port2
-        if sw1 is None or sw2 is None:
-            return
-        if event.added:
-            self.network.link_ups.signal((sw1, p1, sw2, p2))
-        elif event.removed:
-            self.network.link_downs.signal((sw1, p1, sw2, p2))
-        
     def send_packet(self, packet):
         switch = packet["switch"]
         inport = packet["inport"]

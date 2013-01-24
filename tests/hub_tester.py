@@ -69,7 +69,7 @@ def main():
     sleep(1)
 
     # TEST EACH TOPO
-    topos = ['single,2','single,16','linear,2','linear,8','tree,2,2','tree,3,2','cycle,3,3','clique,4,4','clique,5,5']
+    topos = ['single,2','single,16','linear,2','linear,16','tree,2,2','tree,3,2','tree,3,3','cycle,3,3','clique,6,6','clique,10,10']
 
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + flags

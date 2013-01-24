@@ -158,12 +158,13 @@ class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical
                        self.physical_policy_fn(self)))
         return pol
         
-def add_nodes_from_vmap(vmap, graph):
-    d = {}
-    for sw, port in vmap:
-        d.setdefault(sw, set()).add(port)
-    for sw, ports in d.iteritems():
-        graph.add_node(sw, ports=ports)
+def add_nodes_from_vmap(vmap, vtopo):
+    for switch, port_no in vmap:
+        port = Port(port_no,'UP')
+        try:
+            vtopo.node[switch]['ports'][port_no] = port 
+        except KeyError:
+            vtopo.add_node(switch, ports={port_no: port})
     
 def vmap_to_ingress_policy(vmap):
     ingress_policy = parallel(push(vswitch=vsw, vinport=vp) &

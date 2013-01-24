@@ -227,53 +227,66 @@ class Packet(object):
                 l.append("%s:%s%s" % (k, " " * (size - len(k)), v))
         return "\n".join(l)
 
-
-class Location(object):
-    def __init__(self,switch,port):
-        self.switch = switch
-        self.port = port
+class Port(object):
+    def __init__(self,port_no,status='UP',linked_to=None):
+        self.port_no = port_no
+        self.status = status
+        self.linked_to = linked_to
 
     def __hash__(self):
-        return hash((self.switch, self.port))
+        return hash(self.port_no)
 
     def __eq__(self,other):
-        return self.switch == other.switch and self.port == other.port
+        return self.port_no == other.port_no
 
     def __repr__(self):
-        return "%s[%s]" % (self.switch,self.port)
+        return "%d:%s:%s" % (self.port_no,self.status,self.linked_to)
+
+
+
+class Location(object):
+    def __init__(self,switch,port_no):
+        self.switch = switch
+        self.port_no = port_no
+
+    def __hash__(self):
+        return hash((self.switch, self.port_no))
+
+    def __eq__(self,other):
+        return self.switch == other.switch and self.port_no == other.port_no
+
+    def __repr__(self):
+        return "%s[%s]" % (self.switch,self.port_no)
 
 
 class Topology(nx.Graph):
     def is_connected(self):
         return nx.is_connected(self)
 
-    def interior_locations(self, sw):
-        interior = set()
-        # result could be incorrect if self[sw] changes during execution
-        for attrs in self[sw].values():   
-            interior.add(Location(sw,attrs[sw]))
-        return interior
-
-    def egress_locations(self, sw=None):
-        if sw is None:
-            locations = set()
-            for sw in self.nodes():
-                locations |= self.egress_locations(sw)
-            return locations
+    def egress_locations(self,switch=None):
+        locs = set()
+        if switch is None:
+            for s in self.nodes():
+                locs |= (self.egress_locations(s))
         else:
-            attrs = self.node[sw]
-            try:
-                all_locations = {Location(sw,p) for p in attrs["ports"]}
-            except KeyError:
-                all_locations = set()
-            non_egress_locations = self.interior_locations(sw)
-            return all_locations - non_egress_locations
+            for port in self.node[switch]['ports'].values():
+                if port.status == 'UP' and port.linked_to is None:
+                    locs.add(Location(switch,port.port_no))
+        return locs
 
-    def copy(self):
-        return Topology(self.copy())
+    def interior_locations(self,switch=None):
+        locs = set()
+        if switch is None:
+            for s in self.nodes():
+                locs |= (self.interior_locations(s))
+        else:
+            for port in self.node[switch]['ports'].values():
+                if port.status == 'UP' and not port.linked_to is None:
+                    locs.add(Location(switch,port.port_no))
+        return locs
 
-    ### TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY
     def copy_attributes(self,initial_topo):
+        """TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY"""
         for s,data in initial_topo.nodes(data=True):
             try:
                 if self.node[s] == data:
@@ -310,15 +323,15 @@ class Topology(nx.Graph):
                     # matching edge data
                     pass
                 else:
-                    raise Exception("NON-MATCHING EDGE DATA")
-            except: 
+                    raise RuntimeError("NON-MATCHING EDGE DATA")
+            except KeyError:  
                # removed edge, reconcile node ports"
                 to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
                 for loc in to_remove:
                     try:
-                        old_ports = self.node[loc.switch]['ports'] 
-                        new_ports = old_ports - {loc.port}
-                        self.node[loc.switch]['ports'] = new_ports
+                        new_port_nos = self.node[loc.switch]['ports'].copy() 
+                        del new_port_nos[loc.port_no]
+                        self.node[loc.switch]['ports'] = new_port_nos
                     except KeyError:
                         pass                # node removed
 
@@ -385,8 +398,8 @@ class Topology(nx.Graph):
                 cur = s1
                 for nxt in path + [s2]:
                     if cur != nxt:
-                        ports = topology[cur][nxt]
-                        loc = Location(cur,ports[cur])
+                        link = topology[cur][nxt]
+                        loc = Location(cur,link[cur])
                         location_paths[s1][s2].append(loc)
                     cur = nxt
         return location_paths
@@ -400,8 +413,8 @@ class Topology(nx.Graph):
         egress_str_maxlen = len('egress ports')
         for switch in self.nodes():
             edge_str[switch] = \
-                ', '.join([ "%s[%s] --- %s[%s]" % (s1,ports[s1],s2,ports[s2]) \
-                                for (s1,s2,ports) in self.edges(data=True) \
+                ', '.join([ "%s[%s] --- %s[%s]" % (s1,port_nos[s1],s2,port_nos[s2]) \
+                                for (s1,s2,port_nos) in self.edges(data=True) \
                                 if s1 == switch or s2 == switch])
             egress_str[switch] = \
                 ', '.join([ "%s---" % l for l in self.egress_locations(switch)])
@@ -429,6 +442,7 @@ class Topology(nx.Graph):
     def __str__(self):
         return repr(self)
         
+
 class Network(object):
     def __init__(self,backend):
         from frenetic.netcore import drop
@@ -458,8 +472,8 @@ class Network(object):
     def init_events(self):
         self._topology = gs.Behavior(Topology())                
         self.events = ["switch_joins", "switch_parts",
-                       "port_ups", "port_downs",
-                       "link_ups", "link_downs"]
+                       "port_joins", "port_parts",
+                       "port_ups", "port_downs", "link_updates"]
         for event in self.events:
             e = gs.Event()
             setattr(self, event, e)
@@ -483,6 +497,9 @@ class Network(object):
 
     def inject_packet(self, packet):
         self.backend.send_packet(packet)
+
+    def inject_discovery_packet(self, dpid, port_no):
+        self.backend.inject_discovery_packet(dpid, port_no)
     
     def install_policy_func(self, policy_func):
         self.install_policy(policy_func(self))
@@ -523,44 +540,89 @@ class Network(object):
     #
            
     def _handle_switch_joins(self, switch):
-        self.topology.add_node(switch, ports=set())
+        self.topology.add_node(switch, ports={})
         self._topology.signal_mutation()
+
+    def remove_associated_link(self,location):
+        port = self.topology.node[location.switch]["ports"][location.port_no]
+        if not port.linked_to is None:
+            try:
+                self.topology.remove_edge(location.switch, port.linked_to.switch)
+            except:
+                pass  # ALREADY REMOVED
+            self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def _handle_switch_parts(self, switch):
+        # REMOVE ALL ASSOCIATED LINKS
+        for port_no in self.topology.node[switch]["ports"].keys():
+            self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
         self._topology.signal_mutation()
         
-    def _handle_port_ups(self, (switch, port)):
-        self.topology.node[switch]["ports"].add(port)
-        self._topology.signal_mutation()
+    def _handle_port_joins(self, (switch, port_no, status)):
+        self.topology.node[switch]["ports"][port_no] = Port(port_no,status)
+        if status == 'UP':
+            self.inject_discovery_packet(switch,port_no)
+            self._topology.signal_mutation()
 
-    def _handle_port_downs(self, (switch, port)):
+    def _handle_port_parts(self, (switch, port_no)):
         try:
-            self.topology.node[switch]["ports"].remove(port)
+            self.remove_associated_link(Location(switch,port_no))
+            del self.topology.node[switch]["ports"][port_no]
             self._topology.signal_mutation()
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
         
-    def _handle_link_ups(self, (s1, p1, s2, p2)):
+    def _handle_port_ups(self, (switch, port_no)):
+        if self.topology.node[switch]["ports"][port_no].status != 'UP':
+            self.topology.node[switch]["ports"][port_no].status = 'UP'
+            self.inject_discovery_packet(switch,port_no)
+            self._topology.signal_mutation()
+
+    def _handle_port_downs(self, (switch, port_no)):
+        if self.topology.node[switch]["ports"][port_no].status != 'DOWN':
+            self.topology.node[switch]["ports"][port_no].status = 'DOWN'
+            self.remove_associated_link(Location(switch,port_no))
+            self._topology.signal_mutation()
+
+    def _handle_link_updates(self, (s1, p_no1, s2, p_no2)):
         try:
-            port_mapping = self.topology[s1][s2]
-            if port_mapping[s1] == p1 and port_mapping[s2] == p2:
-                pass # THE LINK BETWEEN THESE SWITCHES HASN'T CHANGED AT ALL
-            else:
-                # THE LINK BETWEEN THESE SWITCHES HAS MOVED PORT(S)!
-                self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
-                self._topology.signal_mutation()
+            p1 = self.topology.node[s1]["ports"][p_no1]
+            p2 = self.topology.node[s2]["ports"][p_no2]
         except KeyError:
-            # NO LINK CURRENTLY EXISTS BETWEEN THESE SWITCHES
-            self.topology.add_edge(s1, s2, {s1: p1, s2: p2})
-            self._topology.signal_mutation()
-        
-    def _handle_link_downs(self, (s1, p1, s2, p2)):
+            return  # at least one of these ports isn't (yet) in the topology
+
+        # LINK ALREADY EXISTS
         try:
-            self.topology.remove_edge(s1, s2)
-            self._topology.signal_mutation()
-        except nx.NetworkXError:
-            pass  # LINK HAS ALREADY BEEN REMOVED
+            link = self.topology[s1][s2]
+
+            # LINK ON SAME PORT PAIR
+            if link[s1] == p_no1 and link[s2] == p_no2:         
+                if p1.status == 'UP' and p2.status == 'UP':     #  AND BOTH PORTS ARE UP
+                    return                                      #   NOTHING TO DO
+                else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
+                    raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
+            # LINK PORTS CHANGED
+            else:                                               
+                # REMOVE OLD LINKS
+                if link[s1] != p_no1:
+                    self.remove_associated_link(Location(s1,link[s1]))
+                if link[s2] != p_no2:
+                    self.remove_associated_link(Location(s2,link[s2]))
+
+        # COMPLETELY NEW LINK
+        except KeyError:     
+            pass
+        
+        # ADD LINK IF PORTS ARE UP
+        if p1.status == 'UP' and p2.status == 'UP':
+            self.topology.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
+            self.topology.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
+            self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
+            
+        # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
+        self._topology.signal_mutation()
+
 
 
     #

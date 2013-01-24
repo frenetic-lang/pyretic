@@ -40,6 +40,8 @@ from frenetic.lib import *
 
 def monitor(network):
     for topo in network.topology_changes:
+        print "------ monitor topology output start -------"
         print topo
+        print "------ monitor topology output end - -------"
         
 main = monitor

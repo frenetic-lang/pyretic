@@ -42,6 +42,8 @@ from examples import monitor_topology
 def calculate_spanning_tree_set(network):
     for topo in network.topology_changes:
         msts = Topology.disjoint_minimum_spanning_tree_set(topo)
+        print "Topo"
+        print topo
         print "Disjoint Minimum Spanning Tree Set:"
         print "{"
         for mst in msts:
@@ -49,7 +51,7 @@ def calculate_spanning_tree_set(network):
         print "}"
 
 def example(network):
-    run(monitor_topology.monitor, Network.fork(network))
+#    run(monitor_topology.monitor, Network.fork(network))
     run(calculate_spanning_tree_set, Network.fork(network))
  
 main = example
