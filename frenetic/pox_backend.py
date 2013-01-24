@@ -29,9 +29,13 @@ import threading
 from collections import Counter
 
 import pox.openflow.libopenflow_01 as of
-import pox.openflow.discovery as discovery
+#import pox.openflow.discovery as discovery
 from pox.core import core
 from pox.lib import revent, addresses as packetaddr, packet as packetlib
+from pox.lib.packet.ethernet      import ethernet
+from pox.lib.packet.ethernet      import LLDP_MULTICAST, NDP_MULTICAST
+from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
+from pox.lib.packet.lldp          import ttl, system_description
 
 from frenetic import generators as gs, network as net, virt, util
 
@@ -44,7 +48,7 @@ class POXBackend(revent.EventMixin):
         self.network = virt.Network(self)
         self.network.init_events()
         
-        self.switch_connections = {}
+        self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
         self.vlan_to_diff_db = {}
@@ -52,12 +56,12 @@ class POXBackend(revent.EventMixin):
         self.vlan_diff_lock = threading.RLock()
         self.packetno = 0
         
-        core.registerNew(discovery.Discovery)
+#        core.registerNew(discovery.Discovery)
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
-        if core.hasComponent("openflow_discovery"):
-            self.listenTo(core.openflow_discovery)
+#        if core.hasComponent("openflow_discovery"):
+#            self.listenTo(core.openflow_discovery)
         
         gs.run(user_program, self.network, **kwargs)
     
@@ -167,16 +171,122 @@ class POXBackend(revent.EventMixin):
 
         return payload
 
+    def _handle_ComponentRegistered (self, event):
+        if event.name == "openflow":
+            self.listenTo(core.openflow)
+            return EventRemove # We don't need this listener anymore
+
+    def handle_lldp(self,packet,event):
+
+        if not packet.next:
+            print "lldp packet could not be parsed"
+            return
+
+        assert isinstance(packet.next, lldp)
+
+        lldph = packet.next
+        if  len(lldph.tlvs) < 3 or \
+                (lldph.tlvs[0].tlv_type != lldp.CHASSIS_ID_TLV) or\
+                (lldph.tlvs[1].tlv_type != lldp.PORT_ID_TLV) or\
+                (lldph.tlvs[2].tlv_type != lldp.TTL_TLV):
+            print "lldp_input_handler invalid lldp packet"
+            return
+
+        def lookInSysDesc():
+            r = None
+            for t in lldph.tlvs[3:]:
+                if t.tlv_type == lldp.SYSTEM_DESC_TLV:
+                    # This is our favored way...
+                    for line in t.next.split('\n'):
+                        if line.startswith('dpid:'):
+                            try:
+                                return int(line[5:], 16)
+                            except:
+                                pass
+                    if len(t.next) == 8:
+                        # Maybe it's a FlowVisor LLDP...
+                        try:
+                            return struct.unpack("!Q", t.next)[0]
+                        except:
+                            pass
+                    return None
+
+        originatorDPID = lookInSysDesc()
+
+        if originatorDPID == None:
+            # We'll look in the CHASSIS ID
+            if lldph.tlvs[0].subtype == chassis_id.SUB_LOCAL:
+                if lldph.tlvs[0].id.startswith('dpid:'):
+                    # This is how NOX does it at the time of writing
+                    try:
+                        originatorDPID = int(lldph.tlvs[0].id.tostring()[5:], 16)
+                    except:
+                        pass
+            if originatorDPID == None:
+                if lldph.tlvs[0].subtype == chassis_id.SUB_MAC:
+                    # Last ditch effort -- we'll hope the DPID was small enough
+                    # to fit into an ethernet address
+                    if len(lldph.tlvs[0].id) == 6:
+                        try:
+                            s = lldph.tlvs[0].id
+                            originatorDPID = struct.unpack("!Q",'\x00\x00' + s)[0]
+                        except:
+                            pass
+
+        if originatorDPID == None:
+            print "Couldn't find a DPID in the LLDP packet"
+            return
+
+#        # if chassid is from a switch we're not connected to, ignore
+#        if originatorDPID not in self._dps:
+#            log.info('Received LLDP packet from unconnected switch')
+#            return
+
+        # grab port ID from port tlv
+        if lldph.tlvs[1].subtype != port_id.SUB_PORT:
+            print "Thought we found a DPID, but packet didn't have a port"
+            return # not one of ours
+        originatorPort = None
+        if lldph.tlvs[1].id.isdigit():
+            # We expect it to be a decimal value
+            originatorPort = int(lldph.tlvs[1].id)
+        elif len(lldph.tlvs[1].id) == 2:
+            # Maybe it's a 16 bit port number...
+            try:
+                originatorPort  =  struct.unpack("!H", lldph.tlvs[1].id)[0]
+            except:
+                pass
+        if originatorPort is None:
+            print "Thought we found a DPID, but port number didn't make sense"
+            return
+
+        if (event.dpid, event.port) == (originatorDPID, originatorPort):
+            print 'Loop detected; received our own LLDP event'
+            return
+
+        print (originatorDPID, originatorPort, event.dpid, event.port)
+
+        return
+
+#    return EventHalt # Probably nobody else needs this event
+
+
     def _handle_PacketIn(self, event):
-        if self.show_traces:
-            self.packetno += 1
-            print "-------- POX/OF RECV %d ---------------" % self.packetno
-            print event.connection
-            print event.ofp
-            print "port\t%s" % event.port
-            print "data\t%s" % packetlib.ethernet(event.data)
-            print "dpid\t%s" % event.dpid
-            print
+
+        packet = event.parsed
+        if packet.type == ethernet.LLDP_TYPE: 
+            self.handle_lldp(packet,event)
+            return
+
+#        if self.show_traces:
+        self.packetno += 1
+        print "-------- POX/OF RECV %d ---------------" % self.packetno
+        print event.connection
+        print event.ofp
+        print "port\t%s" % event.port
+        print "data\t%s" % packetlib.ethernet(event.data)
+        print "dpid\t%s" % event.dpid
+        print
 
         recv_packet = self.create_packet(event.dpid, event.ofp.in_port, event.data)
         
@@ -259,32 +369,85 @@ class POXBackend(revent.EventMixin):
         print "%speer:        " % prefix, 
         print self.active_ofp_port_features(port.peer)
 
-    def _handle_ConnectionUp(self, event):
-        assert event.dpid not in self.switch_connections
+    def create_discovery_packet (self, dpid, portNum, portAddr):
+        """ Create LLDP packet """
         
-        self.switch_connections[event.dpid] = event.connection
+        discovery_packet = lldp()
+        
+        cid = chassis_id()
+        # Maybe this should be a MAC.  But a MAC of what?  Local port, maybe?
+        cid.fill(cid.SUB_LOCAL, bytes('dpid:' + hex(long(dpid))[2:-1]))
+        discovery_packet.add_tlv(cid)
+        
+        pid = port_id()
+        pid.fill(pid.SUB_PORT, str(portNum))
+        discovery_packet.add_tlv(pid)
+        
+        ttlv = ttl()
+        ttlv.fill(0)
+        discovery_packet.add_tlv(ttlv)
+        
+        sysdesc = system_description()
+        sysdesc.fill(bytes('dpid:' + hex(long(dpid))[2:-1]))
+        discovery_packet.add_tlv(sysdesc)
+        
+        discovery_packet.add_tlv(end_tlv())
+        
+        eth = ethernet()
+        eth.src = portAddr
+        eth.dst = NDP_MULTICAST
+        eth.set_payload(discovery_packet)
+        eth.type = ethernet.LLDP_TYPE
+        
+        po = of.ofp_packet_out(action = of.ofp_action_output(port=portNum),
+                               data = eth.pack())
+    #    log.info("discovery_packet_created")    
+        return po.pack()
+
+    def inject_discovery_packet(self,dpid, port):
+        hw_addr = self.switches[dpid]['ports'][port]
+        packet = self.create_discovery_packet(dpid, port, hw_addr)
+        core.openflow.sendToDPID(dpid, packet)
+
+
+    def _handle_ConnectionUp(self, event):
+        assert event.dpid not in self.switches
+        
+        self.switches[event.dpid] = {}
+        self.switches[event.dpid]['connection'] = event.connection
+        self.switches[event.dpid]['ports'] = {}
+
+        msg = of.ofp_flow_mod(match = of.ofp_match())
+        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+        self.switches[event.dpid]['connection'].send(msg)
+
         self.network.switch_joins.signal(event.dpid)
+
         # port type is ofp_phy_port
         for port in event.ofp.ports:
-            self.inspect_ofp_phy_port(port,' ')
+#            self.inspect_ofp_phy_port(port,' ')
         
             if port.port_no <= of.OFPP_MAX:
-                self.network.port_ups.signal((event.dpid, port.port_no))
-        
-    def _handle_ConnectionDown(self, event):
-        assert event.dpid in self.switch_connections
+                self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
+                self.network.port_ups.signal((event.dpid, port.port_no))               
+                self.inject_discovery_packet(event.dpid,port.port_no)
 
-        del self.switch_connections[event.dpid]
+    def _handle_ConnectionDown(self, event):
+        assert event.dpid in self.switches
+
+        del self.switches[event.dpid]
         self.network.switch_parts.signal(event.dpid)
         
     def _handle_PortStatus(self, event):
-        self.inspect_ofp_phy_port(event.ofp.desc,'  ')
+#        self.inspect_ofp_phy_port(event.ofp.desc,'  ')
 
         if event.port <= of.OFPP_MAX:
             if event.added:
+                self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
                 self.network.port_ups.signal((event.dpid, event.port))
             elif event.deleted:
                 self.network.port_downs.signal((event.dpid, event.port))
+                del self.switches[event.dpid]['ports'][event.port] 
 
     def _handle_LinkEvent(self, event):
         sw1 = event.link.dpid1
@@ -318,7 +481,7 @@ class POXBackend(revent.EventMixin):
 
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
         try:
-            self.switch_connections[switch].send(msg)
+            self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
             print "ERROR:send_packet: %s to switch %d" % (str(e),switch)
             # TODO - ATTEMPT TO RECONNECT SOCKET
