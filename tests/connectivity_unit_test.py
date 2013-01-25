@@ -62,13 +62,18 @@ def main():
     ## SET UP MININET INSTANCE AND START
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
+    print "Mininet started"
 
     # WAIT FOR CONTROLLER TO HOOK UP
     # TODO - PARAMETERIZE WAIT BASED ON NUMBER OF LINKS
     sleep(10)
 
     # RUN TESTS
+    print "Test beginning"
+    start = time()
     results = ping_all(net,options.verbose,options.ping_type,options.count,options.ping_pattern)
+    elapsed = time() - start
+    print "ELAPSED %s" % elapsed
     connectivity = fullConnectivity(net.hosts,results)
 
     if not options.quiet:
