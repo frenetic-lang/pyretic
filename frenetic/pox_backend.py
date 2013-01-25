@@ -297,7 +297,10 @@ class POXBackend(revent.EventMixin):
                 else:
                     self.network.port_joins.signal((event.dpid, port.port_no,'UP'))
             elif event.deleted:
-                del self.switches[event.dpid]['ports'][event.port] 
+                try:
+                    del self.switches[event.dpid]['ports'][event.port] 
+                except KeyError:
+                    pass  # SWITCH ALREADY DELETED
                 self.network.port_parts.signal((event.dpid, event.port))
             elif event.modified:
                 if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(event.ofp.desc.state):
