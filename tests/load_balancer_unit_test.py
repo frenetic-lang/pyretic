@@ -2,29 +2,32 @@
 
 from unit_util import *
 
-def clientServerConnectivity(clients,servers,canonical_ip,results):
-
+def clientServerConnectivity(clients,servers,canonical_ip,results,verbose=False):
+    cutoff = 0.1
     for c1 in clients:
         for c2 in clients:
             try:
                 # IF ALL PINGS FAILED FOR ANY CLIENT PAIR
-                # CONNECTIVITY FAILS
-                if results[c1.name][c2.name] == 0:
+                # CONNECTIVITY FAILS 
+                if results[c1.name][c2.name] < cutoff:
+                    if verbose:  print "(%s,%s) failed" % (c1,c2)
                     return False
             except KeyError:
                 pass    
 
         missing = 0
         for s in servers:
-            if results[c1.name][s.name] == 0:
+            if results[c1.name][s.name] < cutoff:
                 missing += 1
         # EXACTLY ONE SERVER SHOULD BE UNREACHABLE
         if missing != 1:
+            if verbose:  print "%s missing %d servers" % (c1,missing)
             return False
 
         # AND SHOULD RESPOND AS THE CANONICAL IP
-        if results[c1.name][canonical_ip] == 0:
-                return False
+        if results[c1.name][canonical_ip] < cutoff:
+            if verbose:  print "%s cannot connect to %s" (c1,cannonical_ip)
+            return False
 
     return True
 
@@ -80,19 +83,26 @@ def main():
     ## SET UP MININET INSTANCE AND START
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
+    if options.verbose:  print "Mininet started"
 
     # WAIT FOR CONTROLLER TO HOOK UP
     # TODO - PARAMETERIZE WAIT BASED ON NUMBER OF LINKS
-    sleep(10)
+    sleep(WARMUP)
 
+    # RUN TESTS
+    if options.verbose:  print "Test beginning"
+
+    start = time()
     results = ping_all(net,options.verbose,options.ping_type,options.count,options.ping_pattern,['10.0.0.100'])
-    connectivity = clientServerConnectivity(net.hosts[:num_clients],net.hosts[-num_servers:],'10.0.0.100',results)
+    elapsed = time() - start
+    if options.verbose:  print "Test done, processing results"
+    connectivity = clientServerConnectivity(net.hosts[:num_clients],net.hosts[-num_servers:],'10.0.0.100',results,options.verbose)
 
     if not options.quiet:
         if connectivity:
-            print "Unit test: success"
+            print "%s\tBALANCER PASSED\t%s" % (options.topo,elapsed)
         else:
-            print "Unit test: failure"
+            print "%s\tBALANCER FAILED\t%s" % (options.topo,elapsed)
 
     ## SHUTDOWN MININET
     net.stop()

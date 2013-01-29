@@ -20,6 +20,8 @@ from subprocess import call, PIPE, STDOUT
 
 from optparse import OptionParser
 
+WARMUP = 3
+
 TOPODEF = 'minimal'
 TOPOS = { 'minimal': lambda: SingleSwitchTopo( k=2 ),
           'linear': LinearTopo,

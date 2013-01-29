@@ -62,25 +62,25 @@ def main():
     ## SET UP MININET INSTANCE AND START
     net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
     net.start()
-    print "Mininet started"
+    if options.verbose:  print "Mininet started"
 
     # WAIT FOR CONTROLLER TO HOOK UP
     # TODO - PARAMETERIZE WAIT BASED ON NUMBER OF LINKS
-    sleep(10)
+    sleep(WARMUP)
 
     # RUN TESTS
-    print "Test beginning"
+    if options.verbose:  print "Test beginning"
     start = time()
     results = ping_all(net,options.verbose,options.ping_type,options.count,options.ping_pattern)
     elapsed = time() - start
-    print "ELAPSED %s" % elapsed
+    if options.verbose:  print "Test done, processing results"
     connectivity = fullConnectivity(net.hosts,results)
 
     if not options.quiet:
         if connectivity:
-            print "Unit test: success"
+            print "%s\tCONNECTIVITY PASSED\t%s" % (options.topo,elapsed)
         else:
-            print "Unit test: failure"
+            print "%s\tCONNECTIVITY FAILED\t%s" % (options.topo,elapsed)
 
     ## SHUTDOWN MININET
     net.stop()

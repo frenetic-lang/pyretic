@@ -35,10 +35,6 @@ def parseArgs():
     opts = OptionParser( description=desc, usage=usage )
     opts.add_option( '--verbose', '-v', action="store_true", dest="verbose")
     opts.add_option( '--quiet', '-q', action="store_true", dest="quiet")
-    opts.add_option( '--clients', '-c', action="store", type="string", 
-                     dest="clients", default='2', help = 'number of clients'  )
-    opts.add_option( '--servers', '-s', action="store", type="string", 
-                     dest="servers", default='2', help = 'number of servers'  )
 
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
@@ -48,10 +44,9 @@ def parseArgs():
 def main():
     
     (options, args) = parseArgs()
+    flags = ['-P','intermediate']
     if options.verbose:
-        flags = ['-v']
-    else:
-        flags = ['-q']
+        flags.append('-v')
 
     # GET PATHS
     controller_src_path = os.path.expanduser('~/pyretic/examples/static_load_balancer.py')
@@ -63,30 +58,41 @@ def main():
     if options.verbose:
         env['PYTHONUNBUFFERED'] = 'True'
 
-    # STARTUP CONTROLLER
-    controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path, 
-                        '--clients='+options.clients, '--servers='+options.servers], 
-                       env=env,
-                       stdout=PIPE, 
-                       stderr=STDOUT)
-    if options.verbose:
-        controller_out = subprocess_output(controller)
-        controller_out.start()
-    sleep(1)
+    dists = [(2,2),(8,3)]
+    print "----------------- LOAD BALANCER TESTER -----------------------"
+    count = 0
 
-    # TEST EACH TOPO
-    topos = ['bump_clique,1,'+options.clients+','+options.servers, 'bump_clique,2,'+options.clients+','+options.servers]
+    for (clients,servers) in dists:
 
-    for topo in topos:
-        test = ['sudo', unit_test_path, '--topo', topo] + flags
-        testproc = call(test)
-        if testproc == 0:
-            print "%s\tCONNECTIVITY PASSED" % topo
-        else:
-            print "%s\tCONNECTIVITY FAILED" % topo
+        # STARTUP CONTROLLER
+        controller = Popen([sys.executable, pox_path,'--no-cli', controller_src_path, 
+                        '--clients='+str(clients), '--servers='+str(servers)], 
+                           env=env,
+                           stdout=PIPE, 
+                           stderr=STDOUT)
+        if options.verbose:
+            controller_out = subprocess_output(controller)
+            controller_out.start()
+            sleep(1)
+
+        cs_params = str(clients)+','+str(servers)
+        topos = ['bump_clique,1,'+cs_params, 'bump_clique,4,'+cs_params]
+
+        for topo in topos:
+            test = ['sudo', unit_test_path, '--topo', topo, '-c', str(clients),'-s', str(servers)] + flags
+            testproc = call(test)
+            if testproc == 0:
+                count += 1
+
+        # KILL CONTROLLER
+        controller.send_signal( SIGINT )
+    
+    print "----------------------------------------------------"
+    if count == len(topos) * len(dists):
+        print "+ load_balancer_tester PASSED [%d/%d]" % (count,len(topos)*len(dists))
+    else:
+        print "- load_balancer_tester FAILED [%d/%d]" % (count,len(topos)*len(dists))
         
-    # KILL CONTROLLER
-    controller.send_signal( SIGINT )
 
 if __name__ == '__main__':
     main()

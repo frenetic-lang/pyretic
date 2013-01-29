@@ -43,10 +43,9 @@ def parseArgs():
 def main():
     
     (options, args) = parseArgs()
+    flags = ['-P','intermediate']
     if options.verbose:
-        flags = ['-v']
-    else:
-        flags = ['-q']
+        flags.append('-v')
 
     # GET PATHS
     controller_src_path = os.path.expanduser('~/pyretic/examples/hub.py')
@@ -69,15 +68,21 @@ def main():
     sleep(1)
 
     # TEST EACH TOPO
-    topos = ['single,2','single,16','linear,2','linear,16','tree,2,2','tree,3,2','tree,3,3','cycle,3,3','clique,6,6','clique,10,10']
+    topos = ['single,2','single,16','linear,2','linear,8','tree,2,2','tree,3,2','cycle,8,8','clique,8,8']
 
+    print "----------------- HUB TESTER -----------------------"
+    count = 0
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + flags
         testproc = call(test)
         if testproc == 0:
-            print "%s\tCONNECTIVITY PASSED" % topo
-        else:
-            print "%s\tCONNECTIVITY FAILED" % topo
+            count += 1
+    print "----------------------------------------------------"
+
+    if count == len(topos):
+        print "+ hub_tester PASSED [%d/%d]" % (count,len(topos))
+    else:
+        print "- hub_tester FAILED [%d/%d]" % (count,len(topos))
         
     # KILL CONTROLLER
     controller.send_signal( SIGINT )
