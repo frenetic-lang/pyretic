@@ -49,7 +49,7 @@ def main():
 
     # GET PATHS
     controller_src_path = os.path.expanduser('~/pyretic/examples/hub.py')
-    unit_test_path = os.path.expanduser('~/pyretic/tests/connectivity_unit_test.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/hub_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -70,14 +70,15 @@ def main():
     # TEST EACH TOPO
     topos = ['single,2','single,16','linear,2','linear,8','tree,2,2','tree,3,2','cycle,8,8','clique,8,8']
 
-    print "----------------- HUB TESTER -----------------------"
+    print "=============== HUB TESTER ===================="
+    print "-TOPO---------CONNS----PKTS----------TIME------"
     count = 0
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + flags
         testproc = call(test)
         if testproc == 0:
             count += 1
-    print "----------------------------------------------------"
+    print "-----------------------------------------------"
 
     if count == len(topos):
         print "+ hub_tester PASSED [%d/%d]" % (count,len(topos))

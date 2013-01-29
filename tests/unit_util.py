@@ -17,7 +17,7 @@ from mininet.clean import cleanup
 from mininet.log import lg
 
 from subprocess import call, PIPE, STDOUT
-
+from signal import SIGINT
 from optparse import OptionParser
 
 WARMUP = 3
@@ -184,6 +184,86 @@ def ping_all_parallel(net,verbose,ping_type,count,extra_ips=[]):
                         results[h1_name][h2_name] = success
     
     return results
+
+
+from threading import Thread
+
+class pmonitorBackground(Thread):
+    
+    def __init__(self,popens,pdumps):
+        self.popens = popens
+        self.pdumps = pdumps
+        self.stopped = False
+        Thread.__init__(self)
+
+    def run(self):
+        for h, line in pmonitor( self.popens ):
+            if h and line:
+                try:
+                    self.pdumps[h.name].append(line.strip())
+                except:
+                    self.pdumps[h.name] =[line.strip()]
+
+def collect_tcpdumps(hosts):
+    popens = {}
+    for host in hosts:
+        popens[host] = host.popen('/home/mininet/pyretic/tests/tcpdump_wrapper.sh', stdout=PIPE, stderr=STDOUT)
+    pdumps = {}
+    pb = pmonitorBackground(popens,pdumps)
+    pb.start()
+    return (pb,pdumps)
+
+def get_tcpdumps((pb,pdumps)):
+    sleep(10)
+    pb.join()
+    return pdumps
+
+def dumps_to_packets(dumps):
+    packets = {}
+    for h in dumps.keys():
+        packets[h] = []
+        cur = ''
+        for line in dumps[h]:
+            if re.search('^IP', line):
+                if cur != '':
+                    packets[h].append(cur)
+                cur = line + '\n'
+            elif re.search('^ARP', line):
+                if cur != '':
+                    packets[h].append(cur)
+                cur = line + '\n'
+            elif re.search('^tcpdump', line):
+                if cur != '':
+                    packets[h].append(cur)
+                cur = ''
+            else:
+                if cur != '':
+                    cur += line + '\n'
+        if cur != '':
+            packets[h].append(cur)
+        #if len(packets[h]) != len(set(packets[h])):
+        #    print "WARNING: multiple identical packets captured by tcpdump host %s" % h
+    return packets
+
+def hub_packet_behavior(packets,verbose):
+    for h1 in packets.keys():
+        for h2 in packets.keys():
+            difference = set(packets[h1]).symmetric_difference(set(packets[h2]))
+            # TCPDUMP BEHAVIOR NOT COMPLETELY SYNCHRONIZED
+            if len(difference) > 0:
+                if verbose:  
+                    print "%s,%s,%d" % (h1,h2,len(difference))
+                    for packet in difference:
+                        print packet
+                return False
+    return True
+
+def passed_str(b):
+    if b:
+        return '+'
+    else:
+        return '-'
+
 
 
 
