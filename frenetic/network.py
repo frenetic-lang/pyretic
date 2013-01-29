@@ -546,10 +546,17 @@ class Network(object):
     def remove_associated_link(self,location):
         port = self.topology.node[location.switch]["ports"][location.port_no]
         if not port.linked_to is None:
-            try:
+            # REMOVE CORRESPONDING EDGE
+            try:      
                 self.topology.remove_edge(location.switch, port.linked_to.switch)
             except:
                 pass  # ALREADY REMOVED
+            # UNLINK LINKED_TO PORT
+            try:      
+                self.topology.node[port.linked_to.switch]["ports"][port.linked_to.port_no].linked_to = None
+            except KeyError:
+                pass  # LINKED TO PORT ALREADY DELETED
+            # UNLINK SELF
             self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def _handle_switch_parts(self, switch):
@@ -580,10 +587,15 @@ class Network(object):
             self._topology.signal_mutation()
 
     def _handle_port_downs(self, (switch, port_no)):
-        if self.topology.node[switch]["ports"][port_no].status != 'DOWN':
+        try:
+            switch_data = self.topology.node[switch]
+            if switch_data["ports"][port_no].status == 'DOWN':
+                return
             self.topology.node[switch]["ports"][port_no].status = 'DOWN'
             self.remove_associated_link(Location(switch,port_no))
             self._topology.signal_mutation()
+        except KeyError:  
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
 
     def _handle_link_updates(self, (s1, p_no1, s2, p_no2)):
         try:
