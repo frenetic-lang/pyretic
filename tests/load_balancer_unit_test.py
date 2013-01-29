@@ -29,6 +29,24 @@ def clientServerConnectivity(clients,servers,canonical_ip,results,verbose=False)
             if verbose:  print "%s cannot connect to %s" (c1,cannonical_ip)
             return False
 
+    # SERVERS SHOULD HAVE FULL CONNECTIVITY TO ALL HOSTS, NONE TO CANNONICAL ADDRESS
+    for s1 in servers:
+        for s2 in servers:
+            try:
+                if results[s1.name][s2.name] < cutoff:
+                    if verbose:  print "(%s,%s) failed" % (s1,s2)
+                    return False
+            except KeyError:
+                pass
+        for c1 in clients:
+            if results[s1.name][c1.name] < cutoff:
+                if verbose:  print "(%s,%s) failed" % (s1,c1)
+                return False
+
+        if not results[s1.name][canonical_ip] < cutoff:
+            if verbose:  print "%s can connect to %s" (s1,cannonical_ip)
+            return False
+
     return True
 
 
