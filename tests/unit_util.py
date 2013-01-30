@@ -202,9 +202,9 @@ class pmonitorBackground(Thread):
         for h, line in pmonitor( self.popens ):
             if h and line:
                 try:
-                    self.pdumps[h.name].append(line.strip())
+                    self.pdumps[h].append(line.strip())
                 except:
-                    self.pdumps[h.name] =[line.strip()]
+                    self.pdumps[h] =[line.strip()]
 
                     if self.filedump:
                         f[h] = open('/tmp/'+str(h)+'.tcpdump', 'w')
@@ -293,6 +293,42 @@ def hub_packet_behavior(packets,verbose):
                         if float(h2_inds[packet])/float(len(h2_packets)) < 0.9:
                             if verbose:  print (h2_inds[packet],len(h2_packets),float(h2_inds[packet])/float(len(h2_packets)))
                             return False
+    return True
+
+
+def learning_switch_packet_behavior(packets,verbose):
+    hosts = packets.keys()
+    for i in range(0,len(hosts)):
+        h1 = hosts[i]
+        h1_packets, h1_inds = packets[h1]
+        for j in range(i+1,len(hosts)):
+            h2 = hosts[j]
+            h2_packets, h2_inds = packets[h2]
+            h1_only = set(h1_packets) - set(h2_packets)
+            h1_in_h1_only = 0
+            for packet in h1_only:
+                if re.search(h1.IP()+'\D', packet):
+                    h1_in_h1_only += 1
+                if re.search(h2.IP()+'\D', packet):
+                    if verbose:
+                        print "has %s" % h2.IP()
+                        print packet
+                    return False
+            h2_only = set(h2_packets) - set(h1_packets)
+            h2_in_h2_only = 0
+            for packet in h2_only:
+                if re.search(h2.IP()+'\D', packet):
+                    h2_in_h2_only += 1
+                if re.search(h1.IP()+'\D', packet):
+                    if verbose:
+                        print "has %s" % h1.IP()
+                        print packet
+                    return False
+            try:
+                if float(h1_in_h1_only)/len(h1_only) < 0.75 or float(h2_in_h2_only)/len(h2_only) < 0.75:
+                    if verbose: print "%s:%d:%d\t%s:%d:%d" % (h1,h1_in_h1_only,len(h1_only),h2,h2_in_h2_only,len(h2_only))
+                    return False
+            except ZeroDivisionError: pass
     return True
 
 def passed_str(b):

@@ -35,6 +35,9 @@ def parseArgs():
     opts = OptionParser( description=desc, usage=usage )
     opts.add_option( '--verbose', '-v', action="store_true", dest="verbose")
     opts.add_option( '--quiet', '-q', action="store_true", dest="quiet")
+    opts.add_option( '--ping-pattern', '-P', type='choice',
+                     choices=['sequential','intermediate','parallel'], default = 'intermediate' ,
+                     help = '|'.join( ['sequential','intermediate','parallel'] )  )
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
         opts.error("options -q and -v are mutually exclusive")
@@ -43,13 +46,13 @@ def parseArgs():
 def main():
     
     (options, args) = parseArgs()
-    flags = ['-P','intermediate']
+    flags = ['-P',options.ping_pattern]
     if options.verbose:
         flags.append('-v')
 
     # GET PATHS
     controller_src_path = os.path.expanduser('~/pyretic/examples/learning_switch.py')
-    unit_test_path = os.path.expanduser('~/pyretic/tests/connectivity_unit_test.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/learning_switch_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -70,7 +73,8 @@ def main():
     # TEST EACH TOPO
     topos = ['single,2','single,16','linear,2','linear,8','tree,2,2','tree,3,2','cycle,8,8','clique,8,8']
 
-    print "----------------- LEARNING SWITCH TESTER -----------------------"
+    print "=========== LEARNING SWITCH TESTER ============"
+    print "-TOPO---------CONNS----PKTS----------TIME------"
     count = 0
     for topo in topos:
         test = ['sudo', unit_test_path, '--topo', topo] + flags
