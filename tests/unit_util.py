@@ -268,12 +268,12 @@ def hub_packet_behavior(packets,verbose):
                 # (DIFFERENCES AT VERY END OF TCPDUMP TO BE EXPECTED)
                 for packet in difference:
                     if packet in h1_inds:
-                        if verbose:  print (h1_inds[packet],len(h1_packets),float(h1_inds[packet])/float(len(h1_packets)))
-                        if float(h1_inds[packet])/float(len(h1_packets)) < 0.95:
+                        if float(h1_inds[packet])/float(len(h1_packets)) < 0.9:
+                            if verbose:  print (h1_inds[packet],len(h1_packets),float(h1_inds[packet])/float(len(h1_packets)))
                             return False
                     if packet in h2_inds:
-                        if verbose:  print (h2_inds[packet],len(h2_packets),float(h2_inds[packet])/float(len(h2_packets)))
-                        if float(h2_inds[packet])/float(len(h2_packets)) < 0.95:
+                        if float(h2_inds[packet])/float(len(h2_packets)) < 0.9:
+                            if verbose:  print (h2_inds[packet],len(h2_packets),float(h2_inds[packet])/float(len(h2_packets)))
                             return False
     return True
 
