@@ -85,13 +85,12 @@ def main():
     # GET DUMPS AND PROCESS
     dumps = get_tcpdumps(ct)
     packets = dumps_to_packets(dumps)
-    hub_behavior = hub_packet_behavior(packets,options.verbose)
+    packet_behavior = hub_packet_behavior(packets,options.verbose)
 
     if not options.quiet:
-        print "%s\t%s\t%s\t%s" % (options.topo,passed_str(connectivity),passed_str(hub_behavior),elapsed)
+        print "%s\t%s\t%s\t%s" % (options.topo,passed_str(connectivity),passed_str(packet_behavior),elapsed)
 
-#    if connectivity and hub_behavior:
-    if connectivity:
+    if connectivity and packet_behavior:
         sys.exit(0)
     else:
         sys.exit(-1)
