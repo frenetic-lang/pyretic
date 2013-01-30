@@ -67,7 +67,8 @@ def main():
     # TODO - PARAMETERIZE WAIT BASED ON NUMBER OF LINKS
     sleep(WARMUP)
 
-    # START DUMP COLLECTION
+    # START DUMP COLLECTION 
+    if options.verbose:  print "Starting tcpdump collection"
     ct = collect_tcpdumps(net.hosts)
 
     # RUN TESTS
@@ -84,9 +85,7 @@ def main():
     # GET DUMPS AND PROCESS
     dumps = get_tcpdumps(ct)
     packets = dumps_to_packets(dumps)
-
     hub_behavior = hub_packet_behavior(packets,options.verbose)
-#    hub_behavior = hub_packet_behavior(packets,True)
 
     if not options.quiet:
         print "%s\t%s\t%s\t%s" % (options.topo,passed_str(connectivity),passed_str(hub_behavior),elapsed)

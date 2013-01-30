@@ -36,7 +36,7 @@ def parseArgs():
     opts.add_option( '--verbose', '-v', action="store_true", dest="verbose")
     opts.add_option( '--quiet', '-q', action="store_true", dest="quiet")
     opts.add_option( '--ping-pattern', '-P', type='choice',
-                     choices=['sequential','intermediate','parallel'], default = 'sequential' ,
+                     choices=['sequential','intermediate','parallel'], default = 'intermediate' ,
                      help = '|'.join( ['sequential','intermediate','parallel'] )  )
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
