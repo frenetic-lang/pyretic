@@ -35,6 +35,9 @@ def parseArgs():
     opts = OptionParser( description=desc, usage=usage )
     opts.add_option( '--verbose', '-v', action="store_true", dest="verbose")
     opts.add_option( '--quiet', '-q', action="store_true", dest="quiet")
+    opts.add_option( '--ping-pattern', '-P', type='choice',
+                     choices=['sequential','intermediate','parallel'], default = 'sequential' ,
+                     help = '|'.join( ['sequential','intermediate','parallel'] )  )
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
         opts.error("options -q and -v are mutually exclusive")
@@ -43,7 +46,7 @@ def parseArgs():
 def main():
     
     (options, args) = parseArgs()
-    flags = ['-P','intermediate']
+    flags = ['-P',options.ping_pattern]
     if options.verbose:
         flags.append('-v')
 
