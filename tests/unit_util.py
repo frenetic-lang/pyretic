@@ -208,6 +208,7 @@ def collect_tcpdumps(hosts):
     popens = {}
     for host in hosts:
         popens[host] = host.popen('/home/mininet/pyretic/tests/tcpdump_wrapper.sh', stdout=PIPE, stderr=STDOUT)
+    sleep(1)
     pdumps = {}
     pb = pmonitorBackground(popens,pdumps)
     pb.start()
