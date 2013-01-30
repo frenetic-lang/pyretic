@@ -59,9 +59,9 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     dists = [(2,2),(8,3)]
-    print "----------------- LOAD BALANCER TESTER -----------------------"
+    print "=============== HUB TESTER ===================="
+    print "-TOPO------------------PKTS----------TIME------"
     count = 0
-
     for (clients,servers) in dists:
 
         # STARTUP CONTROLLER
@@ -87,7 +87,7 @@ def main():
         # KILL CONTROLLER
         controller.send_signal( SIGINT )
     
-    print "----------------------------------------------------"
+    print "-----------------------------------------------"
     if count == len(topos) * len(dists):
         print "+ load_balancer_tester PASSED [%d/%d]" % (count,len(topos)*len(dists))
     else:

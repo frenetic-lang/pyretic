@@ -118,9 +118,7 @@ def main():
 
     if not options.quiet:
         if connectivity:
-            print "%s\tBALANCER PASSED\t%s" % (options.topo,elapsed)
-        else:
-            print "%s\tBALANCER FAILED\t%s" % (options.topo,elapsed)
+            print "%s\t%s\t%s" % (options.topo,passed_str(connectivity),elapsed)
 
     ## SHUTDOWN MININET
     net.stop()
