@@ -190,19 +190,37 @@ from threading import Thread
 
 class pmonitorBackground(Thread):
     
-    def __init__(self,popens,pdumps):
+    def __init__(self,popens,pdumps,filedump=False):
         self.popens = popens
         self.pdumps = pdumps
-        self.stopped = False
+        self.filedump = filedump
         Thread.__init__(self)
 
     def run(self):
+        f = {}
+        pkt_count = {}
         for h, line in pmonitor( self.popens ):
             if h and line:
                 try:
                     self.pdumps[h.name].append(line.strip())
                 except:
                     self.pdumps[h.name] =[line.strip()]
+
+                    if self.filedump:
+                        f[h] = open('/tmp/'+str(h)+'.tcpdump', 'w')
+                        pkt_count[h] = 0
+
+                if self.filedump:
+                    if re.search('^IP', line):
+                        pkt_count[h] += 1
+                        delim = str(pkt_count[h])
+                    elif re.search('^ARP', line):
+                        pkt_count[h] += 1
+                        delim = str(pkt_count[h]) + '\t'
+                    else:
+                        delim = '  \t'
+                    f[h].write(delim+line)
+                    f[h].flush()
 
 def collect_tcpdumps(hosts):
     popens = {}
