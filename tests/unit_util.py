@@ -215,7 +215,7 @@ def collect_tcpdumps(hosts):
     return (pb,pdumps)
 
 def get_tcpdumps((pb,pdumps)):
-    sleep(10)
+    sleep(0)
     pb.join()
     return pdumps
 
@@ -244,19 +244,37 @@ def dumps_to_packets(dumps):
             packets[h].append(cur)
         #if len(packets[h]) != len(set(packets[h])):
         #    print "WARNING: multiple identical packets captured by tcpdump host %s" % h
+        c = 0
+
+    # STORE PACKET INDICIES
+    for h in packets.keys():
+        packet_index = {}
+        c = 0
+        for p in packets[h]:
+            c +=1
+            packet_index[p] = c            
+        packets[h] = (packets[h],packet_index)
     return packets
 
 def hub_packet_behavior(packets,verbose):
     for h1 in packets.keys():
+        h1_packets, h1_inds = packets[h1]
         for h2 in packets.keys():
-            difference = set(packets[h1]).symmetric_difference(set(packets[h2]))
+            h2_packets, h2_inds = packets[h2]
+            difference = set(h1_packets) ^ set(h2_packets)
             # TCPDUMP BEHAVIOR NOT COMPLETELY SYNCHRONIZED
             if len(difference) > 0:
-                if verbose:  
-                    print "%s,%s,%d" % (h1,h2,len(difference))
-                    for packet in difference:
-                        print packet
-                return False
+                # CHECK EACH PACKET TO SEE WHETHER REALLY A PROBLEM 
+                # (DIFFERENCES AT VERY END OF TCPDUMP TO BE EXPECTED)
+                for packet in difference:
+                    if packet in h1_inds:
+                        if verbose:  print (h1_inds[packet],len(h1_packets),float(h1_inds[packet])/float(len(h1_packets)))
+                        if float(h1_inds[packet])/float(len(h1_packets)) < 0.95:
+                            return False
+                    if packet in h2_inds:
+                        if verbose:  print (h2_inds[packet],len(h2_packets),float(h2_inds[packet])/float(len(h2_packets)))
+                        if float(h2_inds[packet])/float(len(h2_packets)) < 0.95:
+                            return False
     return True
 
 def passed_str(b):
