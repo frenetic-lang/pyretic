@@ -41,6 +41,8 @@ def parseArgs():
                      help = '|'.join( ['sequential','intermediate','parallel'] )  )
     opts.add_option( '--count', '-c', action="store", type="string", 
                      dest="count", default='1', help = 'number of ping attempts'  )
+    opts.add_option( '--switch', '-s', action="store", type="string", 
+                     dest="switch", default='ovsk', help = 'ovsk|user'  )
     options, args = opts.parse_args()
 
     if options.quiet and options.verbose:
@@ -59,7 +61,7 @@ def main():
     topo = buildTopo( TOPOS, options.topo )
 
     ## SET UP MININET INSTANCE AND START
-    net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
+    net = Mininet( topo, switch=SWITCHES[options.switch], host=Host, controller=RemoteController )
     net.start()
     if options.verbose:  print "Mininet started"
 

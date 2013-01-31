@@ -12,7 +12,7 @@ from mininet.topo import SingleSwitchTopo, LinearTopo
 from mininet.topolib import TreeTopo
 from mininet.util import pmonitor, buildTopo
 from mininet.net import Mininet
-from mininet.node import Host, OVSKernelSwitch, RemoteController
+from mininet.node import Host, OVSKernelSwitch, UserSwitch, RemoteController
 from mininet.clean import cleanup
 from mininet.log import lg
 
@@ -27,6 +27,11 @@ TOPOS = { 'minimal': lambda: SingleSwitchTopo( k=2 ),
           'linear': LinearTopo,
           'single': SingleSwitchTopo,
           'tree': TreeTopo }
+
+SWITCHDEF = 'ovsk'
+SWITCHES = { 'user': UserSwitch,
+             'ovsk': OVSKernelSwitch }
+
 
 def ping_all(net,verbose,ping_type,count,pattern='sequential',extra_ips=[]):
     if pattern == 'sequential':
