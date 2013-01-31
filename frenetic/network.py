@@ -228,10 +228,18 @@ class Packet(object):
         return "\n".join(l)
 
 class Port(object):
-    def __init__(self,port_no,status='UP',linked_to=None):
+    def __init__(self,port_no, config, status,linked_to=None):
         self.port_no = port_no
+        self.config = config
         self.status = status
         self.linked_to = linked_to
+
+    def definitely_down(self):
+        return not self.config and not self.status
+
+    def possibly_up(self):
+        """User switch reports ports having LINK_DOWN status when in fact link is up"""
+        return not self.definitely_down()
 
     def __hash__(self):
         return hash(self.port_no)
@@ -240,7 +248,7 @@ class Port(object):
         return self.port_no == other.port_no
 
     def __repr__(self):
-        return "%d:%s:%s" % (self.port_no,self.status,self.linked_to)
+        return "%d:config_up=%s:status_up=%s:linked_to=%s" % (self.port_no,self.config_down,self.status_down,self.linked_to)
 
 
 
@@ -270,7 +278,7 @@ class Topology(nx.Graph):
                 locs |= (self.egress_locations(s))
         else:
             for port in self.node[switch]['ports'].values():
-                if port.status == 'UP' and port.linked_to is None:
+                if port.possibly_up() and port.linked_to is None:
                     locs.add(Location(switch,port.port_no))
         return locs
 
@@ -281,7 +289,7 @@ class Topology(nx.Graph):
                 locs |= (self.interior_locations(s))
         else:
             for port in self.node[switch]['ports'].values():
-                if port.status == 'UP' and not port.linked_to is None:
+                if port.possibly_up() and not port.linked_to is None:
                     locs.add(Location(switch,port.port_no))
         return locs
 
@@ -442,7 +450,7 @@ class Topology(nx.Graph):
     def __str__(self):
         return repr(self)
         
-
+DEBUG_TOPO_DISCOVERY = False
 class Network(object):
     def __init__(self,backend):
         from frenetic.netcore import drop
@@ -473,7 +481,7 @@ class Network(object):
         self._topology = gs.Behavior(Topology())                
         self.events = ["switch_joins", "switch_parts",
                        "port_joins", "port_parts",
-                       "port_ups", "port_downs", "link_updates"]
+                       "port_mods", "link_updates"]
         for event in self.events:
             e = gs.Event()
             setattr(self, event, e)
@@ -540,7 +548,9 @@ class Network(object):
     #
            
     def _handle_switch_joins(self, switch):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
         self.topology.add_node(switch, ports={})
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
         self._topology.signal_mutation()
 
     def remove_associated_link(self,location):
@@ -560,44 +570,74 @@ class Network(object):
             self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def _handle_switch_parts(self, switch):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_parts"
         # REMOVE ALL ASSOCIATED LINKS
         for port_no in self.topology.node[switch]["ports"].keys():
             self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
         self._topology.signal_mutation()
         
-    def _handle_port_joins(self, (switch, port_no, status)):
-        self.topology.node[switch]["ports"][port_no] = Port(port_no,status)
-        if status == 'UP':
+    def _handle_port_joins(self, (switch, port_no, config, status)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
+        self.topology.node[switch]["ports"][port_no] = Port(port_no,config,status)
+        if config or status:
             self.inject_discovery_packet(switch,port_no)
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
             self._topology.signal_mutation()
 
     def _handle_port_parts(self, (switch, port_no)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_parts"
         try:
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
             self._topology.signal_mutation()
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
         
-    def _handle_port_ups(self, (switch, port_no)):
-        if self.topology.node[switch]["ports"][port_no].status != 'UP':
-            self.topology.node[switch]["ports"][port_no].status = 'UP'
-            self.inject_discovery_packet(switch,port_no)
-            self._topology.signal_mutation()
-
-    def _handle_port_downs(self, (switch, port_no)):
+    def _handle_port_mods(self, (switch, port_no, config, status)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
+        # GET PREV VALUES
         try:
-            switch_data = self.topology.node[switch]
-            if switch_data["ports"][port_no].status == 'DOWN':
-                return
-            self.topology.node[switch]["ports"][port_no].status = 'DOWN'
+            prev_config = self.topology.node[switch]["ports"][port_no].config
+            prev_status = self.topology.node[switch]["ports"][port_no].status
+        except KeyError:
+            print "KeyError CASE!!!!!!!!"
+            self.port_down(switch, port_no)
+            return
+
+        # UPDATE VALUES
+        self.topology.node[switch]["ports"][port_no].config = config
+        self.topology.node[switch]["ports"][port_no].status = status
+
+        # DETERMINE IF/WHAT CHANGED
+        if (prev_config and not config):
+            self.port_down(switch, port_no)
+        if (prev_status and not status):
+            self.port_down(switch, port_no,double_check=True)
+
+        if (not prev_config and config) or (not prev_status and status):
+            self.port_up(switch, port_no)
+
+    def port_up(self, switch, port_no):
+        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s"
+        self.inject_discovery_packet(switch,port_no)
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self._topology.signal_mutation()
+
+    def port_down(self, switch, port_no, double_check=False):
+        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s"
+        try:
             self.remove_associated_link(Location(switch,port_no))
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
             self._topology.signal_mutation()
+            if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
 
     def _handle_link_updates(self, (s1, p_no1, s2, p_no2)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_link_updates"
         try:
             p1 = self.topology.node[s1]["ports"][p_no1]
             p2 = self.topology.node[s2]["ports"][p_no2]
@@ -610,7 +650,7 @@ class Network(object):
 
             # LINK ON SAME PORT PAIR
             if link[s1] == p_no1 and link[s2] == p_no2:         
-                if p1.status == 'UP' and p2.status == 'UP':     #  AND BOTH PORTS ARE UP
+                if p1.possibly_up() and p2.possibly_up():   
                     return                                      #   NOTHING TO DO
                 else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
                     raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
@@ -627,12 +667,13 @@ class Network(object):
             pass
         
         # ADD LINK IF PORTS ARE UP
-        if p1.status == 'UP' and p2.status == 'UP':
+        if p1.possibly_up() and p2.possibly_up():
             self.topology.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
             self.topology.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
             self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
         self._topology.signal_mutation()
 
 
