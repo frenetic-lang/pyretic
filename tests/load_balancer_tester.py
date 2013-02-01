@@ -53,7 +53,7 @@ def main():
         flags.append('-v')
 
     # GET PATHS
-    controller_src_path = os.path.expanduser('~/pyretic/examples/static_load_balancer.py')
+    controller_src_path = os.path.expanduser('~/pyretic/examples/load_balancer_dyn.py')
     unit_test_path = os.path.expanduser('~/pyretic/tests/load_balancer_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 

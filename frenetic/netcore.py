@@ -759,3 +759,39 @@ class DynamicPolicy(gs.Behavior):
     def eval(self, packet):
         return self.value.eval(packet)
 
+    def __rshift__(self, other):
+        from operator import rshift
+        return DynamicApply(self, other, rshift)
+
+    def __sub__(self, pred):
+        from operator import sub
+        return DynamicApply(self, pred, sub)
+
+    def __and__(self, pred):
+        from operator import and_
+        return DynamicApply(self, pred, and_)
+
+    def __or__(self, other):
+        from operator import or_
+        return DynamicApply(self, other, or_)
+        
+    def __eq__(self, other):
+        raise NotImplementedError
+
+    def __ne__(self, other):
+        raise NotImplementedError
+
+
+class DynamicApply(DynamicPolicy):
+    def __init__(self, pol1 ,pol2, op):
+        self.pol1 = pol1
+        self.pol2 = pol2
+        self.applied = op(self.pol1.value,self.pol2)
+        @self.pol1.notify     # ANYTIME THE VALUE OF POL1 CHANGES
+        def handle(value):    # RE-APPLY THE OPERATOR
+            self.applied = op(value,self.pol2)
+    
+    def eval(self, packet):   # ALWAYS EVAL ON THE RESULT OF OPERATOR APPLICATION
+        return self.applied.eval(packet)
+
+

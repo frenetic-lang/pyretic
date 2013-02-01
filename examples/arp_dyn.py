@@ -38,7 +38,7 @@
 import collections
 
 from frenetic.lib import *
-from examples.hub_dyn import hub
+from examples.learning_switch_dyn import learning_switch
 
 
 ARP_TYPE = 2054
@@ -159,7 +159,7 @@ def arp(network):
 
                 
 def example(network):
-    run(network.install_policy(hub(network) - ARP), Network.fork(network))
+    run(network.install_policy(learning_switch(network) - ARP), Network.fork(network))
     run(arp, Network.fork(network))
 
 main = example
