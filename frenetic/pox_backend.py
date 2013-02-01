@@ -406,6 +406,8 @@ class POXBackend(revent.EventMixin):
         if packet.type == ethernet.LLDP_TYPE: 
             self.handle_lldp(packet,event)
             return
+        elif packet.type == 0x86dd:  # IGNORE IPV6
+            return 
 
         if self.show_traces:
             self.packetno += 1
