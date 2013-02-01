@@ -53,7 +53,7 @@ def learning_switch(network):
         host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
 
         network -= host_p # Don't do our old action.
-        network |= host_p & fwd(pkt['inport']) # Do this instead.
+        network |= host_p[fwd(pkt['inport'])] # Do this instead.
         
 main = learning_switch
 
