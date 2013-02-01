@@ -426,11 +426,11 @@ class POXBackend(revent.EventMixin):
         pol = self.network.policy
         
         with ipdb.launch_ipdb_on_exception():
-            output = pol.attach(self.network).eval(recv_packet)
+            output = pol.attach(self.network)(recv_packet)
         
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = pol.attach(self.network).eval(recv_packet) # So we can step through it
+            output = pol.attach(self.network)(recv_packet) # So we can step through it
         
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
