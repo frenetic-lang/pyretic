@@ -31,12 +31,12 @@
 # -------------------------------------------------------------------                                                        #
 # start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,1,3,2                                                #
 # run controller: pox.py --no-cli pyretic/examples/firewall_dyn.py                                                           #
-# test:           clients can only ping 10.0.0.100, servers can ping each other and clients they serve                       #
+# test:           clients can only ping 10.0.0.100, servers can only ping clients they serve                                 #
 ##############################################################################################################################
 
 from frenetic.lib import *
 from examples.learning_switch_dyn import learning_switch
-from examples.firewall_dyn import simple_firewall
+from examples.firewall_dyn import simple_ingress_firewall
 from examples.load_balancer_dyn import static_matching, static_load_balancer
 
 def example(network, clients, servers):
@@ -59,9 +59,15 @@ def example(network, clients, servers):
     for client_ip in client_ips:
         allowed.add((client_ip,service_ip))
 
-    policy = (simple_firewall(allowed) & match(switch=101) | passthrough - match(switch=101)) \
-        >> static_load_balancer(service_ip,lb_matching) \
+    from_client = None
+    for client_ip in client_ips:
+        try:    from_client |= match(srcip=client_ip)
+        except: from_client  = match(srcip=client_ip)
+        
+    policy = ((simple_ingress_firewall(allowed,network) >> static_load_balancer(service_ip,lb_matching)) & from_client | \
+        (static_load_balancer(service_ip,lb_matching) >> simple_ingress_firewall(allowed,network)) - from_client) \
         >> learning_switch(network)
+
     network.install_policy(policy)
 
         

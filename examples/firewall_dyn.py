@@ -43,7 +43,14 @@ def simple_firewall(pairs):
     pol = drop
     for (ip1,ip2) in pairs:     
         pred = match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
-        
+        pol -= pred
+        pol |= pred & passthrough
+    return pol
+
+def simple_ingress_firewall(pairs,network):
+    pol = drop_ingress(network)
+    for (ip1,ip2) in pairs:     
+        pred = match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
         pol -= pred
         pol |= pred & passthrough
     return pol

@@ -695,7 +695,22 @@ class simple_route(Policy):
             policy |= match(dict(zip(headers, header_preds))) & act
         return policy.eval(packet)
 
-        
+
+class drop_ingress(Policy):
+    def __init__(self, network):
+        self.network = network
+    
+    def __repr__(self):
+        return "drop_ingress %s" % self.network
+    
+    def eval(self, packet):
+        switch = packet["switch"]
+        inport = packet["inport"]
+        if Location(switch,inport) in self.network.topology.egress_locations():
+            return Counter()
+        else:
+            return Counter([packet])
+
 class flood(Policy):
     def __init__(self, network):
         self.network = network
