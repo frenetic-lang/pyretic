@@ -313,6 +313,22 @@ class Predicate(object):
     def __ne__(self, other):
         raise NotImplementedError
 
+    def attach(self, network):
+        """Not intended for general use."""
+        raise NotImplementedError
+        
+
+class AttachedPredicate(object):
+    """XXX document me"""
+    def eval(self, packet):
+        raise NotImplementedError
+
+
+class ObliviousPredicate(Predicate, AttachedPredicate):
+    """XXX document me"""
+    def attach(self, network):
+        return self
+
 
 class DerivedPredicate(Predicate):
     def get_predicate(self):
@@ -326,7 +342,7 @@ class DerivedPredicate(Predicate):
 
         
 @singleton
-class all_packets(Predicate):
+class all_packets(ObliviousPredicate):
     """The always-true predicate."""
     def __repr__(self):
         return "all packets"
@@ -336,7 +352,7 @@ class all_packets(Predicate):
 
         
 @singleton
-class no_packets(Predicate):
+class no_packets(ObliviousPredicate):
     """The always-false predicate."""
     def __repr__(self):
         return "no packets"
@@ -345,7 +361,7 @@ class no_packets(Predicate):
         return False
 
         
-class is_bucket(Predicate):
+class is_bucket(ObliviousPredicate):
     def __init__(self, field):
         self.field = field
         
@@ -356,7 +372,7 @@ class is_bucket(Predicate):
         return "is_bucket %s" % self.field
 
         
-class match(Predicate):
+class match(ObliviousPredicate):
     """A set of field matches (one per field)"""
     
     def __init__(self, *args, **kwargs):
@@ -386,7 +402,7 @@ class match(Predicate):
         return True
 
         
-class union(Predicate):
+class union(ObliviousPredicate):
     """A predicate representing the union of two predicates."""
 
     def __init__(self, predicates):
@@ -399,7 +415,7 @@ class union(Predicate):
         return any(predicate.eval(packet) for predicate in self.predicates)
 
         
-class intersect(Predicate):
+class intersect(ObliviousPredicate):
     """A predicate representing the intersection of two predicates."""
 
     def __init__(self, predicates):
@@ -412,7 +428,7 @@ class intersect(Predicate):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
         
-class difference(Predicate):
+class difference(ObliviousPredicate):
     """A predicate representing the difference of two predicates."""
 
     def __init__(self, base_predicate, diff_predicates):
@@ -428,7 +444,7 @@ class difference(Predicate):
                                                             for pred in self.diff_predicates)
 
         
-class negate(Predicate):
+class negate(ObliviousPredicate):
     """A predicate representing the difference of two predicates."""
 
     def __init__(self, predicate):
@@ -466,11 +482,19 @@ class Policy(object):
     def __ne__(self, other):
         raise NotImplementedError
 
+    def attach(self, network):
+        raise NotImplementedError
+
+class AttachedPolicy(object):
     def eval(self, packet):
         raise NotImplementedError
 
+class ObliviousPolicy(Policy, AttachedPolicy):
+    def attach(self, network):
+        return self
+        
 
-class DerivedPolicy(Policy):
+class DerivedPolicy(ObliviousPolicy):
     def get_policy(self):
         raise NotImplementedError
         
@@ -482,7 +506,7 @@ class DerivedPolicy(Policy):
 
         
 @singleton
-class drop(Policy):
+class drop(ObliviousPolicy):
     """Policy that drops everything."""
     def __repr__(self):
         return "drop"
@@ -492,7 +516,7 @@ class drop(Policy):
 
         
 @singleton
-class passthrough(Policy):
+class passthrough(ObliviousPolicy):
     def __repr__(self):
         return "passthrough"
         
@@ -500,7 +524,7 @@ class passthrough(Policy):
         return Counter([packet])
 
         
-class modify(Policy):
+class modify(ObliviousPolicy):
     """Policy that drops everything."""
                                             
     def __init__(self, *args, **kwargs):
@@ -522,7 +546,7 @@ class modify(Policy):
         return Counter([packet])
 
         
-class fwd(Policy):
+class fwd(ObliviousPolicy):
     """Forward"""
     
     def __init__(self, port):
@@ -536,7 +560,7 @@ class fwd(Policy):
         return Counter([packet])
 
         
-class push(Policy):
+class push(ObliviousPolicy):
     """Policy that drops everything."""
     
     def __init__(self, *args, **kwargs):
@@ -550,7 +574,7 @@ class push(Policy):
         return Counter([packet])
 
         
-class pop(Policy):
+class pop(ObliviousPolicy):
     """Policy that drops everything."""
     
     def __init__(self, fields):
@@ -564,7 +588,7 @@ class pop(Policy):
         return Counter([packet])
 
         
-class copy(Policy):
+class copy(ObliviousPolicy):
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
 
@@ -581,7 +605,7 @@ class copy(Policy):
         return Counter([packet])
 
 
-class remove(Policy):
+class remove(ObliviousPolicy):
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
@@ -596,7 +620,7 @@ class remove(Policy):
             return Counter()
         
 
-class restrict(Policy):
+class restrict(ObliviousPolicy):
     """Policy for mapping a single predicate to a list of actions."""
 
     def __init__(self, policy, predicate):
@@ -614,7 +638,7 @@ class restrict(Policy):
             return Counter()
 
                     
-class parallel(Policy):
+class parallel(ObliviousPolicy):
     def __init__(self, policies):
         self.policies = list(policies)
     
@@ -629,7 +653,7 @@ class parallel(Policy):
         return c
 
 
-class compose(Policy):
+class compose(ObliviousPolicy):
     def __init__(self, policies):
         self.policies = list(policies)
     
@@ -648,7 +672,7 @@ class compose(Policy):
         return lc
 
             
-class if_(Policy):
+class if_(ObliviousPolicy):
     def __init__(self, pred, t_branch, f_branch=passthrough):
         self.pred = pred
         self.t_branch = t_branch
@@ -669,7 +693,7 @@ class if_(Policy):
             return self.f_branch.eval(packet)
 
             
-class breakpoint(Policy):
+class breakpoint(ObliviousPolicy):
     def __init__(self, policy, condition=lambda ps: True):
         self.policy = policy
         self.condition = condition
@@ -683,7 +707,7 @@ class breakpoint(Policy):
         return self.policy.eval(packet)
 
         
-class simple_route(Policy):
+class simple_route(ObliviousPolicy):
     def eval(self, packet):
         policy = drop
         headers = tuple(headers)
@@ -691,8 +715,17 @@ class simple_route(Policy):
             policy |= match(dict(zip(headers, header_preds))) & act
         return policy.eval(packet)
 
-        
+
+@singleton
 class flood(Policy):
+    def attach(self, network):
+        return AttachedFlood(network)
+    
+    def __repr__(self):
+        return "flood"
+
+        
+class AttachedFlood(AttachedPolicy):
     def __init__(self, network):
         self.network = network
         @network._topology.notify
