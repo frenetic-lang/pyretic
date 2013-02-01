@@ -27,13 +27,20 @@
 ################################################################################
 
 from frenetic.lib import *
-from examples.hub import hub
+from examples.learning_switch import learning_switch
 
 def monitor_packets(network):
     for pkt in query(network, all_packets):
         print "I see packet:"
         print pkt
         print "---------------"
+
+def monitor_packets_explicit_bucket(network):
+    b = Bucket()
+    monitoring_network = Network.fork(network)  # WE MUST EXPLICITY FORK NETWORK
+    monitoring_network.install_policy(fwd(b))   # OR THIS LINE WOULD OVERWRITE OTHER COMPONENTS!
+    for pkt in b:
+        print "(explicit) I see packet: ", pkt
 
 def monitor_packet_count(network):
     for count in query_count(network, all_packets,2.5):
@@ -46,10 +53,25 @@ def monitor_grouped_packet_count(network):
         for (k,v) in count.items():
             print "%d:  %s" % (v,k)
 
+def monitor_policy(network):
+    """Must use same network object on which policy to be monitored runs"""
+    for policy in network.policy_changes:
+        print "-------- POLICY CHANGE --------"
+        print policy
+
+def monitor_topology(network):
+    for topo in network.topology_changes:
+        print "------ monitor topology output start -------"
+        print topo
+        print "------ monitor topology output end - -------"
+
 def example(network):
-    run(hub, Network.fork(network))
-    run(monitor_packets, Network.fork(network))
-    run(monitor_packet_count, Network.fork(network))
-    run(monitor_grouped_packet_count, Network.fork(network))
+    run(learning_switch, network)
+    run(monitor_policy, network)                       
+    run(monitor_packets, network)
+    run(monitor_packets_explicit_bucket, network)  
+    run(monitor_packet_count, network)
+    run(monitor_grouped_packet_count, network)
+    run(monitor_topology, network)
 
 main = example
