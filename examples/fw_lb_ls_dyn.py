@@ -64,9 +64,21 @@ def example(network, clients, servers):
         try:    from_client |= match(srcip=client_ip)
         except: from_client  = match(srcip=client_ip)
         
-    policy = ((simple_ingress_firewall(allowed,network) >> static_load_balancer(service_ip,lb_matching)) & from_client | \
-        (static_load_balancer(service_ip,lb_matching) >> simple_ingress_firewall(allowed,network)) - from_client) \
-        >> learning_switch(network)
+    # DIRECTIONAL OPERATOR SYNTAX
+    policy = (simple_ingress_firewall(allowed,network) \
+                  >> static_load_balancer(service_ip,lb_matching)) \
+                  % from_client \
+                  >> learning_switch(network)
+
+    # EXPLICT DIRECTIONAL COMPOSITION    
+    # policy = directional_compose(from_client,[simple_ingress_firewall(allowed,network),
+    #                                           static_load_balancer(service_ip,lb_matching)]) \
+    #                                           >> learning_switch(network)
+
+    # W/O DIRECTIONAL COMPOSITION OPERATOR
+    # policy = ((simple_ingress_firewall(allowed,network) >> static_load_balancer(service_ip,lb_matching)) & from_client | \
+    #     (static_load_balancer(service_ip,lb_matching) >> simple_ingress_firewall(allowed,network)) - from_client) \
+    #     >> learning_switch(network)
 
     network.install_policy(policy)
 

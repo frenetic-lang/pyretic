@@ -637,6 +637,9 @@ class compose(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
+    def __mod__(self, pred):
+        return directional_compose(pred, self.policies)
+
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
   
@@ -651,6 +654,23 @@ class compose(Policy):
             lc = c
         return lc
 
+
+class directional_compose(Policy):
+    def __init__(self, direction_pred, policies):
+        pol_list = list(policies)
+        self.direction_pred = direction_pred
+        self.positive_direction = compose(pol_list)
+        pol_list.reverse()
+        self.negative_direction = compose(pol_list)
+
+    def __repr__(self):
+        return "directional_compose:\n%s\n%s" % (self.direction_pred,self.positive_direction)
+
+    def eval(self,packet):
+        if self.direction_pred.eval(packet):
+            return self.positive_direction.eval(packet)
+        else:
+            return self.negative_direction.eval(packet)
             
 class if_(Policy):
     def __init__(self, pred, t_branch, f_branch=passthrough):
