@@ -403,7 +403,6 @@ class POXBackend(revent.EventMixin):
 #    return EventHalt # Probably nobody else needs this event
 
     def _handle_PacketIn(self, event):
-
         packet = event.parsed
         if packet.type == ethernet.LLDP_TYPE: 
             self.handle_lldp(packet,event)
@@ -427,11 +426,11 @@ class POXBackend(revent.EventMixin):
         pol = self.network.policy
         
         with ipdb.launch_ipdb_on_exception():
-            output = pol.eval(recv_packet)
+            output = pol.attach(self.network).eval(recv_packet)
         
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = pol.eval(recv_packet) # So we can step through it
+            output = pol.attach(self.network).eval(recv_packet) # So we can step through it
         
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
@@ -451,6 +450,7 @@ class POXBackend(revent.EventMixin):
                 pkt = pkt.pop("outport")
                 bucket.signal(pkt)
 
+                
     def send_packet(self, packet):
         switch = packet["switch"]
         inport = packet["inport"]

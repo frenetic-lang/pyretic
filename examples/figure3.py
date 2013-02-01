@@ -86,7 +86,7 @@ def figure_3_views(network):
     add_nodes_from_vmap(lswitch_vmap, lswitch_vtopo)
     lswitch_vtopo.add_edge(Switch(101), Switch(102), {Switch(101): Port(3), Switch(102): Port(2)})
     lswitch_vn.topology = lswitch_vtopo
-    lswitch_vn.physical_policy = isolated_lswitch_vn.flood
+    lswitch_vn.physical_policy = flood
 
     #
     
@@ -99,7 +99,7 @@ def figure_3_views(network):
     arp_vtopo = nx.Graph()
     add_nodes_from_vmap(arp_vmap, arp_vtopo)
     arp_vn.topology = arp_vtopo
-    arp_vn.physical_policy = isolated_arp_vn.flood
+    arp_vn.physical_policy = flood
 
     return lswitch_vn, arp_vn
 

@@ -40,7 +40,7 @@
 from frenetic.lib import *
 
 def learning_switch(network):
-    network.install_flood()
+    network.install_policy(flood)
 
     host_to_outport = {}
     for pkt in query(network, all_packets, fields=["switch", "srcmac"]):

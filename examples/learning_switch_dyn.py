@@ -57,7 +57,7 @@ def learning_switch_logic(network,ls):
         ls.set(ls_pol)
 
 def learning_switch(network):
-    return DynamicPolicy(network,learning_switch_logic,network.flood)
+    return DynamicPolicy(network,learning_switch_logic, flood)
 
 
 def example(network):

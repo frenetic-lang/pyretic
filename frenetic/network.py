@@ -510,15 +510,6 @@ class Network(object):
     def install_sub_policy(self, id, policy):
         self._sub_policies[id] = policy
         self._policy.set(self._aggregate_policy())
-
-    @property
-    @util.cached
-    def flood(self):
-        from frenetic.netcore import flood
-        return flood(self)
-
-    def install_flood(self):
-        self.install_policy(self.flood)
         
     @property
     def policy(self):

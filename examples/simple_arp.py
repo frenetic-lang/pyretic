@@ -29,7 +29,7 @@
 from frenetic.lib import *
 
 def arp(network):
-    network.install_flood()
+    network.install_policy(flood)
 
 main = arp
 

@@ -79,7 +79,7 @@ def setup_virtual_network(network):
             vtopo = Topology()
             vmap = topo_to_vmap(topo)
             add_nodes_from_vmap(vmap, vtopo)
-#            vn.physical_policy = network.flood # THIS WILL WORK ALSO, BUT IS FAR LESS EFFICIENT
+#            vn.physical_policy = flood # THIS WILL WORK ALSO, BUT IS FAR LESS EFFICIENT
             vn.physical_policy = shortest_path_policy(topo,vmap)
             vn.from_vmap(vmap)
             vn.topology = vtopo
