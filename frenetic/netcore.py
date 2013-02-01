@@ -357,17 +357,6 @@ class no_packets(SimplePredicate):
         return False
  
         
-class is_bucket(SimplePredicate):
-    def __init__(self, field):
-        self.field = field
-        
-    def eval(self, network, packet):
-        return isinstance(packet[self.field], Bucket)
-        
-    def __repr__(self):
-        return "is_bucket %s" % self.field
-
-        
 class match(SimplePredicate):
     """A set of field matches (one per field)"""
     
@@ -770,8 +759,19 @@ class flood(Policy):
     def __repr__(self):
         return "flood"
 
- 
+        
+class bucket(SimplePolicy):
+    def __init__(self):
+        from Queue import Queue
+        self.packets = Queue()
 
+    def eval(self, network, packet):
+        self.packets.put(packet)
+
+    def __iter__(self):
+        while True:
+            yield self.packets.get()
+        
 
 def query(network, pred=all_packets, fields=[]):
     b = Bucket(fields)

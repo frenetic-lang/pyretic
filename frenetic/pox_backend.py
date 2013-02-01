@@ -441,14 +441,7 @@ class POXBackend(revent.EventMixin):
             print
         
         for pkt in output.elements():
-            outport = pkt["outport"]
-            if not isinstance(outport, net.Bucket):
-                self.send_packet(pkt)
-            else:
-                bucket = outport
-                # Perform the link's function here and rm outport
-                pkt = pkt.pop("outport")
-                bucket.signal(pkt)
+            self.send_packet(pkt)
 
                 
     def send_packet(self, packet):
