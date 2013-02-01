@@ -160,7 +160,7 @@ class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical
         
 def add_nodes_from_vmap(vmap, vtopo):
     for switch, port_no in vmap:
-        port = Port(port_no,'UP')
+        port = Port(port_no)
         try:
             vtopo.node[switch]['ports'][port_no] = port 
         except KeyError:

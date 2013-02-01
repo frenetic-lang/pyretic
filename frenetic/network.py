@@ -228,7 +228,7 @@ class Packet(object):
         return "\n".join(l)
 
 class Port(object):
-    def __init__(self,port_no, config, status,linked_to=None):
+    def __init__(self, port_no, config=True, status=True,linked_to=None):
         self.port_no = port_no
         self.config = config
         self.status = status
