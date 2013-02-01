@@ -53,9 +53,9 @@ class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate egress_p
     def get_policy(self):
         pol = (if_(match(itag=None) & self.ingress_predicate,
                    push(itag=self.itag)) >>
-               (match(itag=self.itag) &
-                (self.policy >>
-                 if_(is_bucket("outport") | self.egress_predicate, pop(["itag"])))))
+                match(itag=self.itag)[
+                   self.policy >>
+                   if_(is_bucket("outport") | self.egress_predicate, pop(["itag"]))])
         return pol
     
 class INetwork(Network):
