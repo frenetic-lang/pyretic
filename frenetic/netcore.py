@@ -776,13 +776,13 @@ class flood(Policy):
 def query(network, pred=all_packets, fields=[]):
     b = Bucket(fields)
     sub_net = Network.fork(network)
-    sub_net.install_policy(pred & fwd(b))
+    sub_net.install_policy(pred[fwd(b)])
     return b
 
 def query_limit(network, pred=all_packets, limit=None, fields=[]):
     sub_net = Network.fork(network)
     b = LimitBucket(sub_net, fields, limit)
-    sub_net.install_policy(pred & fwd(b))    
+    sub_net.install_policy(pred[fwd(b)])    
     return b
 
 def query_unique(network, pred=all_packets, fields=[]):
@@ -791,7 +791,7 @@ def query_unique(network, pred=all_packets, fields=[]):
 def query_count(network, pred=all_packets, interval=None, group_by=[]):
     b = CountingBucket(interval,group_by)
     sub_net = Network.fork(network)
-    sub_net.install_policy(pred & fwd(b))    
+    sub_net.install_policy(pred[fwd(b)])    
     return b
 
 
