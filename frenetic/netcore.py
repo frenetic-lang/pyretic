@@ -747,13 +747,14 @@ def query_count(network, pred=all_packets, interval=None, group_by=[]):
 class DynamicPolicy(gs.Behavior):
     """DynamicPolicy is a Behavior of policies, that evolves with respect to a given network, according to given logic, and starting from a given initial value."""
 
-    def __init__(self, network, logic, initial_value):
+    def __init__(self, network, logics, initial_value):
         self.network = network
-        self.logic = logic
+        self.logics = logics
         super(DynamicPolicy, self).__init__(initial_value)
         # START A SEPERATE THREAD TO THAT WILL UPDATE self.value
         # BASED ON INPUT LOGIC AND NETWORK
-        gs.run(self.logic, self.network, self)
+        for logic in self.logics:
+            gs.run(logic, self.network, self)
 
     # EVALUATE ACCORDING TO WHATEVER THE CURRENT POLICY IS
     def eval(self, packet):
