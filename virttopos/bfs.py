@@ -56,15 +56,15 @@ def shortest_path_policy(topo,vmap):
                 continue
             # IF IDENTICAL VIRTUAL LOCATIONS, THEN WE KNOW FABRIC POLICY IS JUST TO FORWARD OUT MATCHING PHYSICAL PORT
             if vport_no1 == vport_no2:
-                fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2) & fwd(pport_no2)
+                fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2)[fwd(pport_no2)]
             # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
             # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
             # FINALLY ADD A RULE THAT FORWARDS OUT THE CORRECT PHYSICAL PORT AT THE LAST PHYSICAL SWITCH ON THE PATH
             else:
                 try:
                     for loc in paths[pswitch1][pswitch2]:
-                        fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=loc.switch) & fwd(loc.port_no)
-                    fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2) & fwd(pport_no2)
+                        fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=loc.switch)[fwd(loc.port_no)]
+                    fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2)[fwd(pport_no2)]
                 except KeyError:
                     pass
     return fabric_policy

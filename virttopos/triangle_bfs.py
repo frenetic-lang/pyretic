@@ -53,25 +53,25 @@ from frenetic.lib import *
 vinfo = {1: [1, 2, 3]}
 
 def get_ingress_policy():
-    ingress_policy = ((match(switch=1, inport=1) & push(vinport = 1) | 
-                      match(switch=2, inport=1) & push(vinport = 2) | 
-                      match(switch=3, inport=1) & push(vinport = 3))
+    ingress_policy = ((match(switch=1, inport=1)[push(vinport = 1)] | 
+                       match(switch=2, inport=1)[push(vinport = 2)] | 
+                       match(switch=3, inport=1)[push(vinport = 3)])
                       >> push(vswitch=1))
     return ingress_policy
 
     
 def get_physical_policy():
-    physical_policy = (match(switch=1) & ((match(voutport=1)) & fwd(1)  | 
-                                          (match(voutport=2)) & fwd(2)  | 
-                                          (match(voutport=3)) & fwd(3))
+    physical_policy = (match(switch=1)[ match(voutport=1)[fwd(1)]  | 
+                                        match(voutport=2)[fwd(2)]  | 
+                                        match(voutport=3)[fwd(3)] ]
                        
-                       |  match(switch=2) & (match(voutport=1) & fwd(2) | 
-                                             match(voutport=2) & fwd(1) | 
-                                             match(voutport=3) & fwd(3))
+                       |  match(switch=2)[ match(voutport=1)[fwd(2)] | 
+                                           match(voutport=2)[fwd(1)] | 
+                                           match(voutport=3)[fwd(3)] ]
                        
-                       |  match(switch=3) &  (match(voutport=1) & fwd(3) | 
-                                              match(voutport=2) & fwd(2) | 
-                                              match(voutport=3) & fwd(1)))
+                       |  match(switch=3)[ match(voutport=1)[fwd(3)] | 
+                                           match(voutport=2)[fwd(2)] | 
+                                           match(voutport=3)[fwd(1)] ]
     return physical_policy
 
     

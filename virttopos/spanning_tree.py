@@ -58,7 +58,7 @@ def one_to_one_fabric_policy(vmap):
             if vswitch1 != vswitch2:
                 continue
             # FORWARD OUT THE CORRECT PHYSICAL PORT
-            fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2) & fwd(pport2)
+            fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2)[fwd(pport2)]
     return fabric_policy
 
 

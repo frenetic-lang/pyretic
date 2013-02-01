@@ -68,18 +68,18 @@ def get_egress_policy2():
     return if_(egress_pred, pop_vheaders)
 
 def get_physical_policy1():
-    physical_policy = (match(switch=1) & (match(voutport=1) & fwd(1)
-                                          | match(voutport=2) & fwd(2)) 
-                      | match(switch=2) & (match(voutport=1) & fwd(2)
-                                           | match(voutport=2) & fwd(1)))
+    physical_policy = (match(switch=1) [ match(voutport=1)[fwd(1)] |
+                                         match(voutport=2)[fwd(2)] ] |
+                       match(switch=2) [ match(voutport=1)[fwd(2)] | 
+                                         match(voutport=2)[fwd(1)] ] )
 
     return physical_policy
     
 def get_physical_policy2():
-    physical_policy = (match(switch=3) & (match(voutport=1) & fwd(1) | 
-                                          match(voutport=2) & fwd(3)) | 
-                       match(switch=4) & (match(voutport=1) & fwd(3) | 
-                                          match(voutport=2) & fwd(1)))
+    physical_policy = (match(switch=3)[match(voutport=1)[fwd(1)] | 
+                                       match(voutport=2)[fwd(3)]] | 
+                       match(switch=4)[match(voutport=1)[fwd(3)] | 
+                                       match(voutport=2)[fwd(1)]])
 
     return physical_policy
     
