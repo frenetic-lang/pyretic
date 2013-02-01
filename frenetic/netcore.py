@@ -289,19 +289,15 @@ register_header("dstip", IPWildcard)
 ################################################################################
 # Predicates
 ################################################################################
-    
+
 class Predicate(object):
     """Top-level abstract class for predicates."""
-        
     def __sub__(self, other):
         return difference(self, other)
 
     def __and__(self, other):
-        if isinstance(other,Predicate):
-            return intersect([self, other])
-        else:
-            return other.__and__(self)
-       
+        return intersect([self, other])
+        
     def __or__(self, other):
         return union([self, other])
 
