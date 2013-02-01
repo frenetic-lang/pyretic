@@ -19,7 +19,7 @@ class subprocess_output(Thread):
         while self.proc.poll() is None:
             line = self.proc.stdout.readline()
             print line,
-            sleep(0.1)
+            sleep(0.001)
 
 def parseArgs():
     """Parse command-line args and return options object.
