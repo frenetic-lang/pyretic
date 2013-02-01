@@ -51,7 +51,7 @@ class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate egress_p
                                                           self.egress_predicate]))
     
     def get_policy(self):
-        pol = (if_(match(itag=None) & self.ingress_predicate,
+        pol = (if_(match(itag=None)[self.ingress_predicate],
                    push(itag=self.itag)) >>
                 match(itag=self.itag)[
                    self.policy >>
@@ -167,9 +167,9 @@ def add_nodes_from_vmap(vmap, vtopo):
             vtopo.add_node(switch, ports={port_no: port})
     
 def vmap_to_ingress_policy(vmap):
-    ingress_policy = parallel(push(vswitch=vsw, vinport=vp) &
-                            union(match(switch=sw, inport=p) for (sw, p) in switches)
-                            for ((vsw, vp), switches) in vmap.iteritems())
+    ingress_policy = parallel(union(match(switch=sw, inport=p) for (sw, p) in switches)[
+                                  push(vswitch=vsw, vinport=vp)]
+                              for ((vsw, vp), switches) in vmap.iteritems())
     return ingress_policy
 
 def vmap_to_egress_policy(vmap):
@@ -179,7 +179,7 @@ def vmap_to_egress_policy(vmap):
         switch_pred = union(match(switch=sw, outport=p) for (sw, p) in switches)
         matches_egress.append(switch_pred)
         valid_match_egress.append(match(vswitch=vsw, voutport=vp) & switch_pred)
-    return if_(union(matches_egress), union(valid_match_egress) & pop_vheaders, passthrough)
+    return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
         
 class VNetwork(Network):
     def __init__(self,backend):
