@@ -671,22 +671,13 @@ class compose(Policy):
         return lc
 
 
-class directional_compose(Policy):
-    def __init__(self, direction_pred, policies):
-        pol_list = list(policies)
-        self.direction_pred = direction_pred
-        self.positive_direction = compose(pol_list)
-        pol_list.reverse()
-        self.negative_direction = compose(pol_list)
-
-    def __repr__(self):
-        return "directional_compose:\n%s\n%s" % (self.direction_pred,self.positive_direction)
-
-    def eval(self,packet):
-        if self.direction_pred.eval(packet):
-            return self.positive_direction.eval(packet)
-        else:
-            return self.negative_direction.eval(packet)
+def directional_compose(direction_pred, policies):
+    pol_list = list(policies)
+    positive_direction = compose(pol_list)
+    pol_list.reverse()
+    negative_direction = compose(pol_list)
+    return if_(direction_pred,positive_direction,negative_direction)
+    
             
 class if_(Policy):
     def __init__(self, pred, t_branch, f_branch=passthrough):
