@@ -70,6 +70,13 @@ def example(network, clients, servers):
                   % from_client \
                   >> learning_switch(network)
 
+    # DIRECTIONAL OPERATOR SYNTAX WITH CRAZY MESS INSIDE TO TEST RECURSION
+    # policy = (((simple_ingress_firewall(allowed,network) \
+    #               >> passthrough) | drop)\
+    #               >> static_load_balancer(service_ip,lb_matching)) \
+    #               % from_client \
+    #               >> learning_switch(network)
+
     # EXPLICT DIRECTIONAL COMPOSITION    
     # policy = directional_compose(from_client,[simple_ingress_firewall(allowed,network),
     #                                           static_load_balancer(service_ip,lb_matching)]) \
