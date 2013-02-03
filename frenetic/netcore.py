@@ -464,6 +464,9 @@ class Policy(object):
     def __rshift__(self, pol):
         return compose([self, pol])
 
+    def __mod__(self, pred):
+        return self
+
     def __eq__(self, other):
         raise NotImplementedError
 
@@ -589,6 +592,9 @@ class remove(Policy):
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
+
+    def __mod__(self, pred):
+        return remove(self.policy % pred, self.predicate)
     
     def __repr__(self):
         return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
@@ -606,6 +612,9 @@ class restrict(Policy):
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
+
+    def __mod__(self, pred):
+        return restrict(self.policy % pred, self.predicate)
         
     def __repr__(self):
         return "restrict:\n%s" % util.repr_plus([self.predicate,
@@ -622,6 +631,9 @@ class parallel(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
+    def __mod__(self, pred):
+        return parallel([ p % pred for p in self.policies])
+
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
         
@@ -638,7 +650,11 @@ class compose(Policy):
         self.policies = list(policies)
     
     def __mod__(self, pred):
-        return directional_compose(pred, self.policies)
+        mod_sub_pols = [ p % pred for p in self.policies ]
+        positive_pol = compose(mod_sub_pols)
+        mod_sub_pols.reverse()
+        negative_pol = compose(mod_sub_pols)
+        return if_(pred,positive_pol,negative_pol)
 
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
@@ -678,6 +694,9 @@ class if_(Policy):
         self.t_branch = t_branch
         self.f_branch = f_branch
 
+    def __mod__(self, pred):
+        return if_(self.pred, self.t_branch % pred, self.f_branch)
+
     def __repr__(self):
         return "if\n%s" % util.repr_plus(["PREDICATE",
                                           self.pred,
@@ -697,6 +716,9 @@ class breakpoint(Policy):
     def __init__(self, policy, condition=lambda ps: True):
         self.policy = policy
         self.condition = condition
+
+    def __mod__(self, pred):
+        return breakpoint(self.policy % pred, self.condition)
         
     def __repr__(self):
         return "***debug***\n%s" % util.repr_plus([self.policy])
@@ -810,6 +832,10 @@ class DynamicPolicy(gs.Behavior):
     def __or__(self, other):
         from operator import or_
         return DynamicApply(self, other, or_)
+
+    def __mod__(self, other):
+        from operator import mod
+        return DynamicApply(self, other, mod)
         
     def __eq__(self, other):
         raise NotImplementedError
