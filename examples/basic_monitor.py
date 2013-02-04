@@ -28,12 +28,13 @@
 
 from frenetic.lib import *
 
-def monitor_packets(network):
+@policy_decorator
+def monitor_packets(self):
     b = bucket()
-    network.install_policy(b)
-    for pkt in b:
+    @self.query(all_packets)
+    def f(pkt):
         print "I see packet:"
         print pkt
         print "---------------"
 
-main = monitor_packets
+main = monitor_packets()

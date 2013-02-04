@@ -781,7 +781,7 @@ class drop_ingress(Policy):
         else:
             return Counter([packet])
 
-            
+@singleton
 class flood(Policy):
     def attach(self, network):
         get_mst = [None] # Hack b/c no Python 3 nonlocal
@@ -808,19 +808,41 @@ class flood(Policy):
     def __repr__(self):
         return "flood"
 
+
+class MutablePolicy(DerivedPolicy):
+    def __init__(self):
+        self.policy = drop
+        
+    def get_policy(self):
+        return self.policy
+
+    def query(self, pred=all_packets):
+        b = bucket()
+        self.policy |= b
+        return b.when()
+        
+
+def policy_decorator(fn):
+    class DecoratedPolicy(MutablePolicy):
+        def __init__(self):
+            MutablePolicy.__init__(self)
+            fn(self)
+
+    DecoratedPolicy.__name__ = fn.__name__
+    return DecoratedPolicy
+ 
         
 class bucket(SimplePolicy):
     def __init__(self):
-        from Queue import Queue
-        self.packets = Queue()
+        self.listeners = []
 
     def eval(self, network, packet):
-        self.packets.put(packet)
+        for listener in self.listeners:
+            listener(packet)
 
-    def __iter__(self):
-        while True:
-            yield self.packets.get()
-        
+    def when(self, fn):
+        self.listeners.append(fn)
+        return fn
 
 def query(network, pred=all_packets, fields=[]):
     b = Bucket(fields)

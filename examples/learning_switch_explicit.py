@@ -39,30 +39,26 @@
 
 from frenetic.lib import *
 
-def learning_switch_logic(network,ls):    
+@policy_decorator
+def learning_switch(self):
+    b = bucket()
+    
+    self.policy |= flood
+    self.policy |= b
+
     host_to_outport = {}
-    for pkt in query_unique(network, all_packets, fields=['switch', 'srcmac']):
-
-        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
-
-        ## ONLY NEEDED TO KEEP THE POLICY FROM BLOWING UP FROM REDUNDANT RESTRICTS
-        if host_to_outport.get((pkt['switch'], pkt['srcmac'])) == pkt['inport']:
-            continue
-
-        host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
-
-        ls_pol = ls.get() 
-        ls_pol -= host_p    # Don't do our old action.
-        ls_pol |= host_p & fwd(pkt['inport'])  # Do this instead.
-        ls.set(ls_pol)
-
-def learning_switch(network):
-    return DynamicPolicy(network,[learning_switch_logic],network.flood)
-
-
-def example(network):
-    network.install_policy_func(learning_switch)
+    @b.when
+    def f(pkt):
+        outport = host_to_outport.get((pkt['switch'], pkt['srcmac']))
+        if outport != pkt['inport']:
+            host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
+            host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
+            
+            self.policy -= host_p # Don't do our old action.
+            self.policy |= host_p[ fwd(pkt['inport']) ] # Do this instead.
         
-main = example
+main = learning_switch()
+
+
 
 

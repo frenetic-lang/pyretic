@@ -39,26 +39,22 @@
 
 from frenetic.lib import *
 
-def learning_switch(network):
-    b = bucket()
+@policy_decorator
+def learning_switch(self):
+    self.policy |= flood
     
-    network.install_policy(flood | b)
-
     host_to_outport = {}
-    for pkt in b:
+    @self.query(all_packets)
+    def f(pkt):
         outport = host_to_outport.get((pkt['switch'], pkt['srcmac']))
-
-        if outport == pkt['inport']:
-            continue
-
-        host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
-
-        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
-
-        network -= host_p # Don't do our old action.
-        network |= host_p[ fwd(pkt['inport']) ] # Do this instead.
+        if outport != pkt['inport']:
+            host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
+            host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
+            
+            self.policy -= host_p # Don't do our old action.
+            self.policy |= host_p[ fwd(pkt['inport']) ] # Do this instead.
         
-main = learning_switch
+main = learning_switch()
 
 
 
