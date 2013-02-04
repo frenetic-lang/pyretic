@@ -28,9 +28,10 @@
 
 from frenetic.lib import *
 
-def arp(network):
-    network.install_policy(flood)
-
-main = arp
+@policy_decorator
+def arp(self):
+    self.policy |= flood
+    
+main = arp()
 
 

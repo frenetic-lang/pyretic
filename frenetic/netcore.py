@@ -812,6 +812,9 @@ class flood(Policy):
 class MutablePolicy(DerivedPolicy):
     def __init__(self):
         self.policy = drop
+
+    def attach(self, network):
+        return DerivedPolicy.attach(self, network)
         
     def get_policy(self):
         return self.policy
@@ -819,14 +822,18 @@ class MutablePolicy(DerivedPolicy):
     def query(self, pred=all_packets):
         b = bucket()
         self.policy |= b
-        return b.when()
+        return b.when
         
 
 def policy_decorator(fn):
     class DecoratedPolicy(MutablePolicy):
         def __init__(self):
             MutablePolicy.__init__(self)
+
+        def attach(self, network):
+            self.network = network
             fn(self)
+            return MutablePolicy.attach(self, network)
 
     DecoratedPolicy.__name__ = fn.__name__
     return DecoratedPolicy

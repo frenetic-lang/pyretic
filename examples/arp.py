@@ -29,7 +29,7 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  ./mininet.sh --switch ovsk --topo linear,4                                                                 #
+# start mininet:  pyretic/mininet.sh --topo linear,4                                                                 #
 # run controller: pox.py --no-cli pyretic/examples/arp.py                                                                    #
 # run pingall:    once or twice, clear a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping           # 
 # test:           NO RESPONSE AVAILABLE message should only show up once for each end host IP address                        #
@@ -38,7 +38,7 @@
 import collections
 
 from frenetic.lib import *
-from examples.learning_switch_dyn import learning_switch
+from examples.learning_switch import learning_switch
 
 
 ARP_TYPE = 2054
@@ -47,7 +47,6 @@ ARP = match([('type',ARP_TYPE)])
 
 ### THIS IS A BIT LAZY, WE COPY PACKET AND ONLY OVERRIDE NECESSARY FIELDS
 def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
-
     response_packet = Packet(pkt.header)
     response_packet = response_packet.pop('switch')
     response_packet = response_packet.push(switch=switch)
@@ -67,26 +66,27 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
             print "All ports on switch %s are currently reported as egress ports!\nWill try incrementing the inport.\n(bug in some switches does not allow packets to be sent out the same outport as they reportedly came in...)"
             response_packet = response_packet.push(inport=outport+1)
 
-
     if VERBOSE_LEVEL > 0:
         print "--------- INJECTING RESPONSE -----------"
         if VERBOSE_LEVEL > 1:
             print response_packet
 
+    # XXX
     network.inject_packet(response_packet)
 
 
 ### USING STRING CASTING TO MAKE SURE PACKET FIELDS ACT LIKE PROPER DICT KEYS
 ### THIS IS A HACK AND SHOULD BE FIXED
-def arp(network):
-
+@policy_decorator
+def arp(self):
+    network = self.network
     request_packets = {}
     known_ips = {}
     response_packets = {}
     outstanding_requests = collections.defaultdict(dict)
 
-    for pkt in query(network, ARP):
-
+    @self.query(ARP)
+    def f(pkt):
         switch = pkt['switch']
         inport = pkt['inport']
         srcmac = pkt['srcmac']
@@ -100,16 +100,13 @@ def arp(network):
             request_packets[dstip] = pkt
 
             if dstip in response_packets:
-
                 if VERBOSE_LEVEL > 0:
                     print "RECEIVED REQUEST FOR %s FROM %s, RESPONSE AVAILABLE" % (dstip,srcip)
                     if VERBOSE_LEVEL > 1:
                         print pkt
-
                 response_pkt = response_packets[dstip]
                 send_response(network,response_pkt,switch,inport,srcip,srcmac)
             else:
-
                 if VERBOSE_LEVEL > 0:
                     print "RECEIVED REQUEST FOR %s FROM %s, NO RESPONSE AVAILABLE" % (dstip,srcip)
                     if VERBOSE_LEVEL > 1:
@@ -117,6 +114,7 @@ def arp(network):
 
                 outstanding_requests[str(srcip)][dstip] = True
                 for loc in network.topology.egress_locations() - {Location(switch,inport)}:
+                    # Can this just be send_response?
                     request_packet = Packet(pkt.header)
                     request_packet = request_packet.pop('switch')
                     request_packet = request_packet.push(switch=loc.switch)
@@ -130,7 +128,6 @@ def arp(network):
                         except IndexError:
                             print "All ports on switch %s are currently reported as egress ports!\nWill try incrementing the inport.\n(bug in some switches does not allow packets to be sent out the same outport as they reportedly came in...)"
                             request_packet = request_packet.push(inport=loc.port_no+1)
-
 
                     if VERBOSE_LEVEL > 0:
                         print "--------- INJECTING REQUEST -----------"
@@ -157,11 +154,6 @@ def arp(network):
                     print pkt
                 pass
 
-                
-def example(network):
-    run(network.install_policy(learning_switch(network) - ARP), Network.fork(network))
-    run(arp, Network.fork(network))
-
-main = example
+main = learning_switch() - ARP | arp()
 
 
