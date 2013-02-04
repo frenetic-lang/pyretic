@@ -276,11 +276,10 @@ class POXBackend(revent.EventMixin):
         for port in event.ofp.ports:
             if port.port_no <= of.OFPP_MAX:
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
-                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state):
-                    self.network.port_joins.signal((event.dpid, port.port_no,'DOWN'))
-                else:
-                    self.network.port_joins.signal((event.dpid, port.port_no,'UP'))
-        
+                CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
+                STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
+                self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
+                        
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
 
@@ -288,14 +287,14 @@ class POXBackend(revent.EventMixin):
         self.network.switch_parts.signal(event.dpid)
         
     def _handle_PortStatus(self, event):
+        port = event.ofp.desc
         if event.port <= of.OFPP_MAX:
             if event.added:
                 self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
                 self.network.port_joins.signal((event.dpid, event.port))
-                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(event.ofp.desc.state):
-                    self.network.port_joins.signal((event.dpid, port.port_no,'DOWN'))
-                else:
-                    self.network.port_joins.signal((event.dpid, port.port_no,'UP'))
+                CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
+                STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
+                self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
@@ -303,10 +302,9 @@ class POXBackend(revent.EventMixin):
                     pass  # SWITCH ALREADY DELETED
                 self.network.port_parts.signal((event.dpid, event.port))
             elif event.modified:
-                if 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(event.ofp.desc.state):
-                    self.network.port_downs.signal((event.dpid, event.port))
-                else:
-                    self.network.port_ups.signal((event.dpid, event.port))
+                CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
+                STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
+                self.network.port_mods.signal((event.dpid, event.port, CONF_UP, STAT_UP))
             else:
                 raise RuntimeException("Unknown port status event")
 
@@ -407,6 +405,8 @@ class POXBackend(revent.EventMixin):
         if packet.type == ethernet.LLDP_TYPE: 
             self.handle_lldp(packet,event)
             return
+        elif packet.type == 0x86dd:  # IGNORE IPV6
+            return 
 
         if self.show_traces:
             self.packetno += 1

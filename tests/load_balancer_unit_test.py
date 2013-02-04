@@ -78,6 +78,8 @@ def parseArgs():
                      dest="clients", default='2', help = 'number of clients'  )
     opts.add_option( '--servers', '-s', action="store", type="string", 
                      dest="servers", default='2', help = 'number of servers'  )
+    opts.add_option( '--switch', action="store", type="string", 
+                     dest="switch", default='ovsk', help = 'ovsk|user'  )
 
     options, args = opts.parse_args()
     if options.quiet and options.verbose:
@@ -99,7 +101,7 @@ def main():
     topo = buildTopo( TOPOS, options.topo )
 
     ## SET UP MININET INSTANCE AND START
-    net = Mininet( topo, switch=OVSKernelSwitch, host=Host, controller=RemoteController )
+    net = Mininet( topo, switch=SWITCHES[options.switch], host=Host, controller=RemoteController )
     net.start()
     if options.verbose:  print "Mininet started"
 
@@ -118,9 +120,7 @@ def main():
 
     if not options.quiet:
         if connectivity:
-            print "%s\tBALANCER PASSED\t%s" % (options.topo,elapsed)
-        else:
-            print "%s\tBALANCER FAILED\t%s" % (options.topo,elapsed)
+            print "%s\t%s\t%s" % (options.topo,passed_str(connectivity),elapsed)
 
     ## SHUTDOWN MININET
     net.stop()

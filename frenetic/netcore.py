@@ -474,6 +474,9 @@ class Policy(object):
     def __rshift__(self, pol):
         return compose([self, pol])
 
+    def __mod__(self, pred):
+        return self
+
     def __eq__(self, other):
         raise NotImplementedError
 
@@ -608,6 +611,9 @@ class remove(Policy):
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
+
+    def __mod__(self, pred):
+        return remove(self.policy % pred, self.predicate)
     
     def __repr__(self):
         return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
@@ -629,6 +635,9 @@ class restrict(Policy):
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
+
+    def __mod__(self, pred):
+        return restrict(self.policy % pred, self.predicate)
         
     def __repr__(self):
         return "restrict:\n%s" % util.repr_plus([self.predicate,
@@ -649,6 +658,9 @@ class parallel(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
+    def __mod__(self, pred):
+        return parallel([ p % pred for p in self.policies])
+
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
 
@@ -667,6 +679,13 @@ class compose(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
+    def __mod__(self, pred):
+        mod_sub_pols = [ p % pred for p in self.policies ]
+        positive_pol = compose(mod_sub_pols)
+        mod_sub_pols.reverse()
+        negative_pol = compose(mod_sub_pols)
+        return if_(pred,positive_pol,negative_pol)
+
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
 
@@ -684,12 +703,23 @@ class compose(Policy):
             return lc
         return eval
 
+
+def directional_compose(direction_pred, policies):
+    pol_list = list(policies)
+    positive_direction = compose(pol_list)
+    pol_list.reverse()
+    negative_direction = compose(pol_list)
+    return if_(direction_pred,positive_direction,negative_direction)
+    
             
 class if_(DerivedPolicy):
     def __init__(self, pred, t_branch, f_branch=passthrough):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
+
+    def __mod__(self, pred):
+        return if_(self.pred, self.t_branch % pred, self.f_branch)
 
     def __repr__(self):
         return "if\n%s" % util.repr_plus(["PREDICATE",
@@ -707,6 +737,9 @@ class breakpoint(Policy):
     def __init__(self, policy, condition=lambda ps: True):
         self.policy = policy
         self.condition = condition
+
+    def __mod__(self, pred):
+        return breakpoint(self.policy % pred, self.condition)
         
     def __repr__(self):
         return "***debug***\n%s" % util.repr_plus([self.policy])
@@ -728,11 +761,27 @@ class simple_route(DerivedPolicy):
         for header_preds, act in args:
             self.policy |= match(dict(zip(headers, header_preds))) & act
 
+            
     def get_policy(self):
         return self.policy
-        
+       
 
-@singleton
+class drop_ingress(Policy):
+    def __init__(self, network):
+        self.network = network
+    
+    def __repr__(self):
+        return "drop_ingress %s" % self.network
+    
+    def eval(self, packet):
+        switch = packet["switch"]
+        inport = packet["inport"]
+        if Location(switch,inport) in self.network.topology.egress_locations():
+            return Counter()
+        else:
+            return Counter([packet])
+
+            
 class flood(Policy):
     def attach(self, network):
         get_mst = [None] # Hack b/c no Python 3 nonlocal
@@ -794,4 +843,60 @@ def query_count(network, pred=all_packets, interval=None, group_by=[]):
     sub_net.install_policy(pred[fwd(b)])    
     return b
 
+
+
+class DynamicPolicy(gs.Behavior):
+    """DynamicPolicy is a Behavior of policies, that evolves with respect to a given network, according to given logic, and starting from a given initial value."""
+
+    def __init__(self, network, logics, initial_value):
+        self.network = network
+        self.logics = logics
+        super(DynamicPolicy, self).__init__(initial_value)
+        # START A SEPERATE THREAD TO THAT WILL UPDATE self.value
+        # BASED ON INPUT LOGIC AND NETWORK
+        for logic in self.logics:
+            gs.run(logic, self.network, self)
+
+    # EVALUATE ACCORDING TO WHATEVER THE CURRENT POLICY IS
+    def eval(self, packet):
+        return self.value.eval(packet)
+
+    def __rshift__(self, other):
+        from operator import rshift
+        return DynamicApply(self, other, rshift)
+
+    def __sub__(self, pred):
+        from operator import sub
+        return DynamicApply(self, pred, sub)
+
+    def __and__(self, pred):
+        from operator import and_
+        return DynamicApply(self, pred, and_)
+
+    def __or__(self, other):
+        from operator import or_
+        return DynamicApply(self, other, or_)
+
+    def __mod__(self, other):
+        from operator import mod
+        return DynamicApply(self, other, mod)
+        
+    def __eq__(self, other):
+        raise NotImplementedError
+
+    def __ne__(self, other):
+        raise NotImplementedError
+
+
+class DynamicApply(DynamicPolicy):
+    def __init__(self, pol1 ,pol2, op):
+        self.pol1 = pol1
+        self.pol2 = pol2
+        self.applied = op(self.pol1.value,self.pol2)
+        @self.pol1.notify     # ANYTIME THE VALUE OF POL1 CHANGES
+        def handle(value):    # RE-APPLY THE OPERATOR
+            self.applied = op(value,self.pol2)
+    
+    def eval(self, packet):   # ALWAYS EVAL ON THE RESULT OF OPERATOR APPLICATION
+        return self.applied.eval(packet)
 

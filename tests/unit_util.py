@@ -12,7 +12,7 @@ from mininet.topo import SingleSwitchTopo, LinearTopo
 from mininet.topolib import TreeTopo
 from mininet.util import pmonitor, buildTopo
 from mininet.net import Mininet
-from mininet.node import Host, OVSKernelSwitch, RemoteController
+from mininet.node import Host, OVSKernelSwitch, UserSwitch, RemoteController
 from mininet.clean import cleanup
 from mininet.log import lg
 
@@ -27,6 +27,11 @@ TOPOS = { 'minimal': lambda: SingleSwitchTopo( k=2 ),
           'linear': LinearTopo,
           'single': SingleSwitchTopo,
           'tree': TreeTopo }
+
+SWITCHDEF = 'ovsk'
+SWITCHES = { 'user': UserSwitch,
+             'ovsk': OVSKernelSwitch }
+
 
 def ping_all(net,verbose,ping_type,count,pattern='sequential',extra_ips=[]):
     if pattern == 'sequential':
@@ -190,31 +195,50 @@ from threading import Thread
 
 class pmonitorBackground(Thread):
     
-    def __init__(self,popens,pdumps):
+    def __init__(self,popens,pdumps,filedump=False):
         self.popens = popens
         self.pdumps = pdumps
-        self.stopped = False
+        self.filedump = filedump
         Thread.__init__(self)
 
     def run(self):
+        f = {}
+        pkt_count = {}
         for h, line in pmonitor( self.popens ):
             if h and line:
                 try:
-                    self.pdumps[h.name].append(line.strip())
+                    self.pdumps[h].append(line.strip())
                 except:
-                    self.pdumps[h.name] =[line.strip()]
+                    self.pdumps[h] =[line.strip()]
+
+                    if self.filedump:
+                        f[h] = open('/tmp/'+str(h)+'.tcpdump', 'w')
+                        pkt_count[h] = 0
+
+                if self.filedump:
+                    if re.search('^IP', line):
+                        pkt_count[h] += 1
+                        delim = str(pkt_count[h])
+                    elif re.search('^ARP', line):
+                        pkt_count[h] += 1
+                        delim = str(pkt_count[h]) + '\t'
+                    else:
+                        delim = '  \t'
+                    f[h].write(delim+line)
+                    f[h].flush()
 
 def collect_tcpdumps(hosts):
     popens = {}
     for host in hosts:
         popens[host] = host.popen('/home/mininet/pyretic/tests/tcpdump_wrapper.sh', stdout=PIPE, stderr=STDOUT)
+    sleep(1)
     pdumps = {}
     pb = pmonitorBackground(popens,pdumps)
     pb.start()
     return (pb,pdumps)
 
 def get_tcpdumps((pb,pdumps)):
-    sleep(10)
+    sleep(0)
     pb.join()
     return pdumps
 
@@ -243,19 +267,73 @@ def dumps_to_packets(dumps):
             packets[h].append(cur)
         #if len(packets[h]) != len(set(packets[h])):
         #    print "WARNING: multiple identical packets captured by tcpdump host %s" % h
+        c = 0
+
+    # STORE PACKET INDICIES
+    for h in packets.keys():
+        packet_index = {}
+        c = 0
+        for p in packets[h]:
+            c +=1
+            packet_index[p] = c            
+        packets[h] = (packets[h],packet_index)
     return packets
 
 def hub_packet_behavior(packets,verbose):
     for h1 in packets.keys():
+        h1_packets, h1_inds = packets[h1]
         for h2 in packets.keys():
-            difference = set(packets[h1]).symmetric_difference(set(packets[h2]))
+            h2_packets, h2_inds = packets[h2]
+            difference = set(h1_packets) ^ set(h2_packets)
             # TCPDUMP BEHAVIOR NOT COMPLETELY SYNCHRONIZED
             if len(difference) > 0:
-                if verbose:  
-                    print "%s,%s,%d" % (h1,h2,len(difference))
-                    for packet in difference:
+                # CHECK EACH PACKET TO SEE WHETHER REALLY A PROBLEM 
+                # (DIFFERENCES AT VERY END OF TCPDUMP TO BE EXPECTED)
+                for packet in difference:
+                    if packet in h1_inds:
+                        if float(h1_inds[packet])/float(len(h1_packets)) < 0.9:
+                            if verbose:  print (h1_inds[packet],len(h1_packets),float(h1_inds[packet])/float(len(h1_packets)))
+                            return False
+                    if packet in h2_inds:
+                        if float(h2_inds[packet])/float(len(h2_packets)) < 0.9:
+                            if verbose:  print (h2_inds[packet],len(h2_packets),float(h2_inds[packet])/float(len(h2_packets)))
+                            return False
+    return True
+
+
+def learning_switch_packet_behavior(packets,verbose):
+    hosts = packets.keys()
+    for i in range(0,len(hosts)):
+        h1 = hosts[i]
+        h1_packets, h1_inds = packets[h1]
+        for j in range(i+1,len(hosts)):
+            h2 = hosts[j]
+            h2_packets, h2_inds = packets[h2]
+            h1_only = set(h1_packets) - set(h2_packets)
+            h1_in_h1_only = 0
+            for packet in h1_only:
+                if re.search(h1.IP()+'\D', packet):
+                    h1_in_h1_only += 1
+                if re.search(h2.IP()+'\D', packet):
+                    if verbose:
+                        print "has %s" % h2.IP()
                         print packet
-                return False
+                    return False
+            h2_only = set(h2_packets) - set(h1_packets)
+            h2_in_h2_only = 0
+            for packet in h2_only:
+                if re.search(h2.IP()+'\D', packet):
+                    h2_in_h2_only += 1
+                if re.search(h1.IP()+'\D', packet):
+                    if verbose:
+                        print "has %s" % h1.IP()
+                        print packet
+                    return False
+            try:
+                if float(h1_in_h1_only)/len(h1_only) < 0.75 or float(h2_in_h2_only)/len(h2_only) < 0.75:
+                    if verbose: print "%s:%d:%d\t%s:%d:%d" % (h1,h1_in_h1_only,len(h1_only),h2,h2_in_h2_only,len(h2_only))
+                    return False
+            except ZeroDivisionError: pass
     return True
 
 def passed_str(b):

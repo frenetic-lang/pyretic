@@ -29,23 +29,65 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  sudo mn -c; sudo mn --switch ovsk --controller remote --mac --topo tree,3,3                                #
-# run controller: pox.py --no-cli pyretic/examples/monitor_topology.py                                                       #
-# watch topology: a new topology will be printed each time a switch, port, or link registers                                 #
-# test:           change topology by running 'link sX sY down', or restart mininet w/ new topology args                      #
+# start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,1,3,2                                                #
+# run controller: pox.py --no-cli pyretic/examples/firewall_dyn.py                                                           #
+# test:           clients can only ping 10.0.0.100, servers can only ping clients they serve                                 #
 ##############################################################################################################################
 
-
 from frenetic.lib import *
-from examples import learning_switch
+from examples.learning_switch_dyn import learning_switch
+from examples.firewall_dyn import simple_ingress_firewall
+from examples.load_balancer_dyn import static_matching, static_load_balancer
 
-def monitor(network):
-    for policy in network.policy_changes:
-        print "-------- POLICY CHANGE --------"
-        print policy
+def example(network, clients, servers):
+    num_clients = int(clients)
+    num_servers = int(servers)
+    print "clients %d" % num_clients
+    print "servers %d" % num_servers
+
+    # CALCULATE IPS
+    ip_prefix = '10.0.0.'
+    service_ip = ip_prefix + str(100)
+    print "service_ip = %s" % service_ip
+    client_ips = [ip_prefix + str(i) for i in range(1,1+num_clients)]
+    instance_ips = [ip_prefix + str(i) for i in range(1+num_clients,1+num_clients+num_servers)]
+
+    lb_matching = static_matching(client_ips,instance_ips)
+    print "static_matching = %s" % lb_matching
+
+    allowed = set([])
+    for client_ip in client_ips:
+        allowed.add((client_ip,service_ip))
+
+    from_client = None
+    for client_ip in client_ips:
+        try:    from_client |= match(srcip=client_ip)
+        except: from_client  = match(srcip=client_ip)
         
-def example(network):
-    run(monitor, network)
-    run(learning_switch.learning_switch, Network.fork(network))
+    # DIRECTIONAL OPERATOR SYNTAX
+    policy = (simple_ingress_firewall(allowed,network) \
+                  >> static_load_balancer(service_ip,lb_matching)) \
+                  % from_client \
+                  >> learning_switch(network)
 
+    # DIRECTIONAL OPERATOR SYNTAX WITH CRAZY MESS INSIDE TO TEST RECURSION
+    # policy = (((simple_ingress_firewall(allowed,network) \
+    #               >> passthrough) | drop)\
+    #               >> static_load_balancer(service_ip,lb_matching)) \
+    #               % from_client \
+    #               >> learning_switch(network)
+
+    # EXPLICT DIRECTIONAL COMPOSITION    
+    # policy = directional_compose(from_client,[simple_ingress_firewall(allowed,network),
+    #                                           static_load_balancer(service_ip,lb_matching)]) \
+    #                                           >> learning_switch(network)
+
+    # W/O DIRECTIONAL COMPOSITION OPERATOR
+    # policy = ((simple_ingress_firewall(allowed,network) >> static_load_balancer(service_ip,lb_matching)) & from_client | \
+    #     (static_load_balancer(service_ip,lb_matching) >> simple_ingress_firewall(allowed,network)) - from_client) \
+    #     >> learning_switch(network)
+
+    network.install_policy(policy)
+
+        
 main = example

@@ -26,22 +26,43 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# start mininet:  sudo mn -c; sudo mn --switch ovsk --controller remote --mac --topo tree,3,3                                #
-# run controller: pox.py --no-cli pyretic/examples/monitor_topology.py                                                       #
-# watch topology: a new topology will be printed each time a switch, port, or link registers                                 #
-# test:           change topology by running 'link sX sY down', or restart mininet w/ new topology args                      #
-##############################################################################################################################
-
+############################################################################################################################
+# TO TEST EXAMPLE                                                                                                          #
+# -------------------------------------------------------------------                                                      #
+# start mininet:  sudo mn --switch ovsk --controller remote --mac --topo linear,3                                          #
+# run controller: pox.py --no-cli pyretic/examples/hub.py                                                                  #
+# start xterms:   xterm h1 h2 h3                                                                                           #
+# start tcpdump:  in each xterm,                                                                                           #
+# > IFACE=`ifconfig | head -n 1 | awk '{print $1}'`; tcpdump -XX -vvv -t -n -i $IFACE not ether proto 0x88cc > $IFACE.dump #
+# test:           run h1 ping -c 2 h3, examine tcpdumps and confirm that h2 does not see packets on second go around       #
+############################################################################################################################
 
 from frenetic.lib import *
 
-def monitor(network):
-    for topo in network.topology_changes:
-        print "------ monitor topology output start -------"
-        print topo
-        print "------ monitor topology output end - -------"
+def learning_switch_logic(network,ls):    
+    host_to_outport = {}
+    for pkt in query_unique(network, all_packets, fields=['switch', 'srcmac']):
+
+        host_p = match(switch=pkt['switch'], dstmac=pkt['srcmac'])
+
+        ## ONLY NEEDED TO KEEP THE POLICY FROM BLOWING UP FROM REDUNDANT RESTRICTS
+        if host_to_outport.get((pkt['switch'], pkt['srcmac'])) == pkt['inport']:
+            continue
+
+        host_to_outport[(pkt['switch'], pkt['srcmac'])] = pkt['inport']
+
+        ls_pol = ls.get() 
+        ls_pol -= host_p    # Don't do our old action.
+        ls_pol |= host_p & fwd(pkt['inport'])  # Do this instead.
+        ls.set(ls_pol)
+
+def learning_switch(network):
+    return DynamicPolicy(network,[learning_switch_logic],network.flood)
+
+
+def example(network):
+    network.install_policy_func(learning_switch)
         
-main = monitor
+main = example
+
+

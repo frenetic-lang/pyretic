@@ -29,7 +29,7 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  sudo mn -c; sudo mn --switch ovsk --controller remote --mac --topo linear,4                                #
+# start mininet:  ./mininet.sh --switch ovsk --topo linear,4                                                                 #
 # run controller: pox.py --no-cli pyretic/examples/arp.py                                                                    #
 # run pingall:    once or twice, clear a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping           # 
 # test:           NO RESPONSE AVAILABLE message should only show up once for each end host IP address                        #
@@ -38,7 +38,7 @@
 import collections
 
 from frenetic.lib import *
-from examples import hub
+from examples.learning_switch_dyn import learning_switch
 
 
 ARP_TYPE = 2054
@@ -59,7 +59,7 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
         response_packet = response_packet.push(dstmac=dstmac)
 
     if response_packet['inport'] == outport:
-        fake_inports = [l.port for l in network.topology.interior_locations(switch)] 
+        fake_inports = [l.port_no for l in network.topology.interior_locations(switch)] 
         response_packet = response_packet.pop('inport')
         try:
             response_packet = response_packet.push(inport=fake_inports[0])
@@ -120,16 +120,16 @@ def arp(network):
                     request_packet = Packet(pkt.header)
                     request_packet = request_packet.pop('switch')
                     request_packet = request_packet.push(switch=loc.switch)
-                    request_packet = request_packet.push(outport=loc.port)
+                    request_packet = request_packet.push(outport=loc.port_no)
                     
-                    if request_packet['inport'] == loc.port:
-                        fake_inports = [l.port for l in network.topology.interior_locations(loc.switch)] 
+                    if request_packet['inport'] == loc.port_no:
+                        fake_inports = [l.port_no for l in network.topology.interior_locations(loc.switch)] 
                         request_packet = request_packet.pop('inport')
                         try:
                             request_packet = request_packet.push(inport=fake_inports[0])
                         except IndexError:
                             print "All ports on switch %s are currently reported as egress ports!\nWill try incrementing the inport.\n(bug in some switches does not allow packets to be sent out the same outport as they reportedly came in...)"
-                            request_packet = request_packet.push(inport=loc.port+1)
+                            request_packet = request_packet.push(inport=loc.port_no+1)
 
 
                     if VERBOSE_LEVEL > 0:
@@ -149,7 +149,7 @@ def arp(network):
 
                 response_packets[str(srcip)] = pkt
                 loc = known_ips[dstip]
-                send_response(network,pkt,loc.switch,loc.port)
+                send_response(network,pkt,loc.switch,loc.port_no)
             except:
 
                 if VERBOSE_LEVEL > 1:
@@ -159,7 +159,7 @@ def arp(network):
 
                 
 def example(network):
-    run(network.install_policy(hub.hub(network) - ARP), Network.fork(network))
+    run(network.install_policy(learning_switch(network) - ARP), Network.fork(network))
     run(arp, Network.fork(network))
 
 main = example
