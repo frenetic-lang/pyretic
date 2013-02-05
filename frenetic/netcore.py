@@ -326,8 +326,9 @@ class DerivedPredicate(Predicate):
         return repr(self.get_predicate())
 
     def attach(self, network):
-        pred = self.get_predicate().attach(network)
-        return pred
+        def eval(pkt):
+            return self.get_predicate().attach(network)(pkt)
+        return eval
         
 
 class SimplePredicate(Predicate):
@@ -495,8 +496,9 @@ class DerivedPolicy(Policy):
         return repr(self.get_policy())
 
     def attach(self, network):
-        pol = self.get_policy().attach(network)
-        return pol
+        def eval(pkt):
+            return self.get_policy().attach(network)(pkt)
+        return eval
         
 
 class SimplePolicy(Policy):
