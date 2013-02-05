@@ -44,7 +44,7 @@ import ipdb
             
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self, policy, show_traces, debug_packet_in, kwargs):
+    def __init__(self, main, show_traces, debug_packet_in, kwargs):
         self.network = virt.Network(self)
         self.network.init_events()
         
@@ -59,8 +59,17 @@ class POXBackend(revent.EventMixin):
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
 
-        self.policy = policy.attach(self.network)
-        
+        # main : Policy
+        try:     
+            self.eval = main.attach(self.network)
+            self.policy = main
+        # main : List KeywordArgs -> Policy
+        except:  
+            self.policy = main(**kwargs)
+            self.eval = self.policy.attach(self.network)
+            
+
+
     def vlan_from_diff(self, diff):
         with self.vlan_diff_lock:
             vlan = self.diff_to_vlan_db.get(diff)
@@ -424,11 +433,11 @@ class POXBackend(revent.EventMixin):
             ipdb.set_trace()
         
         with ipdb.launch_ipdb_on_exception():
-            output = self.policy(recv_packet)
-        
+            output = self.eval(recv_packet)
+            
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = self.policy(recv_packet) # So we can step through it
+            output = self.eval(recv_packet) # So we can step through it
         
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"

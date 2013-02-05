@@ -424,10 +424,10 @@ class union(Predicate):
         
     ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicates = [pred.attach(network) for pred in self.predicates]
+        pred_evals = [pred.attach(network) for pred in self.predicates]
         ### eval: Packet -> bool
         def eval(packet):
-            return any(predicate(packet) for predicate in predicates)
+            return any(pred_eval(packet) for pred_eval in pred_evals)
         return eval
 
         
@@ -443,10 +443,10 @@ class intersect(Predicate):
     
     ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicates = [pred.attach(network) for pred in self.predicates]
+        pred_evals = [pred.attach(network) for pred in self.predicates]
         ### eval: Packet -> bool
         def eval(packet):
-            return all(predicate(packet) for predicate in predicates)
+            return all(pred_eval(packet) for pred_eval in pred_evals)
         return eval
 
         
@@ -465,12 +465,12 @@ class difference(Predicate):
 
     ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        base_predicate = self.base_predicate.attach(network)
-        diff_predicates = [pred.attach(network) for pred in self.diff_predicates]
+        base_pred_eval = self.base_predicate.attach(network)
+        diff_pred_evals = [pred.attach(network) for pred in self.diff_predicates]
         ### eval : Packet -> bool
         def eval(packet):
-            return base_predicate(packet) and not any(pred(packet)
-                                                      for pred in diff_predicates)
+            return base_pred_eval(packet) and not any(pred_eval(packet)
+                                                      for pred_eval in diff_pred_evals)
         return eval
 
         
@@ -487,10 +487,10 @@ class negate(Predicate):
     
     ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicate = self.predicate.attach(network)
+        pred_eval = self.predicate.attach(network)
         ### eval : Packet -> bool
         def eval(packet):
-            return not predicate(packet)
+            return not pred_eval(packet)
         return eval
 
         
@@ -691,11 +691,11 @@ class remove(Policy):
         
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        predicate = self.predicate.attach(network)
+        pred_eval = self.predicate.attach(network)
         policy = self.policy.attach(network)
         ### eval : Packet -> Counter List Packet
         def eval(packet):
-            if not predicate(packet):
+            if not pred_eval(packet):
                 return policy(packet)
             else:
                 return Counter()
@@ -720,11 +720,11 @@ class restrict(Policy):
 
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        predicate = self.predicate.attach(network)
+        pred_eval = self.predicate.attach(network)
         policy = self.policy.attach(network)
         ### eval : Packet -> Counter List Packet
         def eval(packet):
-            if predicate(packet):
+            if pred_eval(packet):
                 return policy(packet)
             else:
                 return Counter()
@@ -745,12 +745,12 @@ class parallel(Policy):
 
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        policies = [policy.attach(network) for policy in self.policies]
+        pol_evals = [policy.attach(network) for policy in self.policies]
         ### eval : Packet -> Counter List Packet
         def eval(packet):
             c = Counter()
-            for policy in policies:
-                rc = policy(packet)
+            for pol_eval in pol_evals:
+                rc = pol_eval(packet)
                 c.update(rc)
             return c
         return eval
@@ -774,14 +774,14 @@ class compose(Policy):
 
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        policies = [policy.attach(network) for policy in self.policies]
+        pol_evals = [policy.attach(network) for policy in self.policies]
         ### eval : Packet -> Counter List Packet
         def eval(packet):
             lc = Counter([packet])
-            for policy in policies:
+            for pol_eval in pol_evals:
                 c = Counter()
                 for lpacket, lcount in lc.iteritems():
-                    rc = policy(lpacket)
+                    rc = pol_eval(lpacket)
                     for rpacket, rcount in rc.iteritems():
                         c[rpacket] = lcount * rcount
                 lc = c
@@ -835,13 +835,13 @@ class breakpoint(Policy):
 
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        policy = self.policy.attach(network)
+        pol_eval = self.policy.attach(network)
         ### eval : Packet -> Counter List Packet
         def eval(packet):
             import ipdb
             if self.condition(packet):
                 ipdb.set_trace()
-            return policy(packet)
+            return pol_eval(packet)
         return eval
 
 ## DEPRECATED FOR THE MOMENT        
