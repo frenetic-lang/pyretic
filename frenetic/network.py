@@ -348,13 +348,9 @@ class Topology(nx.Graph):
         self.reconcile_attributes(initial_topo)
         return self
 
-    @classmethod
-    def filter_out_nodes(cls,initial_topo,switches=[]):
-        try:
-            self = initial_topo.copy()
-        except nx.NetworkXError:
-            return node
-        return self.remove_nodes_from(switches)
+    def filter_out_nodes(self, switches=[]):
+        self_copy = initial_topo.copy()
+        return self_copy.remove_nodes_from(switches)
         
     @classmethod
     def difference(cls,topo1,topo2):
