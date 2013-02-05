@@ -30,7 +30,6 @@ from frenetic.lib import *
 
 @policy_decorator
 def monitor_packets(self):
-    b = bucket()
     @self.query(all_packets)
     def f(pkt):
         print "I see packet:"
