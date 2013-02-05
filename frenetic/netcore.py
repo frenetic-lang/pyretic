@@ -760,20 +760,16 @@ class simple_route(DerivedPolicy):
         headers = tuple(headers)
         for header_preds, act in args:
             self.policy |= match(dict(zip(headers, header_preds))) & act
-
             
     def get_policy(self):
         return self.policy
        
-
-class drop_ingress(Policy):
-    def __init__(self, network):
-        self.network = network
-    
+@singleton
+class drop_ingress(SimplePolicy):
     def __repr__(self):
-        return "drop_ingress %s" % self.network
+        return "drop_ingress"
     
-    def eval(self, packet):
+    def eval(self, network, packet):
         switch = packet["switch"]
         inport = packet["inport"]
         if Location(switch,inport) in self.network.topology.egress_locations():
@@ -781,6 +777,7 @@ class drop_ingress(Policy):
         else:
             return Counter([packet])
 
+            
 @singleton
 class flood(Policy):
     def attach(self, network):
