@@ -528,6 +528,7 @@ class Policy(object):
     def __ne__(self, other):
         raise NotImplementedError
 
+    ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
         raise NotImplementedError
 
@@ -820,7 +821,7 @@ class if_(DerivedPolicy):
         
             
 class breakpoint(Policy):
-    ### init : Policy -> option Predicate -> unit
+    ### init : Policy -> Predicate -> unit
     def __init__(self, policy, condition=lambda ps: True):
         self.policy = policy
         self.condition = condition
@@ -858,6 +859,8 @@ class breakpoint(Policy):
        
 
 class drop_ingress(Policy):
+
+    ### init : Network -> unit
     def __init__(self, network):
         self.network = network
     
@@ -923,12 +926,33 @@ class MutablePolicy(DerivedPolicy):
         b = bucket()
         self.policy |= b
         return b.when
+
+    ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_limit(self, pred=all_packets, limit=None, fields=[]):
+        if limit:
+            b = limit_bucket(limit,fields)
+            self.policy |= b
+            return b.when
+        else:
+            return self.query(pred)
+
+    ### query_unique : Predicate -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_unique(self, pred=all_packets, fields=[]):
+        return self.query_limit(pred,1,fields)
+
+    ### query_count : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_count(self, pred=all_packets, interval=None, group_by=[]):
+        b = counting_bucket(interval,group_by)
+        self.policy |= b
+        return b.when
+
         
 # policy_decorator : (DecoratedPolicy ->  unit) -> DecoratedPolicy
-def policy_decorator(fn):
+def policy_decorator(fn,**kwargs):
     class DecoratedPolicy(MutablePolicy):
         ### init : unit -> unit
-        def __init__(self):
+        def __init__(self,**kwargs):
+            self.kwargs = dict(**kwargs)
             MutablePolicy.__init__(self)
 
         ### attach : Network -> (Packet -> Counter List Packet)
@@ -966,27 +990,83 @@ class bucket(SimplePolicy):
         self.listeners.append(fn)
         return fn
 
-def query(network, pred=all_packets, fields=[]):
-    b = Bucket(fields)
-    sub_net = Network.fork(network)
-    sub_net.install_policy(pred[fwd(b)])
-    return b
+class limit_bucket(bucket):
+    ### init : int -> List String
+    def __init__(self,limit,fields=[]):
+        self.limit = limit
+        self.seen = {}
+        self.fields = fields
+        bucket.__init__(self)        
 
-def query_limit(network, pred=all_packets, limit=None, fields=[]):
-    sub_net = Network.fork(network)
-    b = LimitBucket(sub_net, fields, limit)
-    sub_net.install_policy(pred[fwd(b)])    
-    return b
+    ### eval : Network -> Packet -> unit
+    def eval(self, network, packet):
 
-def query_unique(network, pred=all_packets, fields=[]):
-    return query_limit(network, pred, 1, fields)
+        if self.fields:    # MATCH ON PROVIDED FIELDS
+            pred = match([(field,packet[field]) for field in self.fields])
+
+        else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
+            pred = match([(field,packet[field]) 
+                          for field in packet.available_fields()])
+
+        # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+        try:
+            self.seen[pred] += 1
+        except KeyError:
+            self.seen[pred] = 1
+
+        if self.seen[pred] > self.limit:
+            return 
+
+        for listener in self.listeners:
+            listener(packet)
+
+class counting_bucket(bucket):
+    ### init : int -> List String
+    def __init__(self,interval,group_by=[]):
+        self.lock = threading.Lock()
+        self.interval = interval
+        self.group_by = group_by
+        if group_by:
+            self.count = {}
+        else:
+            self.count = 0
+        bucket.__init__(self)        
+
+    ### inc : Packet -> unit
+    def inc(self,pkt):
+        """threadsafe incrementor"""
+        if self.group_by:
+            from frenetic.netcore import match
+            groups = set(self.group_by) & set(pkt.available_fields())
+            pred = match([(field,pkt[field]) for field in groups])
+            try:
+                self.count[pred] += 1
+            except KeyError:
+                self.count[pred] = 1
+        else:
+            self.lock.acquire()
+            self.count += 1
+            self.lock.release()
+
+    ### notify : unit -> unit
+    def notify(self):
+        while True:
+           for listener in self.listeners:
+               listener(self.count)
+           from time import sleep
+           sleep(self.interval)
+
+    ### attach : Network -> (Packet -> bool)
+    def attach(self, network):
+        from generators import run
+        run(self.notify)
+        return bucket.attach(self,network)
+
+    ### eval : Network -> Packet -> unit
+    def eval(self, network, packet):
+        self.inc(packet)
+
     
-def query_count(network, pred=all_packets, interval=None, group_by=[]):
-    b = CountingBucket(interval,group_by)
-    sub_net = Network.fork(network)
-    sub_net.install_policy(pred[fwd(b)])    
-    return b
-
 
 
 class DynamicPolicy(gs.Behavior):
