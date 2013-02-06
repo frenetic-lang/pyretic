@@ -39,12 +39,12 @@
 
 from frenetic.lib import *
 
-@policy_decorator
-def learning_switch(self):
-    self.policy |= flood
-    
+@policy_decorator             # policy_decorater will be applied to learning_switch
+def learning_switch(self):    # self : DecoratedPolicy  
+    self.policy |= flood      # self.policy initial value is drop
     host_to_outport = {}
-    @self.query(all_packets)
+
+    @self.query(all_packets)  # self.query(all_packets) will be applied to f
     def f(pkt):
         outport = host_to_outport.get((pkt['switch'], pkt['srcmac']))
         if outport != pkt['inport']:
@@ -54,8 +54,11 @@ def learning_switch(self):
             self.policy -= host_p # Don't do our old action.
             self.policy |= host_p[ fwd(pkt['inport']) ] # Do this instead.
         
-main = learning_switch()
-
+main = learning_switch()  # this learning_switch() is NOT the function defined above
+                          # it is the name of the DecoratedPolicy produced by applying policy_decorator
+                          # to the learning_switch function defined above!   
+                          # specifically learning_switch is the DecoratedPolicy and () is the constructor call
+                          # on the learning_switch DecoratedPolicy
 
 
 
