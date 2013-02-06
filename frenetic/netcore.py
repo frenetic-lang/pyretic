@@ -858,24 +858,27 @@ class breakpoint(Policy):
 #         return self.policy
        
 
+@singleton
 class drop_ingress(Policy):
-
     ### init : Network -> unit
-    def __init__(self, network):
-        self.network = network
+#    def __init__(self, network):
+#        self.network = network
     
     ### repr : unit -> String
     def __repr__(self):
-        return "drop_ingress %s" % self.network
+        return "drop_ingress"
     
-    ### eval : Packet -> Counter List Packet
-    def eval(self, packet):
-        switch = packet["switch"]
-        inport = packet["inport"]
-        if Location(switch,inport) in self.network.topology.egress_locations():
-            return Counter()
-        else:
-            return Counter([packet])
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            switch = packet["switch"]
+            inport = packet["inport"]
+            if Location(switch,inport) in network.topology.egress_locations():
+                return Counter()
+            else:
+                return Counter([packet])
+        return eval
 
 @singleton
 class flood(Policy):
