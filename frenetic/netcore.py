@@ -719,6 +719,24 @@ class shift(SimplePolicy):
         return Counter([packet])
 
 
+class overwrite(SimplePolicy):
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "overwrite:\n%s" % util.repr_plus(self.map.items())
+  
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        pushes = {}
+        for (dstfield, srcfield) in self.map.iteritems():
+            pushes[dstfield] = packet[srcfield]
+        pops_before = self.map.keys()
+        packet = packet.popmany(pops_before).pushmany(pushes)
+        return Counter([packet])
+
 class remove(Policy):
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
