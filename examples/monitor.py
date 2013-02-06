@@ -29,6 +29,9 @@
 from frenetic.lib import *
 from examples.learning_switch import learning_switch
 
+
+### 50 ways to write your packet monitor ###
+
 @policy_decorator
 def monitor_packets(self):
     @self.query(all_packets)
@@ -40,7 +43,7 @@ def monitor_packets(self):
 @policy_decorator
 def monitor_packets_less_decorated(self):
     def f(pkt):
-        print "(less decorated) I see packet:"
+        print "(less_decorated) I see packet:"
         print pkt
         print "---------------"
     self.query(all_packets)(f)
@@ -49,7 +52,7 @@ def monitor_packets_less_decorated(self):
 def monitor_packets_undecorated():
     def monitor_packets_undecorated_fn(self):
         def f(pkt):
-            print "(undecorated) I see packet:"
+            print "(undecorated_fn) I see packet:"
             print pkt
             print "---------------"
         self.query(all_packets)(f)
@@ -61,9 +64,22 @@ def monitor_packets_explicit_bucket(self):
     self.policy |= b
     @b.when
     def f(pkt):
-        print "(explicit) I see packet:"
+        print "(explicit_bucket) I see packet:"
         print pkt
         print "---------------"
+
+def monitor_packets_lowest_level_syntax():
+    b = bucket()
+    def f(pkt):
+        print "(lowest_level_syntax) I see packet:"
+        print pkt  
+        print "---------------" 
+    b.when(f)
+    return b
+
+
+### packet monitoring w/ other bucket types ###
+
 
 @policy_decorator
 def monitor_packets_limit_by_src_dst(self,**kwargs):
@@ -99,6 +115,10 @@ def monitor_grouped_packet_count(self):
         for (k,v) in count.items():
             print "%d:  %s" % (v,k)
 
+
+### Topology monitoring ###
+
+
 @policy_decorator
 def monitor_topology(self):
     @self.network._topology.notify
@@ -107,11 +127,15 @@ def monitor_topology(self):
         print topo
         print "------ monitor topology output end - -------"
 
+
+### Examples ###
+
 all_monitor_modules =                           \
     monitor_packets()                           \
     | monitor_packets_explicit_bucket()         \
     | monitor_packets_less_decorated()          \
     | monitor_packets_undecorated()()           \
+    | monitor_packets_lowest_level_syntax()     \
     | monitor_packets_limit_by_src_dst(limit=3) \
     | monitor_unique_packets()                  \
     | monitor_topology()                        \
@@ -123,5 +147,12 @@ summary_modules =                     \
     | monitor_grouped_packet_count()  \
     | learning_switch()
 
-main = summary_modules
+lowest_level_syntax =                      \
+    monitor_packets_lowest_level_syntax()  \
+    | flood
+
+
+### Main ###
+
+main = lowest_level_syntax
 

@@ -375,7 +375,34 @@ class no_packets(SimplePredicate):
     ### eval : Network -> Packet -> bool
     def eval(self, network, packet):
         return False
- 
+
+@singleton
+class ingress(SimplePredicate):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "ingress"
+    
+    ### eval : Network -> Packet -> bool
+    def eval(self, network, packet):
+        switch = packet["switch"]
+        port_no = packet["inport"]
+        return Location(switch,port_no) in network.topology.egress_locations()
+
+@singleton
+class egress(SimplePredicate):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "egress"
+    
+    ### eval : Network -> Packet -> bool
+    def eval(self, network, packet):
+        switch = packet["switch"]
+        try:
+            port_no = packet["outport"]
+            return Location(switch,port_no) in network.topology.egress_locations()
+        except:
+            return False
+
         
 class match(SimplePredicate):
     """A set of field matches (one per field)"""
@@ -575,21 +602,6 @@ class drop(SimplePolicy):
         return Counter()
 
 @singleton
-class drop_ingress(SimplePolicy):
-    ### repr : unit -> String
-    def __repr__(self):
-        return "drop_ingress"
-    
-    ### eval : Network -> Packet -> Counter List Packet
-    def eval(network, packet):
-        switch = packet["switch"]
-        inport = packet["inport"]
-        if Location(switch,inport) in network.topology.egress_locations():
-            return Counter()
-        else:
-            return Counter([packet])
-        
-@singleton
 class flood(Policy):
     ### repr : unit -> String
     def __repr__(self):
@@ -706,6 +718,24 @@ class shift(SimplePolicy):
         packet = packet.pushmany(pushes).popmany(pops)
         return Counter([packet])
 
+
+class overwrite(SimplePolicy):
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "overwrite:\n%s" % util.repr_plus(self.map.items())
+  
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        pushes = {}
+        for (dstfield, srcfield) in self.map.iteritems():
+            pushes[dstfield] = packet[srcfield]
+        pops_before = self.map.keys()
+        packet = packet.popmany(pops_before).pushmany(pushes)
+        return Counter([packet])
 
 class remove(Policy):
     ### init : Policy -> Predicate -> unit
