@@ -375,7 +375,34 @@ class no_packets(SimplePredicate):
     ### eval : Network -> Packet -> bool
     def eval(self, network, packet):
         return False
- 
+
+@singleton
+class ingress(SimplePredicate):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "ingress"
+    
+    ### eval : Network -> Packet -> bool
+    def eval(self, network, packet):
+        switch = packet["switch"]
+        port_no = packet["inport"]
+        return Location(switch,port_no) in network.topology.egress_locations()
+
+@singleton
+class egress(SimplePredicate):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "egress"
+    
+    ### eval : Network -> Packet -> bool
+    def eval(self, network, packet):
+        switch = packet["switch"]
+        try:
+            port_no = packet["outport"]
+            return Location(switch,port_no) in network.topology.egress_locations()
+        except:
+            return False
+
         
 class match(SimplePredicate):
     """A set of field matches (one per field)"""
@@ -574,21 +601,6 @@ class drop(SimplePolicy):
     def eval(self, network, packet):
         return Counter()
 
-@singleton
-class drop_ingress(SimplePolicy):
-    ### repr : unit -> String
-    def __repr__(self):
-        return "drop_ingress"
-    
-    ### eval : Network -> Packet -> Counter List Packet
-    def eval(network, packet):
-        switch = packet["switch"]
-        inport = packet["inport"]
-        if Location(switch,inport) in network.topology.egress_locations():
-            return Counter()
-        else:
-            return Counter([packet])
-        
 @singleton
 class flood(Policy):
     ### repr : unit -> String
