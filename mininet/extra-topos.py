@@ -196,7 +196,39 @@ class YTopo(Topo):
         self.addLink('s1', 's2')
         self.addLink('s2', 's3')
         self.addLink('s2', 's4')
+
+
+class GatewayTopo(Topo):
+    def __init__(self):
         
+        super(GatewayTopo, self).__init__()
+
+        for switch_id in xrange(1, 8): 
+            self.addSwitch('s'+str(switch_id))
+
+        for host_id in xrange(1, 7): 
+            self.addHost('h'+str(host_id))
+        
+        # Ethernet side
+        self.addLink('s2', 'h1')
+        self.addLink('s3', 'h2')
+        self.addLink('s4', 'h3')
+        
+        self.addLink('s2', 's3')
+        self.addLink('s3', 's1')
+        self.addLink('s1', 's4')
+        self.addLink('s4', 's2')
+
+        # IP side
+        self.addLink('s5', 'h4')
+        self.addLink('s6', 'h5')
+        self.addLink('s7', 'h6')
+
+        self.addLink('s1', 's5')
+        self.addLink('s5', 's6')
+        self.addLink('s6', 's7')
+        self.addLink('s7', 's1')
+            
 
 
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
@@ -208,6 +240,7 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'bump_cycle': BumpCycleTopo,
           'bump_clique': BumpCliqueTopo,
           'figure3' : Figure3Topo,
-          'ytopo': YTopo
+          'ytopo': YTopo,
+          'gateway': GatewayTopo,
 }
  
