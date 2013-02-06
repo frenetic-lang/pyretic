@@ -48,7 +48,7 @@
 import math
 from frenetic.lib import *
 from examples.renamer import renamer
-from examples.learning_switch_dyn import learning_switch
+from examples.learning_switch import learning_switch
 
 def static_load_balancer(service_ip,static_matching):
 
@@ -68,7 +68,7 @@ def static_matching(client_ips,instance_ips):
     return zip(client_ips,repeating_instance_ips)
 
 
-def example(network, clients, servers):
+def example(clients, servers):
 
     num_clients = int(clients)
     num_servers = int(servers)
@@ -84,9 +84,6 @@ def example(network, clients, servers):
 
     lb_matching = static_matching(client_ips,instance_ips)
     print "static_matching = %s" % lb_matching
-
-    policy = static_load_balancer(service_ip,lb_matching) >> learning_switch(network)
-    network.install_policy(policy)
-
+    return static_load_balancer(service_ip,lb_matching) >> learning_switch()
 
 main = example

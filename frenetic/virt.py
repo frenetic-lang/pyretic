@@ -110,7 +110,7 @@ class physical_to_virtual(DerivedPolicy, Data("vtag")):
         return "physical_to_virtual %s" % self.vtag
         
     def get_policy(self):
-        return (push(vtag=self.vtag) >> copy(voutport="outport",
+        return (push(vtag=self.vtag) >> shift(voutport="outport",
                                              vswitch="switch",
                                              vinport="inport"))
         
@@ -121,7 +121,7 @@ class virtual_to_physical(DerivedPolicy):
         
     def get_policy(self):
          return (pop(["switch", "inport", "outport", "vtag"]) >>
-                 copy(outport="voutport", switch="vswitch", inport="vinport"))
+                 shift(outport="voutport", switch="vswitch", inport="vinport"))
          
 
 @singleton
@@ -149,7 +149,7 @@ class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical
         pol = (if_(~match(vtag=self.vtag), 
                     (self.ingress_policy >> # set vswitch and vinport
                      # now make the virtualization transparent to the tenant's policy to get the outport
-                     copy(switch="vswitch", inport="vinport") >>
+                     shift(switch="vswitch", inport="vinport") >>
                      self.policy >>
                      physical_to_virtual(self.vtag)))
                 # Pipe the packet with appropriate v* headers to the physical policy for processing

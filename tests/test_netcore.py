@@ -99,7 +99,7 @@ def test_match_ints():
 def test_copy():
     p = packets[1]._push(switch=10)
     p_ = p._push(vswitch=10)
-    assert get_single_packet(copy(vswitch="switch"), p) == p_
+    assert get_single_packet(shift(vswitch="switch"), p) == p_
 
 
 # Test virtualization

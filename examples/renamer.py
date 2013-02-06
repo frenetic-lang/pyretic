@@ -49,19 +49,13 @@ def renamer(client_ip,instance_ip,service_ip):
   
     pol = passthrough
     pol -= service_to_client_pred | client_to_service_pred
-    pol |= service_to_client_pred & service_to_client_mod | client_to_service_pred & client_to_service_mod
+    pol |= service_to_client_pred[service_to_client_mod] | client_to_service_pred[client_to_service_mod]
     
     return pol
 
 
-def example(network):
-    service_ip  = '10.0.0.100'
-    client_ip   = '10.0.0.1'
-    instance_ip = '10.0.0.2'
+service_ip  = '10.0.0.100'
+client_ip   = '10.0.0.1'
+instance_ip = '10.0.0.2'
 
-#   policy = renamer(network) >> hub(network)
-    policy = renamer(client_ip,instance_ip,service_ip) >> learning_switch(network)
-    network.install_policy(policy)
-
-        
-main = example
+main = renamer(client_ip,instance_ip,service_ip) >> hub

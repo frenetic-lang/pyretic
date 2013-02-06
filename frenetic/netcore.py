@@ -277,9 +277,9 @@ def register_header(header, matchclass):
 def matchable_for_header(header):
     return _header_to_matchclass.get(header, Exact)
 
-### JREICH - disabled incorrect registration calls
-### type mistmatch between src/dstmac which are MAC
-### and Wildcard which takes binary string
+## JREICH - disabled incorrect registration calls
+## type mistmatch between src/dstmac which are MAC
+## and Wildcard which takes binary string
 #register_header("srcmac", Wildcard(48))
 #register_header("dstmac", Wildcard(48))
 register_header("srcip", IPWildcard)
@@ -290,41 +290,54 @@ register_header("dstip", IPWildcard)
 # Predicates
 ################################################################################
 
+
 class Predicate(object):
     """Top-level abstract class for predicates."""
+
+    ### sub : Predicate -> Predicate
     def __sub__(self, other):
         return difference(self, other)
-
+    
+    ### and : Predicate -> Predicate 
     def __and__(self, other):
         return intersect([self, other])
-        
+    
+    ### or : Predicate -> Predicate 
     def __or__(self, other):
         return union([self, other])
 
+    ### getitem : Policy -> Policy 
     def __getitem__(self, policy):
         return restrict(policy, self)
         
+    ### invert : unit -> Predicate
     def __invert__(self):
         return negate(self)
 
+    ### eq : Predicate -> bool
     def __eq__(self, other):
         raise NotImplementedError
 
+    ### ne : Predicate -> bool
     def __ne__(self, other):
         raise NotImplementedError
 
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
         """Not intended for general use."""
         raise NotImplementedError
 
         
 class DerivedPredicate(Predicate):
+    ### get_predicate : unit -> Predicate
     def get_predicate(self):
         raise NotImplementedError
     
+    ### repr : unit -> String
     def __repr__(self):
         return repr(self.get_predicate())
 
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
         def eval(pkt):
             return self.get_predicate().attach(network)(pkt)
@@ -332,7 +345,9 @@ class DerivedPredicate(Predicate):
         
 
 class SimplePredicate(Predicate):
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
+        ### eval : Packet -> bool
         def eval(packet):
             return self.eval(network, packet)
         return eval
@@ -341,9 +356,11 @@ class SimplePredicate(Predicate):
 @singleton
 class all_packets(SimplePredicate):
     """The always-true predicate."""
+    ### repr : unit -> String
     def __repr__(self):
         return "all packets"
 
+    ### eval : Network -> Packet -> bool
     def eval(self, network, packet):
         return True
         
@@ -351,9 +368,11 @@ class all_packets(SimplePredicate):
 @singleton
 class no_packets(SimplePredicate):
     """The always-false predicate."""
+    ### repr : unit -> String
     def __repr__(self):
         return "no packets"
 
+    ### eval : Network -> Packet -> bool
     def eval(self, network, packet):
         return False
  
@@ -361,21 +380,26 @@ class no_packets(SimplePredicate):
 class match(SimplePredicate):
     """A set of field matches (one per field)"""
     
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         init_map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
             init_map[k] = matchable_for_header(k)(v)
         self.map = util.frozendict(init_map)
 
+    ### repr : unit -> String
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
-    
+
+    ### hash : unit -> int
     def __hash__(self):
         return hash(self.map)
     
+    ### eq : Predicate -> bool
     def __eq__(self, other):
         return self.map == other.map
 
+    ### eval : Network -> Packet -> bool
     def eval(self, network, packet):
         for field, pattern in self.map.iteritems():
             v = packet.get_stack(field)
@@ -391,16 +415,20 @@ class match(SimplePredicate):
 class union(Predicate):
     """A predicate representing the union of two predicates."""
 
+    ### init : List Predicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
         
+    ### repr : unit -> String
     def __repr__(self):
         return "union:\n%s" % util.repr_plus(self.predicates)
         
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicates = [pred.attach(network) for pred in self.predicates]
+        pred_evals = [pred.attach(network) for pred in self.predicates]
+        ### eval: Packet -> bool
         def eval(packet):
-            return any(predicate(packet) for predicate in predicates)
+            return any(pred_eval(packet) for pred_eval in pred_evals)
         return eval
 
         
@@ -410,49 +438,60 @@ class intersect(Predicate):
     def __init__(self, predicates):
         self.predicates = list(predicates)
         
+    ### repr : unit -> String
     def __repr__(self):
         return "intersect:\n%s" % util.repr_plus(self.predicates)
     
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicates = [pred.attach(network) for pred in self.predicates]
+        pred_evals = [pred.attach(network) for pred in self.predicates]
+        ### eval: Packet -> bool
         def eval(packet):
-            return all(predicate(packet) for predicate in predicates)
+            return all(pred_eval(packet) for pred_eval in pred_evals)
         return eval
 
         
 class difference(Predicate):
     """A predicate representing the difference of two predicates."""
 
+    ### init : Predicate -> List Predicate -> unit
     def __init__(self, base_predicate, diff_predicates):
         self.base_predicate = base_predicate
         self.diff_predicates = list(diff_predicates)
         
+    ### repr : unit -> String
     def __repr__(self):
         return "difference:\n%s" % util.repr_plus([self.base_predicate,
                                                    self.diff_predicates])
 
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        base_predicate = self.base_predicate.attach(network)
-        diff_predicates = [pred.attach(network) for pred in self.diff_predicates]
+        base_pred_eval = self.base_predicate.attach(network)
+        diff_pred_evals = [pred.attach(network) for pred in self.diff_predicates]
+        ### eval : Packet -> bool
         def eval(packet):
-            return base_predicate(packet) and not any(pred(packet)
-                                                      for pred in diff_predicates)
+            return base_pred_eval(packet) and not any(pred_eval(packet)
+                                                      for pred_eval in diff_pred_evals)
         return eval
 
         
 class negate(Predicate):
     """A predicate representing the difference of two predicates."""
 
+    ### init : Predicate -> unit
     def __init__(self, predicate):
         self.predicate = predicate
         
+    ### repr : unit -> String
     def __repr__(self):
         return "negate:\n%s" % util.repr_plus([self.predicate])
     
+    ### attach : Network -> (Packet -> bool)
     def attach(self, network):
-        predicate = self.predicate.attach(network)
+        pred_eval = self.predicate.attach(network)
+        ### eval : Packet -> bool
         def eval(packet):
-            return not predicate(packet)
+            return not pred_eval(packet)
         return eval
 
         
@@ -463,330 +502,106 @@ class negate(Predicate):
 class Policy(object):
     """Top-level abstract description of a static network program."""
 
+    ### sub : Predicate -> Policy
     def __sub__(self, pred):
         return remove(self, pred)
 
+    ### add : Predicate -> Policy
     def __and__(self, pred):
         return restrict(self, pred)
 
+    ### or : Policy -> Policy
     def __or__(self, other):
         return parallel([self, other])
         
+    ### rshift : Policy -> Policy
     def __rshift__(self, pol):
         return compose([self, pol])
 
-    def __mod__(self, pred):
-        return self
-
+    ### eq : Policy -> bool
     def __eq__(self, other):
         raise NotImplementedError
 
+    ### ne : Policy -> bool
     def __ne__(self, other):
         raise NotImplementedError
 
+    ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
         raise NotImplementedError
 
+class SimplePolicy(Policy):
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            return self.eval(network, packet)
+        return eval
         
 class DerivedPolicy(Policy):
-    def get_policy(self):
-        raise NotImplementedError
-    
+    ### repr : unit -> String
     def __repr__(self):
         return repr(self.get_policy())
 
+    ### get_policy : unit -> Policy
+    def get_policy(self):
+        raise NotImplementedError
+    
+    ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
         def eval(pkt):
             return self.get_policy().attach(network)(pkt)
         return eval
         
-
-class SimplePolicy(Policy):
-    def attach(self, network):
-        def eval(packet):
-            return self.eval(network, packet)
-        return eval
-
-
+@singleton
+class passthrough(SimplePolicy):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "passthrough"
+        
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        return Counter([packet])
         
 @singleton
 class drop(SimplePolicy):
     """Policy that drops everything."""
+    ### repr : unit -> String
     def __repr__(self):
         return "drop"
         
+    ### eval : Network -> Packet -> Counter List Packet
     def eval(self, network, packet):
         return Counter()
 
-        
-@singleton
-class passthrough(SimplePolicy):
-    def __repr__(self):
-        return "passthrough"
-        
-    def eval(self, network, packet):
-        return Counter([packet])
-
-        
-class modify(SimplePolicy):
-    """Policy that drops everything."""
-                                            
-    def __init__(self, *args, **kwargs):
-       init_map = {}
-       for (k, v) in dict(*args, **kwargs).iteritems():
-           if k == 'srcip' or k == 'dstip':
-               init_map[k] = IP(v) 
-           elif k == 'srcmac' or k == 'dstmac':
-               init_map[k] = MAC(v)
-           else:
-               init_map[k] = v
-       self.map = util.frozendict(init_map)
-
-    def __repr__(self):
-        return "modify:\n%s" % util.repr_plus(self.map.items())
-        
-    def eval(self, network, packet):
-        packet = packet.modifymany(self.map)
-        return Counter([packet])
-
-        
-class fwd(SimplePolicy):
-    """Forward"""
-    
-    def __init__(self, port):
-        self.port = port
-
-    def __repr__(self):
-        return "fwd %s" % self.port
-    
-    def eval(self, network, packet):
-        packet = packet.push(outport=self.port)
-        return Counter([packet])
-
-        
-class push(SimplePolicy):
-    """Policy that drops everything."""
-    
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-
-    def __repr__(self):
-        return "push:\n%s" % util.repr_plus(self.map.items())
-        
-    def eval(self, network, packet):
-        packet = packet.pushmany(self.map)
-        return Counter([packet])
-
-        
-class pop(SimplePolicy):
-    """Policy that drops everything."""
-    
-    def __init__(self, fields):
-        self.fields = set(fields)
-
-    def __repr__(self):
-        return "pop:\n%s" % util.repr_plus(self.fields)
-        
-    def eval(self, network, packet):
-        packet = packet.popmany(self.fields)
-        return Counter([packet])
-
-        
-class copy(SimplePolicy):
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-
-    def __repr__(self):
-        return "copy:\n%s" % util.repr_plus(self.map.items())
-  
-    """Policy that drops everything."""
-    def eval(self, network, packet):
-        pushes = {}
-        for (dstfield, srcfield) in self.map.iteritems():
-            pushes[dstfield] = packet[srcfield]
-        pops = self.map.values()
-        packet = packet.pushmany(pushes).popmany(pops)
-        return Counter([packet])
-
-
-class remove(Policy):
-    def __init__(self, policy, predicate):
-        self.policy = policy
-        self.predicate = predicate
-
-    def __mod__(self, pred):
-        return remove(self.policy % pred, self.predicate)
-    
-    def __repr__(self):
-        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
-        
-    def attach(self, network):
-        predicate = self.predicate.attach(network)
-        policy = self.policy.attach(network)
-        def eval(packet):
-            if not predicate(packet):
-                return policy(packet)
-            else:
-                return Counter()
-        return eval
-        
-
-class restrict(Policy):
-    """Policy for mapping a single predicate to a list of actions."""
-
-    def __init__(self, policy, predicate):
-        self.policy = policy
-        self.predicate = predicate
-
-    def __mod__(self, pred):
-        return restrict(self.policy % pred, self.predicate)
-        
-    def __repr__(self):
-        return "restrict:\n%s" % util.repr_plus([self.predicate,
-                                                 self.policy])
-
-    def attach(self, network):
-        predicate = self.predicate.attach(network)
-        policy = self.policy.attach(network)
-        def eval(packet):
-            if predicate(packet):
-                return policy(packet)
-            else:
-                return Counter()
-        return eval
-
-                    
-class parallel(Policy):
-    def __init__(self, policies):
-        self.policies = list(policies)
-    
-    def __mod__(self, pred):
-        return parallel([ p % pred for p in self.policies])
-
-    def __repr__(self):
-        return "parallel:\n%s" % util.repr_plus(self.policies)
-
-    def attach(self, network):
-        policies = [policy.attach(network) for policy in self.policies]
-        def eval(packet):
-            c = Counter()
-            for policy in policies:
-                rc = policy(packet)
-                c.update(rc)
-            return c
-        return eval
-
-
-class compose(Policy):
-    def __init__(self, policies):
-        self.policies = list(policies)
-    
-    def __mod__(self, pred):
-        mod_sub_pols = [ p % pred for p in self.policies ]
-        positive_pol = compose(mod_sub_pols)
-        mod_sub_pols.reverse()
-        negative_pol = compose(mod_sub_pols)
-        return if_(pred,positive_pol,negative_pol)
-
-    def __repr__(self):
-        return "compose:\n%s" % util.repr_plus(self.policies)
-
-    def attach(self, network):
-        policies = [policy.attach(network) for policy in self.policies]
-        def eval(packet):
-            lc = Counter([packet])
-            for policy in policies:
-                c = Counter()
-                for lpacket, lcount in lc.iteritems():
-                    rc = policy(lpacket)
-                    for rpacket, rcount in rc.iteritems():
-                        c[rpacket] = lcount * rcount
-                lc = c
-            return lc
-        return eval
-
-
-def directional_compose(direction_pred, policies):
-    pol_list = list(policies)
-    positive_direction = compose(pol_list)
-    pol_list.reverse()
-    negative_direction = compose(pol_list)
-    return if_(direction_pred,positive_direction,negative_direction)
-    
-            
-class if_(DerivedPolicy):
-    def __init__(self, pred, t_branch, f_branch=passthrough):
-        self.pred = pred
-        self.t_branch = t_branch
-        self.f_branch = f_branch
-
-    def __mod__(self, pred):
-        return if_(self.pred, self.t_branch % pred, self.f_branch)
-
-    def __repr__(self):
-        return "if\n%s" % util.repr_plus(["PREDICATE",
-                                          self.pred,
-                                          "T BRANCH",
-                                          self.t_branch,
-                                          "F BRANCH",
-                                          self.f_branch])
-
-    def get_policy(self):
-        return self.pred[self.t_branch] | (~self.pred)[self.f_branch]
-        
-            
-class breakpoint(Policy):
-    def __init__(self, policy, condition=lambda ps: True):
-        self.policy = policy
-        self.condition = condition
-
-    def __mod__(self, pred):
-        return breakpoint(self.policy % pred, self.condition)
-        
-    def __repr__(self):
-        return "***debug***\n%s" % util.repr_plus([self.policy])
-
-    def attach(self, network):
-        policy = self.policy.attach(network)
-        def eval(packet):
-            import ipdb
-            if self.condition(packet):
-                ipdb.set_trace()
-            return policy(packet)
-        return eval
-
-        
-class simple_route(DerivedPolicy):
-    def __init__(self, headers, *args):
-        self.policy = drop
-        headers = tuple(headers)
-        for header_preds, act in args:
-            self.policy |= match(dict(zip(headers, header_preds))) & act
-            
-    def get_policy(self):
-        return self.policy
-       
 @singleton
 class drop_ingress(SimplePolicy):
+    ### repr : unit -> String
     def __repr__(self):
         return "drop_ingress"
     
-    def eval(self, network, packet):
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(network, packet):
         switch = packet["switch"]
         inport = packet["inport"]
-        if Location(switch,inport) in self.network.topology.egress_locations():
+        if Location(switch,inport) in network.topology.egress_locations():
             return Counter()
         else:
             return Counter([packet])
-
-            
+        
 @singleton
 class flood(Policy):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "flood"
+
+    ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
         get_mst = [None] # Hack b/c no Python 3 nonlocal
         @network._topology.notify
         def handle(topo):
             get_mst[0] = Topology.minimum_spanning_tree(topo)
+        ### eval : Packet -> Counter List Packet
         def eval(packet):
             mst = get_mst[0]
             switch = packet["switch"]
@@ -804,73 +619,409 @@ class flood(Policy):
                 return Counter()
         return eval
         
-    def __repr__(self):
-        return "flood"
+class modify(SimplePolicy):
+    """Policy that drops everything."""
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+       init_map = {}
+       for (k, v) in dict(*args, **kwargs).iteritems():
+           if k == 'srcip' or k == 'dstip':
+               init_map[k] = IP(v) 
+           elif k == 'srcmac' or k == 'dstmac':
+               init_map[k] = MAC(v)
+           else:
+               init_map[k] = v
+       self.map = util.frozendict(init_map)
 
+    ### repr : unit -> String
+    def __repr__(self):
+        return "modify:\n%s" % util.repr_plus(self.map.items())
+
+    ### eval : Network -> Packet -> Counter List Packet        
+    def eval(self, network, packet):
+        packet = packet.modifymany(self.map)
+        return Counter([packet])
+        
+class fwd(SimplePolicy):
+    """Forward"""
+    ### init : int -> unit
+    def __init__(self, port):
+        self.port = port
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "fwd %s" % self.port
+    
+    ### eval : Network -> Packet -> Counter List Packet        
+    def eval(self, network, packet):
+        packet = packet.push(outport=self.port)
+        return Counter([packet])
+
+        
+class push(SimplePolicy):
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "push:\n%s" % util.repr_plus(self.map.items())
+        
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        packet = packet.pushmany(self.map)
+        return Counter([packet])
+
+        
+class pop(SimplePolicy):
+    ### init : List String -> unit
+    def __init__(self, fields):
+        self.fields = set(fields)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "pop:\n%s" % util.repr_plus(self.fields)
+        
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        packet = packet.popmany(self.fields)
+        return Counter([packet])
+
+        
+class shift(SimplePolicy):
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "copy:\n%s" % util.repr_plus(self.map.items())
+  
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        pushes = {}
+        for (dstfield, srcfield) in self.map.iteritems():
+            pushes[dstfield] = packet[srcfield]
+        pops = self.map.values()
+        packet = packet.pushmany(pushes).popmany(pops)
+        return Counter([packet])
+
+
+class remove(Policy):
+    ### init : Policy -> Predicate -> unit
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
+        
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pred_eval = self.predicate.attach(network)
+        policy = self.policy.attach(network)
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            if not pred_eval(packet):
+                return policy(packet)
+            else:
+                return Counter()
+        return eval
+        
+
+class restrict(Policy):
+    ### init : Policy -> Predicate -> unit
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "restrict:\n%s" % util.repr_plus([self.predicate,
+                                                 self.policy])
+
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pred_eval = self.predicate.attach(network)
+        policy = self.policy.attach(network)
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            if pred_eval(packet):
+                return policy(packet)
+            else:
+                return Counter()
+        return eval
+
+                    
+class parallel(Policy):
+    ### init : List Policy -> unit
+    def __init__(self, policies):
+        self.policies = list(policies)
+    
+    ### repr : unit -> String
+    def __repr__(self):
+        return "parallel:\n%s" % util.repr_plus(self.policies)
+
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pol_evals = [policy.attach(network) for policy in self.policies]
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            c = Counter()
+            for pol_eval in pol_evals:
+                rc = pol_eval(packet)
+                c.update(rc)
+            return c
+        return eval
+
+
+class compose(Policy):
+    ### init : List Policy -> unit
+    def __init__(self, policies):
+        self.policies = list(policies)
+    
+    ### repr : unit -> String
+    def __repr__(self):
+        return "compose:\n%s" % util.repr_plus(self.policies)
+
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pol_evals = [policy.attach(network) for policy in self.policies]
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            lc = Counter([packet])
+            for pol_eval in pol_evals:
+                c = Counter()
+                for lpacket, lcount in lc.iteritems():
+                    rc = pol_eval(lpacket)
+                    for rpacket, rcount in rc.iteritems():
+                        c[rpacket] = lcount * rcount
+                lc = c
+            return lc
+        return eval
+
+### directional_compose : Predicate -> List Policy -> Policy
+def directional_compose(direction_pred, policies):
+    pol_list = list(policies)
+    positive_direction = compose(pol_list)
+    pol_list.reverse()
+    negative_direction = compose(pol_list)
+    return if_(direction_pred,positive_direction,negative_direction)
+    
+            
+class if_(DerivedPolicy):
+    ### init : Predicate -> Policy -> Policy -> unit
+    def __init__(self, pred, t_branch, f_branch=passthrough):
+        self.pred = pred
+        self.t_branch = t_branch
+        self.f_branch = f_branch
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "if\n%s" % util.repr_plus(["PREDICATE",
+                                          self.pred,
+                                          "T BRANCH",
+                                          self.t_branch,
+                                          "F BRANCH",
+                                          self.f_branch])
+    ### get_policy : unit -> Policy
+    def get_policy(self):
+        return self.pred[self.t_branch] | (~self.pred)[self.f_branch]
+        
+            
+class breakpoint(Policy):
+    ### init : Policy -> Predicate -> unit
+    def __init__(self, policy, condition=lambda ps: True):
+        self.policy = policy
+        self.condition = condition
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "***debug***\n%s" % util.repr_plus([self.policy])
+
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pol_eval = self.policy.attach(network)
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            import ipdb
+            if self.condition(packet):
+                ipdb.set_trace()
+            return pol_eval(packet)
+        return eval
+
+        
+class simple_route(DerivedPolicy):
+    def __init__(self, headers, *args):
+        self.policy = drop
+        headers = tuple(headers)
+        for header_preds, act in args:
+            self.policy |= match(dict(zip(headers, header_preds))) & act
+            
+    def get_policy(self):
+        return self.policy
+       
 
 class MutablePolicy(DerivedPolicy):
+    ### init : unit -> unit
     def __init__(self):
         self.policy = drop
 
+    ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
         return DerivedPolicy.attach(self, network)
         
+    ### get_policy : unit -> unit
     def get_policy(self):
         return self.policy
 
+    ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
         b = bucket()
         self.policy |= b
         return b.when
-        
 
-def policy_decorator(fn):
+    ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_limit(self, pred=all_packets, limit=None, fields=[]):
+        if limit:
+            b = limit_bucket(limit,fields)
+            self.policy |= b
+            return b.when
+        else:
+            return self.query(pred)
+
+    ### query_unique : Predicate -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_unique(self, pred=all_packets, fields=[]):
+        return self.query_limit(pred,1,fields)
+
+    ### query_count : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
+    def query_count(self, pred=all_packets, interval=None, group_by=[]):
+        b = counting_bucket(interval,group_by)
+        self.policy |= b
+        return b.when
+
+        
+# policy_decorator : (DecoratedPolicy ->  unit) -> DecoratedPolicy
+def policy_decorator(fn,**kwargs):
     class DecoratedPolicy(MutablePolicy):
-        def __init__(self):
+        ### init : unit -> unit
+        def __init__(self,**kwargs):
+            self.kwargs = dict(**kwargs)
             MutablePolicy.__init__(self)
 
+        ### attach : Network -> (Packet -> Counter List Packet)
         def attach(self, network):
             self.network = network
-            fn(self)
+            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
+            # IN PARICULAR, THE when FUNCTION RETURNED BY self.query 
+            # (ITSELF A MEMBER OF A BUCKET CREATED BY self.query)
+            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
+            # FUNCTION TO WHICH when IS ASSIGNED AS when IS EVALUATED
+            # EACH TIME A NEW EVENT OCCURS
+            fn(self)  
             return MutablePolicy.attach(self, network)
 
+    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
     DecoratedPolicy.__name__ = fn.__name__
     return DecoratedPolicy
  
         
 class bucket(SimplePolicy):
+    ### init : unit -> unit
     def __init__(self):
         self.listeners = []
 
+    ### eval : Network -> Packet -> unit
     def eval(self, network, packet):
         for listener in self.listeners:
             listener(packet)
 
+    ### when : (Packet -> unit) -> (Packet -> unit)  
+    # UNCLEAR IF THIS SIGNATURE IS OVERLY RESTRICTIVE 
+    # CODE COULD PERMIT (Packet -> X) WHERE X not unit
+    # CURRENT EXAMPLES USE SOLELY SIDE-EFFECTING FUNCTIONS
     def when(self, fn):
         self.listeners.append(fn)
         return fn
 
-def query(network, pred=all_packets, fields=[]):
-    b = Bucket(fields)
-    sub_net = Network.fork(network)
-    sub_net.install_policy(pred[fwd(b)])
-    return b
+class limit_bucket(bucket):
+    ### init : int -> List String
+    def __init__(self,limit,fields=[]):
+        self.limit = limit
+        self.seen = {}
+        self.fields = fields
+        bucket.__init__(self)        
 
-def query_limit(network, pred=all_packets, limit=None, fields=[]):
-    sub_net = Network.fork(network)
-    b = LimitBucket(sub_net, fields, limit)
-    sub_net.install_policy(pred[fwd(b)])    
-    return b
+    ### eval : Network -> Packet -> unit
+    def eval(self, network, packet):
 
-def query_unique(network, pred=all_packets, fields=[]):
-    return query_limit(network, pred, 1, fields)
+        if self.fields:    # MATCH ON PROVIDED FIELDS
+            pred = match([(field,packet[field]) for field in self.fields])
+
+        else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
+            pred = match([(field,packet[field]) 
+                          for field in packet.available_fields()])
+
+        # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+        try:
+            self.seen[pred] += 1
+        except KeyError:
+            self.seen[pred] = 1
+
+        if self.seen[pred] > self.limit:
+            return 
+
+        for listener in self.listeners:
+            listener(packet)
+
+class counting_bucket(bucket):
+    ### init : int -> List String
+    def __init__(self,interval,group_by=[]):
+        self.lock = threading.Lock()
+        self.interval = interval
+        self.group_by = group_by
+        if group_by:
+            self.count = {}
+        else:
+            self.count = 0
+        bucket.__init__(self)        
+
+    ### inc : Packet -> unit
+    def inc(self,pkt):
+        """threadsafe incrementor"""
+        if self.group_by:
+            from frenetic.netcore import match
+            groups = set(self.group_by) & set(pkt.available_fields())
+            pred = match([(field,pkt[field]) for field in groups])
+            try:
+                self.count[pred] += 1
+            except KeyError:
+                self.count[pred] = 1
+        else:
+            self.lock.acquire()
+            self.count += 1
+            self.lock.release()
+
+    ### notify : unit -> unit
+    def notify(self):
+        while True:
+           for listener in self.listeners:
+               listener(self.count)
+           from time import sleep
+           sleep(self.interval)
+
+    ### attach : Network -> (Packet -> bool)
+    def attach(self, network):
+        from generators import run
+        run(self.notify)
+        return bucket.attach(self,network)
+
+    ### eval : Network -> Packet -> unit
+    def eval(self, network, packet):
+        self.inc(packet)
+
     
-def query_count(network, pred=all_packets, interval=None, group_by=[]):
-    b = CountingBucket(interval,group_by)
-    sub_net = Network.fork(network)
-    sub_net.install_policy(pred[fwd(b)])    
-    return b
-
 
 
 class DynamicPolicy(gs.Behavior):
@@ -904,10 +1055,6 @@ class DynamicPolicy(gs.Behavior):
     def __or__(self, other):
         from operator import or_
         return DynamicApply(self, other, or_)
-
-    def __mod__(self, other):
-        from operator import mod
-        return DynamicApply(self, other, mod)
         
     def __eq__(self, other):
         raise NotImplementedError

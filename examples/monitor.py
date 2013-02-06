@@ -29,49 +29,99 @@
 from frenetic.lib import *
 from examples.learning_switch import learning_switch
 
-def monitor_packets(network):
-    for pkt in query(network, all_packets):
+@policy_decorator
+def monitor_packets(self):
+    @self.query(all_packets)
+    def f(pkt):
         print "I see packet:"
         print pkt
         print "---------------"
 
-def monitor_packets_explicit_bucket(network):
-    b = Bucket()
-    monitoring_network = Network.fork(network)  # WE MUST EXPLICITY FORK NETWORK
-    monitoring_network.install_policy(fwd(b))   # OR THIS LINE WOULD OVERWRITE OTHER COMPONENTS!
-    for pkt in b:
-        print "(explicit) I see packet: ", pkt
+@policy_decorator
+def monitor_packets_less_decorated(self):
+    def f(pkt):
+        print "(less decorated) I see packet:"
+        print pkt
+        print "---------------"
+    self.query(all_packets)(f)
 
-def monitor_packet_count(network):
-    for count in query_count(network, all_packets,2.5):
-        print "I've seen %d packets!" % count
+
+def monitor_packets_undecorated():
+    def monitor_packets_undecorated_fn(self):
+        def f(pkt):
+            print "(undecorated) I see packet:"
+            print pkt
+            print "---------------"
+        self.query(all_packets)(f)
+    return policy_decorator(monitor_packets_undecorated_fn)
+
+@policy_decorator
+def monitor_packets_explicit_bucket(self):
+    b = bucket()
+    self.policy |= b
+    @b.when
+    def f(pkt):
+        print "(explicit) I see packet:"
+        print pkt
+        print "---------------"
+
+@policy_decorator
+def monitor_packets_limit_by_src_dst(self,**kwargs):
+    try:    limit = self.kwargs['limit']
+    except: limit = None
+    @self.query_limit(all_packets,limit,['srcip','dstip'])
+    def f(pkt):
+        if limit:  print "(limit %d) I see packet:" % limit
+        else:      print "(no limit) I see packet:" 
+        print pkt
+        print "---------------"
+    
+@policy_decorator
+def monitor_unique_packets(self):
+    @self.query_unique(all_packets,['payload'])
+    def f(pkt):
+        print "I see unique packet:"
+        print pkt
+        print "---------------"
+
+@policy_decorator
+def monitor_packet_count(self):
+    @self.query_count(all_packets,3)
+    def f(count):
+        print "%s packets seen" % count
         
-def monitor_grouped_packet_count(network):
+@policy_decorator
+def monitor_grouped_packet_count(self):
     group_by = ['srcmac','dstmac','switch','srcip','vlan_tos']
-    for count in query_count(network, all_packets,4,group_by):
+    @self.query_count(all_packets,4,group_by)
+    def f(count):
         print "count grouped by %s" % group_by
         for (k,v) in count.items():
             print "%d:  %s" % (v,k)
 
-def monitor_policy(network):
-    """Must use same network object on which policy to be monitored runs"""
-    for policy in network.policy_changes:
-        print "-------- POLICY CHANGE --------"
-        print policy
-
-def monitor_topology(network):
-    for topo in network.topology_changes:
+@policy_decorator
+def monitor_topology(self):
+    @self.network._topology.notify
+    def f(topo):
         print "------ monitor topology output start -------"
         print topo
         print "------ monitor topology output end - -------"
 
-def example(network):
-    run(learning_switch, network)
-    run(monitor_policy, network)                       
-    run(monitor_packets, network)
-    run(monitor_packets_explicit_bucket, network)  
-    run(monitor_packet_count, network)
-    run(monitor_grouped_packet_count, network)
-    run(monitor_topology, network)
+all_monitor_modules =                           \
+    monitor_packets()                           \
+    | monitor_packets_explicit_bucket()         \
+    | monitor_packets_less_decorated()          \
+    | monitor_packets_undecorated()()           \
+    | monitor_packets_limit_by_src_dst(limit=3) \
+    | monitor_unique_packets()                  \
+    | monitor_topology()                        \
+    | monitor_grouped_packet_count()            \
+    | learning_switch()
 
-main = example
+summary_modules =                     \
+    monitor_topology()                \
+    | monitor_grouped_packet_count()  \
+    | learning_switch()
+
+main = summary_modules
+
