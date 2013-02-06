@@ -517,9 +517,6 @@ class Policy(object):
     def __rshift__(self, pol):
         return compose([self, pol])
 
-    # def __mod__(self, pred):
-    #     return self
-
     ### eq : Policy -> bool
     def __eq__(self, other):
         raise NotImplementedError
@@ -532,22 +529,6 @@ class Policy(object):
     def attach(self, network):
         raise NotImplementedError
 
-        
-class DerivedPolicy(Policy):
-    ### get_policy : unit -> Policy
-    def get_policy(self):
-        raise NotImplementedError
-    
-    ### repr : unit -> String
-    def __repr__(self):
-        return repr(self.get_policy())
-
-    ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        pol = self.get_policy().attach(network)
-        return pol
-        
-
 class SimplePolicy(Policy):
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
@@ -555,8 +536,30 @@ class SimplePolicy(Policy):
         def eval(packet):
             return self.eval(network, packet)
         return eval
+        
+class DerivedPolicy(Policy):
+    ### repr : unit -> String
+    def __repr__(self):
+        return repr(self.get_policy())
 
-
+    ### get_policy : unit -> Policy
+    def get_policy(self):
+        raise NotImplementedError
+    
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        pol = self.get_policy().attach(network)
+        return pol
+        
+@singleton
+class passthrough(SimplePolicy):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "passthrough"
+        
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        return Counter([packet])
         
 @singleton
 class drop(SimplePolicy):
@@ -569,22 +572,54 @@ class drop(SimplePolicy):
     def eval(self, network, packet):
         return Counter()
 
-        
 @singleton
-class passthrough(SimplePolicy):
+class drop_ingress(SimplePolicy):
     ### repr : unit -> String
     def __repr__(self):
-        return "passthrough"
-        
+        return "drop_ingress"
+    
     ### eval : Network -> Packet -> Counter List Packet
-    def eval(self, network, packet):
-        return Counter([packet])
+    def eval(network, packet):
+        switch = packet["switch"]
+        inport = packet["inport"]
+        if Location(switch,inport) in network.topology.egress_locations():
+            return Counter()
+        else:
+            return Counter([packet])
+        
+@singleton
+class flood(Policy):
+    ### repr : unit -> String
+    def __repr__(self):
+        return "flood"
 
+    ### attach : Network -> (Packet -> Counter List Packet)
+    def attach(self, network):
+        get_mst = [None] # Hack b/c no Python 3 nonlocal
+        @network._topology.notify
+        def handle(topo):
+            get_mst[0] = Topology.minimum_spanning_tree(topo)
+        ### eval : Packet -> Counter List Packet
+        def eval(packet):
+            mst = get_mst[0]
+            switch = packet["switch"]
+            inport = packet["inport"]
+            if switch in network.topology.nodes() and switch in mst:
+                port_nos = set()
+                port_nos.update({loc.port_no for loc in network.topology.egress_locations(switch)})
+                for sw in mst.neighbors(switch):
+                    port_no = mst[switch][sw][switch]
+                    port_nos.add(port_no)
+                packets = [packet.push(outport=port_no)
+                           for port_no in port_nos if port_no != inport]
+                return Counter(packets)
+            else:
+                return Counter()
+        return eval
         
 class modify(SimplePolicy):
     """Policy that drops everything."""
-
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit                                            
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
        init_map = {}
        for (k, v) in dict(*args, **kwargs).iteritems():
@@ -604,11 +639,9 @@ class modify(SimplePolicy):
     def eval(self, network, packet):
         packet = packet.modifymany(self.map)
         return Counter([packet])
-
         
 class fwd(SimplePolicy):
     """Forward"""
-    
     ### init : int -> unit
     def __init__(self, port):
         self.port = port
@@ -624,8 +657,6 @@ class fwd(SimplePolicy):
 
         
 class push(SimplePolicy):
-    """Policy that drops everything."""
-    
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
@@ -641,8 +672,6 @@ class push(SimplePolicy):
 
         
 class pop(SimplePolicy):
-    """Policy that drops everything."""
-    
     ### init : List String -> unit
     def __init__(self, fields):
         self.fields = set(fields)
@@ -682,9 +711,6 @@ class remove(Policy):
         self.policy = policy
         self.predicate = predicate
 
-    # def __mod__(self, pred):
-    #     return remove(self.policy % pred, self.predicate)
-    
     ### repr : unit -> String
     def __repr__(self):
         return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
@@ -703,16 +729,11 @@ class remove(Policy):
         
 
 class restrict(Policy):
-    """Policy for mapping a single predicate to a list of actions."""
-
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
         self.policy = policy
         self.predicate = predicate
 
-    # def __mod__(self, pred):
-    #     return restrict(self.policy % pred, self.predicate)
-        
     ### repr : unit -> String
     def __repr__(self):
         return "restrict:\n%s" % util.repr_plus([self.predicate,
@@ -736,9 +757,6 @@ class parallel(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
-    # def __mod__(self, pred):
-    #     return parallel([ p % pred for p in self.policies])
-
     ### repr : unit -> String
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
@@ -761,13 +779,6 @@ class compose(Policy):
     def __init__(self, policies):
         self.policies = list(policies)
     
-    # def __mod__(self, pred):
-    #     mod_sub_pols = [ p % pred for p in self.policies ]
-    #     positive_pol = compose(mod_sub_pols)
-    #     mod_sub_pols.reverse()
-    #     negative_pol = compose(mod_sub_pols)
-    #     return if_(pred,positive_pol,negative_pol)
-
     ### repr : unit -> String
     def __repr__(self):
         return "compose:\n%s" % util.repr_plus(self.policies)
@@ -804,9 +815,6 @@ class if_(DerivedPolicy):
         self.t_branch = t_branch
         self.f_branch = f_branch
 
-    # def __mod__(self, pred):
-    #     return if_(self.pred, self.t_branch % pred, self.f_branch)
-
     ### repr : unit -> String
     def __repr__(self):
         return "if\n%s" % util.repr_plus(["PREDICATE",
@@ -826,9 +834,6 @@ class breakpoint(Policy):
         self.policy = policy
         self.condition = condition
 
-    # def __mod__(self, pred):
-    #     return breakpoint(self.policy % pred, self.condition)
-        
     ### repr : unit -> String
     def __repr__(self):
         return "***debug***\n%s" % util.repr_plus([self.policy])
@@ -857,59 +862,6 @@ class breakpoint(Policy):
 #     def get_policy(self):
 #         return self.policy
        
-
-@singleton
-class drop_ingress(Policy):
-    ### init : Network -> unit
-#    def __init__(self, network):
-#        self.network = network
-    
-    ### repr : unit -> String
-    def __repr__(self):
-        return "drop_ingress"
-    
-    ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        ### eval : Packet -> Counter List Packet
-        def eval(packet):
-            switch = packet["switch"]
-            inport = packet["inport"]
-            if Location(switch,inport) in network.topology.egress_locations():
-                return Counter()
-            else:
-                return Counter([packet])
-        return eval
-
-@singleton
-class flood(Policy):
-    ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        get_mst = [None] # Hack b/c no Python 3 nonlocal
-        @network._topology.notify
-        def handle(topo):
-            get_mst[0] = Topology.minimum_spanning_tree(topo)
-        ### eval : Packet -> Counter List Packet
-        def eval(packet):
-            mst = get_mst[0]
-            switch = packet["switch"]
-            inport = packet["inport"]
-            if switch in network.topology.nodes() and switch in mst:
-                port_nos = set()
-                port_nos.update({loc.port_no for loc in network.topology.egress_locations(switch)})
-                for sw in mst.neighbors(switch):
-                    port_no = mst[switch][sw][switch]
-                    port_nos.add(port_no)
-                packets = [packet.push(outport=port_no)
-                           for port_no in port_nos if port_no != inport]
-                return Counter(packets)
-            else:
-                return Counter()
-        return eval
-        
-    ### repr : unit -> String
-    def __repr__(self):
-        return "flood"
-
 
 class MutablePolicy(DerivedPolicy):
     ### init : unit -> unit
@@ -1103,10 +1055,6 @@ class DynamicPolicy(gs.Behavior):
     def __or__(self, other):
         from operator import or_
         return DynamicApply(self, other, or_)
-
-    def __mod__(self, other):
-        from operator import mod
-        return DynamicApply(self, other, mod)
         
     def __eq__(self, other):
         raise NotImplementedError
