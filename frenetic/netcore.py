@@ -657,7 +657,7 @@ class pop(SimplePolicy):
         return Counter([packet])
 
         
-class copy(SimplePolicy):
+class shift(SimplePolicy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
