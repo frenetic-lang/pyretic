@@ -157,7 +157,7 @@ class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical
                        self.query_policy_fn(self),
                        self.physical_policy_fn(self)))
         return pol
-        
+
 def add_nodes_from_vmap(vmap, vtopo):
     for switch, port_no in vmap:
         port = Port(port_no)
@@ -238,3 +238,35 @@ class VNetwork(Network):
     @property
     def vpolicy_changes(self):
         return iter(self._vpolicy)
+
+
+# New style combinators
+
+class virtualize(DerivedPolicy):
+    def __init__(self, vtag, policy, ingress_policy, fabric_policy):
+        self.vtag = vtag
+        self.policy = policy
+        self.ingress_policy = ingress_policy
+        self.fabric_policy = fabric_policy
+        DerivedPolicy.__init__(self)
+        
+    def __repr__(self):
+        return "virtualize_policy %s\n%s" % (self.vtag,
+                                             util.repr_plus(["POLICY",
+                                                             self.policy,
+                                                             "INGRESS POLICY", 
+                                                             self.ingress_policy,
+                                                             "FABRIC POLICY", 
+                                                             self.fabric_policy]))
+        
+    def get_policy(self):
+        # if the vlan isnt set, then we need to find out the v* headers.
+        pol = (if_(~match(vtag=self.vtag), 
+                    (self.ingress_policy >> # set vswitch and vinport
+                     # now make the virtualization transparent to the tenant's policy to get the outport
+                     shift(switch="vswitch", inport="vinport") >>
+                     self.policy >>
+                     physical_to_virtual(self.vtag)))
+                # Pipe the packet with appropriate v* headers to the physical policy for processing
+                >> self.fabric_policy)
+        return pol
