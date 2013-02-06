@@ -29,8 +29,8 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  /pyretic/mininet.sh --switch ovsk --clique,5,5                                                             #
-# run controller: pox.py --no-cli pyretic/examples/firewall_dyn.py                                                           #
+# start mininet:  pyretic/mininet.sh --topo=clique,5,5                                                                       #
+# run controller: pox.py --no-cli pyretic/examples/firewall.py                                                               #
 # test:           pingall. odd nodes should reach odd nodes w/ higher IP, likewise for even ones                             #
 #                 controller prints one message "punching hole for reverse traffic [IP1]:[IP2]" for each pair where IP1<IP2  #
 #                 timeout seconds after last time punched hole used, it will close w/ corresponding print statement          #
@@ -94,8 +94,8 @@ def directional_hole_puncher(self,**kwargs):
         if (srcip_str,dstip_str) in allowed:
             pred = match(srcip=dstip_str,dstip=srcip_str) 
             print "punching hole for reverse traffic %s:%s\n%s" % (srcip_str,dstip_str,pred)
-            import ipdb
-            ipdb.set_trace()
+            #import ipdb
+            #ipdb.set_trace()
             self.policy -= pred
             self.policy |= pred[passthrough]
             
