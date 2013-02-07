@@ -82,7 +82,7 @@ def hole_puncher(self,**kwargs):
         srcip_str = str(pkt['srcip'])
         dstip_str = str(pkt['dstip'])
         if (srcip_str,dstip_str) in allowed:
-            test_reverse = (reverse_packet >> self.policy).attach(self.network,use_buckets=False)
+            test_reverse = (reverse_packet >> self.policy).attach(self.network)
             if len(test_reverse(pkt)) == 0:  # REVERSE PACKET DROPPED
                 pred = match(srcip=dstip_str,dstip=srcip_str) 
                 print "punching hole for reverse traffic %s:%s\n%s" % (srcip_str,dstip_str,pred)
