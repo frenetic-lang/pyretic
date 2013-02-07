@@ -53,7 +53,7 @@ def main():
         flags.append('-v')
 
     # GET PATHS
-    controller_src_path = os.path.expanduser('~/pyretic/examples/load_balancer_dyn.py')
+    controller_src_path = os.path.expanduser('~/pyretic/examples/load_balancer.py')
     unit_test_path = os.path.expanduser('~/pyretic/tests/load_balancer_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
@@ -63,7 +63,7 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     dists = [(2,2),(8,3)]
-    print "=============== HUB TESTER ===================="
+    print "=========== LOAD BALANCER TESTER =============="
     print "-TOPO------------------PKTS----------TIME------"
     count = 0
     for (clients,servers) in dists:
