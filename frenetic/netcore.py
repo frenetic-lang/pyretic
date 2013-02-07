@@ -611,7 +611,6 @@ class flood(SimplePolicy):
     ### attach : Network -> (Packet -> Counter List Packet)
     def eval(self, network, packet):
         mst = Topology.minimum_spanning_tree(network.topology)
-        ### eval : Packet -> Counter List Packet
         
         switch = packet["switch"]
         inport = packet["inport"]
@@ -990,6 +989,7 @@ class bucket(SimplePolicy):
         self.listeners.append(fn)
         return fn
 
+        
 class limit_bucket(bucket):
     ### init : int -> List String
     def __init__(self,limit,fields=[]):
@@ -1015,14 +1015,14 @@ class limit_bucket(bucket):
             self.seen[pred] = 1
 
         if self.seen[pred] > self.limit:
-            return 
+            return
 
-        for listener in self.listeners:
-            listener(packet)
+        bucket.eval(self, network, packet)
 
+        
 class counting_bucket(bucket):
     ### init : int -> List String
-    def __init__(self,interval,group_by=[]):
+    def __init__(self, interval, group_by=[]):
         self.lock = threading.Lock()
         self.interval = interval
         self.group_by = group_by
@@ -1034,7 +1034,6 @@ class counting_bucket(bucket):
 
     ### inc : Packet -> unit
     def inc(self,pkt):
-        """threadsafe incrementor"""
         if self.group_by:
             from frenetic.netcore import match
             groups = set(self.group_by) & set(pkt.available_fields())
@@ -1044,27 +1043,12 @@ class counting_bucket(bucket):
             except KeyError:
                 self.count[pred] = 1
         else:
-            self.lock.acquire()
             self.count += 1
-            self.lock.release()
-
-    ### notify : unit -> unit
-    def notify(self):
-        while True:
-           for listener in self.listeners:
-               listener(self.count)
-           from time import sleep
-           sleep(self.interval)
-
-    ### attach : Network -> (Packet -> bool)
-    def attach(self, network):
-        from generators import run
-        run(self.notify)
-        return bucket.attach(self,network)
 
     ### eval : Network -> Packet -> unit
     def eval(self, network, packet):
         self.inc(packet)
+        bucket.eval(self, network, self.count)
 
     
 

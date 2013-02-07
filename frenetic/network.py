@@ -366,9 +366,17 @@ class Topology(nx.Graph):
         self.reconcile_attributes(topo1)
         return self
 
-    ### A RANDOMIZED MINIMUM SPANNING TREE
     @classmethod
     def minimum_spanning_tree(cls,topology):
+        self = Topology(nx.minimum_spanning_tree(topology))
+        self.copy_attributes(topology)
+        self.reconcile_attributes(topology)
+        return self
+
+        
+    ### A RANDOMIZED MINIMUM SPANNING TREE
+    @classmethod
+    def random_minimum_spanning_tree(cls,topology):
         self = cls(Kruskal(topology))
         self.copy_attributes(topology)
         self.reconcile_attributes(topology)
