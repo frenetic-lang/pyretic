@@ -30,16 +30,16 @@
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
 # start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,1,3,2                                                #
-# run controller: pox.py --no-cli pyretic/examples/firewall_dyn.py                                                           #
+# run controller: pox.py --no-cli pyretic/examples/fw_lb_ls.py --clients=3 --servers=2                                       #
 # test:           clients can only ping 10.0.0.100, servers can only ping clients they serve                                 #
 ##############################################################################################################################
 
 from frenetic.lib import *
-from examples.learning_switch_dyn import learning_switch
-from examples.firewall_dyn import simple_ingress_firewall
-from examples.load_balancer_dyn import static_matching, static_load_balancer
+from examples.learning_switch import learning_switch
+from examples.firewall import simple_ingress_firewall
+from examples.load_balancer import static_matching, static_load_balancer
 
-def example(network, clients, servers):
+def example(clients, servers):
     num_clients = int(clients)
     num_servers = int(servers)
     print "clients %d" % num_clients
@@ -64,30 +64,9 @@ def example(network, clients, servers):
         try:    from_client |= match(srcip=client_ip)
         except: from_client  = match(srcip=client_ip)
         
-    # DIRECTIONAL OPERATOR SYNTAX
-    policy = (simple_ingress_firewall(allowed,network) \
-                  >> static_load_balancer(service_ip,lb_matching)) \
-                  % from_client \
-                  >> learning_switch(network)
-
-    # DIRECTIONAL OPERATOR SYNTAX WITH CRAZY MESS INSIDE TO TEST RECURSION
-    # policy = (((simple_ingress_firewall(allowed,network) \
-    #               >> passthrough) | drop)\
-    #               >> static_load_balancer(service_ip,lb_matching)) \
-    #               % from_client \
-    #               >> learning_switch(network)
-
-    # EXPLICT DIRECTIONAL COMPOSITION    
-    # policy = directional_compose(from_client,[simple_ingress_firewall(allowed,network),
-    #                                           static_load_balancer(service_ip,lb_matching)]) \
-    #                                           >> learning_switch(network)
-
-    # W/O DIRECTIONAL COMPOSITION OPERATOR
-    # policy = ((simple_ingress_firewall(allowed,network) >> static_load_balancer(service_ip,lb_matching)) & from_client | \
-    #     (static_load_balancer(service_ip,lb_matching) >> simple_ingress_firewall(allowed,network)) - from_client) \
-    #     >> learning_switch(network)
-
-    network.install_policy(policy)
+    return directional_compose(from_client,[simple_ingress_firewall(allowed),
+                                            static_load_balancer(service_ip,lb_matching)]) \
+                                            >> learning_switch()
 
         
 main = example
