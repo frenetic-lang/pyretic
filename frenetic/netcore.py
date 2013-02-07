@@ -1023,14 +1023,22 @@ class limit_bucket(bucket):
 class counting_bucket(bucket):
     ### init : int -> List String
     def __init__(self, interval, group_by=[]):
-        self.lock = threading.Lock()
         self.interval = interval
         self.group_by = group_by
         if group_by:
             self.count = {}
         else:
             self.count = 0
-        bucket.__init__(self)        
+
+        # XXX hack! remove pox dependency!
+        from pox.lib.recoco import Timer
+
+        Timer(interval, self.report_count, recurring=True)
+        
+        bucket.__init__(self)
+
+    def report_count(self):
+        bucket.eval(self, None, self.count) # We don't actually use the "network" parameter
 
     ### inc : Packet -> unit
     def inc(self,pkt):
@@ -1048,7 +1056,6 @@ class counting_bucket(bucket):
     ### eval : Network -> Packet -> unit
     def eval(self, network, packet):
         self.inc(packet)
-        bucket.eval(self, network, self.count)
 
     
 
