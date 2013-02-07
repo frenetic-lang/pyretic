@@ -368,11 +368,10 @@ class Topology(nx.Graph):
 
     @classmethod
     def minimum_spanning_tree(cls,topology):
-        self = Topology(nx.minimum_spanning_tree(topology))
+        self = cls(nx.minimum_spanning_tree(topology))
         self.copy_attributes(topology)
         self.reconcile_attributes(topology)
         return self
-
         
     ### A RANDOMIZED MINIMUM SPANNING TREE
     @classmethod
@@ -390,11 +389,11 @@ class Topology(nx.Graph):
         remainder = topology.copy()
         if remainder is None or len(remainder) == 0 or not remainder.is_connected():
             return msts
-        mst = (cls.minimum_spanning_tree(remainder))
+        mst = (cls.random_minimum_spanning_tree(remainder))
         msts.add(mst)
         remainder = Topology.difference(remainder,mst)
         while(not remainder is None and remainder.is_connected()):
-            mst = (cls.minimum_spanning_tree(remainder))
+            mst = (cls.random_minimum_spanning_tree(remainder))
             msts.add(mst)
             remainder = Topology.difference(remainder,mst)
         return msts

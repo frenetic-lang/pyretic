@@ -37,10 +37,12 @@
 
 
 from frenetic.lib import *
-from examples import monitor_topology
+from examples.monitor import monitor_topology
 
-def calculate_spanning_tree_set(network):
-    for topo in network.topology_changes:
+@policy_decorator
+def calculate_spanning_tree_set(self):
+    @self.network._topology.notify
+    def f(topo):
         msts = Topology.disjoint_minimum_spanning_tree_set(topo)
         print "Topo"
         print topo
@@ -50,8 +52,4 @@ def calculate_spanning_tree_set(network):
             print "%s" % mst
         print "}"
 
-def example(network):
-#    run(monitor_topology.monitor, Network.fork(network))
-    run(calculate_spanning_tree_set, Network.fork(network))
- 
-main = example
+main = calculate_spanning_tree_set()
