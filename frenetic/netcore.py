@@ -601,36 +601,33 @@ class drop(SimplePolicy):
     def eval(self, network, packet):
         return Counter()
 
+        
 @singleton
-class flood(Policy):
+class flood(SimplePolicy):
     ### repr : unit -> String
     def __repr__(self):
         return "flood"
 
     ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        get_mst = [None] # Hack b/c no Python 3 nonlocal
-        @network._topology.notify
-        def handle(topo):
-            get_mst[0] = Topology.minimum_spanning_tree(topo)
+    def eval(self, network, packet):
+        mst = Topology.minimum_spanning_tree(network.topology)
         ### eval : Packet -> Counter List Packet
-        def eval(packet):
-            mst = get_mst[0]
-            switch = packet["switch"]
-            inport = packet["inport"]
-            if switch in network.topology.nodes() and switch in mst:
-                port_nos = set()
-                port_nos.update({loc.port_no for loc in network.topology.egress_locations(switch)})
-                for sw in mst.neighbors(switch):
-                    port_no = mst[switch][sw][switch]
-                    port_nos.add(port_no)
-                packets = [packet.push(outport=port_no)
-                           for port_no in port_nos if port_no != inport]
-                return Counter(packets)
-            else:
-                return Counter()
-        return eval
         
+        switch = packet["switch"]
+        inport = packet["inport"]
+        if switch in network.topology.nodes() and switch in mst:
+            port_nos = set()
+            port_nos.update({loc.port_no for loc in network.topology.egress_locations(switch)})
+            for sw in mst.neighbors(switch):
+                port_no = mst[switch][sw][switch]
+                port_nos.add(port_no)
+            packets = [packet.push(outport=port_no)
+                       for port_no in port_nos if port_no != inport]
+            return Counter(packets)
+        else:
+            return Counter()
+
+            
 class modify(SimplePolicy):
     """Policy that drops everything."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
