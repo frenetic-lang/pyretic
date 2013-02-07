@@ -120,6 +120,11 @@ def hole_patcher(self):
                 self.inner.policy = pred[drop] | (~pred)[self.inner.policy]
             count_stats[pred] = (count,polls_missed)
 
+
+def directional_firewall(whitelist,timeout):
+    return hole_patcher(allowed=whitelist,timeout=2,inner=hole_puncher(allowed=whitelist))
+
+
 ### EXAMPLES ###
 
 def simple_firewall_example():
@@ -166,7 +171,7 @@ def directional_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return hole_patcher(allowed=whitelist,timeout=2,inner=hole_puncher(allowed=whitelist)) >> hub
+    return directional_firewall(whitelist,2) >> hub
 
 
 ### Main ###
