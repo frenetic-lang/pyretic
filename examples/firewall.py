@@ -80,6 +80,8 @@ def hole_puncher(self,**kwargs):
         srcip_str = str(pkt['srcip'])
         dstip_str = str(pkt['dstip'])
         if (srcip_str,dstip_str) in allowed:
+            print "seen ",
+            print (srcip_str,dstip_str)
             test_reverse = (reverse_packet >> self.policy).attach(self.network)
             if len(test_reverse(pkt)) == 0:  # REVERSE PACKET DROPPED
                 pred = match(srcip=dstip_str,dstip=srcip_str) 
@@ -91,6 +93,8 @@ def hole_patcher(self,**kwargs):
     # GET ARGS
     timeout = self.kwargs['timeout']
     allowed = self.kwargs['allowed']
+    self.inner = self.kwargs['inner']
+    self.policy = self.inner
 
     poll_freq = 1  # poll every second - if changed need to change timeout logic
 
@@ -102,19 +106,19 @@ def hole_patcher(self,**kwargs):
     @self.query_count(potential_holes, poll_freq, ['srcip','dstip'])
     def f(qcount):
         for (pred,count) in qcount.items():
-            polls_missed = 0
             try:
                 (prev_count,polls_missed) = count_stats[pred]
-                if prev_count >= count:
+                if prev_count < count:   # TRAFFIC IN LAST POLL PERIOD
+                    polls_missed = 0   
+                else:                    # NO TRAFFIC IN LAST POLL PERIOD
                     polls_missed += 1
             except KeyError:
-                pass
-            count_stats[pred] = (count,polls_missed)
+                polls_missed = 0         # FIRST TIME STAT SEEN
             if polls_missed == timeout:
                 print "%d seconds w/o traffic, closing hole" % timeout,
                 print pred
-                self.policy = pred[drop] | (~pred)[self.policy]
-
+                self.inner.policy = pred[drop] | (~pred)[self.inner.policy]
+            count_stats[pred] = (count,polls_missed)
 
 ### EXAMPLES ###
 
@@ -162,7 +166,7 @@ def directional_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return hole_puncher(allowed=whitelist) | hole_patcher(allowed=whitelist,timeout=10) >> hub
+    return hole_patcher(allowed=whitelist,timeout=2,inner=hole_puncher(allowed=whitelist)) >> hub
 
 
 ### Main ###
