@@ -60,7 +60,7 @@ def simple_ingress_firewall(pairs):
      return pol
 
 @policy_decorator
-def hole_puncher(self,**kwargs):
+def hole_puncher(self):
     # GET ARGS
     allowed = self.kwargs['allowed']
 
@@ -89,7 +89,7 @@ def hole_puncher(self,**kwargs):
                 self.policy = pred[passthrough] | (~pred)[self.policy] 
 
 @policy_decorator
-def hole_patcher(self,**kwargs):
+def hole_patcher(self):
     # GET ARGS
     timeout = self.kwargs['timeout']
     allowed = self.kwargs['allowed']

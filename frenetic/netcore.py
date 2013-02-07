@@ -947,7 +947,7 @@ class MutablePolicy(DerivedPolicy):
 
         
 # policy_decorator : (DecoratedPolicy ->  unit) -> DecoratedPolicy
-def policy_decorator(fn,**kwargs):
+def policy_decorator(fn):
     class DecoratedPolicy(MutablePolicy):
         ### init : unit -> unit
         def __init__(self,**kwargs):
