@@ -49,7 +49,6 @@ def simple_firewall(pairs):
     for (ip1,ip2) in pairs:     
         pred = pred | match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
     pol = pred[passthrough] | (~pred)[pol] 
-    print pol
     return pol
 
 def simple_ingress_firewall(pairs):
@@ -58,7 +57,6 @@ def simple_ingress_firewall(pairs):
      for (ip1,ip2) in pairs:     
          pred = pred | match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
      pol = pred[passthrough] | (~pred)[pol] 
-     print pol
      return pol
 
 @policy_decorator
@@ -87,6 +85,35 @@ def hole_puncher(self,**kwargs):
                 pred = match(srcip=dstip_str,dstip=srcip_str) 
                 print "punching hole for reverse traffic %s:%s\n%s" % (srcip_str,dstip_str,pred)
                 self.policy = pred[passthrough] | (~pred)[self.policy] 
+
+@policy_decorator
+def hole_patcher(self,**kwargs):
+    # GET ARGS
+    timeout = self.kwargs['timeout']
+    allowed = self.kwargs['allowed']
+
+    poll_freq = 1  # poll every second - if changed need to change timeout logic
+
+    potential_holes = no_packets
+    for (srcip_str,dstip_str) in allowed:
+        potential_holes |= match(srcip=dstip_str,dstip=srcip_str) 
+
+    count_stats = {}
+    @self.query_count(potential_holes, poll_freq, ['srcip','dstip'])
+    def f(qcount):
+        for (pred,count) in qcount.items():
+            polls_missed = 0
+            try:
+                (prev_count,polls_missed) = count_stats[pred]
+                if prev_count >= count:
+                    polls_missed += 1
+            except KeyError:
+                pass
+            count_stats[pred] = (count,polls_missed)
+            if polls_missed == timeout:
+                print "%d seconds w/o traffic, closing hole" % timeout,
+                print pred
+                self.policy = pred[drop] | (~pred)[self.policy]
 
 
 ### EXAMPLES ###
@@ -123,9 +150,24 @@ def authentication_firewall_example():
     print whitelist
     return hole_puncher(allowed=whitelist) >> hub
 
+def directional_firewall_example():
+    """odd nodes should reach odd nodes w/ higher IP, likewise for even ones
+       after a higher IP node is pinged, it can contact the lower IP for a short while """
+    client_ips =  [ '10.0.0.' + str(i) for i in range(1,10) ]
+    i = 0
+    whitelist = set([])
+    for client_ip in client_ips:
+        i += 1
+        for client_ip2 in client_ips[i+1::2]:
+            whitelist.add((client_ip,client_ip2))
+
+    print whitelist
+    return hole_puncher(allowed=whitelist) | hole_patcher(allowed=whitelist,timeout=10) >> hub
+
 
 ### Main ###
 
 #main = simple_firewall_example()
 #main = simple_ingress_firewall_example()
-main = authentication_firewall_example()
+#main = authentication_firewall_example()
+main = directional_firewall_example()
