@@ -699,6 +699,24 @@ class pop(SimplePolicy):
         packet = packet.popmany(self.fields)
         return Counter([packet])
 
+
+class copy(SimplePolicy):
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "copy:\n%s" % util.repr_plus(self.map.items())
+  
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        pushes = {}
+        for (dstfield, srcfield) in self.map.iteritems():
+            pushes[dstfield] = packet[srcfield]
+        packet = packet.pushmany(pushes)
+        return Counter([packet])
+        
         
 class shift(SimplePolicy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
