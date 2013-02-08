@@ -35,9 +35,9 @@
 
 
 from frenetic.lib import *
-import sys
 
-def topo_to_vmap(topo):
+
+def topo_to_bfs_vmap(topo):
     vmap = {}
     port_no = 1
     for loc in topo.egress_locations():
@@ -45,6 +45,7 @@ def topo_to_vmap(topo):
         port_no += 1
     return vmap
 
+    
 def shortest_path_policy(topo,vmap):
     fabric_policy = drop
     paths = Topology.all_pairs_shortest_path(topo)
@@ -68,24 +69,27 @@ def shortest_path_policy(topo,vmap):
                 except KeyError:
                     pass
     return fabric_policy
-                    
 
-def setup_virtual_network(network):
-    vn = VNetwork.fork(network)
-    @run
-    def vmap_gen():
-        counter = 0
-        for topo in network.topology_changes:
-            vtopo = Topology()
-            vmap = topo_to_vmap(topo)
-            add_nodes_from_vmap(vmap, vtopo)
-#            vn.physical_policy = flood # THIS WILL WORK ALSO, BUT IS FAR LESS EFFICIENT
-            vn.physical_policy = shortest_path_policy(topo,vmap)
-            vn.from_vmap(vmap)
-            vn.topology = vtopo
-            print "------------ underlying network %d ---------------" % counter
-            print topo
-            print "------------ abstracted network %d ---------------" % counter
-            print vtopo
-            counter += 1
-    return vn
+    
+class BFS(VirtDefinition):
+    def __init__(self, network):
+        self.network = network
+        self.vmap = topo_to_bfs_vmap(self.network.topology)
+        VirtDefinition.__init__(self, network)
+
+    def abstracted_network(self):
+        vtopo = Topology()
+        add_nodes_from_vmap(self.vmap, vtopo)
+        return vtopo
+    
+    def ingress_policy(self):
+        return vmap_to_ingress_policy(self.vmap)
+        
+    def fabric_policy(self):
+        return shortest_path_policy(self.network.topology, self.vmap)
+
+    def egress_policy(self):
+        return vmap_to_egress_policy(self.vmap)
+
+        
+transform = BFS
