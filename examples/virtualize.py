@@ -28,14 +28,15 @@
 
 from frenetic.lib import *
 
-def virtualize(network, virttopo, program):
+
+def virtualize_program(virttopo, program):
     virttopons = {}
     programns = {}
     execfile(virttopo, virttopons)
     execfile(program, programns)
 
-    vn = virttopons["setup_virtual_network"](network)
+    vn = virttopons["transform"]
+    return virtualize(programns["main"], vn)
 
-    programns["main"](vn)
     
-main = virtualize
+main = virtualize_program

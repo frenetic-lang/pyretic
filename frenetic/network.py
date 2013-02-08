@@ -345,11 +345,11 @@ class Topology(nx.Graph):
 
     def remove_nodes_from(self,switches=[]):
         self.remove_nodes_from(switches)
-        self.reconcile_attributes(initial_topo)
+        self.reconcile_attributes()
         return self
 
     def filter_out_nodes(self, switches=[]):
-        self_copy = initial_topo.copy()
+        self_copy = self.copy()
         return self_copy.remove_nodes_from(switches)
         
     @classmethod

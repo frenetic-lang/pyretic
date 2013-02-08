@@ -242,31 +242,54 @@ class VNetwork(Network):
 
 # New style combinators
 
-class virtualize(DerivedPolicy):
-    def __init__(self, vtag, policy, ingress_policy, fabric_policy):
-        self.vtag = vtag
+class VirtDefinition(object):
+    def __init__(self, network):
+        pass
+
+    def abstracted_network(self):
+        pass
+        
+    def ingress_policy(self):
+        """Return an ingress policy, already attached to network"""
+        pass
+
+    def fabric_policy(self):
+        """Return a fabric policy, already attached to network"""
+        pass
+        
+    def egress_policy(self):
+        """Return an egress policy, already attached to network"""
+        pass
+        
+
+class virtualize(Policy):
+    def __init__(self, policy, virtdef):
         self.policy = policy
-        self.ingress_policy = ingress_policy
-        self.fabric_policy = fabric_policy
+        self.virtdef = virtdef
+        self.vtag = id(self)
         DerivedPolicy.__init__(self)
         
     def __repr__(self):
-        return "virtualize_policy %s\n%s" % (self.vtag,
-                                             util.repr_plus(["POLICY",
-                                                             self.policy,
-                                                             "INGRESS POLICY", 
-                                                             self.ingress_policy,
-                                                             "FABRIC POLICY", 
-                                                             self.fabric_policy]))
-        
-    def get_policy(self):
+        return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)
+
+
+    def attach(self, network):
+        import ipdb
+        ipdb.set_trace()
+        virtdef = self.virtdef(network)
+
         # if the vlan isnt set, then we need to find out the v* headers.
         pol = (if_(~match(vtag=self.vtag), 
-                    (self.ingress_policy >> # set vswitch and vinport
+                    (virtdef.ingress_policy() >> # set vswitch and vinport
                      # now make the virtualization transparent to the tenant's policy to get the outport
                      shift(switch="vswitch", inport="vinport") >>
-                     self.policy >>
+                     transform_topology(virtdef.abstracted_network(), self.policy) >>
                      physical_to_virtual(self.vtag)))
                 # Pipe the packet with appropriate v* headers to the physical policy for processing
-                >> self.fabric_policy)
-        return pol
+               >> virtdef.fabric_policy()
+               >> virtdef.egress_policy())
+
+        pol_eval = pol.attach(network)
+
+        return pol_eval
+        

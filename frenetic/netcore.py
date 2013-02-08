@@ -339,8 +339,9 @@ class DerivedPredicate(Predicate):
 
     ### attach : Network -> (Packet -> bool)
     def attach(self, network):
+        pred_eval = self.get_predicate().attach(network)
         def eval(pkt):
-            return self.get_predicate().attach(network)(pkt)
+            return pred_eval(pkt)
         return eval
         
 
@@ -576,8 +577,9 @@ class DerivedPolicy(Policy):
     
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
+        pol_eval = self.get_policy().attach(network)
         def eval(pkt):
-            return self.get_policy().attach(network)(pkt)
+            return pol_eval(pkt)
         return eval
         
 @singleton
@@ -907,18 +909,30 @@ class simple_route(DerivedPolicy):
         return self.policy
        
 
-class MutablePolicy(DerivedPolicy):
+class MutablePolicy(Policy):
     ### init : unit -> unit
     def __init__(self):
+        self.attachments = {}
         self.policy = drop
+        
+    @property
+    def policy(self):
+        return self._policy
 
+    @policy.setter
+    def policy(self, pol):
+        self._policy = pol
+        for network in self.attachments:
+            # XXX detach network?
+            self.attachments[network] = pol.attach(network)
+             
     ### attach : Network -> (Packet -> Counter List Packet)
     def attach(self, network):
-        return DerivedPolicy.attach(self, network)
-        
-    ### get_policy : unit -> unit
-    def get_policy(self):
-        return self.policy
+        assert network not in self.attachments, "can't attach more than once!"
+        self.attachments[network] = self._policy.attach(network)
+        def eval(packet):
+            return self.attachments[network](packet)
+        return eval
 
     ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
@@ -952,10 +966,12 @@ def policy_decorator(fn,**kwargs):
         ### init : unit -> unit
         def __init__(self,**kwargs):
             self.kwargs = dict(**kwargs)
+            self.network = None
             MutablePolicy.__init__(self)
 
         ### attach : Network -> (Packet -> Counter List Packet)
         def attach(self, network):
+            assert self.network is None, "can't attach more than once"
             self.network = network
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
             # IN PARICULAR, THE when FUNCTION RETURNED BY self.query 
@@ -1057,9 +1073,16 @@ class counting_bucket(bucket):
     def eval(self, network, packet):
         self.inc(packet)
 
-    
 
+class transform_topology(Policy):
+    def __init__(self, topology, policy):
+        self.topology = topology
+        self.policy = policy
 
+    def attach(self, network):
+        return self.policy.attach(self) 
+
+        
 class DynamicPolicy(gs.Behavior):
     """DynamicPolicy is a Behavior of policies, that evolves with respect to a given network, according to given logic, and starting from a given initial value."""
 

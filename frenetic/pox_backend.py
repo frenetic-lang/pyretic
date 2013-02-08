@@ -64,11 +64,10 @@ class POXBackend(revent.EventMixin):
             self.eval = main.attach(self.network)
             self.policy = main
         # main : List KeywordArgs -> Policy
-        except:  
+        except:
             self.policy = main(**kwargs)
             self.eval = self.policy.attach(self.network)
             
-
 
     def vlan_from_diff(self, diff):
         with self.vlan_diff_lock:
