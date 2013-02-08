@@ -62,8 +62,7 @@ def ingress_policy():
                match(at=None, inport=3)[push(vswitch=1002, vinport=1)] |
                match(at=None, inport=4)[push(vswitch=1002, vinport=2)],
             
-               copy(vswitch="switch", vinport="inport")
-            )
+               copy(vswitch="switch", vinport="inport"))
 
     
 def fabric_policy(self):
@@ -85,9 +84,9 @@ def fabric_policy(self):
 
 
 def gateway_example():
-    return ((match(switch=2) | match(switch=3) | match(switch=4) | match(switch=1000))[ learning_switch() ] |
+    return ((match(switch=2) | match(switch=3) | match(switch=4) | match(switch=1000))[ hub ] |
             match(switch=1001)[ repeater ] |
-            (match(switch=5) | match(switch=6) | match(switch=7) | match(switch=1002))[ learning_switch() ])
+            (match(switch=5) | match(switch=6) | match(switch=7) | match(switch=1002))[ hub ])
 
     
 @policy_decorator
