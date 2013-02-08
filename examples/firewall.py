@@ -38,112 +38,82 @@
 
 from frenetic.lib import *
 from examples.hub import hub
-from examples.learning_switch import learning_switch
+from examples.learning_switch import learn
 
 
 ### FIREWALLS ###
 
-def simple_firewall(pairs):
-    pol = drop
-    pred = no_packets
-    for (ip1,ip2) in pairs:     
-        pred = pred | match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
-    pol = pred[passthrough] | (~pred)[pol] 
-    return pol
+def poke(W,P):
+  p = union([match(srcip=s,dstip=d) for (s,d) in W])
+  return if_(p,passthrough,P)
 
-def simple_ingress_firewall(pairs):
-     pol = ingress[drop] | (~ingress)[passthrough]
-     pred = no_packets
-     for (ip1,ip2) in pairs:     
-         pred = pred | match(srcip=ip1,dstip=ip2) | match(srcip=ip2,dstip=ip1) 
-     pol = pred[passthrough] | (~pred)[pol] 
-     return pol
+def static_fw(W):
+  W_rev = [(d,s) for (s,d) in W]
+  return poke(W_rev, poke(W, ingress[drop]))
 
-@policy_decorator
-def hole_puncher(self):
-    # GET ARGS
-    allowed = self.kwargs['allowed']
+def ns_fw(self,W):
 
-    # PUNCH FOWARD DIRECTIONAL HOLES
-    pred = no_packets
-    for (ip1,ip2) in allowed:     
-        pred = pred | match(srcip=ip1,dstip=ip2) 
-    self.policy = pred[passthrough] | (~pred)[self.policy] 
+  def allow_reverse(p):
+      print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
+      self.policy = poke({(p['dstip'],p['srcip'])},self.policy)
 
-    # REVERSE HOLE PUNCHING LOGIC
-    reverse_packet = overwrite(srcip='dstip',
-                               dstip='srcip',
-                               srcmac='dstmac',
-                               dstmac='srcmac')
-    @self.query(all_packets)
-    def f(pkt):
-        srcip_str = str(pkt['srcip'])
-        dstip_str = str(pkt['dstip'])
-        if (srcip_str,dstip_str) in allowed:
-            print "seen ",
-            print (srcip_str,dstip_str)
-            test_reverse = (reverse_packet >> self.policy).attach(self.network)
-            if len(test_reverse(pkt)) == 0:  # REVERSE PACKET DROPPED
-                pred = match(srcip=dstip_str,dstip=srcip_str) 
-                print "punching hole for reverse traffic %s:%s\n%s" % (srcip_str,dstip_str,pred)
-                self.policy = pred[passthrough] | (~pred)[self.policy] 
+  q = packets(None,[])
+  q.when(allow_reverse)
 
-@policy_decorator
-def hole_patcher(self):
-    # GET ARGS
-    timeout = self.kwargs['timeout']
-    allowed = self.kwargs['allowed']
-    self.inner = self.kwargs['inner']
-    self.policy = self.inner
+  wp = union([match(srcip=s,dstip=d) for (s,d) in W])
+  # self.queries.append(wp[q])
+  # self.policy = poke(W,ingress[drop])
+  self.policy = poke(W,ingress[drop]) | wp[q]
 
-    poll_freq = 1  # poll every second - if changed need to change timeout logic
+def patch(p,P):
+    return if_(p,ingress[drop],P)
 
-    potential_holes = no_packets
-    for (srcip_str,dstip_str) in allowed:
-        potential_holes |= match(srcip=dstip_str,dstip=srcip_str) 
+def fw(self,W):
 
-    count_stats = {}
-    @self.query_count(potential_holes, poll_freq, ['srcip','dstip'])
-    def f(qcount):
-        for (pred,count) in qcount.items():
-            try:
-                (prev_count,polls_missed) = count_stats[pred]
-                if prev_count < count:   # TRAFFIC IN LAST POLL PERIOD
-                    polls_missed = 0   
-                else:                    # NO TRAFFIC IN LAST POLL PERIOD
-                    polls_missed += 1
-            except KeyError:
-                polls_missed = 0         # FIRST TIME STAT SEEN
-            if polls_missed == timeout:
-                print "%d seconds w/o traffic, closing hole" % timeout,
-                print pred
-                self.inner.policy = pred[drop] | (~pred)[self.inner.policy]
-            count_stats[pred] = (count,polls_missed)
+    def check_reverse(stats):
+        for (p,cnt) in stats.items():
+            (pcnt,missed) = self.H[p]
+            if pcnt < cnt: missed = 0   
+            else:          missed += 1
+            if missed == self.T:
+                print "%d seconds w/o traffic, closing hole" % self.T,
+                print p
+                self.inner.policy = patch(p,self.inner.policy)
+            self.H[p] = (cnt,missed)
+
+    q = counts(1,['srcip','dstip'])
+    q.when(check_reverse)
+
+    rps = [match(srcip=d,dstip=s) for (s,d) in W]
+    self.H = { rp : (0,0) for rp in rps }
+    self.T = 3
+    self.inner = dynamic(ns_fw)(W)
+#    self.policy = self.inner
+#    self.queries.append(union(rps)[q])
+    self.policy = self.inner | union(rps)[q]
 
 
-def directional_firewall(whitelist,timeout):
-    return hole_patcher(allowed=whitelist,timeout=2,inner=hole_puncher(allowed=whitelist))
+# # HOW TO CHECK A REVERSE PATH
+# reverse_packet = overwrite(srcip='dstip',
+#                            dstip='srcip',
+#                            srcmac='dstmac',
+#                            dstmac='srcmac')
+# test_reverse = (reverse_packet >> self.policy).attach(self.network)
+    
 
 
 ### EXAMPLES ###
 
-def simple_firewall_example():
+def static_firewall_example():
     """traffic allowed between sets {10.0.0.1-10.0.0.3} and {10.0.0.4}, all other traffic dropped"""
     client_ips =  [ '10.0.0.' + str(i) for i in range(1,4) ]
     service_ip  = '10.0.0.4'
     allowed = set([])
     for client_ip in client_ips:
         allowed.add((client_ip,service_ip))
-    return simple_firewall(allowed) >> hub
 
-def simple_ingress_firewall_example():
-    """traffic allowed between sets {10.0.0.1-10.0.0.3} and {10.0.0.4}, all other traffic dropped"""
-    client_ips =  [ '10.0.0.' + str(i) for i in range(1,4) ]
-    service_ip  = '10.0.0.4'
-    allowed = set([])
-    for client_ip in client_ips:
-        allowed.add((client_ip,service_ip))
-    return simple_ingress_firewall(allowed) >> hub
+    return static_fw(allowed) >> hub
+ 
 
 def authentication_firewall_example():
     """odd nodes should reach odd nodes w/ higher IP, likewise for even ones
@@ -157,9 +127,11 @@ def authentication_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return hole_puncher(allowed=whitelist) >> hub
+    return dynamic(ns_fw)(whitelist) >> hub
 
-def directional_firewall_example():
+
+
+def statefull_firewall_example():
     """odd nodes should reach odd nodes w/ higher IP, likewise for even ones
        after a higher IP node is pinged, it can contact the lower IP for a short while """
     client_ips =  [ '10.0.0.' + str(i) for i in range(1,10) ]
@@ -171,12 +143,12 @@ def directional_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return directional_firewall(whitelist,2) >> hub
+    return dynamic(fw)(whitelist) >> hub
 
 
 ### Main ###
 
-#main = simple_firewall_example()
-#main = simple_ingress_firewall_example()
-#main = authentication_firewall_example()
-main = directional_firewall_example()
+def main(): 
+#    return static_firewall_example()
+#    return authentication_firewall_example()
+    return statefull_firewall_example()
