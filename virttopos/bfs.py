@@ -71,25 +71,39 @@ def shortest_path_policy(topo,vmap):
     return fabric_policy
 
     
-class BFS(VirtDefinition):
-    def __init__(self, network):
-        self.network = network
-        self.vmap = topo_to_bfs_vmap(self.network.topology)
-        VirtDefinition.__init__(self, network)
+class BFS(object):
+    def __init__(self):
+        self.vmaps = {}
 
-    def abstracted_network(self):
-        vtopo = Topology()
-        add_nodes_from_vmap(self.vmap, vtopo)
-        return vtopo
-    
-    def ingress_policy(self):
-        return vmap_to_ingress_policy(self.vmap)
+    def update_network(self, network):
+        self.vmaps[network] = topo_to_bfs_vmap(network.topology)
         
-    def fabric_policy(self):
-        return shortest_path_policy(self.network.topology, self.vmap)
+    def attach(self, network):
+        self.vmaps[network] = topo_to_bfs_vmap(network.topology)
 
-    def egress_policy(self):
-        return vmap_to_egress_policy(self.vmap)
+    @property
+    def transform_network(self):
+        from frenetic import netcore
+        def f(network):
+            vtopo = Topology()
+            add_nodes_from_vmap(self.vmaps[network], vtopo)
+            n = Network(None)
+            n.init_events()
+            n.topology = vtopo
+            return n
+        return functools.partial(netcore.transform_network, f)
+        
+    @ndp_decorator
+    def ingress_policy(self, network):
+        return vmap_to_ingress_policy(self.vmaps[network])
+
+    @ndp_decorator
+    def fabric_policy(self, network):
+        return shortest_path_policy(network.topology, self.vmaps[network])
+
+    @ndp_decorator
+    def egress_policy(self, network):
+        return vmap_to_egress_policy(self.vmaps[network])
 
         
-transform = BFS
+transform = BFS()

@@ -59,16 +59,10 @@ class POXBackend(revent.EventMixin):
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
 
-        # main : Policy
-        try:     
-            self.eval = main.attach(self.network)
-            self.policy = main
-        # main : List KeywordArgs -> Policy
-        except:
-            self.policy = main(**kwargs)
-            self.eval = self.policy.attach(self.network)
-            
+        self.policy = main(**kwargs)
+        self.policy.attach(self.network)
 
+        
     def vlan_from_diff(self, diff):
         with self.vlan_diff_lock:
             vlan = self.diff_to_vlan_db.get(diff)
@@ -287,12 +281,16 @@ class POXBackend(revent.EventMixin):
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
                 self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
+        
+        self.policy.update_network(self.network)
                         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
 
         del self.switches[event.dpid]
         self.network.switch_parts.signal(event.dpid)
+
+        self.policy.update_network(self.network)
         
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
@@ -315,6 +313,8 @@ class POXBackend(revent.EventMixin):
                 self.network.port_mods.signal((event.dpid, event.port, CONF_UP, STAT_UP))
             else:
                 raise RuntimeException("Unknown port status event")
+
+        self.policy.update_network(self.network)
 
     def handle_lldp(self,packet,event):
 
@@ -405,6 +405,9 @@ class POXBackend(revent.EventMixin):
             return
 
         self.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
+
+        self.policy.update_network(self.network)
+        
         return
 #    return EventHalt # Probably nobody else needs this event
 
@@ -432,11 +435,11 @@ class POXBackend(revent.EventMixin):
             ipdb.set_trace()
         
         with ipdb.launch_ipdb_on_exception():
-            output = self.eval(recv_packet)
+            output = self.policy.eval(self.network, recv_packet)
             
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = self.eval(recv_packet) # So we can step through it
+            output = self.policy.eval(self.network, recv_packet) # So we can step through it
         
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"

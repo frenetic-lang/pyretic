@@ -41,9 +41,9 @@ from examples.repeater import repeater
 from examples.hub import hub
 
 
-def ingress_policy():
-    return if_(match(switch=1),
-
+class GatewayVirt(Virtualizer):
+    def __init__(self, redo):
+        self.ingress_policy = if_(match(switch=1),
                # At physical gateway, ethernet side. Pretend we are switch 1000.
                match(at=None, inport=1)[push(vswitch=1000, vinport=1)] |
                match(at=None, inport=2)[push(vswitch=1000, vinport=2)] |
@@ -64,35 +64,77 @@ def ingress_policy():
             
                copy(vswitch="switch", vinport="inport"))
 
-    
-def fabric_policy(self):
-    return parallel([
-        # Destined to ethernet side
-        match(vswitch=1000, voutport=1)[pop_vheaders >> fwd(1)],
-        match(vswitch=1000, voutport=2)[pop_vheaders >> fwd(2)],
-        # If we are destined to a fake switch, lets push another header that
-        # says which fake switch we are at.
-        match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1") >> pop_vheaders >> self],
-        match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3") >> pop_vheaders >> self],
-        match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3") >> pop_vheaders >> self],
-        match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2") >> pop_vheaders >> self],
-        # Destined to ip side
-        match(vswitch=1002, voutport=1)[pop_vheaders >> fwd(1)],
-        match(vswitch=1002, voutport=2)[pop_vheaders >> fwd(2)],
-        (~(match(vswitch=1000) | match(vswitch=1001) | match(vswitch=1002)))[virtual_to_physical]
-    ])
+        self.fabric_policy = parallel([
+            # Destined to ethernet side
+            match(vswitch=1000, voutport=1)[pop_vheaders >> fwd(1)],
+            match(vswitch=1000, voutport=2)[pop_vheaders >> fwd(2)],
+            # If we are destined to a fake switch, lets push another header that
+            # says which fake switch we are at.
+            match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1") >> pop_vheaders >> redo],
+            match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3") >> pop_vheaders >> redo],
+            match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3") >> pop_vheaders >> redo],
+            match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2") >> pop_vheaders >> redo],
+            # Destined to ip side
+            match(vswitch=1002, voutport=1)[pop_vheaders >> fwd(3)],
+            match(vswitch=1002, voutport=2)[pop_vheaders >> fwd(4)],
+            (~(match(vswitch=1000) | match(vswitch=1001) | match(vswitch=1002)))[virtual_to_physical]
+        ])
+
+        self.egress_policy = passthrough
+
+        def transformer(network):
+            vtopo = network.topology.copy()
+            n = Network(None)
+            n.init_events()
+            n.topology = vtopo
+
+            try:
+                vtopo.remove_node(1)
+
+                vtopo.add_node(1000, ports={1: Port(1, True, True),
+                                            2: Port(2, True, True),
+                                            3: Port(3, True, True)})
+                vtopo.add_node(1001, ports={1: Port(1, True, True),
+                                            2: Port(2, True, True)})
+                vtopo.add_node(1002, ports={1: Port(1, True, True),
+                                            2: Port(2, True, True),
+                                            3: Port(3, True, True)})
+
+                vtopo.add_edge(3, 1000, {3: 3, 1000: 1})
+                vtopo.add_edge(4, 1000, {4: 2, 1000: 2})
+                vtopo.add_edge(1000, 1001, {1000: 3, 1001: 1})
+                vtopo.add_edge(1001, 1002, {1001: 2, 1002: 3})
+                vtopo.add_edge(5, 1002, {5: 2, 1002: 1})
+                vtopo.add_edge(7, 1002, {7: 3, 1002: 2})
+            except nx.NetworkXError:
+                pass
+            
+            return n
+
+        self.transform_network = functools.partial(transform_network, transformer)
+
+    def attach(self, network):
+        pass
+
+    def update_network(self, network):
+        pass
+
+    def detach(self, network):
+        pass
 
 
 def gateway_example():
     return ((match(switch=2) | match(switch=3) | match(switch=4) | match(switch=1000))[ hub ] |
-            match(switch=1001)[ repeater ] |
+            match(switch=1001)[ repeater  ] |
             (match(switch=5) | match(switch=6) | match(switch=7) | match(switch=1002))[ hub ])
 
-    
+
 @policy_decorator
 def vgateway_example(self):
     ge = gateway_example()
-    self.policy = virtualize(id(self), ge, ingress_policy(), fabric_policy(self))
+    self.policy = virtualize(ge, GatewayVirt(Recurse(self)))
 
-    
-main = vgateway_example
+
+def main():
+    return vgateway_example()
+

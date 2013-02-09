@@ -80,17 +80,20 @@ def monitor_packets_lowest_level_syntax():
 
 ### packet monitoring w/ other bucket types ###
 
+class monitor_packets_limit_by_src_dst(MutablePolicy):
+    def __init__(self, limit=None):
+        self.limit = limit
 
-@policy_decorator
-def monitor_packets_limit_by_src_dst(self,**kwargs):
-    try:    limit = self.kwargs['limit']
-    except: limit = None
-    @self.query_limit(all_packets,limit,['srcip','dstip'])
-    def f(pkt):
-        if limit:  print "(limit %d) I see packet:" % limit
-        else:      print "(no limit) I see packet:" 
+    def attach(self, network):
+        @self.query_limit(all_packets,limit,['srcip','dstip'])
+        def f(pkt):
+            if self.limit:
+                print "(limit %d) I see packet:" % limit
+            else:
+                print "(no limit) I see packet:" 
         print pkt
         print "---------------"
+        MutablePolicy.attach(self, network)
     
 @policy_decorator
 def monitor_unique_packets(self):
@@ -154,5 +157,6 @@ lowest_level_syntax =                      \
 
 ### Main ###
 
-main = lowest_level_syntax
+def main():
+    return monitor_packets()
 

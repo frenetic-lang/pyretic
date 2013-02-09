@@ -105,59 +105,36 @@ class INetwork(Network):
 # Virtualization policies 
 ################################################################################
 
-class physical_to_virtual(DerivedPolicy, Data("vtag")):
+class physical_to_virtual(DerivedPolicy):
+    def __init__(self, vtag):
+        self.vtag = vtag
+        self.policy = (push(vtag=self.vtag) >> shift(voutport="outport",
+                                                     vswitch="switch",
+                                                     vinport="inport"))
+        
     def __repr__(self):
         return "physical_to_virtual %s" % self.vtag
-        
-    def get_policy(self):
-        return (push(vtag=self.vtag) >> shift(voutport="outport",
-                                             vswitch="switch",
-                                             vinport="inport"))
+
         
 @singleton
 class virtual_to_physical(DerivedPolicy):
+    def __init__(self):
+        self.policy = (pop(["switch", "inport", "outport", "vtag"]) >>
+                       shift(outport="voutport", switch="vswitch", inport="vinport"))
+        
     def __repr__(self):
         return "virtual_to_physical"
-        
-    def get_policy(self):
-         return (pop(["switch", "inport", "outport", "vtag"]) >>
-                 shift(outport="voutport", switch="vswitch", inport="vinport"))
-         
 
+        
 @singleton
 class pop_vheaders(DerivedPolicy):
+    def __init__(self):
+        self.policy = pop(["vswitch", "vinport", "voutport", "vtag"])
+        
     def __repr__(self):
         return "pop_vheaders"
+
         
-    def get_policy(self):
-        return pop(["vswitch", "vinport", "voutport", "vtag"])
-
-    
-class virtualize_policy(DerivedPolicy, Data("vtag policy ingress_policy physical_policy_fn query_policy_fn")):
-    def __repr__(self):
-        return "virtualize_policy %s\n%s" % (self.vtag, util.repr_plus(["POLICY",
-                                                                        self.policy,
-                                                                        "INGRESS POLICY", 
-                                                                        self.ingress_policy,
-                                                                        "PHYSICAL POLICY", 
-                                                                        self.physical_policy_fn(self),
-                                                                        "QUERY POLICY",
-                                                                        self.query_policy_fn(self)]))
-
-    def get_policy(self):
-        # if the vlan isnt set, then we need to find out the v* headers.
-        pol = (if_(~match(vtag=self.vtag), 
-                    (self.ingress_policy >> # set vswitch and vinport
-                     # now make the virtualization transparent to the tenant's policy to get the outport
-                     shift(switch="vswitch", inport="vinport") >>
-                     self.policy >>
-                     physical_to_virtual(self.vtag)))
-                # Pipe the packet with appropriate v* headers to the physical policy for processing
-                >> if_(is_bucket("voutport"),
-                       self.query_policy_fn(self),
-                       self.physical_policy_fn(self)))
-        return pol
-
 def add_nodes_from_vmap(vmap, vtopo):
     for switch, port_no in vmap:
         port = Port(port_no)
@@ -180,116 +157,41 @@ def vmap_to_egress_policy(vmap):
         matches_egress.append(switch_pred)
         valid_match_egress.append(match(vswitch=vsw, voutport=vp) & switch_pred)
     return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
-        
-class VNetwork(Network):
-    def __init__(self,backend):
-        super(VNetwork, self).__init__(backend)
-        
-        self._vpolicy = gs.Behavior(drop)
-        self._ingress_policy = gs.Behavior(drop)
-        self._physical_policy = gs.Behavior(drop)
-        self._egress_policy = gs.Behavior(no_packets)
-        
-        for b in [self._policy, self._ingress_policy,
-                  self._physical_policy, self._egress_policy]:
-            b.notify(self._handle_changes)
-
-    @property
-    def vpolicy(self):
-        return self._vpolicy.get()
-    
-    ingress_policy = gs.Behavior.property("_ingress_policy")
-    physical_policy = gs.Behavior.property("_physical_policy")
-    egress_policy = gs.Behavior.property("_egress_policy")
-
-    @classmethod
-    def fork(cls, network):
-        """different than base"""
-        self = cls(network.backend)
-        self.init_events()
-        self.connect(network)
-        return self
-
-    def connect(self, network):
-        """different than base"""
-        @self._vpolicy.notify
-        def change(policy):
-            network.install_sub_policy(self, policy)
-
-    def from_vmap(self, vmap):
-        self.ingress_policy = vmap_to_ingress_policy(vmap)
-        self.egress_policy = vmap_to_egress_policy(vmap)
-
-    def _handle_changes(self, item):
-        self._vpolicy.set(self._aggregate_vpolicy())
-
-    def _aggregate_vpolicy(self):
-        if isinstance(self.physical_policy, Policy):
-            physical_policy = lambda rev: self.physical_policy
-        else:
-            assert callable(self.physical_policy), "must be a function or policy"
-            physical_policy = self.physical_policy
-            
-        return virtualize_policy(id(self),
-                                 self.policy,
-                                 self.ingress_policy,
-                                 lambda rev: physical_policy(rev) >> self.egress_policy,
-                                 lambda rev: virtual_to_physical)
-    @property
-    def vpolicy_changes(self):
-        return iter(self._vpolicy)
 
 
 # New style combinators
 
-class VirtDefinition(object):
-    def __init__(self, network):
-        pass
+class Virtualizer(object):
+    pass
 
-    def abstracted_network(self):
-        pass
-        
-    def ingress_policy(self):
-        """Return an ingress policy, already attached to network"""
-        pass
-
-    def fabric_policy(self):
-        """Return a fabric policy, already attached to network"""
-        pass
-        
-    def egress_policy(self):
-        """Return an egress policy, already attached to network"""
-        pass
-        
-
-class virtualize(Policy):
+class virtualize(DerivedPolicy):
     def __init__(self, policy, virtdef):
-        self.policy = policy
+        self.vpolicy = policy
         self.virtdef = virtdef
         self.vtag = id(self)
-        DerivedPolicy.__init__(self)
+        self.policy = (
+            if_(~match(vtag=self.vtag), 
+                (self.virtdef.ingress_policy >> # set vswitch and vinport
+                 # now make the virtualization transparent to the tenant's policy to get the outport
+                 shift(switch="vswitch", inport="vinport") >>
+                 self.virtdef.transform_network(self.vpolicy) >>
+                 physical_to_virtual(self.vtag)))
+            # Pipe the packet with appropriate v* headers to the physical policy for processing
+            >> self.virtdef.fabric_policy
+            >> self.virtdef.egress_policy)
         
     def __repr__(self):
         return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)
 
-
+    def update_network(self, network):
+        self.virtdef.update_network(network)
+        DerivedPolicy.update_network(self, network)
+        
     def attach(self, network):
-        import ipdb
-        ipdb.set_trace()
-        virtdef = self.virtdef(network)
-
-        # if the vlan isnt set, then we need to find out the v* headers.
-        pol = (if_(~match(vtag=self.vtag), 
-                    (virtdef.ingress_policy() >> # set vswitch and vinport
-                     # now make the virtualization transparent to the tenant's policy to get the outport
-                     shift(switch="vswitch", inport="vinport") >>
-                     transform_topology(virtdef.abstracted_network(), self.policy) >>
-                     physical_to_virtual(self.vtag)))
-                # Pipe the packet with appropriate v* headers to the physical policy for processing
-               >> virtdef.fabric_policy()
-               >> virtdef.egress_policy())
-
-        pol_eval = pol.attach(network)
-
-        return pol_eval
+        self.virtdef.attach(network)
+        DerivedPolicy.attach(self, network)
+        
+    def detach(self, network):
+        self.virtdef.detach(network)
+        DerivedPolicy.detach(self, network)
         

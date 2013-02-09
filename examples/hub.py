@@ -42,4 +42,5 @@ from frenetic.lib import *
 
 hub = flood
 
-main = hub
+def main():
+    return hub
