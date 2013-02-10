@@ -29,33 +29,26 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  /pyretic/mininet.sh --switch ovsk --bump_topo,1,1,1                                                        #
+# start mininet:  pyretic/mininet.sh --switch ovsk --bump_topo,1,1,1                                                         #
 # run controller: pox.py --no-cli pyretic/examples/renamer.py                                                                #
 # test:           h1 ping -c 1 10.0.0.100 (should work), h1 ping -c 1 hs2 (should not work)                                  #
 ##############################################################################################################################
 
 from frenetic.lib import *
-from examples.hub import hub
-from examples.learning_switch import learning_switch
 
-# RENAMES PACKETS TO/FROM 10.0.0.2/10.0.0.100 
-def renamer(client_ip,instance_ip,service_ip):
-
-    service_to_client_pred = match(srcip=instance_ip,dstip=client_ip)
+def renamer(client_ip, instance_ip, service_ip):
+    service_to_client_pred = match(srcip=instance_ip, dstip=client_ip)
     service_to_client_mod = modify(srcip=service_ip)
 
-    client_to_service_pred = match(srcip=client_ip,dstip=service_ip) 
+    client_to_service_pred = match(srcip=client_ip, dstip=service_ip) 
     client_to_service_mod = modify(dstip=instance_ip)
   
     pol = passthrough
     pol -= service_to_client_pred | client_to_service_pred
     pol |= service_to_client_pred[service_to_client_mod] | client_to_service_pred[client_to_service_mod]
-    
     return pol
 
-
-service_ip  = '10.0.0.100'
-client_ip   = '10.0.0.1'
-instance_ip = '10.0.0.2'
-
-main = renamer(client_ip,instance_ip,service_ip) >> hub
+# RENAMES PACKETS TO/FROM 10.0.0.2/10.0.0.100 
+def main(service_ip='10.0.0.100', client_ip='10.0.0.1', instance_ip='10.0.0.2'):
+    from examples.hub import hub
+    return renamer(client_ip, instance_ip, service_ip) >> hub

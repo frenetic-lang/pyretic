@@ -29,8 +29,8 @@
 ###############################################################################################################################
 # TO TEST EXAMPLE                                                                                                             #
 # -------------------------------------------------------------------                                                         #
-# start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,1,5,3                                                 #
-# run controller: pox.py --no-cli pyretic/examples/static_load_balancer.py --clients=5 --servers=3                            #
+# start mininet:  pyretic/mininet.sh --topo=bump_clique,1,5,3                                                                 #
+# run controller: pox.py --no-cli pyretic/examples/load_balancer.py --clients=5 --servers=3                                   #
 # test:           hX ping -c 1 10.0.0.100 will work from each host                                                            #
 #                 all nodes will be able to ping each other, except hosts to their load-balanced instance                     #
 #                 pingall will output                                                                                         #
@@ -48,30 +48,27 @@
 import math
 from frenetic.lib import *
 from examples.renamer import renamer
-from examples.learning_switch import learning_switch
 
-def static_load_balancer(service_ip,static_matching):
 
+def static_load_balancer(service_ip, static_matching):
     pol = passthrough
-
     for client_ip,instance_ip in static_matching:
-        pol >>= renamer(client_ip,instance_ip,service_ip)
-    
+        pol >>= renamer(client_ip, instance_ip, service_ip)
     return pol
 
-
-def static_matching(client_ips,instance_ips):
-    extension_factor = int(math.ceil(float(len(client_ips))/len(instance_ips)))
+def static_matching(client_ips, instance_ips):
+    extension_factor = int(math.ceil(float(len(client_ips)) / len(instance_ips)))
     repeating_instance_ips = []
-    for i in range(0,extension_factor):
+    for i in range(0, extension_factor):
         repeating_instance_ips += instance_ips
-    return zip(client_ips,repeating_instance_ips)
+    return zip(client_ips, repeating_instance_ips)
 
-
-def example(clients, servers):
-
+def main(clients, servers):
+    from examples.learning_switch import learning_switch
+    
     num_clients = int(clients)
     num_servers = int(servers)
+
     print "clients %d" % num_clients
     print "servers %d" % num_servers
 
@@ -79,11 +76,10 @@ def example(clients, servers):
     ip_prefix = '10.0.0.'
     service_ip = ip_prefix + str(100)
     print "service_ip = %s" % service_ip
-    client_ips = [ip_prefix + str(i) for i in range(1,1+num_clients)]
-    instance_ips = [ip_prefix + str(i) for i in range(1+num_clients,1+num_clients+num_servers)]
-
-    lb_matching = static_matching(client_ips,instance_ips)
+    
+    client_ips = [ip_prefix + str(i) for i in range(1, 1+num_clients)]
+    instance_ips = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
+    lb_matching = static_matching(client_ips, instance_ips)
     print "static_matching = %s" % lb_matching
-    return static_load_balancer(service_ip,lb_matching) >> learning_switch()
 
-main = example
+    return static_load_balancer(service_ip, lb_matching) >> learning_switch()
