@@ -67,17 +67,17 @@ def test_Switch():
     assert repr(Switch(2)) == "<switch 2>"
 
     
-def test_Port():
-    p = Port(Bucket())
+# def test_Port():
+#     p = Port(Bucket())
 
-    assert not p.is_real()
+#     assert not p.is_real()
 
-    p = Port(10)
+#     p = Port(10)
 
-    assert p.is_real()
-    assert Port(p).is_real()
+#     assert p.is_real()
+#     assert Port(p).is_real()
 
-    assert int(p) == 10
+#     assert int(p) == 10
     
 
 def test_MAC():

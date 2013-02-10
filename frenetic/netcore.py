@@ -1090,14 +1090,14 @@ class MutablePolicy(DerivedPolicy):
     ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
         b = bucket()
-        self.policy |= b
+        self.policy |= pred[b]
         return b.when
 
     ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
     def query_limit(self, pred=all_packets, limit=None, fields=[]):
         if limit:
             b = limit_bucket(limit,fields)
-            self.policy |= b
+            self.policy |= pred[b]
             return b.when
         else:
             return self.query(pred)
@@ -1109,7 +1109,7 @@ class MutablePolicy(DerivedPolicy):
     ### query_count : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
     def query_count(self, pred=all_packets, interval=None, group_by=[]):
         b = counting_bucket(interval,group_by)
-        self.policy |= b
+        self.policy |= pred[b]
         return b.when
 
         
@@ -1241,4 +1241,3 @@ class transform_network(Policy):
         if network in self.transformed_networks:
             self.policy.detach(self.transformed_networks[network])
         del self.transformed_networks[network]
-        
