@@ -91,22 +91,45 @@ class GatewayVirt(Virtualizer):
             try:
                 vtopo.remove_node(1)
 
-                vtopo.add_node(1000, ports={1: Port(1, True, True),
-                                            2: Port(2, True, True),
-                                            3: Port(3, True, True)})
-                vtopo.add_node(1001, ports={1: Port(1, True, True),
-                                            2: Port(2, True, True)})
-                vtopo.add_node(1002, ports={1: Port(1, True, True),
-                                            2: Port(2, True, True),
-                                            3: Port(3, True, True)})
+                vtopo.add_node(1000, ports={1: Port(1),
+                                            2: Port(2),
+                                            3: Port(3)})
+                vtopo.add_node(1001, ports={1: Port(1),
+                                            2: Port(2)})
+                vtopo.add_node(1002, ports={1: Port(1),
+                                            2: Port(2),
+                                            3: Port(3)})
 
                 vtopo.add_edge(3, 1000, {3: 3, 1000: 1})
+
+                vtopo.node[3]['ports'][3].linked_to = vtopo.node[1000]['ports'][1]
+                vtopo.node[1000]['ports'][1].linked_to = vtopo.node[3]['ports'][3]
+                
                 vtopo.add_edge(4, 1000, {4: 2, 1000: 2})
+
+                vtopo.node[4]['ports'][2].linked_to = vtopo.node[1000]['ports'][2]
+                vtopo.node[1000]['ports'][2].linked_to = vtopo.node[4]['ports'][2]
+                
                 vtopo.add_edge(1000, 1001, {1000: 3, 1001: 1})
+                
+                vtopo.node[1000]['ports'][3].linked_to = vtopo.node[1001]['ports'][1]
+                vtopo.node[1001]['ports'][1].linked_to = vtopo.node[1000]['ports'][3]
+                
                 vtopo.add_edge(1001, 1002, {1001: 2, 1002: 3})
+                
+                vtopo.node[1001]['ports'][2].linked_to = vtopo.node[1002]['ports'][3]
+                vtopo.node[1002]['ports'][3].linked_to = vtopo.node[1001]['ports'][2]
+                
                 vtopo.add_edge(5, 1002, {5: 2, 1002: 1})
+
+                vtopo.node[5]['ports'][2].linked_to = vtopo.node[1002]['ports'][1]
+                vtopo.node[1002]['ports'][1].linked_to = vtopo.node[5]['ports'][2]
+                
                 vtopo.add_edge(7, 1002, {7: 3, 1002: 2})
-            except nx.NetworkXError:
+
+                vtopo.node[7]['ports'][3].linked_to = vtopo.node[1002]['ports'][2]
+                vtopo.node[1002]['ports'][2].linked_to = vtopo.node[7]['ports'][3]
+            except:
                 pass
             
             return n

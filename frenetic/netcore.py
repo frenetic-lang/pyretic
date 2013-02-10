@@ -1225,6 +1225,9 @@ class transform_network(Policy):
         self.transform = transform
         self.policy = policy
 
+    def __repr__(self):
+        return "transform_network\n%s" % util.repr_plus([self.policy])
+
     def update_network(self, network):
         self.detach(network)
         self.attach(network)
