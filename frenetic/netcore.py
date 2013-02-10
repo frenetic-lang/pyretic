@@ -456,7 +456,7 @@ class match(SimplePredicate):
 
         
 class union(Predicate):
-    """A predicate representing the union of two predicates."""
+    """A predicate representing the union of a list of predicates."""
 
     ### init : List Predicate -> unit
     def __init__(self, predicates):
@@ -483,7 +483,7 @@ class union(Predicate):
 
         
 class intersect(Predicate):
-    """A predicate representing the intersection of two predicates."""
+    """A predicate representing the intersection of a list of predicates."""
 
     def __init__(self, predicates):
         self.predicates = list(predicates)
@@ -590,7 +590,7 @@ class Policy(object):
         
     ### rshift : Policy -> Policy
     def __rshift__(self, pol):
-        return compose([self, pol])
+        return sequential([self, pol])
 
     ### eq : Policy -> bool
     def __eq__(self, other):
@@ -908,14 +908,14 @@ class parallel(Policy):
         return c
         
 
-class compose(Policy):
+class sequential(Policy):
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
     
     ### repr : unit -> String
     def __repr__(self):
-        return "compose:\n%s" % util.repr_plus(self.policies)
+        return "sequential:\n%s" % util.repr_plus(self.policies)
 
     def update_network(self, network):
         for policy in self.policies:
@@ -941,12 +941,12 @@ class compose(Policy):
         return lc
 
         
-### directional_compose : Predicate -> List Policy -> Policy
-def directional_compose(direction_pred, policies):
+### directional : Predicate -> List Policy -> Policy
+def directional(direction_pred, policies):
     pol_list = list(policies)
-    positive_direction = compose(pol_list)
+    positive_direction = sequential(pol_list)
     pol_list.reverse()
-    negative_direction = compose(pol_list)
+    negative_direction = sequential(pol_list)
     return if_(direction_pred,positive_direction,negative_direction)
     
 
@@ -1089,14 +1089,14 @@ class MutablePolicy(DerivedPolicy):
         
     ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
-        b = bucket()
+        b = packets()
         self.policy |= pred[b]
         return b.when
 
     ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
     def query_limit(self, pred=all_packets, limit=None, fields=[]):
         if limit:
-            b = limit_bucket(limit,fields)
+            b = packets(limit,fields)
             self.policy |= pred[b]
             return b.when
         else:
@@ -1108,18 +1108,18 @@ class MutablePolicy(DerivedPolicy):
 
     ### query_count : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
     def query_count(self, pred=all_packets, interval=None, group_by=[]):
-        b = counting_bucket(interval,group_by)
+        b = counts(interval,group_by)
         self.policy |= pred[b]
         return b.when
 
         
-# policy_decorator : (DecoratedPolicy ->  unit) -> DecoratedPolicy
-def policy_decorator(fn):
+# dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
+def dynamic(fn):
     class DecoratedPolicy(MutablePolicy):
         def __init__(self, *args, **kwargs):
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
             # IN PARICULAR, THE when FUNCTION RETURNED BY self.query 
-            # (ITSELF A MEMBER OF A BUCKET CREATED BY self.query)
+            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
             # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
             # FUNCTION TO WHICH when IS ASSIGNED AS when IS EVALUATED
             # EACH TIME A NEW EVENT OCCURS
@@ -1131,7 +1131,7 @@ def policy_decorator(fn):
     return DecoratedPolicy
  
         
-class bucket(SimplePolicy):
+class queries_base(SimplePolicy):
     ### init : unit -> unit
     def __init__(self):
         self.listeners = []
@@ -1151,36 +1151,38 @@ class bucket(SimplePolicy):
         return fn
 
         
-class limit_bucket(bucket):
+class packets(queries_base):
     ### init : int -> List String
-    def __init__(self,limit,fields=[]):
+    def __init__(self,limit=None,fields=[]):
         self.limit = limit
         self.seen = {}
         self.fields = fields
-        bucket.__init__(self)        
+        queries_base.__init__(self)        
 
     ### eval : Network -> Packet -> unit
     def eval(self, network, packet):
-        if self.fields:    # MATCH ON PROVIDED FIELDS
-            pred = match([(field,packet[field]) for field in self.fields])
+        if not self.limit is None:
 
-        else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
-            pred = match([(field,packet[field]) 
-                          for field in packet.available_fields()])
+            if self.fields:    # MATCH ON PROVIDED FIELDS
+                pred = match([(field,packet[field]) for field in self.fields])
+                
+            else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
+                pred = match([(field,packet[field]) 
+                              for field in packet.available_fields()])
 
-        # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
-        try:
-            self.seen[pred] += 1
-        except KeyError:
-            self.seen[pred] = 1
+            # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+            try:
+                self.seen[pred] += 1
+            except KeyError:
+                self.seen[pred] = 1
 
-        if self.seen[pred] > self.limit:
-            return
+            if self.seen[pred] > self.limit:
+                return
 
-        return bucket.eval(self, network, packet)
+        return queries_base.eval(self, network, packet)
 
         
-class counting_bucket(bucket):
+class counts(queries_base):
     ### init : int -> List String
     def __init__(self, interval, group_by=[]):
         self.interval = interval
@@ -1195,10 +1197,10 @@ class counting_bucket(bucket):
 
         Timer(interval, self.report_count, recurring=True)
         
-        bucket.__init__(self)
+        queries_base.__init__(self)
 
     def report_count(self):
-        bucket.eval(self, None, self.count) # We don't actually use the "network" parameter
+        queries_base.eval(self, None, self.count) # We don't actually use the "network" parameter
 
     ### inc : Packet -> unit
     def inc(self,pkt):

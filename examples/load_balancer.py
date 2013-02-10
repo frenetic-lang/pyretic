@@ -47,24 +47,57 @@
 
 import math
 from frenetic.lib import *
-from examples.renamer import renamer
+
+def subs(c,r,p):
+  c_to_p = match(srcip=c,dstip=p)
+  r_to_c = match(srcip=r,dstip=c)
+  return c_to_p[modify(dstip=r)] | r_to_c[modify(srcip=p)] | (~r_to_c & ~c_to_p)[passthrough]
+
+# # RENAMES PACKETS TO/FROM 10.0.0.2/10.0.0.100 
+# def main(public_ip='10.0.0.100', client_ip='10.0.0.1', replica_ip='10.0.0.2'):
+#     from examples.hub import hub
+#     return subs(client_ip, replica_ip, public_ip) >> hub
+
+def rewrite(d,p):
+    return sequential([subs(c,r,p) for c,r in d])
 
 
-def static_load_balancer(service_ip, static_matching):
-    pol = passthrough
-    for client_ip,instance_ip in static_matching:
-        pol >>= renamer(client_ip, instance_ip, service_ip)
-    return pol
-
-def static_matching(client_ips, instance_ips):
-    extension_factor = int(math.ceil(float(len(client_ips)) / len(instance_ips)))
-    repeating_instance_ips = []
+def balance(R,H):
+    """ A simple balancing function the ignores history"""
+    client_ips = H.keys()
+    extension_factor = int(math.ceil(float(len(client_ips)) / len(R)))
+    repeating_R = []
     for i in range(0, extension_factor):
-        repeating_instance_ips += instance_ips
-    return zip(client_ips, repeating_instance_ips)
+        repeating_R += R
+    import random
+    random.shuffle(repeating_R)
+    return zip(client_ips, repeating_R)
+
+def update(H,stats):
+    # for cli,cnt in stats.items():
+    #     try:    H[cli] = cnt - H[cli]
+    #     except: H[cli] = cnt
+    # print H
+    return H
+
+def lb(self,p,R,H):
+ 
+    def rebalance(stats):
+        self.H = update(H,stats)
+        b = balance(R,self.H)
+        print "rebalance %s" % b
+        self.policy = rewrite(b,p)
+
+    self.H = H
+    q = counts(5,['srcip'])
+    q.when(rebalance)
+#    self.policy = rewrite(balance(R,H),p) 
+#    self.queries.append(match(dstip=p)[q])
+    self.policy = rewrite(balance(R,H),p) | match(dstip=p)[q]
+
 
 def main(clients, servers):
-    from examples.learning_switch import learning_switch
+    from examples.learning_switch import learn
     
     num_clients = int(clients)
     num_servers = int(servers)
@@ -74,12 +107,12 @@ def main(clients, servers):
 
     # CALCULATE IPS
     ip_prefix = '10.0.0.'
-    service_ip = ip_prefix + str(100)
-    print "service_ip = %s" % service_ip
+    public_ip = ip_prefix + str(100)
+    print "public_ip = %s" % public_ip
     
     client_ips = [ip_prefix + str(i) for i in range(1, 1+num_clients)]
-    instance_ips = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
-    lb_matching = static_matching(client_ips, instance_ips)
-    print "static_matching = %s" % lb_matching
+    H = {c : 0 for c in client_ips}
+    R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
-    return static_load_balancer(service_ip, lb_matching) >> learning_switch()
+#    return rewrite(balance(R,H),public_ip) >> dynamic(learn)()
+    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()
