@@ -1073,7 +1073,7 @@ class MutablePolicy(DerivedPolicy):
         old_policy = self.policy
         self._policy = policy
         for network in self.networks:
-            if old_policy is None:
+            if old_policy is not None:
                 old_policy.detach(network)
             policy.attach(network)
 
