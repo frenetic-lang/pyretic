@@ -100,6 +100,8 @@ class GatewayVirt(Virtualizer):
                                             2: Port(2),
                                             3: Port(3)})
 
+                del vtopo.node[6]["ports"][2]
+                
                 vtopo.add_edge(3, 1000, {3: 3, 1000: 1})
 
                 vtopo.node[3]['ports'][3].linked_to = vtopo.node[1000]['ports'][1]

@@ -1116,7 +1116,7 @@ class MutablePolicy(DerivedPolicy):
 # policy_decorator : (DecoratedPolicy ->  unit) -> DecoratedPolicy
 def policy_decorator(fn):
     class DecoratedPolicy(MutablePolicy):
-        def __init__(self):
+        def __init__(self, *args, **kwargs):
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
             # IN PARICULAR, THE when FUNCTION RETURNED BY self.query 
             # (ITSELF A MEMBER OF A BUCKET CREATED BY self.query)
@@ -1124,7 +1124,7 @@ def policy_decorator(fn):
             # FUNCTION TO WHICH when IS ASSIGNED AS when IS EVALUATED
             # EACH TIME A NEW EVENT OCCURS
             MutablePolicy.__init__(self)
-            fn(self)
+            fn(self, *args, **kwargs)
             
     # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
     DecoratedPolicy.__name__ = fn.__name__
