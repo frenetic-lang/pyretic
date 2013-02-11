@@ -39,7 +39,7 @@
 from frenetic.lib import *
 from examples.hub import hub
 from examples.learning_switch import learn
-
+from virttopos.bfs import BFS
 
 ### FIREWALLS ###
 
@@ -51,7 +51,7 @@ def static_fw(W):
   W_rev = [(d,s) for (s,d) in W]
   return poke(W_rev, poke(W, ingress[drop]))
 
-def ns_fw(self,W):
+def static_fw(self,W):
 
   def allow_reverse(p):
       print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
@@ -61,8 +61,6 @@ def ns_fw(self,W):
   q.when(allow_reverse)
 
   wp = union([match(srcip=s,dstip=d) for (s,d) in W])
-  # self.queries.append(wp[q])
-  # self.policy = poke(W,ingress[drop])
   self.policy = poke(W,ingress[drop]) | wp[q]
 
 def patch(p,P):
@@ -87,9 +85,7 @@ def fw(self,W):
     rps = [match(srcip=d,dstip=s) for (s,d) in W]
     self.H = { rp : (0,0) for rp in rps }
     self.T = 3
-    self.inner = dynamic(ns_fw)(W)
-#    self.policy = self.inner
-#    self.queries.append(union(rps)[q])
+    self.inner = dynamic(static_fw)(W)
     self.policy = self.inner | union(rps)[q]
 
 
@@ -127,7 +123,7 @@ def authentication_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return dynamic(ns_fw)(whitelist) >> hub
+    return dynamic(static_fw)(whitelist) >> hub
 
 
 
@@ -152,3 +148,4 @@ def main():
 #    return static_firewall_example()
 #    return authentication_firewall_example()
     return statefull_firewall_example()
+#    return virtualize(statefull_firewall_example(), BFS())

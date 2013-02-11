@@ -39,8 +39,10 @@
 
 
 from frenetic.lib import *
+from virttopos.bfs import BFS
 
 hub = flood
 
 def main():
     return hub
+#    return virtualize(hub, BFS())  # RUN IT ON A BIG SWITCH ABSTRACT TOPOLOGY 

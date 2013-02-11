@@ -38,6 +38,7 @@
 ############################################################################################################################
 
 from frenetic.lib import *
+from virttopos.bfs import BFS
 
 ### NSDI PAPER VERSION ###
 def learn(self):
@@ -58,4 +59,4 @@ def learning_switch():
 
 def main():
     return dynamic(learn)()
-
+#    return virtualize(learning_switch(), BFS())  # RUN IT ON A BIG SWITCH ABSTRACT TOPOLOGY 

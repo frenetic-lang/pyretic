@@ -47,20 +47,15 @@
 
 import math
 from frenetic.lib import *
+from virttopos.bfs import BFS
 
 def subs(c,r,p):
   c_to_p = match(srcip=c,dstip=p)
   r_to_c = match(srcip=r,dstip=c)
   return c_to_p[modify(dstip=r)] | r_to_c[modify(srcip=p)] | (~r_to_c & ~c_to_p)[passthrough]
 
-# # RENAMES PACKETS TO/FROM 10.0.0.2/10.0.0.100 
-# def main(public_ip='10.0.0.100', client_ip='10.0.0.1', replica_ip='10.0.0.2'):
-#     from examples.hub import hub
-#     return subs(client_ip, replica_ip, public_ip) >> hub
-
 def rewrite(d,p):
     return sequential([subs(c,r,p) for c,r in d])
-
 
 def balance(R,H):
     """ A simple balancing function the ignores history"""
@@ -73,12 +68,16 @@ def balance(R,H):
     random.shuffle(repeating_R)
     return zip(client_ips, repeating_R)
 
+## DO-NOTHING UPDATE, TODO - MAKE INTERESTING
 def update(H,stats):
     # for cli,cnt in stats.items():
     #     try:    H[cli] = cnt - H[cli]
     #     except: H[cli] = cnt
     # print H
     return H
+
+def static_lb(p,R,H):
+    return rewrite(balance(R,H),p) 
 
 def lb(self,p,R,H):
  
@@ -91,9 +90,7 @@ def lb(self,p,R,H):
     self.H = H
     q = counts(5,['srcip'])
     q.when(rebalance)
-#    self.policy = rewrite(balance(R,H),p) 
-#    self.queries.append(match(dstip=p)[q])
-    self.policy = rewrite(balance(R,H),p) | match(dstip=p)[q]
+    self.policy = static_lb(p,R,H) | match(dstip=p)[q]
 
 
 def main(clients, servers):
@@ -114,5 +111,11 @@ def main(clients, servers):
     H = {c : 0 for c in client_ips}
     R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
-#    return rewrite(balance(R,H),public_ip) >> dynamic(learn)()
-    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()
+#    return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
+#    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  ## TEST ABOVE DOESN'T WORK (B/C HOST AND REPLICAS ARE ON SAME LAN, SO USE OLD ARPS ON REBALANCE, CODE WORKS, BUT TEST SETUP NEEDS WORK)
+
+    return virtualize(static_lb(public_ip,R,H) >> dynamic(learn)(), BFS())
+
+### DON'T WORK
+#    return virtualize(static_lb(public_ip,R,H), BFS()) >> dynamic(learn)()
+#    return virtualize(dynamic(lb)(public_ip,R,H), BFS()) >> dynamic(learn)()
