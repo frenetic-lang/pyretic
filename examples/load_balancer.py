@@ -111,12 +111,6 @@ def main(clients, servers):
     H = {c : 0 for c in client_ips}
     R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
-#    return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
+    return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
 #    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  ## TEST ABOVE DOESN'T WORK (B/C HOST AND REPLICAS ARE ON SAME LAN, SO USE OLD ARPS ON REBALANCE, CODE WORKS, BUT TEST SETUP NEEDS WORK)
 
-#    return virtualize(static_lb(public_ip,R,H) >> dynamic(learn)(), BFS())  # OR VIRTUALIZE ON BFS
-
-
-### THESE DON'T WORK (YET)
-#    return virtualize(static_lb(public_ip,R,H), BFS()) >> dynamic(learn)()
-#    return virtualize(dynamic(lb)(public_ip,R,H), BFS()) >> dynamic(learn)()

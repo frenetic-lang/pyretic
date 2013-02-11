@@ -29,7 +29,7 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  pyretic/mininet.sh --topo linear,4                                                                 #
+# start mininet:  pyretic/mininet.sh --topo cycle,4,4                                                                        #
 # run controller: pox.py --no-cli pyretic/examples/arp.py                                                                    #
 # run pingall:    once or twice, clear a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping           # 
 # test:           NO RESPONSE AVAILABLE message should only show up once for each end host IP address                        #

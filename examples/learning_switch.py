@@ -59,6 +59,4 @@ def learning_switch():
 
 
 def main():
-#    return dynamic(learn)()
-#    return virtualize(learning_switch(), BFS())  # RUN IT ON A BIG SWITCH ABSTRACT TOPOLOGY 
-    return virtualize(learning_switch(), SpanningTree())  # RUN IT ON A SPANNING TREE ABSTRACT TOPOLOGY 
+    return dynamic(learn)()
