@@ -36,37 +36,40 @@
 
 from frenetic.lib import *
 from examples.learning_switch import learning_switch
-from examples.firewall import simple_ingress_firewall
-from examples.load_balancer import static_matching, static_load_balancer
+from examples.firewall import static_fw, fw
+from examples.load_balancer import static_lb, lb
+from virttopos.bfs import BFS
 
-def example(clients, servers):
+def fw_lb_ls(clients, servers):
     num_clients = int(clients)
     num_servers = int(servers)
+
     print "clients %d" % num_clients
     print "servers %d" % num_servers
 
     # CALCULATE IPS
     ip_prefix = '10.0.0.'
-    service_ip = ip_prefix + str(100)
-    print "service_ip = %s" % service_ip
-    client_ips = [ip_prefix + str(i) for i in range(1,1+num_clients)]
-    instance_ips = [ip_prefix + str(i) for i in range(1+num_clients,1+num_clients+num_servers)]
-
-    lb_matching = static_matching(client_ips,instance_ips)
-    print "static_matching = %s" % lb_matching
+    public_ip = ip_prefix + str(100)
+    print "public_ip = %s" % public_ip
+    
+    client_ips = [ip_prefix + str(i) for i in range(1, 1+num_clients)]
+    H = {c : 0 for c in client_ips}
+    R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
     allowed = set([])
     for client_ip in client_ips:
-        allowed.add((client_ip,service_ip))
+        allowed.add((client_ip,public_ip))
 
-    from_client = None
-    for client_ip in client_ips:
-        try:    from_client |= match(srcip=client_ip)
-        except: from_client  = match(srcip=client_ip)
+    from_client = union([match(srcip=c) for c in client_ips])
         
-    return directional_compose(from_client,[simple_ingress_firewall(allowed),
-                                            static_load_balancer(service_ip,lb_matching)]) \
-                                            >> learning_switch()
+
+    alb = static_lb(public_ip,R,H)  
+    #alb = dynamic(lb)(public_ip,R,H)  
+    #afw = static_fw(allowed)
+    afw = dynamic(fw)(allowed)
+    return if_(from_client, afw >> alb, alb >> afw) >> learning_switch()
 
         
-main = example
+def main(clients,servers):
+#    return fw_lb_ls(clients,servers) 
+    return virtualize(fw_lb_ls(clients,servers), BFS())  ## VIRTUALIZED!
