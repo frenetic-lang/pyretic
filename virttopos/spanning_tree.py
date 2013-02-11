@@ -36,7 +36,7 @@
 
 from frenetic.lib import *
 
-def topo_to_vmap_dict(topo, mst):
+def topo_to_st_vmap(topo, mst):
     d = {}
     for sw, attrs in mst.nodes(data=True):
         elocs = topo.egress_locations(sw)
@@ -63,23 +63,44 @@ def one_to_one_fabric_policy(vmap):
 
 
 
-def setup_virtual_network(network):
-    vn = VNetwork.fork(network)
-    @run
-    def vmap_gen():
-        for topo in network.topology_changes:
-            vtopo = Topology.minimum_spanning_tree(topo)
-            vmap = topo_to_vmap_dict(topo, vtopo)
-            vn.physical_policy = flood  # THIS SHOULD WORK, BUT CURRENTLY DOESN'T
-#            vn.physical_policy = one_to_one_fabric_policy(vmap)
-            vn.from_vmap(vmap)
-            vn.topology = vtopo
-            print "------------ underlying network ---------------"
-            print topo
-            print "------------ abstracted network ---------------"
-            print vtopo
-    return vn
-    
+class SpanningTree(object):
+    def __init__(self):
+        self.vmaps = {}
+
+    def update_network(self, network):
+        vtopo = Topology.minimum_spanning_tree(network.topology)
+        self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
+        
+    def attach(self, network):
+        vtopo = Topology.minimum_spanning_tree(network.topology)
+        self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
+
+    @property
+    def transform_network(self):
+        from frenetic import netcore
+        def f(network):
+            vtopo = Topology.minimum_spanning_tree(network.topology)
+            vmap = topo_to_st_vmap(network.topology, vtopo)
+            n = Network(None)
+            n.init_events()
+            n.topology = vtopo
+            return n
+        return functools.partial(netcore.transform_network, f)
+        
+    @ndp_decorator
+    def ingress_policy(self, network):
+        return vmap_to_ingress_policy(self.vmaps[network])
+
+    @ndp_decorator
+    def fabric_policy(self, network):
+        return one_to_one_fabric_policy(self.vmaps[network])
+
+    @ndp_decorator
+    def egress_policy(self, network):
+        return vmap_to_egress_policy(self.vmaps[network])
+
+transform = SpanningTree()
+
         
     
 

@@ -39,6 +39,7 @@
 
 from frenetic.lib import *
 from virttopos.bfs import BFS
+from virttopos.spanning_tree import SpanningTree
 
 ### NSDI PAPER VERSION ###
 def learn(self):
@@ -58,5 +59,6 @@ def learning_switch():
 
 
 def main():
-    return dynamic(learn)()
+#    return dynamic(learn)()
 #    return virtualize(learning_switch(), BFS())  # RUN IT ON A BIG SWITCH ABSTRACT TOPOLOGY 
+    return virtualize(learning_switch(), SpanningTree())  # RUN IT ON A SPANNING TREE ABSTRACT TOPOLOGY 
