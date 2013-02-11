@@ -77,13 +77,13 @@ def send_response(network,pkt,switch,outport,dstip=None,dstmac=None):
 
 ### USING STRING CASTING TO MAKE SURE PACKET FIELDS ACT LIKE PROPER DICT KEYS
 ### THIS IS A HACK AND SHOULD BE FIXED
-@policy_decorator
+@dynamic
 def arp(self):
-    network = self.network
     request_packets = {}
     known_ips = {}
     response_packets = {}
     outstanding_requests = collections.defaultdict(dict)
+    this = self
 
     @self.query(ARP)
     def f(pkt):
@@ -95,6 +95,11 @@ def arp(self):
         dstip  = str(pkt['dstip'])
 
         known_ips[str(srcip)] = Location(switch,inport)
+
+        network = None
+        for n in this.networks:
+            network = n
+            break
 
         if dstmac == 'ff:ff:ff:ff:ff:ff':
             request_packets[dstip] = pkt
@@ -154,6 +159,7 @@ def arp(self):
                     print pkt
                 pass
 
-main = learning_switch() - ARP | arp()
+def main():
+    return if_(ARP,arp(),learning_switch())
 
 
