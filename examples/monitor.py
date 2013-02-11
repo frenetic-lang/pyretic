@@ -32,6 +32,15 @@ from examples.learning_switch import learning_switch
 
 ### 50 ways to write your packet monitor ###
 
+def printer(pkt):
+  print pkt
+
+def dpi():
+  q = packets(None,[])
+  q.when(printer)
+  return q
+
+
 @dynamic
 def monitor_packets(self):
     @self.query(all_packets)
@@ -117,18 +126,6 @@ def monitor_grouped_packet_count(self):
         print "count grouped by %s" % group_by
         for (k,v) in count.items():
             print "%d:  %s" % (v,k)
-
-
-### Topology monitoring ###
-
-
-@dynamic
-def monitor_topology(self):
-    @self.network._topology.notify
-    def f(topo):
-        print "------ monitor topology output start -------"
-        print topo
-        print "------ monitor topology output end - -------"
 
 
 ### Examples ###
