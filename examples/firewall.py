@@ -49,7 +49,7 @@ def poke(W,P):
 
 def static_fw(W):
   W_rev = [(d,s) for (s,d) in W]
-  return poke(W_rev, poke(W, ingress[drop]))
+  return poke(W_rev, poke(W, if_(ingress,drop,passthrough)))
 
 def static_fw(self,W):
 
@@ -61,7 +61,7 @@ def static_fw(self,W):
   q.when(allow_reverse)
 
   wp = union([match(srcip=s,dstip=d) for (s,d) in W])
-  self.policy = poke(W,ingress[drop]) | wp[q]
+  self.policy = poke(W,if_(ingress,drop,passthrough)) | wp[q]
 
 def patch(p,P):
     return if_(p,ingress[drop],P)
