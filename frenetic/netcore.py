@@ -641,6 +641,21 @@ class DerivedPolicy(Policy):
     def detach(self, network):
         self.policy.detach(network)
 
+
+class pprint(SimplePolicy):
+    def __init__(self,s=''):
+        self.s = s
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "pprint %s" % self.s
+        
+    ### eval : Network -> Packet -> Counter List Packet
+    def eval(self, network, packet):
+        print "---- pprint %s -------" % self.s
+        print packet
+        print "-------------------------------"
+        return Counter([packet])
         
 @singleton
 class passthrough(SimplePolicy):
