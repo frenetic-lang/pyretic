@@ -206,7 +206,7 @@ class GatewayTopo(Topo):
         for switch_id in xrange(1, 8): 
             self.addSwitch('s'+str(switch_id))
 
-        for host_id in xrange(1, 8): 
+        for host_id in xrange(1, 7): 
             self.addHost('h'+str(host_id))
         
         # Ethernet side
@@ -222,8 +222,7 @@ class GatewayTopo(Topo):
         # IP side
         self.addLink('s5', 'h4')
         self.addLink('s6', 'h5')
-        self.addLink('s6', 'h6')
-        self.addLink('s7', 'h7')
+        self.addLink('s7', 'h6')
 
         self.addLink('s1', 's5')
         self.addLink('s5', 's6')

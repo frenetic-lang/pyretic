@@ -100,7 +100,6 @@ class GatewayVirt(Virtualizer):
                                             2: Port(2),
                                             3: Port(3)})
 
-                del vtopo.node[6]["ports"][2]
                 
                 vtopo.add_edge(3, 1000, {3: 3, 1000: 1})
 
