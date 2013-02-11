@@ -51,7 +51,7 @@ def static_fw(W):
   W_rev = [(d,s) for (s,d) in W]
   return poke(W_rev, poke(W, if_(ingress,drop,passthrough)))
 
-def static_fw(self,W):
+def fw0(self,W):
 
   def allow_reverse(p):
       print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
@@ -85,7 +85,7 @@ def fw(self,W):
     rps = [match(srcip=d,dstip=s) for (s,d) in W]
     self.H = { rp : (0,0) for rp in rps }
     self.T = 3
-    self.inner = dynamic(static_fw)(W)
+    self.inner = dynamic(fw0)(W)
     self.policy = self.inner | union(rps)[q]
 
 
@@ -123,7 +123,7 @@ def authentication_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return dynamic(static_fw)(whitelist) >> hub
+    return dynamic(fw0)(whitelist) >> hub
 
 
 
