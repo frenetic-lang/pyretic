@@ -154,7 +154,7 @@ def gateway_example():
             (match(switch=5) | match(switch=6) | match(switch=7) | match(switch=1002))[ hub ])
 
 
-@policy_decorator
+@dynamic
 def vgateway_example(self):
     ge = gateway_example()
     self.policy = virtualize(ge, GatewayVirt(Recurse(self)))

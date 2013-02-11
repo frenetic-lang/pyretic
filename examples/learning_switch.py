@@ -50,9 +50,10 @@ def learn(self):
 
     q = packets(1,['srcmac','switch'])
     q.when(update)
-#    self.queries.append(q)
-#    self.policy = flood 
     self.policy = flood | q
+
+def learning_switch():
+    return dynamic(learn)()
 
 
 def main():
