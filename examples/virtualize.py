@@ -29,14 +29,14 @@
 from frenetic.lib import *
 
 
-def virtualize_program(virttopo, program):
+def virtualize_program(virttopo, program, **kwargs):
     virttopons = {}
     programns = {}
     execfile(virttopo, virttopons)
     execfile(program, programns)
 
     vn = virttopons["transform"]
-    return virtualize(programns["main"](), vn)
+    return virtualize(programns["main"](**kwargs), vn)
 
     
 main = virtualize_program
