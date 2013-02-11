@@ -114,8 +114,9 @@ def main(clients, servers):
 #    return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
 #    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  ## TEST ABOVE DOESN'T WORK (B/C HOST AND REPLICAS ARE ON SAME LAN, SO USE OLD ARPS ON REBALANCE, CODE WORKS, BUT TEST SETUP NEEDS WORK)
 
-    return virtualize(static_lb(public_ip,R,H) >> dynamic(learn)(), BFS())
+#    return virtualize(static_lb(public_ip,R,H) >> dynamic(learn)(), BFS())  # OR VIRTUALIZE ON BFS
 
-### DON'T WORK
+
+### THESE DON'T WORK (YET)
 #    return virtualize(static_lb(public_ip,R,H), BFS()) >> dynamic(learn)()
 #    return virtualize(dynamic(lb)(public_ip,R,H), BFS()) >> dynamic(learn)()
