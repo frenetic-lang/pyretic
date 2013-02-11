@@ -43,13 +43,15 @@ from virttopos.bfs import BFS
 
 ### FIREWALLS ###
 
+drop_ingress = if_(ingress,drop,passthrough)
+
 def poke(W,P):
   p = union([match(srcip=s,dstip=d) for (s,d) in W])
   return if_(p,passthrough,P)
 
 def static_fw(W):
   W_rev = [(d,s) for (s,d) in W]
-  return poke(W_rev, poke(W, if_(ingress,drop,passthrough)))
+  return poke(W_rev, poke(W, drop_ingress))
 
 def fw0(self,W):
 
@@ -61,10 +63,10 @@ def fw0(self,W):
   q.when(allow_reverse)
 
   wp = union([match(srcip=s,dstip=d) for (s,d) in W])
-  self.policy = poke(W,if_(ingress,drop,passthrough)) | wp[q]
+  self.policy = poke(W,drop_ingress) | wp[q]
 
 def patch(p,P):
-    return if_(p,ingress[drop],P)
+    return if_(p,drop_ingress,P)
 
 def fw(self,W):
 
