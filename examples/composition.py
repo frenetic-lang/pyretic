@@ -30,8 +30,8 @@
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
 # start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,1,3,2                                                #
-# run controller: pox.py --no-cli pyretic/examples/fw_lb_ls.py --clients=3 --servers=2                                       #
-# test:           clients can only ping 10.0.0.100, servers can only ping clients they serve                                 #
+# run controller: pox.py --no-cli pyretic/examples/composition.py --clients=3 --servers=2                                    #
+# test:           clients can only ping 10.0.0.100, servers cannot ping anyone                                               #
 ##############################################################################################################################
 
 from frenetic.lib import *
@@ -55,13 +55,8 @@ def fw_lb_ls(clients, servers):
     client_ips = [ip_prefix + str(i) for i in range(1, 1+num_clients)]
     H = {c : 0 for c in client_ips}
     R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
-
-    allowed = set([])
-    for client_ip in client_ips:
-        allowed.add((client_ip,public_ip))
-
+    allowed = {(c,public_ip) for c in client_ips}
     from_client = union([match(srcip=c) for c in client_ips])
-        
 
     alb = static_lb(public_ip,R,H)  
     #alb = dynamic(lb)(public_ip,R,H)  
@@ -71,5 +66,12 @@ def fw_lb_ls(clients, servers):
 
         
 def main(clients,servers):
-#    return fw_lb_ls(clients,servers) 
-    return virtualize(fw_lb_ls(clients,servers), BFS())  ## VIRTUALIZED!
+    return fw_lb_ls(clients,servers) 
+
+## RUNNING ON ABSTRACTED NETWORK AS IN PAPER
+#    return virtualize(fw_lb_ls(clients,servers), BFS())  ## VIRTUALIZED!
+# CAN ALSO BE DONE BY RUNNING FROM COMMANDLINE
+# pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/composition.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/bfs.py
+
+
+
