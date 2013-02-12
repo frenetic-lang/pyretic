@@ -39,7 +39,7 @@ from frenetic.lib import *
 from examples.learning_switch import learning_switch
 from examples.repeater import repeater
 from examples.hub import hub
-
+from virttopos.bfs import BFS
 
 class GatewayVirt(Virtualizer):
     def __init__(self, redo):
@@ -147,12 +147,20 @@ class GatewayVirt(Virtualizer):
         pass
 
 
+
+def in_(l):
+    return union([match(switch=s) for s in l])
+
+
 def gateway_example():
-    return ((match(switch=2) | match(switch=3) | match(switch=4) | match(switch=1000))[ hub ] |
-            match(switch=1001)[ repeater  ] |
-            (match(switch=5) | match(switch=6) | match(switch=7) | match(switch=1002))[ hub ])
+    ethernet = [2,3,4,1000]
+    ip_core  = [5,6,7,1002]
+    gateway  = [1001]
 
-
+    return in_(ethernet)[hub]  | \
+        in_(gateway)[repeater] | \
+        in_(ip_core)[virtualize(learning_switch(),BFS(ip_core))]
+            
 @dynamic
 def vgateway_example(self):
     ge = gateway_example()
