@@ -70,15 +70,28 @@ def shortest_path_policy(topo,vmap):
                     pass
     return fabric_policy
 
-    
+
 class BFS(object):
-    def __init__(self):
+    def __init__(self,keep=[]):
         self.vmaps = {}
+        self.keep = keep
 
     def update_network(self, network):
+        if self.keep:
+            topology = network.topology.filter_nodes(self.keep)
+            if topology:
+                self.vmaps[network] = topo_to_bfs_vmap(topology)
+                return
+
         self.vmaps[network] = topo_to_bfs_vmap(network.topology)
         
     def attach(self, network):
+        if self.keep:
+            topology = network.topology.filter_nodes(self.keep)
+            if topology:
+                self.vmaps[network] = topo_to_bfs_vmap(topology)
+                return
+
         self.vmaps[network] = topo_to_bfs_vmap(network.topology)
 
     @property
@@ -99,6 +112,12 @@ class BFS(object):
 
     @ndp_decorator
     def fabric_policy(self, network):
+        if self.keep:
+            topology = network.topology.filter_nodes(self.keep)
+            if topology:
+                self.vmaps[network] = topo_to_bfs_vmap(topology)
+                return shortest_path_policy(topology, self.vmaps[network])
+
         return shortest_path_policy(network.topology, self.vmaps[network])
 
     @ndp_decorator
