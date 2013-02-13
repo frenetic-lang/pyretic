@@ -142,7 +142,16 @@ class POXBackend(revent.EventMixin):
             p.next.opcode = packet['protocol']
             payload = p.pack()
         else:
-            payload = packetlib.ethernet(packet["payload"]).pack()
+            p = packetlib.ethernet(packet["payload"])
+
+            # UPDATE UNPACKED POX PAYLOAD W/ MAC HEADERS FROM FRENETIC Packet
+            p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
+            p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+
+            # TODO - DO THE SAME FOR OTHER FIELDS (IP,PORT,VLAN,ETC)
+            # SOME OF THIS MAY BE TRICKY (DEALING W/ NESTED PACKETS)
+
+            payload = p.pack()
 
         return payload
 
