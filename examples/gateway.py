@@ -88,6 +88,7 @@ class GatewayVirt(Virtualizer):
             n = Network(None)
             n.init_events()
             n.topology = vtopo
+            n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
             try:
                 vtopo.remove_node(1)
@@ -211,6 +212,6 @@ def vgateway_example(self):
 
 
 def main():
-    return gateway_example()
-#    return vgateway_example()
+#     return gateway_example()
+    return vgateway_example()
 
