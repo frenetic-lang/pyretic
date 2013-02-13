@@ -140,11 +140,8 @@ class POXBackend(revent.EventMixin):
             p.next.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
             p.next.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
             p.next.opcode = packet['protocol']
-
-            print "crafted from packet header"
             payload = p.pack()
         else:
-            print "derived from payload"
             payload = packetlib.ethernet(packet["payload"]).pack()
 
         return payload
