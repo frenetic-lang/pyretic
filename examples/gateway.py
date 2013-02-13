@@ -39,6 +39,7 @@ from frenetic.lib import *
 from examples.learning_switch import learning_switch
 from examples.hub import hub
 from examples.arp import arp, ARP
+from examples.load_balancer import static_lb, lb
 from virttopos.bfs import BFS
 
 class GatewayVirt(Virtualizer):
@@ -177,8 +178,12 @@ def gateway_example(num_clients,num_servers):
     def rewrite_macs(tm):
         return rewrite_dstmac(tm) >> rewrite_srcmac()
 
+    public_ip = '10.0.1.100'
+    R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
+    H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
+
     eth_pol = if_(ARP,arp(to_mac),learning_switch())
-    ip_pol = learning_switch()
+    ip_pol =  learning_switch()
     ip_pol =  virtualize(ip_pol,BFS(ip_core))
    
 ##   CIDR MATCHING CURRENTLY NOT WORKING
@@ -188,11 +193,11 @@ def gateway_example(num_clients,num_servers):
     to_eth = union([ match(dstip='10.0.0.'+str(i)) for i in range(2,2+num_clients) ])
     to_ip  = union([ match(dstip='10.0.1.'+str(i)) for i in range(2,2+num_servers) ])
 
-    eth_to_ip = match(inport=1) & (to_ip)
+    eth_to_ip = match(inport=1) & (to_ip | match(dstip=public_ip) )
     ip_to_eth = match(inport=2) & (to_eth)
 
     gw = if_(ARP,arp(to_mac), 
-             rewrite_macs(to_mac) >> 
+             dynamic(lb)(public_ip,R,H) >> rewrite_macs(to_mac) >> 
              ( eth_to_ip[fwd(2)] | ip_to_eth[fwd(1)] ))
 
     return in_(ethernet)[ pprint('->eth') >> eth_pol >> pprint('eth->') ]  | \
@@ -208,6 +213,6 @@ def vgateway_example(self,num_clients,num_servers):
 def main(clients='3',servers='3'):
     clients = int(clients)
     servers = int(servers)
-#     return gateway_example(clients,servers)
+    #return gateway_example(clients,servers)
     return vgateway_example(clients,servers)
 
