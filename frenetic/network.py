@@ -88,10 +88,7 @@ class IP(object):
         return hash(self.to_bytes())    
 
     def __eq__(self,other):
-        try:
-            return self.bits == other.bits
-        except:
-            return False
+        return repr(self) == repr(other)
 
             
 class MAC(object):
@@ -147,10 +144,7 @@ class MAC(object):
         return hash(self.to_bytes())
 
     def __eq__(self,other):
-        try:
-            return self.bits == other.bits
-        except:
-            return False
+        return repr(self) == repr(other)
 
         
 ################################################################################
