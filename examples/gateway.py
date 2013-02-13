@@ -164,10 +164,15 @@ def gateway_example(num_clients,num_servers):
     eth_prefix = '10.0.0.'
     ip_prefix  = '10.0.1.'
 
-    to_mac = {IP(eth_prefix+'1') : gw_mac,
-              IP(ip_prefix +'1') : gw_mac}
-    to_mac.update({ IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) for i in range(1,1+num_clients) })
-    to_mac.update({ IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+num_clients)) for i in range(1,1+num_servers) })
+    eth_macs = { IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) \
+                      for i in range(1,1+num_clients) }
+    eth_macs.update({IP(eth_prefix+'1') : gw_mac})
+
+    ip_macs = { IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+num_clients)) \
+                        for i in range(1,1+num_servers) }
+    ip_macs.update({IP(ip_prefix +'1') : gw_mac})
+    
+    all_macs = dict(eth_macs.items() + ip_macs.items())
 
     def rewrite_dstmac(tm):
         return parallel([match(dstip=k)[pop('dstmac') >> push(dstmac=v)] for k,v in tm.items()])
@@ -178,12 +183,21 @@ def gateway_example(num_clients,num_servers):
     def rewrite_macs(tm):
         return rewrite_dstmac(tm) >> rewrite_srcmac()
 
+    def fix_dstmac():
+        fix = parallel([(match(dstip=k) & ~match(dstmac=v))[pop('dstmac') >> push(dstmac=v)] for k,v in ip_macs.items()])
+        pas = intersect([~(match(dstip=k) & ~match(dstmac=v)) for k,v in ip_macs.items()])[passthrough]
+        return fix | pas
+
     public_ip = '10.0.1.100'
+    fake_mac = 'BB:BB:BB:BB:BB:BB'
+
+    all_macs.update({public_ip : fake_mac})
+
     R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
     H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
 
-    eth_pol = if_(ARP,arp(to_mac),learning_switch())
-    ip_pol =  learning_switch()
+    eth_pol = if_(ARP,arp(eth_macs),learning_switch())
+    ip_pol =  dynamic(lb)(public_ip,R,H) >> fix_dstmac() >> learning_switch()
     ip_pol =  virtualize(ip_pol,BFS(ip_core))
    
 ##   CIDR MATCHING CURRENTLY NOT WORKING
@@ -196,8 +210,8 @@ def gateway_example(num_clients,num_servers):
     eth_to_ip = match(inport=1) & (to_ip | match(dstip=public_ip) )
     ip_to_eth = match(inport=2) & (to_eth)
 
-    gw = if_(ARP,arp(to_mac), 
-             dynamic(lb)(public_ip,R,H) >> rewrite_macs(to_mac) >> 
+    gw = if_(ARP,arp(eth_macs), 
+             rewrite_macs(all_macs) >> 
              ( eth_to_ip[fwd(2)] | ip_to_eth[fwd(1)] ))
 
     return in_(ethernet)[ pprint('->eth') >> eth_pol >> pprint('eth->') ]  | \
