@@ -130,28 +130,28 @@ def monitor_grouped_packet_count(self):
 
 ### Examples ###
 
-all_monitor_modules =                           \
-    monitor_packets()                           \
-    | monitor_packets_explicit()         \
-    | monitor_packets_less_decorated()          \
-    | monitor_packets_undecorated()()           \
-    | monitor_packets_lowest_level_syntax()     \
-    | monitor_packets_limit_by_src_dst(limit=3) \
-    | monitor_unique_packets()                  \
-    | monitor_grouped_packet_count()            \
-    | learning_switch()
+def all_monitor_modules():
+    return monitor_packets()                           \
+        | monitor_packets_explicit()         \
+        | monitor_packets_less_decorated()          \
+        | monitor_packets_undecorated()()           \
+        | monitor_packets_lowest_level_syntax()     \
+        | monitor_packets_limit_by_src_dst(limit=3) \
+        | monitor_unique_packets()                  \
+        | monitor_grouped_packet_count()            \
+        | learning_switch()
 
-summary_modules =                     \
-    monitor_grouped_packet_count()  \
-    | learning_switch()
+def summary_modules():
+    return monitor_grouped_packet_count()  \
+        | learning_switch()
 
-lowest_level_syntax =                      \
-    monitor_packets_lowest_level_syntax()  \
-    | flood
+def lowest_level_syntax():                      
+    return monitor_packets_lowest_level_syntax()  \
+        | flood
 
 
 ### Main ###
 
 def main():
-    return summary_modules
+    return summary_modules()
 
