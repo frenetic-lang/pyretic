@@ -103,6 +103,7 @@ class BFS(object):
             n = Network(None)
             n.init_events()
             n.topology = vtopo
+            n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
             return n
         return functools.partial(netcore.transform_network, f)
         
