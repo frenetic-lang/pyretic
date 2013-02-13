@@ -225,7 +225,7 @@ class GatewayTopo(Topo):
         
         # Ethernet side
         for c in client_inds:
-            self.addLink('s'+str(c % 3 + 2), 'h'+str(c))
+            self.addLink('s'+str(c % numClients + 2), 'h'+str(c))
         
         self.addLink('s2', 's3')
         self.addLink('s3', 's1')
@@ -234,7 +234,7 @@ class GatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % 3 + 5), 'hs'+str(s))
+            self.addLink('s'+str(s % numServers + numClients + 2), 'hs'+str(s))
 
         self.addLink('s1', 's5')
         self.addLink('s5', 's6')
@@ -266,18 +266,18 @@ class PGatewayTopo(Topo):
         for c in client_inds:
             ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
             hoststr = 'h'+str(c)
-            self.addHost(hoststr, ip=ipstr,gw=left_prefix+'1')
+            self.addHost(hoststr, ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
 
         for s in server_inds: 
             ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
-            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1')
+            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
 
         self.addLink('s1000','s1001')
         self.addLink('s1001','s1002')
         
         # Ethernet side
         for c in client_inds:
-            self.addLink('s'+str(c % 3 + 2), 'h'+str(c))
+            self.addLink('s'+str(c % numClients + 2), 'h'+str(c))
         
         self.addLink('s2', 's3')
         self.addLink('s3', 's1000')
@@ -286,7 +286,7 @@ class PGatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % 3 + 5), 'hs'+str(s))
+            self.addLink('s'+str(s % numServers + numClients + 2), 'hs'+str(s))
 
         self.addLink('s1002', 's5')
         self.addLink('s5', 's6')

@@ -152,9 +152,7 @@ class GatewayVirt(Virtualizer):
 def in_(l):
     return union([match(switch=s) for s in l])
 
-def gateway_example():
-    num_clients = 3
-    num_servers = 3
+def gateway_example(num_clients,num_servers):
 
     ethernet = [2,3,4,1000]
     ip_core  = [5,6,7,1002]
@@ -168,7 +166,7 @@ def gateway_example():
     to_mac = {IP(eth_prefix+'1') : gw_mac,
               IP(ip_prefix +'1') : gw_mac}
     to_mac.update({ IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) for i in range(1,1+num_clients) })
-    to_mac.update({ IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+3)) for i in range(1,1+num_servers) })
+    to_mac.update({ IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+num_clients)) for i in range(1,1+num_servers) })
 
     def rewrite_dstmac(tm):
         return parallel([match(dstip=k)[pop('dstmac') >> push(dstmac=v)] for k,v in tm.items()])
@@ -202,12 +200,14 @@ def gateway_example():
         in_(ip_core)[ pprint('->ip') >> ip_pol >> pprint('ip->') ]
             
 @dynamic
-def vgateway_example(self):
-    ge = gateway_example()
+def vgateway_example(self,num_clients,num_servers):
+    ge = gateway_example(num_clients,num_servers)
     self.policy = virtualize(ge, GatewayVirt(Recurse(self)))
 
 
-def main():
-#     return gateway_example()
-    return vgateway_example()
+def main(clients='3',servers='3'):
+    clients = int(clients)
+    servers = int(servers)
+#     return gateway_example(clients,servers)
+    return vgateway_example(clients,servers)
 
