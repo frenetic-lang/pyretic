@@ -762,8 +762,8 @@ class push(SimplePolicy):
         
 class pop(SimplePolicy):
     ### init : List String -> unit
-    def __init__(self, fields):
-        self.fields = set(fields)
+    def __init__(self, *args):
+        self.fields = list(args)
 
     ### repr : unit -> String
     def __repr__(self):

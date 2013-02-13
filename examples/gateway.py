@@ -49,14 +49,14 @@ class GatewayVirt(Virtualizer):
                match(at=None, inport=2)[push(vswitch=1000, vinport=2)] |
                 
                # At physical gateway, imaginary side close to ethernet.
-               match(at="vswitch 1000, vinport 3")[push(vswitch=1000, vinport=3) >> pop(["at"])] |
+               match(at="vswitch 1000, vinport 3")[push(vswitch=1000, vinport=3) >> pop("at")] |
                
                # At physical gateway, imaginary gateway.
-               match(at="vswitch 1001, vinport 1")[push(vswitch=1001, vinport=1) >> pop(["at"])] |
-               match(at="vswitch 1001, vinport 2")[push(vswitch=1001, vinport=2) >> pop(["at"])] |
+               match(at="vswitch 1001, vinport 1")[push(vswitch=1001, vinport=1) >> pop("at")] |
+               match(at="vswitch 1001, vinport 2")[push(vswitch=1001, vinport=2) >> pop("at")] |
                 
                # At physical gateway, imaginary side close to ip.
-               match(at="vswitch 1002, vinport 3")[push(vswitch=1002, vinport=3) >> pop(["at"])] |
+               match(at="vswitch 1002, vinport 3")[push(vswitch=1002, vinport=3) >> pop("at")] |
                 
                # At physical gateway, ip side. Pretend we are switch 1002.
                match(at=None, inport=3)[push(vswitch=1002, vinport=1)] |

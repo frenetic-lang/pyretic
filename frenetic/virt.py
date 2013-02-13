@@ -55,7 +55,7 @@ class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate egress_p
                    push(itag=self.itag)) >>
                 match(itag=self.itag)[
                    self.policy >>
-                   if_(is_bucket("outport") | self.egress_predicate, pop(["itag"]))])
+                   if_(is_bucket("outport") | self.egress_predicate, pop("itag"))])
         return pol
     
 class INetwork(Network):
@@ -119,7 +119,7 @@ class physical_to_virtual(DerivedPolicy):
 @singleton
 class virtual_to_physical(DerivedPolicy):
     def __init__(self):
-        self.policy = (pop(["switch", "inport", "outport", "vtag"]) >>
+        self.policy = (pop("switch", "inport", "outport", "vtag") >>
                        shift(outport="voutport", switch="vswitch", inport="vinport"))
         
     def __repr__(self):
@@ -129,7 +129,7 @@ class virtual_to_physical(DerivedPolicy):
 @singleton
 class pop_vheaders(DerivedPolicy):
     def __init__(self):
-        self.policy = pop(["vswitch", "vinport", "voutport", "vtag"])
+        self.policy = pop("vswitch", "vinport", "voutport", "vtag")
         
     def __repr__(self):
         return "pop_vheaders"

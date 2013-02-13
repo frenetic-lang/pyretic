@@ -435,7 +435,7 @@ class POXBackend(revent.EventMixin):
         inport = packet["inport"]
         outport = packet["outport"]
 
-        packet = packet.pop("switch", "inport", "outport")
+        packet = packet.popmany(["switch", "inport", "outport"])
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
