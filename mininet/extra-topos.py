@@ -199,20 +199,32 @@ class YTopo(Topo):
 
 
 class GatewayTopo(Topo):
-    def __init__(self):
-        
+    def __init__(self, numClients=3, numServers=3):        
         super(GatewayTopo, self).__init__()
+
+        client_inds = range(1,numClients+1)
+        server_inds = range(1,numServers+1)
 
         for switch_id in xrange(1, 8): 
             self.addSwitch('s'+str(switch_id))
 
-        for host_id in xrange(1, 7): 
-            self.addHost('h'+str(host_id))
+        from mininet.util import ipParse,ipAdd
+
+        prefix_len = 8
+
+        for c in client_inds:
+#            ipstr = '10.0.0.' + str(c+1) + '/24'
+#            self.addHost('h'+str(c), ip=ipstr)
+            self.addHost('h'+str(c))
+
+        for s in server_inds: 
+#            ipstr = '10.0.1.' + str(s+1) + '/24'
+#            self.addHost('hs'+str(s), ip=ipstr)
+            self.addHost('hs'+str(s))
         
         # Ethernet side
-        self.addLink('s2', 'h1')
-        self.addLink('s3', 'h2')
-        self.addLink('s4', 'h3')
+        for c in client_inds:
+            self.addLink('s'+str(c % 3 + 2), 'h'+str(c))
         
         self.addLink('s2', 's3')
         self.addLink('s3', 's1')
@@ -220,14 +232,62 @@ class GatewayTopo(Topo):
         self.addLink('s4', 's2')
 
         # IP side
-        self.addLink('s5', 'h4')
-        self.addLink('s6', 'h5')
-        self.addLink('s7', 'h6')
+        for s in server_inds:
+            self.addLink('s'+str(s % 5 + 2), 'hs'+str(s))
 
         self.addLink('s1', 's5')
         self.addLink('s5', 's6')
         self.addLink('s6', 's7')
         self.addLink('s7', 's1')
+
+class PGatewayTopo(Topo):
+    def __init__(self, numClients=3, numServers=3):        
+        super(PGatewayTopo, self).__init__()
+
+        client_inds = range(1,numClients+1)
+        server_inds = range(1,numServers+1)
+
+        self.addSwitch('s1000')
+        self.addSwitch('s1001')
+        self.addSwitch('s1002')
+        for switch_id in xrange(2, 8): 
+            self.addSwitch('s'+str(switch_id))
+
+        from mininet.util import ipParse,ipAdd
+
+        prefix_len = 8
+
+        for c in client_inds:
+#            ipstr = '10.0.0.' + str(c+1) + '/24'
+#            self.addHost('h'+str(c), ip=ipstr)
+            self.addHost('h'+str(c))
+
+        for s in server_inds: 
+#            ipstr = '10.0.1.' + str(s+1) + '/24'
+#            self.addHost('hs'+str(s), ip=ipstr)
+            self.addHost('hs'+str(s))
+
+        self.addLink('s1000','s1001')
+        self.addLink('s1001','s1002')
+        
+        # Ethernet side
+        for c in client_inds:
+            self.addLink('s'+str(c % 3 + 2), 'h'+str(c))
+        
+        self.addLink('s2', 's3')
+        self.addLink('s3', 's1000')
+        self.addLink('s1000', 's4')
+        self.addLink('s4', 's2')
+
+        # IP side
+        for s in server_inds:
+            self.addLink('s'+str(s % 5 + 2), 'hs'+str(s))
+
+        self.addLink('s1002', 's5')
+        self.addLink('s5', 's6')
+        self.addLink('s6', 's7')
+        self.addLink('s7', 's1002')
+
             
 
 
@@ -242,5 +302,6 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'figure3' : Figure3Topo,
           'ytopo': YTopo,
           'gateway': GatewayTopo,
+          'pgateway': PGatewayTopo,
 }
  
