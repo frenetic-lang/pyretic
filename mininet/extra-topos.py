@@ -257,15 +257,17 @@ class PGatewayTopo(Topo):
 
         prefix_len = 8
 
+        eth_gw_addr = '10.0.0.1'
+        ip_gw_addr = '10.0.1.1'
+        
         for c in client_inds:
-#            ipstr = '10.0.0.' + str(c+1) + '/24'
-#            self.addHost('h'+str(c), ip=ipstr)
-            self.addHost('h'+str(c))
+            ipstr = '10.0.0.' + str(c+1) + '/24'
+            hoststr = 'h'+str(c)
+            self.addHost(hoststr, ip=ipstr,gw=eth_gw_addr)
 
         for s in server_inds: 
-#            ipstr = '10.0.1.' + str(s+1) + '/24'
-#            self.addHost('hs'+str(s), ip=ipstr)
-            self.addHost('hs'+str(s))
+            ipstr = '10.0.1.' + str(s+1) + '/24'
+            self.addHost('hs'+str(s), ip=ipstr, gw=ip_gw_addr)
 
         self.addLink('s1000','s1001')
         self.addLink('s1001','s1002')
