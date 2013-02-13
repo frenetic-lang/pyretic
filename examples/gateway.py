@@ -37,7 +37,6 @@
 from frenetic.lib import *
 
 from examples.learning_switch import learning_switch
-from examples.repeater import repeater
 from examples.hub import hub
 from examples.arp import arp, ARP
 from virttopos.bfs import BFS
@@ -160,10 +159,6 @@ def gateway_example():
     ethernet = [2,3,4,1000]
     ip_core  = [5,6,7,1002]
     gateway  = [1001]
-
-    from examples.monitor import dpi
-    from examples.load_balancer import static_lb_example
-    from examples.firewall import fw
 
     gw_mac = MAC('AA:AA:AA:AA:AA:AA')
 
