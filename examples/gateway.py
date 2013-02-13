@@ -39,6 +39,7 @@ from frenetic.lib import *
 from examples.learning_switch import learning_switch
 from examples.repeater import repeater
 from examples.hub import hub
+from examples.arp import arp, ARP
 from virttopos.bfs import BFS
 
 class GatewayVirt(Virtualizer):
@@ -151,15 +152,57 @@ class GatewayVirt(Virtualizer):
 def in_(l):
     return union([match(switch=s) for s in l])
 
-
 def gateway_example():
+    num_clients = 3
+    num_servers = 3
+
     ethernet = [2,3,4,1000]
     ip_core  = [5,6,7,1002]
     gateway  = [1001]
 
-    return in_(ethernet)[hub]  | \
-        in_(gateway)[repeater] | \
-        in_(ip_core)[virtualize(learning_switch(),BFS(ip_core))]
+    from examples.monitor import dpi
+    from examples.load_balancer import static_lb_example
+    from examples.firewall import fw
+
+    gw_mac = MAC('AA:AA:AA:AA:AA:AA')
+
+    eth_prefix = '10.0.0.'
+    ip_prefix  = '10.0.1.'
+
+    to_mac = {IP(eth_prefix+'1') : gw_mac,
+              IP(ip_prefix +'1') : gw_mac}
+    to_mac.update({ IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) for i in range(1,1+num_clients) })
+    to_mac.update({ IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+3)) for i in range(1,1+num_servers) })
+
+    def rewrite_dstmac(tm):
+        return parallel([match(dstip=k)[pop('dstmac') >> push(dstmac=v)] for k,v in tm.items()])
+
+    def rewrite_srcmac():
+        return pop('srcmac') >> push(srcmac=gw_mac)
+    
+    def rewrite_macs(tm):
+        return rewrite_dstmac(tm) >> rewrite_srcmac()
+
+    eth_pol = if_(ARP,arp(to_mac),hub)
+    ip_pol =  if_(ARP,arp(to_mac),hub)
+
+##   CIDR MATCHING CURRENTLY NOT WORKING
+#    eth_to_ip = match(inport=1,dstip='10.0.0.0/24')
+#    ip_to_eth = match(inport=2,dstip='10.0.1.0/24')
+
+    to_eth = union([ match(dstip='10.0.0.'+str(i)) for i in range(2,2+num_clients) ])
+    to_ip  = union([ match(dstip='10.0.1.'+str(i)) for i in range(2,2+num_servers) ])
+
+    eth_to_ip = match(inport=1) & (to_ip)
+    ip_to_eth = match(inport=2) & (to_eth)
+
+    gw = if_(ARP,arp(to_mac), 
+             rewrite_macs(to_mac) >> 
+             ( eth_to_ip[fwd(2)] | ip_to_eth[fwd(1)] ))
+
+    return in_(ethernet)[ pprint('->eth') >> eth_pol >> pprint('eth->') ]  | \
+        in_(gateway)[ pprint('->gw') >> gw >> pprint('gw->') ] | \
+        in_(ip_core)[ pprint('->ip') >> ip_pol >> pprint('ip->') ]
             
 @dynamic
 def vgateway_example(self):
@@ -168,5 +211,6 @@ def vgateway_example(self):
 
 
 def main():
-    return vgateway_example()
+    return gateway_example()
+#    return vgateway_example()
 
