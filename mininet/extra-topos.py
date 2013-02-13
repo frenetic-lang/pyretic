@@ -217,11 +217,11 @@ class GatewayTopo(Topo):
         for c in client_inds:
             ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
             hoststr = 'h'+str(c)
-            self.addHost(hoststr, ip=ipstr,gw=left_prefix+'1')
+            self.addHost(hoststr, ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
 
         for s in server_inds: 
             ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
-            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1')
+            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
         
         # Ethernet side
         for c in client_inds:
