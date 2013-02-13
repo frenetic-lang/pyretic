@@ -119,39 +119,100 @@ class POXBackend(revent.EventMixin):
                 h["srcip"] = net.IP(p.protosrc.toRaw())
                 h["dstip"] = net.IP(p.protodst.toRaw())
 
+
         h["payload"] = data
         
         packet = net.Packet(vlan_diff)
         return packet.pushmany(h)
 
+
+    def make_pox_arp(self, packet):
+        p = packetlib.ethernet()
+        p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
+        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        
+        p.type = 2054
+        p.next = packetlib.arp(prev=p)
+        
+        p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"].to_bytes())
+        p.next.hwdst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        p.next.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
+        p.next.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
+        p.next.opcode = packet['protocol']
+        
+        print "SCRATCH"
+        print p
+
+        return p
+
     def packet_to_pox(self, packet):
+        if len(packet["payload"]) == 0:
+            return self.make_pox_arp(packet).pack()
 
-        if packet['type'] == 2054:
+        p_begin = p = packetlib.ethernet(packet["payload"])
 
-            p = packetlib.ethernet()
-            p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-            p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        print "---------------------"        
+        print "BEGIN"
+        print p_begin
 
-            p.type = 2054
-            p.next = packetlib.arp(prev=p)
+        # ETHERNET PACKET IS OUTERMOST
+        p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
+        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
 
-            p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-            p.next.hwdst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
-            p.next.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
-            p.next.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
-            p.next.opcode = packet['protocol']
-            payload = p.pack()
+        # DEAL WITH ETHERNET VLANS
+        diff = get_packet_diff(packet)
+        print "diff"
+        print diff
+        if diff:
+            if isinstance(p.next, packetlib.vlan):
+                p = p.next
+            else:
+                # Make a vlan header
+                old_eth_type = p.type
+                p.type = 0x8100
+                p.next = packetlib.vlan(next=p.next)
+                p = p.next
+                p.eth_type = old_eth_type
+            p.id, p.pcp = self.vlan_from_diff(diff)
         else:
-            p = packetlib.ethernet(packet["payload"])
+            if isinstance(p.next, packetlib.vlan):
+                p.type = p.next.eth_type # Restore encapsulated eth type
+                p.next = p.next.next # Remove vlan from header
 
-            # UPDATE UNPACKED POX PAYLOAD W/ MAC HEADERS FROM FRENETIC Packet
-            p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-            p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        # GET PACKET INSIDE ETHERNET/VLAN
+        p = p.next
+        if isinstance(p, packetlib.ipv4):
+            p.srcip = packetaddr.IPAddr(packet["srcip"].to_bytes())
+            p.dstip = packetaddr.IPAddr(packet["dstip"].to_bytes())
+            p.protocol = packet["protocol"]
+            p.tos = packet["tos"]
 
-            # TODO - DO THE SAME FOR OTHER FIELDS (IP,PORT,VLAN,ETC)
-            # SOME OF THIS MAY BE TRICKY (DEALING W/ NESTED PACKETS)
+            p = p.next
+            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
+                p.srcport = packet["srcport"]
+                p.dstport = packet["dstport"]
+            elif isinstance(p, packetlib.icmp):
+                p.type = packet["srcport"]
+                p.code = packet["dstport"]
+            print "AFTER"
+            print p_begin
 
-            payload = p.pack()
+        elif isinstance(p, packetlib.arp):
+            if diff:
+                p.opcode = packet["protocol"]
+                p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
+                p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
+                print "AFTER"
+                print p_begin
+            else:
+                print "AFTER"
+                print p_begin
+                p_begin = self.make_pox_arp(packet)
+        
+
+        print "---------------------"
+
+        payload = p_begin.pack()
 
         return payload
 
@@ -444,7 +505,7 @@ class POXBackend(revent.EventMixin):
         inport = packet["inport"]
         outport = packet["outport"]
 
-        packet = packet.popmany(["switch", "inport", "outport"])
+        packet = packet.pop("switch", "inport", "outport")
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
