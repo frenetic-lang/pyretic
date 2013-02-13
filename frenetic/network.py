@@ -160,7 +160,7 @@ class MAC(object):
 class Packet(object):
     __slots__ = ["header"]
     
-    def __init__(self, state):
+    def __init__(self, state={}):
         self.header = util.frozendict(state)
 
     def available_fields(self):
