@@ -202,6 +202,10 @@ class GatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
         super(GatewayTopo, self).__init__()
 
+        prefix_size  = 24
+        left_prefix  = '10.0.0.'
+        right_prefix = '10.0.1.'
+
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
 
@@ -209,18 +213,15 @@ class GatewayTopo(Topo):
             self.addSwitch('s'+str(switch_id))
 
         from mininet.util import ipParse,ipAdd
-
-        prefix_len = 8
-
+        
         for c in client_inds:
-#            ipstr = '10.0.0.' + str(c+1) + '/24'
-#            self.addHost('h'+str(c), ip=ipstr)
-            self.addHost('h'+str(c))
+            ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
+            hoststr = 'h'+str(c)
+            self.addHost(hoststr, ip=ipstr,gw=left_prefix+'1')
 
         for s in server_inds: 
-#            ipstr = '10.0.1.' + str(s+1) + '/24'
-#            self.addHost('hs'+str(s), ip=ipstr)
-            self.addHost('hs'+str(s))
+            ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
+            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1')
         
         # Ethernet side
         for c in client_inds:
@@ -233,16 +234,23 @@ class GatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % 5 + 2), 'hs'+str(s))
+            self.addLink('s'+str(s % 3 + 5), 'hs'+str(s))
 
         self.addLink('s1', 's5')
         self.addLink('s5', 's6')
         self.addLink('s6', 's7')
         self.addLink('s7', 's1')
 
+
+
+
 class PGatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
         super(PGatewayTopo, self).__init__()
+
+        prefix_size  = 24
+        left_prefix  = '10.0.0.'
+        right_prefix = '10.0.1.'
 
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
@@ -255,19 +263,14 @@ class PGatewayTopo(Topo):
 
         from mininet.util import ipParse,ipAdd
 
-        prefix_len = 8
-
-        eth_gw_addr = '10.0.0.1'
-        ip_gw_addr = '10.0.1.1'
-        
         for c in client_inds:
-            ipstr = '10.0.0.' + str(c+1) + '/24'
+            ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
             hoststr = 'h'+str(c)
-            self.addHost(hoststr, ip=ipstr,gw=eth_gw_addr)
+            self.addHost(hoststr, ip=ipstr,gw=left_prefix+'1')
 
         for s in server_inds: 
-            ipstr = '10.0.1.' + str(s+1) + '/24'
-            self.addHost('hs'+str(s), ip=ipstr, gw=ip_gw_addr)
+            ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
+            self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1')
 
         self.addLink('s1000','s1001')
         self.addLink('s1001','s1002')
@@ -283,7 +286,7 @@ class PGatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % 5 + 2), 'hs'+str(s))
+            self.addLink('s'+str(s % 3 + 5), 'hs'+str(s))
 
         self.addLink('s1002', 's5')
         self.addLink('s5', 's6')
