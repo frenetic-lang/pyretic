@@ -179,9 +179,10 @@ def gateway_example():
     def rewrite_macs(tm):
         return rewrite_dstmac(tm) >> rewrite_srcmac()
 
-    eth_pol = if_(ARP,arp(to_mac),hub)
-    ip_pol =  if_(ARP,arp(to_mac),hub)
-
+    eth_pol = if_(ARP,arp(to_mac),learning_switch())
+    ip_pol = learning_switch()
+    ip_pol =  virtualize(ip_pol,BFS(ip_core))
+   
 ##   CIDR MATCHING CURRENTLY NOT WORKING
 #    eth_to_ip = match(inport=1,dstip='10.0.0.0/24')
 #    ip_to_eth = match(inport=2,dstip='10.0.1.0/24')
