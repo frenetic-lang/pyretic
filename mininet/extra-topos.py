@@ -209,7 +209,11 @@ class GatewayTopo(Topo):
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
 
-        for switch_id in xrange(1, 8): 
+        num_switches_left = 3
+        num_switches_right = 3
+
+        self.addSwitch('s1')
+        for switch_id in xrange(2, 2 + num_switches_left + num_switches_right): 
             self.addSwitch('s'+str(switch_id))
 
         from mininet.util import ipParse,ipAdd
@@ -225,7 +229,7 @@ class GatewayTopo(Topo):
         
         # Ethernet side
         for c in client_inds:
-            self.addLink('s'+str(c % numClients + 2), 'h'+str(c))
+            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
         
         self.addLink('s2', 's3')
         self.addLink('s3', 's1')
@@ -234,7 +238,7 @@ class GatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % numServers + numClients + 2), 'hs'+str(s))
+            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
         self.addLink('s1', 's5')
         self.addLink('s5', 's6')
@@ -255,10 +259,13 @@ class PGatewayTopo(Topo):
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
 
+        num_switches_left = 3
+        num_switches_right = 3
+
         self.addSwitch('s1000')
         self.addSwitch('s1001')
         self.addSwitch('s1002')
-        for switch_id in xrange(2, 8): 
+        for switch_id in xrange(2, 2 + num_switches_left + num_switches_right): 
             self.addSwitch('s'+str(switch_id))
 
         from mininet.util import ipParse,ipAdd
@@ -277,7 +284,7 @@ class PGatewayTopo(Topo):
         
         # Ethernet side
         for c in client_inds:
-            self.addLink('s'+str(c % numClients + 2), 'h'+str(c))
+            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
         
         self.addLink('s2', 's3')
         self.addLink('s3', 's1000')
@@ -286,7 +293,7 @@ class PGatewayTopo(Topo):
 
         # IP side
         for s in server_inds:
-            self.addLink('s'+str(s % numServers + numClients + 2), 'hs'+str(s))
+            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
         self.addLink('s1002', 's5')
         self.addLink('s5', 's6')
