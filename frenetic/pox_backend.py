@@ -139,9 +139,6 @@ class POXBackend(revent.EventMixin):
         p.next.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
         p.next.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
         p.next.opcode = packet['protocol']
-        
-        print "SCRATCH"
-        print p
 
         return p
 
@@ -151,18 +148,12 @@ class POXBackend(revent.EventMixin):
 
         p_begin = p = packetlib.ethernet(packet["payload"])
 
-        print "---------------------"        
-        print "BEGIN"
-        print p_begin
-
         # ETHERNET PACKET IS OUTERMOST
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
         p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
 
         # DEAL WITH ETHERNET VLANS
         diff = get_packet_diff(packet)
-        print "diff"
-        print diff
         if diff:
             if isinstance(p.next, packetlib.vlan):
                 p = p.next
@@ -194,27 +185,16 @@ class POXBackend(revent.EventMixin):
             elif isinstance(p, packetlib.icmp):
                 p.type = packet["srcport"]
                 p.code = packet["dstport"]
-            print "AFTER"
-            print p_begin
 
         elif isinstance(p, packetlib.arp):
             if diff:
                 p.opcode = packet["protocol"]
                 p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
                 p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
-                print "AFTER"
-                print p_begin
             else:
-                print "AFTER"
-                print p_begin
                 p_begin = self.make_pox_arp(packet)
         
-
-        print "---------------------"
-
-        payload = p_begin.pack()
-
-        return payload
+        return p_begin.pack()
 
     def _handle_ComponentRegistered (self, event):
         if event.name == "openflow":
