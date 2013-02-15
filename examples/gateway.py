@@ -40,6 +40,7 @@ from examples.learning_switch import learning_switch
 from examples.hub import hub
 from examples.arp import arp, ARP
 from examples.load_balancer import static_lb, lb
+from examples.firewall import fw
 from virttopos.bfs import BFS
 
 class GatewayVirt(Virtualizer):
@@ -195,9 +196,13 @@ def gateway_example(num_clients,num_servers):
 
     R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
     H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
+    W = {(c,public_ip) for c in H.keys()}
+    from_client = union([match(srcip=c) for c in H.keys()])
 
     eth_pol = if_(ARP,arp(eth_macs),learning_switch())
-    ip_pol =  dynamic(lb)(public_ip,R,H) >> fix_dstmac() >> learning_switch()
+    alb =     dynamic(lb)(public_ip,R,H) >> fix_dstmac() 
+    afw =     dynamic(fw)(W) 
+    ip_pol =  if_(from_client, afw >> alb, alb >> afw) >> learning_switch() 
     ip_pol =  virtualize(ip_pol,BFS(ip_core))
    
 ##   CIDR MATCHING CURRENTLY NOT WORKING
