@@ -190,9 +190,9 @@ def gateway_example(num_clients,num_servers):
         return fix | pas
 
     public_ip = '10.0.1.100'
-    fake_mac = 'BB:BB:BB:BB:BB:BB'
+    fake_mac = MAC('BB:BB:BB:BB:BB:BB')
 
-    all_macs.update({public_ip : fake_mac})
+    all_macs.update({IP(public_ip) : fake_mac})
 
     R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
     H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
