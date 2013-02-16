@@ -800,7 +800,7 @@ class shift(SimplePolicy):
 
     ### repr : unit -> String
     def __repr__(self):
-        return "copy:\n%s" % util.repr_plus(self.map.items())
+        return "shift:\n%s" % util.repr_plus(self.map.items())
   
     ### eval : Network -> Packet -> Counter List Packet
     def eval(self, network, packet):
