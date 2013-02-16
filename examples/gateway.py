@@ -96,23 +96,18 @@ class GatewayVirt(Virtualizer):
                 vtopo.remove_node(1)
 
                 # ADD VIRTUAL SWITCHES
-                vtopo.add_node(1000, ports={1: Port(1),
-                                            2: Port(2),
-                                            3: Port(3)})
-                vtopo.add_node(1001, ports={1: Port(1),
-                                            2: Port(2)})
-                vtopo.add_node(1002, ports={1: Port(1),
-                                            2: Port(2),
-                                            3: Port(3)})
+                vtopo.add_node(1000, ports={i: Port(i) for i in range(1,3+1)})
+                vtopo.add_node(1001, ports={i: Port(1) for i in range(1,2+1)})
+                vtopo.add_node(1002, ports={i: Port(i) for i in range(1,3+1)})
 
                 # WIRE UP VIRTUAL SWITCHES
                 # compare to notations in mininet/extra-topos.py GatewayTopo / PGatewayTopo
                 vtopo.add_link(Location(2,1),Location(1000,1))    # {link(s2[1])} == {s1[1]} == s1000[1] 
                 vtopo.add_link(Location(3,1),Location(1000,2))    # {link(s3[1])} == {s1[2]} == s1000[2] 
-                vtopo.add_link(Location(1001,1),Location(1000,3)) # internal s1001[1] -- s1000[3]
+                vtopo.add_link(Location(1001,1),Location(1000,3)) # internal  s1001[1] -- s1000[3]
                 vtopo.add_link(Location(5,1),Location(1002,1))    # {link(s5[1])} == {s1[3]} == s1002[1] 
                 vtopo.add_link(Location(6,1),Location(1002,2))    # {link(s6[1])} == {s1[4]} == s1002[2] 
-                vtopo.add_link(Location(1001,2),Location(1002,3)) # internal s1001[2] -- s1002[3] 
+                vtopo.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
             except:
                 pass
             
