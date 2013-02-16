@@ -103,12 +103,12 @@ class GatewayVirt(Virtualizer):
                                             2: Port(2),
                                             3: Port(3)})
 
-                vtopo.add_link(Location(3,3),Location(1000,1))
-                vtopo.add_link(Location(4,2),Location(1000,2))
+                vtopo.add_link(Location(3,1),Location(1000,1))
+                vtopo.add_link(Location(4,1),Location(1000,2))
                 vtopo.add_link(Location(1000,3),Location(1001,1))
                 vtopo.add_link(Location(1001,2),Location(1002,3))
-                vtopo.add_link(Location(5,2),Location(1002,1))
-                vtopo.add_link(Location(7,3),Location(1002,2))
+                vtopo.add_link(Location(5,1),Location(1002,1))
+                vtopo.add_link(Location(7,1),Location(1002,2))
             except:
                 pass
             

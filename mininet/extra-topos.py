@@ -228,23 +228,20 @@ class GatewayTopo(Topo):
             self.addHost('hs'+str(s), ip=ipstr, gw=right_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
         
         # Ethernet side
-        for c in client_inds:
-            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
-        
-        self.addLink('s2', 's3')
         self.addLink('s3', 's1')
         self.addLink('s1', 's4')
+        self.addLink('s2', 's3')
         self.addLink('s4', 's2')
+        for c in client_inds:
+            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
 
         # IP side
-        for s in server_inds:
-            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
-
         self.addLink('s1', 's5')
+        self.addLink('s7', 's1')
         self.addLink('s5', 's6')
         self.addLink('s6', 's7')
-        self.addLink('s7', 's1')
-
+        for s in server_inds:
+            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
 
 
@@ -283,22 +280,23 @@ class PGatewayTopo(Topo):
         self.addLink('s1001','s1002')
         
         # Ethernet side
+        self.addLink('s3', 's1000')
+        self.addLink('s1000', 's4')
+        self.addLink('s2', 's3')
+        self.addLink('s4', 's2')
         for c in client_inds:
             self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
         
-        self.addLink('s2', 's3')
-        self.addLink('s3', 's1000')
-        self.addLink('s1000', 's4')
-        self.addLink('s4', 's2')
-
         # IP side
+        self.addLink('s1002', 's5')
+        self.addLink('s7', 's1002')
+        self.addLink('s5', 's6')
+        self.addLink('s6', 's7')
         for s in server_inds:
             self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
-        self.addLink('s1002', 's5')
-        self.addLink('s5', 's6')
-        self.addLink('s6', 's7')
-        self.addLink('s7', 's1002')
+
+
 
             
 
