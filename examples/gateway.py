@@ -92,8 +92,10 @@ class GatewayVirt(Virtualizer):
             n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
             try:
+                # REMOVE PHYSICAL SWITCHES ONTO WHICH VIRTUAL SWITCHES WILL BE MAPPED
                 vtopo.remove_node(1)
 
+                # ADD VIRTUAL SWITCHES
                 vtopo.add_node(1000, ports={1: Port(1),
                                             2: Port(2),
                                             3: Port(3)})
@@ -103,12 +105,14 @@ class GatewayVirt(Virtualizer):
                                             2: Port(2),
                                             3: Port(3)})
 
-                vtopo.add_link(Location(3,1),Location(1000,1))
-                vtopo.add_link(Location(4,1),Location(1000,2))
-                vtopo.add_link(Location(1000,3),Location(1001,1))
-                vtopo.add_link(Location(1001,2),Location(1002,3))
-                vtopo.add_link(Location(5,1),Location(1002,1))
-                vtopo.add_link(Location(7,1),Location(1002,2))
+                # WIRE UP VIRTUAL SWITCHES
+                # compare to notations in mininet/extra-topos.py GatewayTopo / PGatewayTopo
+                vtopo.add_link(Location(2,1),Location(1000,1))    # {link(s2[1])} == {s1[1]} == s1000[1] 
+                vtopo.add_link(Location(3,1),Location(1000,2))    # {link(s3[1])} == {s1[2]} == s1000[2] 
+                vtopo.add_link(Location(1001,1),Location(1000,3)) # internal s1001[1] -- s1000[3]
+                vtopo.add_link(Location(5,1),Location(1002,1))    # {link(s5[1])} == {s1[3]} == s1002[1] 
+                vtopo.add_link(Location(6,1),Location(1002,2))    # {link(s6[1])} == {s1[4]} == s1002[2] 
+                vtopo.add_link(Location(1001,2),Location(1002,3)) # internal s1001[2] -- s1002[3] 
             except:
                 pass
             
