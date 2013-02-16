@@ -116,6 +116,11 @@ class GatewayVirt(Virtualizer):
             except:
                 pass
             
+            print "--- Underlying Topology ------"
+            print network.topology
+            print "----Abstracted Topology ------"
+            print vtopo
+
             return n
 
         self.transform_network = functools.partial(transform_network, transformer)
@@ -198,6 +203,12 @@ def gateway_example(num_clients,num_servers):
     gw = if_(ARP,arp(eth_macs), 
              rewrite_macs(all_macs) >> 
              ( eth_to_ip[fwd(2)] | ip_to_eth[fwd(1)] ))
+
+
+    ## COMMENT THIS OUT TO SEE PACKET HANDLING PRINTOUTS
+    return in_(ethernet)[ eth_pol ]  | \
+        in_(gateway)[ gw ] | \
+        in_(ip_core)[ ip_pol ]
 
     return in_(ethernet)[ pprint('->eth') >> eth_pol >> pprint('eth->') ]  | \
         in_(gateway)[ pprint('->gw') >> gw >> pprint('gw->') ] | \
