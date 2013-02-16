@@ -262,6 +262,12 @@ class Location(object):
 
 
 class Topology(nx.Graph):
+
+    def add_link(self,loc1,loc2):
+        self.add_edge(loc1.switch, loc2.switch, {loc1.switch: loc1.port_no, loc2.switch: loc2.port_no})
+        self.node[loc1.switch]['ports'][loc1.port_no].linked_to = loc2
+        self.node[loc2.switch]['ports'][loc2.port_no].linked_to = loc1
+
     def is_connected(self):
         return nx.is_connected(self)
 
