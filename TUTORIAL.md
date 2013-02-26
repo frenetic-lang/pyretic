@@ -64,14 +64,16 @@ test:           pingall. odd nodes should reach odd nodes w/ higher IP, likewise
 NOTE: state full firewall runs by default, simpler authentication and static firewalls can be used instead by recommenting file
 
 ------------------------------
-composition.py
+kitchen_sink.py
 ------------------------------
 "Firewall, load balance and route."
 
-start mininet:  ./pyretic/mininet.sh --switch ovsk --topo bump_clique,4,3,2
-run controller: pox.py --no-cli pyretic/examples/composition.py --clients=3 --servers=2
-in mininet:  hN ping 10.0.0.100 for N={1,2,3}, pingall fails, hsN ping 10.0.0.100 fails
+./pyretic/mininet.sh --switch ovsk --topo gateway
+pox.py --no-cli pyretic/examples/kitchen_sink.py 
 
+in mininet:  hN ping each other and 10.0.0.100 for N={1,2,3}, all other pings fail
+
+sample output:
 poking hole for 10.0.0.100,10.0.0.1
 poking hole for 10.0.0.100,10.0.0.1
 poking hole for 10.0.0.100,10.0.0.1
@@ -79,13 +81,6 @@ poking hole for 10.0.0.100,10.0.0.1
     ('srcip', 00001010000000000000000001100100)
     ('dstip', 00001010000000000000000000000001)
 
-
-------------------------------
-gateway.py
-------------------------------
-./pyretic/mininet.sh --switch ovsk --topo gateway
-pox.py --no-cli pyretic/examples/gateway.py 
-nodes should have connectivity across the abstract topology (e.g., pingall works)
 
 ------------------------------
 virtualize.py
