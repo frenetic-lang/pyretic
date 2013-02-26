@@ -108,9 +108,9 @@ class INetwork(Network):
 class physical_to_virtual(DerivedPolicy):
     def __init__(self, vtag):
         self.vtag = vtag
-        self.policy = (push(vtag=self.vtag) >> shift(voutport="outport",
-                                                     vswitch="switch",
-                                                     vinport="inport"))
+        self.policy = (push(vtag=self.vtag) >> move(voutport="outport",
+                                                    vswitch="switch",
+                                                    vinport="inport"))
         
     def __repr__(self):
         return "physical_to_virtual %s" % self.vtag
@@ -120,7 +120,7 @@ class physical_to_virtual(DerivedPolicy):
 class virtual_to_physical(DerivedPolicy):
     def __init__(self):
         self.policy = (pop("switch", "inport", "outport", "vtag") >>
-                       shift(outport="voutport", switch="vswitch", inport="vinport"))
+                       move(outport="voutport", switch="vswitch", inport="vinport"))
         
     def __repr__(self):
         return "virtual_to_physical"
@@ -173,7 +173,7 @@ class virtualize(DerivedPolicy):
             if_(~match(vtag=self.vtag), 
                 (self.virtdef.ingress_policy >> # set vswitch and vinport
                  # now make the virtualization transparent to the tenant's policy to get the outport
-                 shift(switch="vswitch", inport="vinport") >>
+                 move(switch="vswitch", inport="vinport") >>
                  self.virtdef.transform_network(self.vpolicy) >>
                  physical_to_virtual(self.vtag)))
             # Pipe the packet with appropriate v* headers to the physical policy for processing
