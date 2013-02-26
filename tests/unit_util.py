@@ -301,7 +301,7 @@ def hub_packet_behavior(packets,verbose):
     return True
 
 
-def learning_switch_packet_behavior(packets,verbose):
+def mac_learner_packet_behavior(packets,verbose):
     hosts = packets.keys()
     for i in range(0,len(hosts)):
         h1 = hosts[i]

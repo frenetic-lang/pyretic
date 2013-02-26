@@ -35,7 +35,7 @@
 ##############################################################################################################################
 
 from frenetic.lib import *
-from examples.learning_switch import learning_switch
+from examples.mac_learner import mac_learner
 from examples.firewall import static_fw, fw
 from examples.load_balancer import static_lb, lb
 from virttopos.bfs import BFS
@@ -62,7 +62,7 @@ def fw_lb_ls(clients, servers):
     #alb = dynamic(lb)(public_ip,R,H)  
     #afw = static_fw(allowed)
     afw = dynamic(fw)(allowed)
-    return if_(from_client, afw >> alb, alb >> afw) >> learning_switch()
+    return if_(from_client, afw >> alb, alb >> afw) >> mac_learner()
 
         
 def main(clients,servers):

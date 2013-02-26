@@ -94,7 +94,7 @@ def lb(self,p,R,H):
 
 
 def main(clients, servers):
-    from examples.learning_switch import learn
+    from examples.mac_learner import learn
     
     num_clients = int(clients)
     num_servers = int(servers)

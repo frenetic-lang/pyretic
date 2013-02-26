@@ -27,7 +27,7 @@
 ################################################################################
 
 from frenetic.lib import *
-from examples.learning_switch import learning_switch
+from examples.mac_learner import mac_learner
 
 
 ### 50 ways to write your packet monitor ###
@@ -139,11 +139,11 @@ def all_monitor_modules():
         | monitor_packets_limit_by_src_dst(limit=3) \
         | monitor_unique_packets()                  \
         | monitor_grouped_packet_count()            \
-        | learning_switch()
+        | mac_learner()
 
 def summary_modules():
     return monitor_grouped_packet_count()  \
-        | learning_switch()
+        | mac_learner()
 
 def lowest_level_syntax():                      
     return monitor_packets_lowest_level_syntax()  \

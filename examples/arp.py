@@ -38,7 +38,7 @@
 import collections
 
 from frenetic.lib import *
-from examples.learning_switch import learning_switch
+from examples.mac_learner import mac_learner
 
 
 ARP_TYPE = 2054
@@ -158,11 +158,11 @@ def arp(self,mac_of={}):
                 pass
 
 def learn_arp():
-    return if_(ARP,arp(),learning_switch())
+    return if_(ARP,arp(),mac_learner())
 
 def pre_specified_arp():
     mac_of = { IP('10.0.0.'+str(i)) : MAC('00:00:00:00:00:0'+str(i)) for i in range(1,9) }
-    return if_(ARP,arp(mac_of),learning_switch())
+    return if_(ARP,arp(mac_of),mac_learner())
 
 
 def main():

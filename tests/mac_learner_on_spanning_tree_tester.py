@@ -54,7 +54,7 @@ def main():
         flags.append('-v')
 
     # GET PATHS
-    unit_test_path = os.path.expanduser('~/pyretic/tests/learning_switch_unit_test.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/mac_learner_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -63,7 +63,7 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     # STARTUP CONTROLLER
-    controller = Popen([sys.executable, '-u', '-O', pox_path,'--no-cli', 'pyretic/examples/virtualize.py', '--program=pyretic/examples/learning_switch.py', '--virttopo=pyretic/virttopos/spanning_tree.py'], 
+    controller = Popen([sys.executable, '-u', '-O', pox_path,'--no-cli', 'pyretic/examples/virtualize.py', '--program=pyretic/examples/mac_learner.py', '--virttopo=pyretic/virttopos/spanning_tree.py'], 
                        env=env,
                        stdout=PIPE, 
                        stderr=STDOUT)
@@ -86,9 +86,9 @@ def main():
     print "----------------------------------------------------"
 
     if count == len(topos):
-        print "+ learning_switch_unit PASSED [%d/%d]" % (count,len(topos))
+        print "+ mac_learner_unit PASSED [%d/%d]" % (count,len(topos))
     else:
-        print "- learning_switch_unit FAILED [%d/%d]" % (count,len(topos))
+        print "- mac_learner_unit FAILED [%d/%d]" % (count,len(topos))
         
     # KILL CONTROLLER
     controller.send_signal( SIGINT )

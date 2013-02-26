@@ -53,8 +53,8 @@ def main():
         flags.append('-v')
 
     # GET PATHS
-    controller_src_path = os.path.expanduser('~/pyretic/examples/learning_switch.py')
-    unit_test_path = os.path.expanduser('~/pyretic/tests/learning_switch_unit_test.py')
+    controller_src_path = os.path.expanduser('~/pyretic/examples/mac_learner.py')
+    unit_test_path = os.path.expanduser('~/pyretic/tests/mac_learner_unit_test.py')
     pox_path = os.path.expanduser('~/pox/pox.py')
 
     # MAKE SURE WE CAN SEE ALL OUTPUT IF VERBOSE
@@ -86,9 +86,9 @@ def main():
     print "----------------------------------------------------"
 
     if count == len(topos):
-        print "+ learning_switch_tester PASSED [%d/%d]" % (count,len(topos))
+        print "+ mac_learner_tester PASSED [%d/%d]" % (count,len(topos))
     else:
-        print "- learning_switch_tester FAILED [%d/%d]" % (count,len(topos))
+        print "- mac_learner_tester FAILED [%d/%d]" % (count,len(topos))
         
     # KILL CONTROLLER
     controller.send_signal( SIGINT )

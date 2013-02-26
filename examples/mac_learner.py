@@ -30,7 +30,7 @@
 # TO TEST EXAMPLE                                                                                                          #
 # -------------------------------------------------------------------                                                      #
 # start mininet:  pyretic/mininet.sh --mac --topo linear,3                                                                 #
-# run controller: pox.py --no-cli pyretic/examples/learning_switch.py                                                      #
+# run controller: pox.py --no-cli pyretic/examples/mac_learner.py                                                      #
 # start xterms:   xterm h1 h2 h3                                                                                           #
 # start tcpdump:  in each xterm,                                                                                           #
 # > IFACE=`ifconfig | head -n 1 | awk '{print $1}'`; tcpdump -XX -vvv -t -n -i $IFACE not ether proto 0x88cc > $IFACE.dump #
@@ -54,7 +54,7 @@ def learn(self):
     q.when(update)
     self.policy = flood | q
 
-def learning_switch():
+def mac_learner():
     return dynamic(learn)()
 
 
