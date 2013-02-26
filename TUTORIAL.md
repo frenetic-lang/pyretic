@@ -89,4 +89,4 @@ virtualize.py
 
 e.g.,
 pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/bfs.py
-pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/composition.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/arp.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree.py
