@@ -39,16 +39,16 @@ load_balancer.py
 start mininet:  pyretic/mininet.sh --topo=bump_clique,1,5,3                                              
 run controller: pox.py --no-cli pyretic/examples/load_balancer.py --clients=5 --servers=3
 test:           hX ping -c 1 10.0.0.100 will work from each host                                       
-#                 all nodes will be able to ping each other, except hosts to their load-balanced instance 
-#                 pingall will output                                                                                                                                                                                               
-#                 h1 -> h2 h3 h4 h5 X hs2 hs3                                                                     
-#                 h2 -> h1 h3 h4 h5 hs1 X hs3                                                                     
-#                 h3 -> h1 h2 h4 h5 hs1 hs2 X                                                                     
-#                 h4 -> h1 h2 h3 h5 X hs2 hs3                                                                     
-#                 h5 -> h1 h2 h3 h4 hs1 X hs3                                                                     
-#                 hs1 -> h1 h2 h3 h4 h5 hs2 hs3                                                                  
-#                 hs2 -> h1 h2 h3 h4 h5 hs1 hs3                                                                  
-#                 hs3 -> h1 h2 h3 h4 h5 hs1 hs2                                                                  
+                all nodes will be able to ping each other, except hosts to their load-balanced instance 
+                pingall will output                                                                                                                                                                                               
+                h1 -> h2 h3 h4 h5 X hs2 hs3                                                                     
+                h2 -> h1 h3 h4 h5 hs1 X hs3                                                                     
+                h3 -> h1 h2 h4 h5 hs1 hs2 X                                                                     
+                h4 -> h1 h2 h3 h5 X hs2 hs3                                                                     
+                h5 -> h1 h2 h3 h4 hs1 X hs3                                                                     
+                hs1 -> h1 h2 h3 h4 h5 hs2 hs3                                                                  
+                hs2 -> h1 h2 h3 h4 h5 hs1 hs3                                                                  
+                hs3 -> h1 h2 h3 h4 h5 hs1 hs2                                                                  
 NOTE: by default this example runs the static firewall, but uncomment to run the dynamic version
             however, b/c the current setup has all hosts on the same LAN, when rebalances occur, pings may break as hosts are caching arp entries
             this isn't a bug in the dynamic firewall, but an artifact of testing it on a LAN instead of the gateway example to which the load balancer will ultimately be applied
@@ -89,4 +89,5 @@ virtualize.py
 
 e.g.,
 pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/bfs.py
-pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/arp.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/arp.py --virttopo=pyretic/virttopos/spanning_tree.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/load_balancer.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree.py
