@@ -99,12 +99,14 @@ def gateway_example(num_clients,num_servers):
     ip_pol =  if_(from_client, afw >> alb, alb >> afw) >> mac_learner() 
     ip_pol =  virtualize(ip_pol,BFS(ip_core))
    
-##   CIDR MATCHING CURRENTLY NOT WORKING
-#    eth_to_ip = match(inport=1,dstip='10.0.0.0/24')
-#    ip_to_eth = match(inport=2,dstip='10.0.1.0/24')
 
-    to_eth = union([ match(dstip='10.0.0.'+str(i)) for i in range(2,2+num_clients) ])
-    to_ip  = union([ match(dstip='10.0.1.'+str(i)) for i in range(2,2+num_servers) ])
+    # CIDR PREFIX MATCH
+    to_eth = match(dstip='10.0.0.0/24')
+    to_ip  = match(dstip='10.0.1.0/24')
+
+    # EQUIVALENT PREDICATES USING EXACT MATCHES
+#    to_eth = union([ match(dstip='10.0.0.'+str(i)) for i in range(2,2+num_clients) ])
+#    to_ip  = union([ match(dstip='10.0.1.'+str(i)) for i in range(2,2+num_servers) ])
 
     eth_to_ip = match(inport=1) & (to_ip | match(dstip=public_ip) )
     ip_to_eth = match(inport=2) & (to_eth)

@@ -41,249 +41,72 @@ from frenetic.network import *
 from frenetic.util import frozendict, singleton
 
 ################################################################################
-# Matching and wildcards
+# Matching
 ################################################################################
 
-class Matchable(object):
-    """Assumption: the binary operators are passed in the same class as the
-    invoking object.
+class ExactMatch(object):
+    """Pattern type for exact match"""
 
-    """
-    __metaclass__ = ABCMeta
-
-    @classmethod
-    @abstractmethod
-    def top(cls):
-        """Return the matchable greater than all other matchables of the same
-        class.
-
-        """
-
-    @abstractmethod
-    def __and__(self, other):
-        """Return the intersection of two matchables of the same class.  Return
-        value is None if there is no intersection.
-
-        """
-
-    @abstractmethod
-    def __le__(self, other):
-        """Return true if `other' matches every object `self' does."""
-
-    @abstractmethod
-    def match(self, other):
-        """Return true if we match `other'.""" 
-
-        
-# XXX some of these should be requirements on matchable.
-class MatchableMixin(object):
-    """Helper"""
-    def disjoint_with(self, other):
-        """Return true if there is no object both matchables match."""
-        return self & other is None
-    
-    def overlaps_with(self, other):
-        """Return true if there is an object both matchables match."""
-        return not self.overlaps_with(other)
-        
-    def __eq__(self, other):
-        return self <= other and other <= self
-
-    def __ne__(self, other):
-        """Implemented in terms of __eq__"""
-        return not self == other
-
-
-class Approx(object):
-    """Interface for things which can be approximated."""
-    __metaclass__ = ABCMeta
-
-    @abstractmethod
-    def overapprox(self, overapproxer):
-        """Docs here."""
-
-    @abstractmethod
-    def underapprox(self, underapproxer):
-        """Docs here."""
-
-        
-@util.cached
-def Wildcard(width_):
-    @functools.total_ordering
-    class Wildcard_(MatchableMixin, util.Data("prefix mask")):
-        """Full wildcards."""
-
-        width = width_
-
-        @classmethod
-        def is_wildstr(cls, value):
-            return isinstance(value, basestring) and len(value) == cls.width and set(value) <= set("?10")
-
-        def __new__(cls, prefix, mask=None):
-            """Create a wildcard. Prefix is a binary string.
-            Mask can either be an integer (how many bits to mask) or a binary string."""
-
-            if cls.is_wildstr(prefix):
-                bprefix = bitarray(prefix.replace("?", "0"))
-                bmask = bitarray(prefix.replace("1", "0").replace("?", "1"))
-                prefix = bprefix
-                mask = bmask
-            elif isinstance(prefix, Wildcard_):
-                (prefix, mask) = prefix.prefix, prefix.mask
-            elif mask is None:
-                mask = bitarray([False] * len(prefix))
-                assert len(prefix) == cls.width == len(mask), "mask and prefix must be same length"
-                
-            return super(Wildcard_, cls).__new__(cls, prefix, mask)
-
-        def __hash__(self):
-            return hash((self.prefix.tobytes(), self.mask.tobytes()))
-
-        def __repr__(self):
-            l = []
-            for pb, mb in zip(self.prefix, self.mask):
-                if mb:
-                    l.append("?")
-                else:
-                    l.append(str(int(pb)))
-            return "".join(l)
-        
-        @classmethod
-        def top(cls):
-            prefix = bitarray(cls.width)
-            prefix.setall(False)
-            mask = bitarray(cls.width)
-            mask.setall(False)
-            return cls(prefix, mask)
-
-        def match(self, other):
-            return other.to_bits() | self.mask == self._normalize()
-
-        def __and__(self, other):
-            if self.overlaps_with(other):
-                return self.__class__(self._normalize() & other._normalize(),
-                                      self.mask & other.mask)
-
-        def overlaps_with(self, other):
-            c_mask = self.mask | other.mask
-            return self.prefix | c_mask == other.prefix | c_mask
-
-        def __le__(self, other):
-            return (self.mask & other.mask == other.mask) and \
-                (self.prefix | self.mask == other.prefix | self.mask)
-
-        def _normalize(self):
-            """Return a bitarray, masked."""
-            return self.prefix | self.mask
-
-    Matchable.register(Wildcard_)
-    Wildcard_.__name__ += repr(width_)
-    
-    return Wildcard_
-
-    
-class IPWildcard(Wildcard(32)):
-    def __new__(cls, ipexpr, mask=None):
-        if isinstance(ipexpr, basestring):
-            parts = ipexpr.split("/")
-
-            if len(parts) == 2:
-                ipexpr = parts[0]
-                try:
-                    mask = int(parts[1], 10)
-                except ValueError:
-                    mask = parts[1]
-            elif len(parts) != 1:
-                raise ValueError
-
-            if mask is None:
-                prefix = bitarray()
-                mask = bitarray(32)
-                (a, b, c, d) = ipexpr.split(".")
-                mask.setall(False)
-                if a == "*":
-                    mask[0:8] = True
-                    prefix.extend("00000000")
-                else:
-                    prefix.frombytes(struct.pack("!B", int(a)))
-                if b == "*":
-                    mask[8:16] = True
-                    prefix.extend("00000000")
-                else:
-                    prefix.frombytes(struct.pack("!B", int(b)))
-                if c == "*":
-                    mask[16:24] = True
-                    prefix.extend("00000000")
-                else:
-                    prefix.frombytes(struct.pack("!B", int(c)))
-                if d == "*":
-                    mask[24:32] = True
-                    prefix.extend("00000000")
-                else:
-                    prefix.frombytes(struct.pack("!B", int(d)))
-            elif isinstance(mask, Integral):
-                prefix = IP(ipexpr).to_bits()
-                bmask = bitarray(32)
-                bmask.setall(True)
-                bmask[0:mask] = False
-                mask = bmask
-            elif isinstance(mask, basestring):
-                prefix = IP(ipexpr).to_bits()
-                mask = IP(mask).to_bits()
-                mask.invert()
-
-        elif isinstance(ipexpr, IP):
-            prefix = ipexpr.to_bits()
-
-        elif isinstance(ipexpr, bitarray):
-            prefix = ipexpr
-
-        else:
-            raise TypeError('unsupported expression type')
-         
-        # TYPE CONVERSION TO MATCH SUPER
-        if not mask is None:
-            mask = mask.to01()
-        prefix = prefix.to01()
-
-        return super(IPWildcard, cls).__new__(cls, prefix, mask)
-
-
-class Exact(object):
-    def __init__(self, obj):
-        self.obj = obj
+    def __init__(self, pattern):
+        self.pattern = pattern
 
     def match(self, other):
-        return self.obj == other
+        return self.pattern == other
 
     def __hash__(self):
-        return hash(self.obj)
+        return hash(self.pattern)
 
     def __eq__(self, other):
-        return self.obj == other.obj 
+        """Match by checking for equality"""
+        return self.pattern == other.pattern 
         
     def __repr__(self):
-        return repr(self.obj)
+        return repr(self.pattern)
+
+class PrefixMatch(object):
+    """Pattern type for IP prefix match"""
+
+    def __init__(self, pattern):
+        self.masklen = 32
+        if isinstance(pattern, IP):     # IP OBJECT
+            self.pattern = pattern
+        else:                           # STRING ENCODING
+            parts = pattern.split("/")
+            self.pattern = IP(parts[0])
+            if len(parts) == 2:
+                self.masklen = int(parts[1])
+        self.prefix = self.pattern.to_bits()[:self.masklen]
+
+    def match(self, other):
+        """Match by checking prefix equality"""
+        return self.prefix == other.to_bits()[:self.masklen]
+
+    def __hash__(self):
+        return hash(self.pattern)
+
+    def __eq__(self, other):
+        return self.pattern == other.pattern 
         
+    def __repr__(self):
+        if self.masklen == 32:
+            return repr(self.pattern)
+        else:
+            return "%s/%d" % (repr(self.pattern),self.masklen)
+
 ################################################################################
-# Lifts
+# Determine how each field will be matched
 ################################################################################
+        
+_field_to_patterntype = {}
 
-_header_to_matchclass = {}
+def register_field(field, patterntype):
+    _field_to_patterntype[field] = patterntype
 
-def register_header(header, matchclass):
-    _header_to_matchclass[header] = matchclass
+def field_patterntype(field):
+    return _field_to_patterntype.get(field, ExactMatch)
 
-def matchable_for_header(header):
-    return _header_to_matchclass.get(header, Exact)
-
-## JREICH - disabled incorrect registration calls
-## type mistmatch between src/dstmac which are MAC
-## and Wildcard which takes binary string
-#register_header("srcmac", Wildcard(48))
-#register_header("dstmac", Wildcard(48))
-register_header("srcip", IPWildcard)
-register_header("dstip", IPWildcard)
+register_field("srcip", PrefixMatch)
+register_field("dstip", PrefixMatch)
 
     
 ################################################################################
@@ -426,8 +249,11 @@ class match(SimplePredicate):
         init_map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
             if v is not None:
-                v = matchable_for_header(k)(v)
-            init_map[k] = v
+                patterntype = field_patterntype(k)
+                pattern_to_match = patterntype(v)
+                init_map[k] = pattern_to_match
+            else: 
+                init_map[k] = None
         self.map = util.frozendict(init_map)
 
     ### repr : unit -> String
@@ -1101,7 +927,7 @@ class MutablePolicy(DerivedPolicy):
         assert network in self.networks
         self.networks.remove(network)
         DerivedPolicy.detach(self, network)
-        
+
     ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
         b = packets()
