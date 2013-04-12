@@ -65,15 +65,11 @@ def send_arp_response(network,switch,outport,srcip,srcmac,dstip,dstmac):
         if VERBOSE_LEVEL > 1:
             print rp
 
-    # XXX
     network.inject_packet(rp)
 
-
-### USING STRING CASTING TO MAKE SURE PACKET FIELDS ACT LIKE PROPER DICT KEYS
-### THIS IS A HACK AND SHOULD BE FIXED
 @dynamic
 def arp(self,mac_of={}):
-    """Respond to arp request for any hosts in mac_of,
+    """Respond to arp request for any known hosts,
        learn macs of unknown hosts"""
 
     location_of = {}
@@ -102,7 +98,6 @@ def arp(self,mac_of={}):
             break
 
         # IF THIS PACKET IS A REQUEST
-        
         if opcode == 1:
             if dstip in mac_of:
                 if VERBOSE_LEVEL > 0:
@@ -158,6 +153,7 @@ def arp(self,mac_of={}):
                 pass
 
 def learn_arp():
+    """Handle ARPs and do MAC learning"""
     return if_(ARP,arp(),mac_learner())
 
 def pre_specified_arp():

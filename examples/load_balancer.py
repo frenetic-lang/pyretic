@@ -50,15 +50,18 @@ from frenetic.lib import *
 from virttopos.bfs import BFS
 
 def subs(c,r,p):
-  c_to_p = match(srcip=c,dstip=p)
-  r_to_c = match(srcip=r,dstip=c)
-  return c_to_p[modify(dstip=r)] | r_to_c[modify(srcip=p)] | (~r_to_c & ~c_to_p)[passthrough]
+    """from client, substitute replica address for the public address 
+    from server, substitute public address for replica address"""
+    c_to_p = match(srcip=c,dstip=p)
+    r_to_c = match(srcip=r,dstip=c)
+    return c_to_p[modify(dstip=r)] | r_to_c[modify(srcip=p)] | (~r_to_c & ~c_to_p)[passthrough]
 
 def rewrite(d,p):
+    "substitute for all client/replica mappings in d"
     return sequential([subs(c,r,p) for c,r in d])
 
 def balance(R,H):
-    """ A simple balancing function the ignores history"""
+    """A simple balancing function the ignores history"""
     client_ips = H.keys()
     extension_factor = int(math.ceil(float(len(client_ips)) / len(R)))
     repeating_R = []
@@ -80,17 +83,24 @@ def static_lb(p,R,H):
     return rewrite(balance(R,H),p) 
 
 def lb(self,p,R,H):
- 
+
+    def update_policy():
+        """Update the policy based on current modify and query policies"""
+        self.policy = self.modify | match(dstip=p)[self.query]
+    self.update_policy = update_policy
+
     def rebalance(stats):
         self.H = update(H,stats)
         b = balance(R,self.H)
         print "rebalance %s" % b
-        self.policy = rewrite(b,p)
+        self.modify = rewrite(b,p)
+        self.update_policy()
 
     self.H = H
-    q = counts(5,['srcip'])
-    q.when(rebalance)
-    self.policy = static_lb(p,R,H) | match(dstip=p)[q]
+    self.query = counts(5,['srcip'])
+    self.query.register_callback(rebalance)
+    self.modify = static_lb(p,R,H) 
+    self.update_policy()
 
 
 def main(clients, servers):
@@ -112,5 +122,5 @@ def main(clients, servers):
     R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
     return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
-#    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  ## TEST ABOVE DOESN'T WORK (B/C HOST AND REPLICAS ARE ON SAME LAN, SO USE OLD ARPS ON REBALANCE, CODE WORKS, BUT TEST SETUP NEEDS WORK)
+#    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  
 

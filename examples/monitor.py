@@ -37,7 +37,7 @@ def printer(pkt):
 
 def dpi():
   q = packets(None,[])
-  q.when(printer)
+  q.register_callback(printer)
   return q
 
 
@@ -71,7 +71,7 @@ def monitor_packets_undecorated():
 def monitor_packets_explicit(self):
     b = packets()
     self.policy |= b
-    @b.when
+    @b.register_callback
     def f(pkt):
         print "(explicit_packets) I see packet:"
         print pkt
@@ -83,7 +83,7 @@ def monitor_packets_lowest_level_syntax():
         print "(lowest_level_syntax) I see packet:"
         print pkt  
         print "---------------" 
-    b.when(f)
+    b.register_callback(f)
     return b
 
 

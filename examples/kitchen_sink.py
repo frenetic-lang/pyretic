@@ -31,7 +31,8 @@
 # -------------------------------------------------------------------                                                        #
 # start mininet:  pyretic/mininet.sh --topo=gateway                                                                          #
 # run controller: pox.py --no-cli pyretic/examples/kitchen_sink.py                                                           #
-# test:           pingall                                                                                                    #
+# test:           pingall should work only between hosts (h1,h2,h3), all traffic between other hosts should be blocked       #
+#                 all hosts should also be able to ping 10.0.1.100, which will be handled by changing server (hs1,hs2,hs3)   #
 ##############################################################################################################################
 
 from frenetic.lib import *

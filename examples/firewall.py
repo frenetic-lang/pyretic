@@ -46,31 +46,55 @@ from virttopos.bfs import BFS
 drop_ingress = if_(ingress,drop,passthrough)
 
 def poke(W,P):
-  p = union([match(srcip=s,dstip=d) for (s,d) in W])
-  return if_(p,passthrough,P)
+    p = union([match(srcip=s,dstip=d) for (s,d) in W])
+    return if_(p,passthrough,P)
 
 def static_fw(W):
-  W_rev = [(d,s) for (s,d) in W]
-  return poke(W_rev, poke(W, drop_ingress))
+    W_rev = [(d,s) for (s,d) in W]
+    return poke(W_rev, poke(W, drop_ingress))
 
 def fw0(self,W):
+    """A dynamic firewall that opens holes but doesn't close them"""
 
-  def allow_reverse(p):
-      print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
-      self.policy = poke({(p['dstip'],p['srcip'])},self.policy)
+    wp = union([match(srcip=s,dstip=d) for (s,d) in W])
+    def update_policy():
+        """Update the policy based on current forward and query policies"""
+        self.policy = self.forward | wp[self.query] 
+    self.update_policy = update_policy
 
-  q = packets(None,[])
-  q.when(allow_reverse)
+    def allow_reverse(p):
+        """Open reverse hole for ongoing traffic"""
+        print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
+        self.forward = poke({(p['dstip'],p['srcip'])},self.forward)
+        self.update_policy()
 
-  wp = union([match(srcip=s,dstip=d) for (s,d) in W])
-  self.policy = poke(W,drop_ingress) | wp[q]
+    def refresh_query():
+        """(Re)set the query checking for allowed traffic"""
+        self.query = packets(1,['dstip','srcip'])
+        self.query.register_callback(allow_reverse)
+
+    def refresh():
+        """Refresh the policy"""
+        refresh_query()
+        update_policy()
+    self.refresh = refresh
+
+    self.forward = poke(W,drop_ingress) 
+    self.refresh()
 
 def patch(p,P):
     return if_(p,drop_ingress,P)
 
 def fw(self,W):
+    """A dynamic firewall that closes holes that it opens"""
 
+    def update_policy():
+        """Update policy based on current inner and query policies"""
+        self.policy = self.inner | union(rps)[self.query]
+    self.update_policy = update_policy
+    
     def check_reverse(stats):
+        """Close unused holes"""
         for (p,cnt) in stats.items():
             (pcnt,missed) = self.H[p]
             if pcnt < cnt: missed = 0   
@@ -78,18 +102,18 @@ def fw(self,W):
             if missed == self.T:
                 print "%d seconds w/o traffic, closing hole" % self.T,
                 print p
-                self.inner.policy = patch(p,self.inner.policy)
+                self.inner.forward = patch(p,self.inner.forward)
+                self.inner.refresh()
             self.H[p] = (cnt,missed)
 
-    q = counts(1,['srcip','dstip'])
-    q.when(check_reverse)
-
+    self.query = counts(1,['srcip','dstip'])
+    self.query.register_callback(check_reverse)
     rps = [match(srcip=d,dstip=s) for (s,d) in W]
     self.H = { rp : (0,0) for rp in rps }
-    self.T = 3
+    self.T = 1
     self.inner = dynamic(fw0)(W)
-    self.policy = self.inner | union(rps)[q]
-
+    self.update_policy()
+    
 
 # # HOW TO CHECK A REVERSE PATH
 # reverse_packet = overwrite(srcip='dstip',

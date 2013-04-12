@@ -41,22 +41,31 @@ from frenetic.lib import *
 from virttopos.bfs import BFS
 from virttopos.spanning_tree import SpanningTree
 
-### NSDI PAPER VERSION ###
 def learn(self):
+    """Standard MAC-learning logic"""
 
-    def update(pkt):
-        self.policy = if_(match(dstmac=pkt['srcmac'],
+    def update_policy():
+        """Update the policy based on current forward and query policies"""
+        self.policy = self.forward | self.query
+    self.update_policy = update_policy
+
+    def learn_new_MAC(pkt):
+        """Update forward policy based on newly seen (mac,port)"""
+        self.forward = if_(match(dstmac=pkt['srcmac'],
                                 switch=pkt['switch']),
                           fwd(pkt['inport']),
-                          self.policy)
+                          self.forward) 
+        self.update_policy()
 
-    q = packets(1,['srcmac','switch'])
-    q.when(update)
-    self.policy = flood | q
+    self.query = packets(1,['srcmac','switch'])
+    self.query.register_callback(learn_new_MAC)
+    self.forward = flood
+    self.update_policy()
+
 
 def mac_learner():
+    """Create a dynamic policy object from learn()"""
     return dynamic(learn)()
-
 
 def main():
-    return dynamic(learn)()
+    return mac_learner()

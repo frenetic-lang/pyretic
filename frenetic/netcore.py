@@ -1106,14 +1106,14 @@ class MutablePolicy(DerivedPolicy):
     def query(self, pred=all_packets):
         b = packets()
         self.policy |= pred[b]
-        return b.when
+        return b.register_callback
 
     ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
     def query_limit(self, pred=all_packets, limit=None, fields=[]):
         if limit:
             b = packets(limit,fields)
             self.policy |= pred[b]
-            return b.when
+            return b.register_callback
         else:
             return self.query(pred)
 
@@ -1125,7 +1125,7 @@ class MutablePolicy(DerivedPolicy):
     def query_count(self, pred=all_packets, interval=None, group_by=[]):
         b = counts(interval,group_by)
         self.policy |= pred[b]
-        return b.when
+        return b.register_callback
 
         
 # dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
@@ -1133,11 +1133,10 @@ def dynamic(fn):
     class DecoratedPolicy(MutablePolicy):
         def __init__(self, *args, **kwargs):
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
-            # IN PARICULAR, THE when FUNCTION RETURNED BY self.query 
+            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
             # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
             # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
-            # FUNCTION TO WHICH when IS ASSIGNED AS when IS EVALUATED
-            # EACH TIME A NEW EVENT OCCURS
+            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
             MutablePolicy.__init__(self)
             fn(self, *args, **kwargs)
             
@@ -1157,13 +1156,16 @@ class queries_base(SimplePolicy):
             listener(packet)
         return Counter()
 
-    ### when : (Packet -> unit) -> (Packet -> unit)  
+    ### register_callback : (Packet -> unit) -> (Packet -> unit)  
     # UNCLEAR IF THIS SIGNATURE IS OVERLY RESTRICTIVE 
     # CODE COULD PERMIT (Packet -> X) WHERE X not unit
     # CURRENT EXAMPLES USE SOLELY SIDE-EFFECTING FUNCTIONS
-    def when(self, fn):
+    def register_callback(self, fn):
         self.listeners.append(fn)
         return fn
+
+    def when(self, fn):
+        return self.register_callback(fn)
 
         
 class packets(queries_base):
