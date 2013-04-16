@@ -60,7 +60,7 @@ class POXBackend(revent.EventMixin):
             self.listenTo(core.openflow)
 
         self.policy = main(**kwargs)
-        self.policy.attach(self.network)
+        self.policy.attach_network(self.network)
 
         
     def vlan_from_diff(self, diff):

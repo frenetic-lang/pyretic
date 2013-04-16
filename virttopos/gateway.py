@@ -113,12 +113,12 @@ class GatewayVirt(Virtualizer):
 
         self.transform_network = functools.partial(transform_network, transformer)
 
-    def attach(self, network):
+    def attach_network(self, network):
         pass
 
     def update_network(self, network):
         pass
 
-    def detach(self, network):
+    def detach_network(self, network):
         pass
 

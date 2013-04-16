@@ -71,7 +71,7 @@ class SpanningTree(object):
         vtopo = Topology.minimum_spanning_tree(network.topology)
         self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
         
-    def attach(self, network):
+    def attach_network(self, network):
         vtopo = Topology.minimum_spanning_tree(network.topology)
         self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
 

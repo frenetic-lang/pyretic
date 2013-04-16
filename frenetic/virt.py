@@ -187,11 +187,11 @@ class virtualize(DerivedPolicy):
         self.virtdef.update_network(network)
         DerivedPolicy.update_network(self, network)
         
-    def attach(self, network):
-        self.virtdef.attach(network)
-        DerivedPolicy.attach(self, network)
+    def attach_network(self, network):
+        self.virtdef.attach_network(network)
+        DerivedPolicy.attach_network(self, network)
         
-    def detach(self, network):
-        self.virtdef.detach(network)
-        DerivedPolicy.detach(self, network)
+    def detach_network(self, network):
+        self.virtdef.detach_network(network)
+        DerivedPolicy.detach_network(self, network)
         

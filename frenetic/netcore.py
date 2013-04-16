@@ -148,11 +148,11 @@ class Predicate(object):
     def update_network(self, network):
         raise NotImplementedError
         
-    def attach(self, network):
+    def attach_network(self, network):
         """Not intended for general use."""
         raise NotImplementedError
 
-    def detach(self, network):
+    def detach_network(self, network):
         raise NotImplementedError
 
     def eval(self, network, packet):
@@ -167,24 +167,24 @@ class DerivedPredicate(Predicate):
     def update_network(self, network):
         self.predicate.update_network(network)
         
-    def attach(self, network):
-        self.predicate.attach(network)
+    def attach_network(self, network):
+        self.predicate.attach_network(network)
 
     def eval(self, network, packet):
         return self.predicate.eval(network, packet)
 
-    def detach(self, network):
-        self.predicate.detach(network)
+    def detach_network(self, network):
+        self.predicate.detach_network(network)
         
 
 class SimplePredicate(Predicate):
     def update_network(self, network):
         pass
         
-    def attach(self, network):
+    def attach_network(self, network):
         pass
 
-    def detach(self, network):
+    def detach_network(self, network):
         pass
         
         
@@ -296,16 +296,16 @@ class union(Predicate):
         for pred in self.predicates:
             pred.update_network(network)
         
-    def attach(self, network):
+    def attach_network(self, network):
         for pred in self.predicates:
-            pred.attach(network)
+            pred.attach_network(network)
             
     def eval(self, network, packet):
         return any(predicate.eval(network, packet) for predicate in self.predicates)
 
-    def detach(self, network):
+    def detach_network(self, network):
         for pred in self.predicates:
-            pred.detach(network)
+            pred.detach_network(network)
 
         
 class intersect(Predicate):
@@ -322,16 +322,16 @@ class intersect(Predicate):
         for pred in self.predicates:
             pred.update_network(network)
             
-    def attach(self, network):
+    def attach_network(self, network):
         for pred in self.predicates:
-            pred.attach(network)
+            pred.attach_network(network)
             
     def eval(self, network, packet):
         return all(predicate.eval(network, packet) for predicate in self.predicates)
 
-    def detach(self, network):
+    def detach_network(self, network):
         for pred in self.predicates:
-            pred.detach(network)
+            pred.detach_network(network)
     
 
 class difference(Predicate):
@@ -353,20 +353,20 @@ class difference(Predicate):
             pred.update_network(network)
             
     ### attach : Network -> (Packet -> bool)
-    def attach(self, network):
-        self.base_predicate.attach(network)
+    def attach_network(self, network):
+        self.base_predicate.attach_network(network)
         for pred in self.diff_predicates:
-            pred.attach(network)
+            pred.attach_network(network)
         
     def eval(self, network, packet):
         return self.base_predicate.eval(network, packet) and not \
             any(pred.eval(network, packet)
                 for pred in self.diff_predicates)
 
-    def detach(self, network):
-        self.base_predicate.detach(network)
+    def detach_network(self, network):
+        self.base_predicate.detach_network(network)
         for pred in self.diff_predicates:
-            pred.detach(network)
+            pred.detach_network(network)
         
 
 class negate(Predicate):
@@ -381,18 +381,18 @@ class negate(Predicate):
         return "negate:\n%s" % util.repr_plus([self.predicate])
 
     def update_network(self, network):
-        self.predicate.attach(network)
+        self.predicate.attach_network(network)
     
     ### attach : Network -> (Packet -> bool)
-    def attach(self, network):
-        self.predicate.attach(network)
+    def attach_network(self, network):
+        self.predicate.attach_network(network)
         
         ### eval : Packet -> bool
     def eval(self, network, packet):
         return not self.predicate.eval(network, packet)
 
-    def detach(self, network):
-        self.predicate.detach(network)
+    def detach_network(self, network):
+        self.predicate.detach_network(network)
         
         
 ################################################################################
@@ -429,13 +429,13 @@ class Policy(object):
     def update_network(self, network):
         raise NotImplementedError
     
-    def attach(self, network):
+    def attach_network(self, network):
         raise NotImplementedError
 
     def eval(self, network, packet):
         raise NotImplementedError
         
-    def detach(self, network):
+    def detach_network(self, network):
         raise NotImplementedError
 
         
@@ -443,10 +443,10 @@ class SimplePolicy(Policy):
     def update_network(self, network):
         pass
         
-    def attach(self, network):
+    def attach_network(self, network):
         pass
 
-    def detach(self, network):
+    def detach_network(self, network):
         pass
         
 
@@ -458,14 +458,14 @@ class DerivedPolicy(Policy):
     def update_network(self, network):
         self.policy.update_network(network)
 
-    def attach(self, network):
-        self.policy.attach(network)
+    def attach_network(self, network):
+        self.policy.attach_network(network)
 
     def eval(self, network, packet):
         return self.policy.eval(network, packet)
 
-    def detach(self, network):
-        self.policy.detach(network)
+    def detach_network(self, network):
+        self.policy.detach_network(network)
 
 
 class pprint(SimplePolicy):
@@ -672,9 +672,9 @@ class remove(Policy):
         self.policy.update_network(network)
         
     ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        self.predicate.attach(network)
-        self.policy.attach(network)
+    def attach_network(self, network):
+        self.predicate.attach_network(network)
+        self.policy.attach_network(network)
 
     ### eval : Packet -> Counter List Packet
     def eval(self, network, packet):
@@ -683,9 +683,9 @@ class remove(Policy):
         else:
             return Counter()
             
-    def detach(self, network):
-        self.predicate.detach(network)
-        self.policy.detach(network)
+    def detach_network(self, network):
+        self.predicate.detach_network(network)
+        self.policy.detach_network(network)
         
 
 class restrict(Policy):
@@ -704,9 +704,9 @@ class restrict(Policy):
         self.policy.update_network(network)
 
     ### attach : Network -> (Packet -> Counter List Packet)
-    def attach(self, network):
-        self.predicate.attach(network)
-        self.policy.attach(network)
+    def attach_network(self, network):
+        self.predicate.attach_network(network)
+        self.policy.attach_network(network)
 
     ### eval : Packet -> Counter List Packet
     def eval(self, network, packet):
@@ -715,9 +715,9 @@ class restrict(Policy):
         else:
             return Counter()
             
-    def detach(self, network):
-        self.predicate.detach(network)
-        self.policy.detach(network)
+    def detach_network(self, network):
+        self.predicate.detach_network(network)
+        self.policy.detach_network(network)
  
 
 class parallel(Policy):
@@ -733,13 +733,13 @@ class parallel(Policy):
         for policy in self.policies:
             policy.update_network(network)
 
-    def attach(self, network):
+    def attach_network(self, network):
         for policy in self.policies:
-            policy.attach(network)
+            policy.attach_network(network)
 
-    def detach(self, network):
+    def detach_network(self, network):
         for policy in self.policies:
-            policy.attach(network)
+            policy.attach_network(network)
             
     def eval(self, network, packet):
         c = Counter()
@@ -762,13 +762,13 @@ class sequential(Policy):
         for policy in self.policies:
             policy.update_network(network)
 
-    def attach(self, network):
+    def attach_network(self, network):
         for policy in self.policies:
-            policy.attach(network)
+            policy.attach_network(network)
 
-    def detach(self, network):
+    def detach_network(self, network):
         for policy in self.policies:
-            policy.attach(network)
+            policy.attach_network(network)
 
     def eval(self, network, packet):
         lc = Counter([packet])
@@ -840,15 +840,15 @@ class NetworkDerivedPolicy(Policy):
         self.policies = {}
 
     def update_network(self, network):
-        self.detach(network)
-        self.attach(network)
+        self.detach_network(network)
+        self.attach_network(network)
         
-    def attach(self, network):
+    def attach_network(self, network):
         self.policies[network] = self.make_policy(network)
-        self.policies[network].attach(network)
+        self.policies[network].attach_network(network)
 
-    def detach(self, network):
-        self.policies[network].detach(network)
+    def detach_network(self, network):
+        self.policies[network].detach_network(network)
 
     def eval(self, network, packet):
         return self.policies[network].eval(network, packet)
@@ -871,17 +871,17 @@ class MultiplexedPolicy(Policy):
 
     def __setitem__(self, network, policy):
         old_policy = self[network]
-        old_policy.detach(network)
+        old_policy.detach_network(network)
         self._policies[network] = policy
-        policy.attach(network)
+        policy.attach_network(network)
 
     def update_network(self, network):
         self[network].update_network(network)
         
-    def attach(self, network):
+    def attach_network(self, network):
         pass
         
-    def detach(self, network):
+    def detach_network(self, network):
         pass
 
     def eval(self, network, packet):
@@ -915,18 +915,18 @@ class MutablePolicy(DerivedPolicy):
         self._policy = policy
         for network in self.networks:
             if old_policy is not None:
-                old_policy.detach(network)
-            policy.attach(network)
+                old_policy.detach_network(network)
+            policy.attach_network(network)
 
-    def attach(self, network):
+    def attach_network(self, network):
         if network not in self.networks:
             self.networks.add(network)
-            DerivedPolicy.attach(self, network)
+            DerivedPolicy.attach_network(self, network)
 
-    def detach(self, network):
+    def detach_network(self, network):
         assert network in self.networks
         self.networks.remove(network)
-        DerivedPolicy.detach(self, network)
+        DerivedPolicy.detach_network(self, network)
 
     ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
     def query(self, pred=all_packets):
@@ -1074,18 +1074,18 @@ class transform_network(Policy):
         return "transform_network\n%s" % util.repr_plus([self.policy])
 
     def update_network(self, network):
-        self.detach(network)
-        self.attach(network)
+        self.detach_network(network)
+        self.attach_network(network)
 
-    def attach(self, network):
+    def attach_network(self, network):
         if network not in self.transformed_networks:
             self.transformed_networks[network] = tn = self.transform(network)
-            self.policy.attach(tn)
+            self.policy.attach_network(tn)
 
     def eval(self, network, packet):
         return self.policy.eval(self.transformed_networks[network], packet)
 
-    def detach(self, network):
+    def detach_network(self, network):
         if network in self.transformed_networks:
-            self.policy.detach(self.transformed_networks[network])
+            self.policy.detach_network(self.transformed_networks[network])
         del self.transformed_networks[network]

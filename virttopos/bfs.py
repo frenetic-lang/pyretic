@@ -85,7 +85,7 @@ class BFS(object):
 
         self.vmaps[network] = topo_to_bfs_vmap(network.topology)
         
-    def attach(self, network):
+    def attach_network(self, network):
         if self.keep:
             topology = network.topology.filter_nodes(self.keep)
             if topology:

@@ -115,15 +115,6 @@ def fw(self,W):
     self.update_policy()
     
 
-# # HOW TO CHECK A REVERSE PATH
-# reverse_packet = overwrite(srcip='dstip',
-#                            dstip='srcip',
-#                            srcmac='dstmac',
-#                            dstmac='srcmac')
-# test_reverse = (reverse_packet >> self.policy).attach(self.network)
-    
-
-
 ### EXAMPLES ###
 
 def static_firewall_example():

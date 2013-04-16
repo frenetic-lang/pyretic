@@ -93,7 +93,7 @@ class monitor_packets_limit_by_src_dst(MutablePolicy):
     def __init__(self, limit=None):
         self.limit = limit
 
-    def attach(self, network):
+    def attach_network(self, network):
         @self.query_limit(all_packets,limit,['srcip','dstip'])
         def f(pkt):
             if self.limit:
@@ -102,7 +102,7 @@ class monitor_packets_limit_by_src_dst(MutablePolicy):
                 print "(no limit) I see packet:" 
         print pkt
         print "---------------"
-        MutablePolicy.attach(self, network)
+        MutablePolicy.attach_network(self, network)
     
 @dynamic
 def monitor_unique_packets(self):
