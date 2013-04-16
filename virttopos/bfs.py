@@ -70,36 +70,24 @@ def shortest_path_policy(topo,vmap):
                     pass
     return fabric_policy
 
+from frenetic import netcore
 
 class BFS(object):
     def __init__(self,keep=[]):
-        self.vmaps = {}
         self.keep = keep
-
-    def update_network(self, network):
-        if self.keep:
-            topology = network.topology.filter_nodes(self.keep)
-            if topology:
-                self.vmaps[network] = topo_to_bfs_vmap(topology)
-                return
-
-        self.vmaps[network] = topo_to_bfs_vmap(network.topology)
-        
-    def attach_network(self, network):
-        if self.keep:
-            topology = network.topology.filter_nodes(self.keep)
-            if topology:
-                self.vmaps[network] = topo_to_bfs_vmap(topology)
-                return
-
-        self.vmaps[network] = topo_to_bfs_vmap(network.topology)
 
     @property
     def transform_network(self):
-        from frenetic import netcore
         def f(network):
+            topology = network.topology
+            if self.keep:
+                tmp = network.topology.filter_nodes(self.keep)
+                if tmp:
+                    topology = tmp
+            self.vmap = topo_to_bfs_vmap(topology)
+
             vtopo = Topology()
-            add_nodes_from_vmap(self.vmaps[network], vtopo)
+            add_nodes_from_vmap(self.vmap, vtopo)
             n = Network(None)
             n.init_events()
             n.topology = vtopo
@@ -109,21 +97,49 @@ class BFS(object):
         
     @ndp_decorator
     def ingress_policy(self, network):
-        return vmap_to_ingress_policy(self.vmaps[network])
+
+        if network is None:
+            return netcore.drop
+
+        topology = network.topology
+        if self.keep:
+            tmp = network.topology.filter_nodes(self.keep)
+            if tmp:
+                topology = tmp
+        self.vmap = topo_to_bfs_vmap(topology)
+
+        return vmap_to_ingress_policy(self.vmap)
 
     @ndp_decorator
-    def fabric_policy(self, network):
-        if self.keep:
-            topology = network.topology.filter_nodes(self.keep)
-            if topology:
-                self.vmaps[network] = topo_to_bfs_vmap(topology)
-                return shortest_path_policy(topology, self.vmaps[network])
+    def fabric_policy(self, network): 
 
-        return shortest_path_policy(network.topology, self.vmaps[network])
+        if network is None:
+            return netcore.drop
+
+        topology = network.topology
+        if self.keep:
+            tmp = network.topology.filter_nodes(self.keep)
+            if tmp:
+                topology = tmp
+        self.vmap = topo_to_bfs_vmap(topology)
+       
+        return shortest_path_policy(topology, self.vmap)
+
 
     @ndp_decorator
     def egress_policy(self, network):
-        return vmap_to_egress_policy(self.vmaps[network])
+
+        if network is None:
+            return netcore.drop
+
+        topology = network.topology
+        if self.keep:
+            tmp = network.topology.filter_nodes(self.keep)
+            if tmp:
+                topology = tmp
+        self.vmap = topo_to_bfs_vmap(topology)
+
+        return vmap_to_egress_policy(self.vmap)
 
         
 transform = BFS()

@@ -74,7 +74,6 @@ def arp(self,mac_of={}):
 
     location_of = {}
     outstanding_requests = collections.defaultdict(dict)
-    this = self
 
     @self.query(ARP)
     def handle_arp(pkt):
@@ -89,13 +88,9 @@ def arp(self,mac_of={}):
         # RECORD THE LOCATION AT WHICH THIS NODE IS ATTACHED TO THE NETWORK
         if not srcip in location_of:
             location_of[srcip] = Location(switch,inport)
-            
 
         # GET THE NETWORK OBJECT
-        network = None
-        for n in this.networks:
-            network = n
-            break
+        network = self.network
 
         # IF THIS PACKET IS A REQUEST
         if opcode == 1:

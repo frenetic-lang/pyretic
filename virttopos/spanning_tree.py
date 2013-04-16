@@ -66,12 +66,8 @@ def one_to_one_fabric_policy(vmap):
 class SpanningTree(object):
     def __init__(self):
         self.vmaps = {}
-
-    def update_network(self, network):
-        vtopo = Topology.minimum_spanning_tree(network.topology)
-        self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
         
-    def attach_network(self, network):
+    def set_network(self, network):
         vtopo = Topology.minimum_spanning_tree(network.topology)
         self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
 

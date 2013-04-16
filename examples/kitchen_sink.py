@@ -121,14 +121,14 @@ def gateway_example(num_clients,num_servers):
         in_(gateway)[ gw ] | \
         in_(ip_core)[ ip_pol ]
 
-    return in_(ethernet)[ pprint('->eth') >> eth_pol >> pprint('eth->') ]  | \
-        in_(gateway)[ pprint('->gw') >> gw >> pprint('gw->') ] | \
-        in_(ip_core)[ pprint('->ip') >> ip_pol >> pprint('ip->') ]
+    return in_(ethernet)[ pkt_print('->eth') >> eth_pol >> pkt_print('eth->') ]  | \
+        in_(gateway)[ pkt_print('->gw') >> gw >> pkt_print('gw->') ] | \
+        in_(ip_core)[ pkt_print('->ip') >> ip_pol >> pkt_print('ip->') ]
             
 @dynamic
 def vgateway_example(self,num_clients,num_servers):
     ge = gateway_example(num_clients,num_servers)
-    self.policy = virtualize(ge, GatewayVirt(Recurse(self)))
+    self.policy = virtualize(ge, GatewayVirt(self))
 
 
 def main(clients='3',servers='3'):

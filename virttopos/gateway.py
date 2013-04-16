@@ -65,10 +65,10 @@ class GatewayVirt(Virtualizer):
             match(vswitch=1000, voutport=2)[pop_vheaders >> fwd(2)],
             # If we are destined to a fake switch, lets push another header that
             # says which fake switch we are at.
-            match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1") >> pop_vheaders >> redo],
-            match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3") >> pop_vheaders >> redo],
-            match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3") >> pop_vheaders >> redo],
-            match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2") >> pop_vheaders >> redo],
+            match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1") >> pop_vheaders >> recurse(redo)],
+            match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3") >> pop_vheaders >> recurse(redo)],
+            match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3") >> pop_vheaders >> recurse(redo)],
+            match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2") >> pop_vheaders >> recurse(redo)],
             # Destined to ip side
             match(vswitch=1002, voutport=1)[pop_vheaders >> fwd(3)],
             match(vswitch=1002, voutport=2)[pop_vheaders >> fwd(4)],
@@ -112,13 +112,4 @@ class GatewayVirt(Virtualizer):
             return n
 
         self.transform_network = functools.partial(transform_network, transformer)
-
-    def attach_network(self, network):
-        pass
-
-    def update_network(self, network):
-        pass
-
-    def detach_network(self, network):
-        pass
 

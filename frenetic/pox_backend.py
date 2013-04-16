@@ -60,7 +60,7 @@ class POXBackend(revent.EventMixin):
             self.listenTo(core.openflow)
 
         self.policy = main(**kwargs)
-        self.policy.attach_network(self.network)
+        self.policy.set_network(self.network)
 
         
     def vlan_from_diff(self, diff):
@@ -309,7 +309,7 @@ class POXBackend(revent.EventMixin):
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
                 self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
         
-        self.policy.update_network(self.network)
+        self.policy.set_network(self.network)
                         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
@@ -317,7 +317,7 @@ class POXBackend(revent.EventMixin):
         del self.switches[event.dpid]
         self.network.switch_parts.signal(event.dpid)
 
-        self.policy.update_network(self.network)
+        self.policy.set_network(self.network)
         
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
@@ -341,7 +341,7 @@ class POXBackend(revent.EventMixin):
             else:
                 raise RuntimeException("Unknown port status event")
 
-        self.policy.update_network(self.network)
+        self.policy.set_network(self.network)
 
     def handle_lldp(self,packet,event):
 
@@ -433,8 +433,7 @@ class POXBackend(revent.EventMixin):
 
         self.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
 
-        self.policy.update_network(self.network)
-        
+        self.policy.set_network(self.network)
         return
 #    return EventHalt # Probably nobody else needs this event
 
@@ -462,11 +461,11 @@ class POXBackend(revent.EventMixin):
             ipdb.set_trace()
         
         with ipdb.launch_ipdb_on_exception():
-            output = self.policy.eval(self.network, recv_packet)
+            output = self.policy.eval(recv_packet)
             
         if self.debug_packet_in == "drop" and not output:
             ipdb.set_trace()
-            output = self.policy.eval(self.network, recv_packet) # So we can step through it
+            output = self.policy.eval(recv_packet) # So we can step through it
         
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"

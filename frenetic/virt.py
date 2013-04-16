@@ -35,77 +35,11 @@ from frenetic.util import singleton, Data
 import itertools
 from collections import Counter
 
-
-################################################################################
-# Isolation
-################################################################################
-
-class isolate_policy(DerivedPolicy, Data("itag policy ingress_predicate egress_predicate")):
-    def __repr__(self):
-        return "isolate_policy %s\n%s" % (self.itag,
-                                          util.repr_plus(["POLICY",
-                                                          self.policy,
-                                                          "INGRESS PREDICATE",
-                                                          self.ingress_predicate,
-                                                          "EGRESS PREDICATE",
-                                                          self.egress_predicate]))
-    
-    def get_policy(self):
-        pol = (if_(match(itag=None)[self.ingress_predicate],
-                   push(itag=self.itag)) >>
-                match(itag=self.itag)[
-                   self.policy >>
-                   if_(is_bucket("outport") | self.egress_predicate, pop("itag"))])
-        return pol
-    
-class INetwork(Network):
-    def __init__(self):
-        super(INetwork, self).__init__()
-        
-        self._ipolicy = gs.Behavior(drop)
-        self._ingress_predicate = gs.Behavior(all_packets)
-        self._egress_predicate = gs.Behavior(no_packets)
-        
-        for b in [self._policy, self._ingress_predicate, self._egress_predicate]:
-            b.notify(self._handle_changes)
-        
-    ingress_predicate = gs.Behavior.property("_ingress_predicate")
-    egress_predicate = gs.Behavior.property("_egress_predicate")
-    
-    def connect(self, network):
-        """different than base"""
-        @self._ipolicy.notify
-        def change(policy):
-            network.install_sub_policy(self, policy)
-
-    def sync_with_topology(self):
-        @self._topology.notify
-        def handle(topology):
-            self.egress_predicate = union(match(switch=l.switch,outport=l.port) 
-                                          for l in topology.egress_locations())
-            
-    def _handle_changes(self, item):
-        self._ipolicy.set(self._aggregate_ipolicy())
-
-    def _aggregate_ipolicy(self):
-        return isolate_policy(id(self),
-                              self.policy,
-                              self.ingress_predicate,
-                              self.egress_predicate)
-
-    @property
-    def ipolicy(self):
-        return self._ipolicy.get()
-        
-    @property
-    def ipolicy_changes(self):
-        return iter(self._ipolicy)
-
 ################################################################################
 # Virtualization policies 
 ################################################################################
 
-class physical_to_virtual(DerivedPolicy):
+class physical_to_virtual(SinglyDerivedPolicy):
     def __init__(self, vtag):
         self.vtag = vtag
         self.policy = (push(vtag=self.vtag) >> move(voutport="outport",
@@ -117,7 +51,7 @@ class physical_to_virtual(DerivedPolicy):
 
         
 @singleton
-class virtual_to_physical(DerivedPolicy):
+class virtual_to_physical(SinglyDerivedPolicy):
     def __init__(self):
         self.policy = (pop("switch", "inport", "outport", "vtag") >>
                        move(outport="voutport", switch="vswitch", inport="vinport"))
@@ -127,7 +61,7 @@ class virtual_to_physical(DerivedPolicy):
 
         
 @singleton
-class pop_vheaders(DerivedPolicy):
+class pop_vheaders(SinglyDerivedPolicy):
     def __init__(self):
         self.policy = pop("vswitch", "vinport", "voutport", "vtag")
         
@@ -164,7 +98,7 @@ def vmap_to_egress_policy(vmap):
 class Virtualizer(object):
     pass
 
-class virtualize(DerivedPolicy):
+class virtualize(SinglyDerivedPolicy):
     def __init__(self, policy, virtdef):
         self.vpolicy = policy
         self.virtdef = virtdef
@@ -182,16 +116,3 @@ class virtualize(DerivedPolicy):
         
     def __repr__(self):
         return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)
-
-    def update_network(self, network):
-        self.virtdef.update_network(network)
-        DerivedPolicy.update_network(self, network)
-        
-    def attach_network(self, network):
-        self.virtdef.attach_network(network)
-        DerivedPolicy.attach_network(self, network)
-        
-    def detach_network(self, network):
-        self.virtdef.detach_network(network)
-        DerivedPolicy.detach_network(self, network)
-        
