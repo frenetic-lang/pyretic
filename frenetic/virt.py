@@ -93,26 +93,36 @@ def vmap_to_egress_policy(vmap):
     return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
 
 
-# New style combinators
-
-class Virtualizer(object):
-    pass
-
 class virtualize(SinglyDerivedPolicy):
-    def __init__(self, policy, virtdef):
+    def __init__(self, policy, virtualizer):
         self.vpolicy = policy
-        self.virtdef = virtdef
+        self.vnetwork = None
+        self.virtualizer = virtualizer
         self.vtag = id(self)
         self.policy = (
             if_(~match(vtag=self.vtag), 
-                (self.virtdef.ingress_policy >> # set vswitch and vinport
+                 pkt_print("virtualize:") >>
+                 self.virtualizer.ingress_policy >> # set vswitch and vinport
+                 pkt_print("ingress:") >>
                  # now make the virtualization transparent to the tenant's policy to get the outport
                  move(switch="vswitch", inport="vinport") >>
-                 self.virtdef.transform_network(self.vpolicy) >>
-                 physical_to_virtual(self.vtag)))
-            # Pipe the packet with appropriate v* headers to the physical policy for processing
-            >> self.virtdef.fabric_policy
-            >> self.virtdef.egress_policy)
+                 pkt_print("lift:") >>
+                 self.vpolicy >>
+                 pkt_print("derived:") >>
+                 physical_to_virtual(self.vtag) >>
+                 pkt_print("lower:") ) >> 
+            self.virtualizer.fabric_policy >>
+            pkt_print("fabric:") >>
+            self.virtualizer.egress_policy >>
+            pkt_print("egress:") )
+
+    def set_network(self, value)
+        if not value is None:
+            vnetwork = self.virtualizer.transform(value)
+        else:
+            vnetwork = None
+        self.vpolicy.set_network(vnetwork)
+        super(virtualize,self).set_network(value)
         
     def __repr__(self):
         return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)

@@ -76,25 +76,23 @@ class BFS(object):
     def __init__(self,keep=[]):
         self.keep = keep
 
-    @property
-    def transform_network(self):
-        def f(network):
-            topology = network.topology
-            if self.keep:
-                tmp = network.topology.filter_nodes(self.keep)
-                if tmp:
-                    topology = tmp
-            self.vmap = topo_to_bfs_vmap(topology)
-
-            vtopo = Topology()
-            add_nodes_from_vmap(self.vmap, vtopo)
-            n = Network(None)
-            n.init_events()
-            n.topology = vtopo
-            n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
-            return n
-        return functools.partial(netcore.transform_network, f)
+    def transform(self,network):
+        """produces a new network object w/ transformed topology"""
+        topology = network.topology
+        if self.keep:
+            tmp = network.topology.filter_nodes(self.keep)
+            if tmp:
+                topology = tmp
+        self.vmap = topo_to_bfs_vmap(topology)
         
+        vtopo = Topology()
+        add_nodes_from_vmap(self.vmap, vtopo)
+        vnetwork = Network(None)
+        vnetwork.init_events()
+        vnetwork.topology = vtopo
+        vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+        return vnetwork
+                
     @ndp_decorator
     def ingress_policy(self, network):
 

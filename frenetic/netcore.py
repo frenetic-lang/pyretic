@@ -721,24 +721,6 @@ class breakpoint(SinglyDerivedPolicy):
         return "***debug***\n%s" % util.repr_plus([self.policy])
 
 
-class transform_network(SinglyDerivedPolicy):
-    def __init__(self, transform, policy):
-        self.transform = transform
-        super(transform_network,self).__init__(policy)
-
-    def __repr__(self):
-        return "transform_network\n%s" % util.repr_plus([self.policy])
-
-    def set_network(self, value):
-        if not value is None:
-            super(transform_network,self).set_network(self.transform(value))
-        else:
-            super(transform_network,self).set_network(value)
-
-    def eval(self, packet):
-        return self.policy.eval(packet)
-
-
 class NetworkDerivedPolicy(SinglyDerivedPolicy):
     def __init__(self, make_policy):
         self.make_policy = make_policy

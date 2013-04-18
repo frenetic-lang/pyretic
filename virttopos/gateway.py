@@ -36,7 +36,7 @@
 
 from frenetic.lib import *
 
-class GatewayVirt(Virtualizer):
+class GatewayVirt(object):
     def __init__(self, redo):
         self.ingress_policy = if_(match(switch=1),
                # At physical gateway, ethernet side. Pretend we are switch 1000.
@@ -77,12 +77,12 @@ class GatewayVirt(Virtualizer):
 
         self.egress_policy = passthrough
 
-        def transformer(network):
+        def transform(self,network):
             vtopo = network.topology.copy()
-            n = Network(None)
-            n.init_events()
-            n.topology = vtopo
-            n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+            vnetwork = Network(None)
+            vnetwork.init_events()
+            vnetwork.topology = vtopo
+            vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
             try:
                 # REMOVE PHYSICAL SWITCHES ONTO WHICH VIRTUAL SWITCHES WILL BE MAPPED
@@ -109,7 +109,5 @@ class GatewayVirt(Virtualizer):
             print "----Abstracted Topology ------"
             print vtopo
 
-            return n
-
-        self.transform_network = functools.partial(transform_network, transformer)
+            return vnetwork
 

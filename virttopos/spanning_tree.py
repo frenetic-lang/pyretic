@@ -71,18 +71,15 @@ class SpanningTree(object):
         vtopo = Topology.minimum_spanning_tree(network.topology)
         self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
 
-    @property
-    def transform_network(self):
-        from frenetic import netcore
-        def f(network):
-            vtopo = Topology.minimum_spanning_tree(network.topology)
-            vmap = topo_to_st_vmap(network.topology, vtopo)
-            n = Network(None)
-            n.init_events()
-            n.topology = vtopo
-            n.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
-            return n
-        return functools.partial(netcore.transform_network, f)
+    from frenetic import netcore
+    def transform(self,network):
+        vtopo = Topology.minimum_spanning_tree(network.topology)
+        vmap = topo_to_st_vmap(network.topology, vtopo)
+        vnetwork = Network(None)
+        vnetwork.init_events()
+        vnetwork.topology = vtopo
+        vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+        return vnetwork
         
     @ndp_decorator
     def ingress_policy(self, network):
