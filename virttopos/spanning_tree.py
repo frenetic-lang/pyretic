@@ -65,33 +65,35 @@ def one_to_one_fabric_policy(vmap):
 
 class SpanningTree(object):
     def __init__(self):
-        self.vmaps = {}
+        self.vmap = None
         
-    def set_network(self, network):
-        vtopo = Topology.minimum_spanning_tree(network.topology)
-        self.vmaps[network] = topo_to_st_vmap(network.topology, vtopo)
-
     from frenetic import netcore
-    def transform(self,network):
+    def network_transform(self,network):
         vtopo = Topology.minimum_spanning_tree(network.topology)
-        vmap = topo_to_st_vmap(network.topology, vtopo)
+        self.vmap = topo_to_st_vmap(network.topology, vtopo)
         vnetwork = Network(None)
         vnetwork.init_events()
         vnetwork.topology = vtopo
         vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+
+        print "------- Underlying ---------"
+        print network.topology
+        print "------- Derived ---------"
+        print vnetwork.topology
+
         return vnetwork
         
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
-        return vmap_to_ingress_policy(self.vmaps[network])
+        return vmap_to_ingress_policy(self.vmap)
 
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network):
-        return one_to_one_fabric_policy(self.vmaps[network])
+        return one_to_one_fabric_policy(self.vmap)
 
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-        return vmap_to_egress_policy(self.vmaps[network])
+        return vmap_to_egress_policy(self.vmap)
 
 transform = SpanningTree()
 

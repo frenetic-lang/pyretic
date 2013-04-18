@@ -177,6 +177,8 @@ class Packet(object):
     def push(self, **kwargs):
         return self.pushmany(kwargs)
     
+    ### CHECK IF THIS IS CORRECT - WE SHOULD BE ABLE TO POP ALL VALUES OFF VIRTUAL FIELDS...
+    ### WE SHOULDN'T ERROR OUT HERE
     def popmany(self, fields):
         r = {}
         for field in fields:

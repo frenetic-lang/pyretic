@@ -36,39 +36,9 @@ import itertools
 from collections import Counter
 
 ################################################################################
-# Virtualization policies 
+# VMAP functions
 ################################################################################
 
-class physical_to_virtual(SinglyDerivedPolicy):
-    def __init__(self, vtag):
-        self.vtag = vtag
-        self.policy = (push(vtag=self.vtag) >> move(voutport="outport",
-                                                    vswitch="switch",
-                                                    vinport="inport"))
-        
-    def __repr__(self):
-        return "physical_to_virtual %s" % self.vtag
-
-        
-@singleton
-class virtual_to_physical(SinglyDerivedPolicy):
-    def __init__(self):
-        self.policy = (pop("switch", "inport", "outport", "vtag") >>
-                       move(outport="voutport", switch="vswitch", inport="vinport"))
-        
-    def __repr__(self):
-        return "virtual_to_physical"
-
-        
-@singleton
-class pop_vheaders(SinglyDerivedPolicy):
-    def __init__(self):
-        self.policy = pop("vswitch", "vinport", "voutport", "vtag")
-        
-    def __repr__(self):
-        return "pop_vheaders"
-
-        
 def add_nodes_from_vmap(vmap, vtopo):
     for switch, port_no in vmap:
         port = Port(port_no)
@@ -76,11 +46,12 @@ def add_nodes_from_vmap(vmap, vtopo):
             vtopo.node[switch]['ports'][port_no] = port 
         except KeyError:
             vtopo.add_node(switch, ports={port_no: port})
-    
+
 def vmap_to_ingress_policy(vmap):
-    ingress_policy = parallel(union(match(switch=sw, inport=p) for (sw, p) in switches)[
-                                  push(vswitch=vsw, vinport=vp)]
-                              for ((vsw, vp), switches) in vmap.iteritems())
+    non_ingress = ~union(
+        union(match(switch=sw, inport=p) for (sw, p) in switches) 
+        for ((vsw, vp), switches) in vmap.iteritems() )
+    ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=sw, inport=p) for (sw, p) in switches)[push(vtag='ingress', vswitch=vsw, vinport=vp)] for ((vsw, vp), switches) in vmap.iteritems())
     return ingress_policy
 
 def vmap_to_egress_policy(vmap):
@@ -93,36 +64,77 @@ def vmap_to_egress_policy(vmap):
     return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
 
 
+################################################################################
+# Virtualization policies 
+################################################################################
+
+class lower_packet(SinglyDerivedPolicy):
+    """Lowers a packet from the derived network to the underlying network"""
+    def __init__(self, vtag):
+        self.vtag = vtag
+        self.policy = (push(vtag=self.vtag) >> move(voutport="outport",
+                                                    vswitch="switch",
+                                                    vinport="inport"))
+        
+    def __repr__(self):
+        return "lower_packet %s" % self.vtag
+
+        
+@singleton
+class lift_packet(SinglyDerivedPolicy):
+    """Lifts a packet from the underlying network to the derived network"""
+    def __init__(self):
+#        self.policy = (pop("switch", "inport", "outport", "vtag") >>
+        self.policy = (pop("vtag") >>
+                       move(outport="voutport", switch="vswitch", inport="vinport"))
+        
+    def __repr__(self):
+        return "lift_packet"
+
+        
+@singleton
+class pop_vheaders(SinglyDerivedPolicy):
+    def __init__(self):
+        self.policy = pop("vswitch", "vinport", "voutport", "vtag")
+        
+    def __repr__(self):
+        return "pop_vheaders"
+
+        
 class virtualize(SinglyDerivedPolicy):
-    def __init__(self, policy, virtualizer):
+    def __init__(self, policy, vdef):
         self.vpolicy = policy
         self.vnetwork = None
-        self.virtualizer = virtualizer
+        self.vdef = vdef
         self.vtag = id(self)
         self.policy = (
-            if_(~match(vtag=self.vtag), 
-                 pkt_print("virtualize:") >>
-                 self.virtualizer.ingress_policy >> # set vswitch and vinport
-                 pkt_print("ingress:") >>
-                 # now make the virtualization transparent to the tenant's policy to get the outport
-                 move(switch="vswitch", inport="vinport") >>
-                 pkt_print("lift:") >>
-                 self.vpolicy >>
-                 pkt_print("derived:") >>
-                 physical_to_virtual(self.vtag) >>
-                 pkt_print("lower:") ) >> 
-            self.virtualizer.fabric_policy >>
-            pkt_print("fabric:") >>
-            self.virtualizer.egress_policy >>
-            pkt_print("egress:") )
+            pkt_print("virtualize:") >>
+            self.vdef.ingress_policy >> # set vswitch and vinport
+            pkt_print("after ingress:") >>
+            ### IF INGRESSING LIFT AND EVALUATE
+            if_(match(vtag='ingress'), 
+                 lift_packet >>
+                 pkt_print("after lift:") >>
+                 pol_print(self.vpolicy,'derived policy is:') >>
+                 pkt_print("after derived policy:") >>
+                 lower_packet(self.vtag) >>
+                 pkt_print("after lower:"),
+                passthrough) >> 
+            ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
+            if_(match(vtag=self.vtag), 
+                self.vdef.fabric_policy >>
+                pkt_print("after fabric:") >>
+                self.vdef.egress_policy >>
+                pkt_print("after egress:"),
+                passthrough) ) 
 
-    def set_network(self, value)
+    def set_network(self, value):
         if not value is None:
-            vnetwork = self.virtualizer.transform(value)
+            vnetwork = self.vdef.network_transform(value)
         else:
             vnetwork = None
-        self.vpolicy.set_network(vnetwork)
         super(virtualize,self).set_network(value)
+        self.vpolicy.set_network(vnetwork) 
         
     def __repr__(self):
         return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)

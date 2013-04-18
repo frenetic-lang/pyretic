@@ -363,7 +363,7 @@ class Policy(NetworkEvaluated):
     ### eq : Policy -> bool
     def __eq__(self, other):
         raise NotImplementedError
-               
+
 
 class pkt_print(Policy):
     def __init__(self,s=''):
@@ -423,7 +423,10 @@ class drop(Policy):
 class flood(Policy):
     ### repr : unit -> String
     def __repr__(self):
-        return "flood"
+        try: 
+            return "flood on:\n%s" % self.mst
+        except:
+            return "flood"
 
     def set_network(self, value):
         if not value is None:
@@ -449,22 +452,6 @@ class flood(Policy):
         else:
             return Counter()
         
-       
-class fwd(Policy):
-    """Forward packet out of a particular port"""
-    ### init : int -> unit
-    def __init__(self, outport):
-        self.outport = outport
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "fwd %s" % self.outport
-    
-    ### eval : Packet -> Counter List Packet        
-    def eval(self, packet):
-        packet = packet.push(outport=self.outport)
-        return Counter([packet])
-
         
 class push(Policy):
     """push(field=value) pushes value onto header field stack"""
@@ -479,6 +466,23 @@ class push(Policy):
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
         packet = packet.pushmany(self.map)
+        return Counter([packet])
+
+
+class fwd(Policy):
+    """Forward packet out of a particular port
+    fwd(a) equivalent to push(outport=a)"""
+    ### init : int -> unit
+    def __init__(self, outport):
+        self.outport = outport
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "fwd %s" % self.outport
+    
+    ### eval : Packet -> Counter List Packet        
+    def eval(self, packet):
+        packet = packet.push(outport=self.outport)
         return Counter([packet])
 
         
@@ -557,9 +561,13 @@ class move(Policy):
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
         pushes = {}
+        pops = []
         for (dstfield, srcfield) in self.map.iteritems():
-            pushes[dstfield] = packet[srcfield]
-        pops = self.map.values()
+            try:
+                pushes[dstfield] = packet[srcfield]
+                pops.append(srcfield)
+            except KeyError:
+                pass
         packet = packet.pushmany(pushes).popmany(pops)
         return Counter([packet])
 
@@ -626,6 +634,20 @@ class SinglyDerivedPolicy(Policy):
 
     def eval(self, packet):
         return self.policy.eval(packet)
+
+class pol_print(SinglyDerivedPolicy):
+    def __init__(self,policy,s=''):
+        super(pol_print,self).__init__(policy)
+        self.s = s    
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "[pol_print %s]\n%s" % (self.s,self.policy)
+
+    def eval(self, packet):
+        print self.s 
+        print self.policy
+        return super(pol_print,self).eval(packet)
 
 class recurse(SinglyDerivedPolicy):
     def set_network(self, value):
@@ -722,11 +744,15 @@ class breakpoint(SinglyDerivedPolicy):
 
 
 class NetworkDerivedPolicy(SinglyDerivedPolicy):
-    def __init__(self, make_policy):
-        self.make_policy = make_policy
+    """Generates new policy every time a new network is set"""
+    def __init__(self, policy_from_network):
+        self.policy_from_network = policy_from_network
 
     def set_network(self, value):
-        self.policy = self.make_policy(value)
+        if not value is None:
+            self.policy = self.policy_from_network(value)
+        else:
+            self.policy = drop
         super(NetworkDerivedPolicy,self).set_network(value)
 
     def eval(self, packet):
@@ -737,13 +763,14 @@ class NetworkDerivedPolicy(SinglyDerivedPolicy):
         return "[NetworkDerivedPolicy]\n%s" % repr(self.policy)
 
     
-def ndp_decorator(fn):
+def NetworkDerivedPolicyPropertyFrom(network_to_policy):
+    """Makes a NetworkDerivedPolicy that is a property of a virtualization defintion 
+    from a policy taking a network and returning a policy"""
     @property
-    @functools.wraps(fn)
-    def decr(self):
-        return NetworkDerivedPolicy(functools.partial(fn, self))
-    return decr
-
+    @functools.wraps(network_to_policy)
+    def wrapper(self):
+        return NetworkDerivedPolicy(functools.partial(network_to_policy, self))
+    return wrapper
 
 
 class MutablePolicy(SinglyDerivedPolicy):

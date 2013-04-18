@@ -75,15 +75,17 @@ from frenetic import netcore
 class BFS(object):
     def __init__(self,keep=[]):
         self.keep = keep
+        self.vmap = None
+        self.underlying_topology = None
 
-    def transform(self,network):
-        """produces a new network object w/ transformed topology"""
-        topology = network.topology
+    def network_transform(self,network):
+        """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
+        self.underlying_topology = network.topology
         if self.keep:
             tmp = network.topology.filter_nodes(self.keep)
             if tmp:
-                topology = tmp
-        self.vmap = topo_to_bfs_vmap(topology)
+                self.underlying_topology = tmp
+        self.vmap = topo_to_bfs_vmap(self.underlying_topology)
         
         vtopo = Topology()
         add_nodes_from_vmap(self.vmap, vtopo)
@@ -91,52 +93,24 @@ class BFS(object):
         vnetwork.init_events()
         vnetwork.topology = vtopo
         vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+
+        print "------- Underlying ---------"
+        print network.topology
+        print "------- Derived ---------"
+        print vnetwork.topology
+
         return vnetwork
                 
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
-
-        if network is None:
-            return netcore.drop
-
-        topology = network.topology
-        if self.keep:
-            tmp = network.topology.filter_nodes(self.keep)
-            if tmp:
-                topology = tmp
-        self.vmap = topo_to_bfs_vmap(topology)
-
         return vmap_to_ingress_policy(self.vmap)
 
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network): 
+        return shortest_path_policy(self.underlying_topology, self.vmap)
 
-        if network is None:
-            return netcore.drop
-
-        topology = network.topology
-        if self.keep:
-            tmp = network.topology.filter_nodes(self.keep)
-            if tmp:
-                topology = tmp
-        self.vmap = topo_to_bfs_vmap(topology)
-       
-        return shortest_path_policy(topology, self.vmap)
-
-
-    @ndp_decorator
+    @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-
-        if network is None:
-            return netcore.drop
-
-        topology = network.topology
-        if self.keep:
-            tmp = network.topology.filter_nodes(self.keep)
-            if tmp:
-                topology = tmp
-        self.vmap = topo_to_bfs_vmap(topology)
-
         return vmap_to_egress_policy(self.vmap)
 
         
