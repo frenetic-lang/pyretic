@@ -101,40 +101,54 @@ class pop_vheaders(SinglyDerivedPolicy):
         return "pop_vheaders"
 
         
-class virtualize(SinglyDerivedPolicy):
-    def __init__(self, policy, vdef):
-        self.vpolicy = policy
+class virtualize_base(SinglyDerivedPolicy):
+    def __init__(self, upolicy, vpolicy, vdef):
+        self.vpolicy = vpolicy
         self.vnetwork = None
         self.vdef = vdef
         self.vtag = id(self)
+        self.DEBUG = False
         self.policy = (
-            pkt_print("virtualize:") >>
+            pkt_print("virtualize:",self.DEBUG) >>
             self.vdef.ingress_policy >> # set vswitch and vinport
-            pkt_print("after ingress:") >>
+            pkt_print("after ingress:",self.DEBUG) >>
             ### IF INGRESSING LIFT AND EVALUATE
             if_(match(vtag='ingress'), 
-                 lift_packet >>
-                 pkt_print("after lift:") >>
-                 pol_print(self.vpolicy,'derived policy is:') >>
-                 pkt_print("after derived policy:") >>
-                 lower_packet(self.vtag) >>
-                 pkt_print("after lower:"),
-                passthrough) >> 
+                lift_packet >>
+                pkt_print("after lift:",self.DEBUG) >>
+                pol_print(self.vpolicy,'derived policy is:',self.DEBUG) >>
+                pkt_print("after derived policy:",self.DEBUG) >>
+                lower_packet(self.vtag) >>
+                pkt_print("after lower:",self.DEBUG),
+                passthrough) >>
             ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
             if_(match(vtag=self.vtag), 
                 self.vdef.fabric_policy >>
-                pkt_print("after fabric:") >>
+                pkt_print("after fabric:",self.DEBUG) >>
                 self.vdef.egress_policy >>
-                pkt_print("after egress:"),
-                passthrough) ) 
+                pkt_print("after egress:",self.DEBUG),
+                upolicy >>
+                pkt_print("after underlying policy",self.DEBUG) ) 
+            )
+            
 
     def set_network(self, value):
         if not value is None:
             vnetwork = self.vdef.network_transform(value)
         else:
             vnetwork = None
-        super(virtualize,self).set_network(value)
+        super(virtualize_base,self).set_network(value)
         self.vpolicy.set_network(vnetwork) 
         
     def __repr__(self):
-        return "virtualize_policy %s\n%s" % (self.vtag, self.virtdef)
+        return "virtualize %s\n%s" % (self.vtag, self.vdef)
+
+
+class virtualize_full(virtualize_base):
+    def __init__(self, vpolicy, vdef):
+        super(virtualize_full,self).__init__(passthrough, vpolicy, vdef)
+
+
+class virtualize_part(virtualize_base):
+    def __init__(self, policy, vdef):
+        super(virtualize_part,self).__init__(policy, policy, vdef)

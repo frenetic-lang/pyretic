@@ -366,34 +366,44 @@ class Policy(NetworkEvaluated):
 
 
 class pkt_print(Policy):
-    def __init__(self,s=''):
+    def __init__(self,s='',on=True):
         self.s = s
+        self.on = on
 
     ### repr : unit -> String
     def __repr__(self):
-        return "pkt_print %s" % self.s
+        if self.on:
+            return "pkt_print %s" % self.s
+        else:
+            return ''
         
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
-        print "---- pkt_print %s -------" % self.s
-        print packet
-        print "-------------------------------"
+        if self.on:
+            print "---- pkt_print %s -------" % self.s
+            print packet
+            print "-------------------------------"
         return Counter([packet])
 
 
 class net_print(Policy):
-    def __init__(self,s=''):
+    def __init__(self,s='',on=True):
         self.s = s
+        self.on = on
 
     ### repr : unit -> String
     def __repr__(self):
-        return "net_print %s" % self.s
-        
+        if self.on:
+            return "net_print %s" % self.s
+        else:
+            return ''
+
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
-        print "---- net_print %s -------" % self.s
-        print self.network
-        print "-------------------------------"
+        if self.on:
+            print "---- net_print %s -------" % self.s
+            print self.network
+            print "-------------------------------"
         return Counter([packet])
         
 @singleton
@@ -636,17 +646,22 @@ class SinglyDerivedPolicy(Policy):
         return self.policy.eval(packet)
 
 class pol_print(SinglyDerivedPolicy):
-    def __init__(self,policy,s=''):
+    def __init__(self,policy,s='',on=True):
         super(pol_print,self).__init__(policy)
         self.s = s    
+        self.on = on
 
     ### repr : unit -> String
     def __repr__(self):
-        return "[pol_print %s]\n%s" % (self.s,self.policy)
+        if self.on:
+            return "[pol_print %s]\n%s" % (self.s,self.policy)
+        else:
+            return ''
 
     def eval(self, packet):
-        print self.s 
-        print self.policy
+        if self.on:
+            print self.s 
+            print self.policy
         return super(pol_print,self).eval(packet)
 
 class recurse(SinglyDerivedPolicy):
