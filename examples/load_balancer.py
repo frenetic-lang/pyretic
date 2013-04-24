@@ -47,7 +47,6 @@
 
 import math
 from frenetic.lib import *
-from virttopos.bfs import BFS
 
 def subs(c,r,p):
     """from client, substitute replica address for the public address 

@@ -36,7 +36,7 @@
 
 from frenetic.lib import *
 
-class GatewayVirt(object):
+class gateway_vdef(object):
     def __init__(self, redo):
         self.ingress_policy = if_(match(switch=1),
                push(vtag='ingress') >> (                                

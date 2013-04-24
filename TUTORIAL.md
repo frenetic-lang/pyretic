@@ -7,29 +7,29 @@ Instructions for running each example are included below.
 ------------------------------
 arp.py
 ------------------------------
-pyretic/mininet.sh --topo clique,4,4                                                                                                                                                                                  
-run controller: pox.py --no-cli pyretic/examples/arp.py                                                                                                                                                                             
-in mininet: run pingall    once or twice, try clearing a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping                                                                                                            
-output from controller    NO RESPONSE AVAILABLE message should only show up once for each end host IP address                                                                                                                               
+start mininet:  pyretic/mininet.sh --topo clique,4,4  
+run controller: pox.py --no-cli pyretic/examples/arp.py
+in mininet: run pingall    once or twice, try clearing a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping
+output from controller    NO RESPONSE AVAILABLE message should only show up once for each end host IP address                         
 
 ------------------------------
 hub.py
 ------------------------------
-start mininet:  ./pyretic/mininet.sh --switch ovsk --topo clique,4,4                                                     
+start mininet:  pyretic/mininet.sh --topo clique,4,4                                                     
 run controller: pox.py --no-cli pyretic/examples/hub.py                 
 in mininet: check connectivity with pingall
 
 ------------------------------
 mac_learner.py
 ------------------------------
-start mininet:  pyretic/mininet.sh --mac --topo linear,3                                                                 
+start mininet:  pyretic/mininet.sh --topo linear,3                                                                 
 run controller: pox.py --no-cli pyretic/examples/mac_learner.py   
 in mininet: check connectivity with pingall
 
 ------------------------------
 monitor.py
 ------------------------------
-start mininet:  pyretic/mininet.sh --mac --topo linear,3                                                                 
+start mininet:  pyretic/mininet.sh --topo linear,3                                                                 
 run controller: pox.py --no-cli pyretic/examples/monitor.py   
 ping away and watch the statistics fly (or change which example(s) execute in main and watch the packets fly)
 
@@ -40,7 +40,7 @@ start mininet:  pyretic/mininet.sh --topo=bump_clique,1,5,3
 run controller: pox.py --no-cli pyretic/examples/load_balancer.py --clients=5 --servers=3
 test:           hX ping -c 1 10.0.0.100 will work from each host                                       
                 all nodes will be able to ping each other, except hosts to their load-balanced instance 
-                pingall will output                                                                                                                                                                                               
+                pingall will output
                 h1 -> h2 h3 h4 h5 X hs2 hs3                                                                     
                 h2 -> h1 h3 h4 h5 hs1 X hs3                                                                     
                 h3 -> h1 h2 h4 h5 hs1 hs2 X                                                                     
@@ -68,9 +68,8 @@ kitchen_sink.py
 ------------------------------
 "Firewall, load balance and route."
 
-./pyretic/mininet.sh --switch ovsk --topo gateway
-pox.py --no-cli pyretic/examples/kitchen_sink.py 
-
+start mininet:  pyretic/mininet.sh --switch ovsk --topo gateway
+run controller: pox.py --no-cli pyretic/examples/kitchen_sink.py 
 in mininet:  hN ping each other and 10.0.0.100 for N={1,2,3}, all other pings fail
 
 sample output:
@@ -88,6 +87,6 @@ virtualize.py
 "Lets you run any module above on an abstract topology"
 
 e.g.,
-pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/bfs.py
-pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/arp.py --virttopo=pyretic/virttopos/spanning_tree.py
-pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/load_balancer.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/bfs_vdef.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/arp.py --virttopo=pyretic/virttopos/spanning_tree_vdef.py
+pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/load_balancer.py --clients=3 --servers=2 --virttopo=pyretic/virttopos/spanning_tree_vdef.py

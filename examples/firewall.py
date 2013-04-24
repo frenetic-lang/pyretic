@@ -39,7 +39,6 @@
 from frenetic.lib import *
 from examples.hub import hub
 from examples.mac_learner import learn
-from virttopos.bfs import BFS
 
 ### FIREWALLS ###
 

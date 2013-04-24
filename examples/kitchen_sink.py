@@ -42,8 +42,8 @@ from examples.hub import hub
 from examples.arp import arp, ARP
 from examples.load_balancer import static_lb, lb
 from examples.firewall import fw
-from virttopos.gateway import GatewayVirt
-from virttopos.bfs import BFS
+from virttopos.gateway_vdef import gateway_vdef
+from virttopos.bfs_vdef import BFS_vdef
 
 def in_(l):
     return union([match(switch=s) for s in l])
@@ -97,7 +97,7 @@ def gateway_example(num_clients,num_servers):
     alb =     dynamic(lb)(public_ip,R,H) >> fix_dstmac() 
     afw =     dynamic(fw)(W) 
     ip_pol =  if_(from_client, afw >> alb, alb >> afw) >> mac_learner() 
-    ip_pol =  virtualize(ip_pol,BFS(ip_core))
+    ip_pol =  virtualize(ip_pol,BFS_vdef(ip_core))
    
 
     # CIDR PREFIX MATCH
@@ -128,7 +128,7 @@ def gateway_example(num_clients,num_servers):
 @dynamic
 def vgateway_example(self,num_clients,num_servers):
     ge = gateway_example(num_clients,num_servers)
-    self.policy = virtualize(ge, GatewayVirt(self))
+    self.policy = virtualize(ge, gateway_vdef(self))
 
 
 def main(clients='3',servers='3'):

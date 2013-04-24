@@ -63,7 +63,7 @@ def main():
         env['PYTHONUNBUFFERED'] = 'True'
 
     # STARTUP CONTROLLER
-    controller = Popen([sys.executable, '-u', '-O', pox_path,'--no-cli', 'pyretic/examples/virtualize.py', '--program=pyretic/examples/mac_learner.py', '--virttopo=pyretic/virttopos/spanning_tree.py'], 
+    controller = Popen([sys.executable, '-u', '-O', pox_path,'--no-cli', 'pyretic/examples/virtualize.py', '--program=pyretic/examples/mac_learner.py', '--virttopo=pyretic/virttopos/spanning_tree_vdef.py'], 
                        env=env,
                        stdout=PIPE, 
                        stderr=STDOUT)

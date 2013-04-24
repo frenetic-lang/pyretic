@@ -39,7 +39,6 @@
 
 
 from frenetic.lib import *
-from virttopos.bfs import BFS
 
 hub = flood
 

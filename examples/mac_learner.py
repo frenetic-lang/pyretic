@@ -38,8 +38,6 @@
 ############################################################################################################################
 
 from frenetic.lib import *
-from virttopos.bfs import BFS
-from virttopos.spanning_tree import SpanningTree
 
 def learn(self):
     """Standard MAC-learning logic"""
