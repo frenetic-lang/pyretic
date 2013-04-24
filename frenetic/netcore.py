@@ -207,9 +207,9 @@ class egress(Predicate):
         switch = packet["switch"]
         try:
             port_no = packet["outport"]
-            return self.Location(switch,port_no) in self.network.topology.egress_locations()
         except:
             return False
+        return Location(switch,port_no) in self.network.topology.egress_locations()
 
         
 class match(Predicate):
