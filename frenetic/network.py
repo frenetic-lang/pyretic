@@ -216,12 +216,49 @@ class Packet(object):
         return hash(self.header)
         
     def __repr__(self):
-        l = []
-        size = max(map(len, self.header) or [0]) + 3
-        for k, v in sorted(self.header.iteritems()):
-            if v:
-                l.append("%s:%s%s" % (k, " " * (size - len(k)), v))
-        return "\n".join(l)
+        import hashlib
+        fixed_fields = {}
+        fixed_fields['location'] = ['switch', 'inport', 'outport']
+        fixed_fields['vlocation'] = ['vswitch', 'vinport', 'voutport']
+        fixed_fields['source']   = ['srcip', 'srcmac']
+        fixed_fields['dest']     = ['dstip', 'dstmac']
+        order = ['location','vlocation','source','dest']
+        all_fields = self.header.keys()
+        outer = []
+        size = max(map(len, self.header) or map(len, order) or [len('md5(payload)'),0]) + 3
+        ### LOCATION, VLOCATION, SOURCE, and DEST - EACH ON ONE LINE
+        for fields in order:
+            inner = ["%s:%s" % (fields, " " * (size - len(fields)))]
+            all_none = True
+            for field in fixed_fields[fields]:
+                try:             
+                    all_fields.remove(field)
+                except:          
+                    pass
+                try:             
+                    inner.append(repr(self.header[field])) 
+                    all_none = False
+                except KeyError: 
+                    inner.append('None')
+            if not all_none:
+                outer.append('\t'.join(inner))
+        ### MD5 OF PAYLOAD
+        field = 'payload'
+        outer.append("%s:%s%s" % ('md5(payload)',
+                                    " " * (size - len(field)),
+                                    hashlib.md5(self.header[field][0]).hexdigest()))
+        all_fields.remove(field)
+        ### ANY ADDITIONAL FIELDS
+        for field in sorted(all_fields):
+            try:             
+                if self.header[field]:
+                    outer.append("%s:%s\t%s" % (field,
+                                                " " * (size - len(field)),
+                                                repr(self.header[field])))
+            except KeyError: 
+                pass
+        return "\n".join(outer)
+        
 
 class Port(object):
     def __init__(self, port_no, config=True, status=True,linked_to=None):
