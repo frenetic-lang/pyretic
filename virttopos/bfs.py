@@ -94,9 +94,9 @@ class BFS(object):
         vnetwork.topology = vtopo
         vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
-        print "------- Underlying ---------"
-        print network.topology
-        print "------- Derived ---------"
+        print "------- Underlying BFS Topology ---------"
+        print self.underlying_topology
+        print "------- Derived BFS Topology ---------"
         print vnetwork.topology
 
         return vnetwork

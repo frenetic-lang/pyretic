@@ -76,9 +76,9 @@ class SpanningTree(object):
         vnetwork.topology = vtopo
         vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
-        print "------- Underlying ---------"
+        print "------- Underlying Spanning Tree Topology ---------"
         print network.topology
-        print "------- Derived ---------"
+        print "------- Derived Spanning Tree Topology ---------"
         print vnetwork.topology
 
         return vnetwork

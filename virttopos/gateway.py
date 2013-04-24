@@ -105,9 +105,9 @@ class GatewayVirt(object):
         except:
             pass
             
-        print "--- Underlying Topology ------"
+        print "--- Underlying Gateway Topology ------"
         print network.topology
-        print "----Abstracted Topology ------"
+        print "--- Derived Gateway Topology ------"
         print vtopo
         
         return vnetwork
