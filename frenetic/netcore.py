@@ -704,10 +704,17 @@ class pol_print(SinglyDerivedPolicy):
 
 class recurse(SinglyDerivedPolicy):
     def set_network(self, value):
+        """Don't set_network for self.policy, as this will lead to infinite recursion."""
         self._network = value
+        self.set_policy_network = False
 
     def eval(self, packet):
-        self.policy.set_network(self.network)
+        """Instead set_network for self.policy on first eval after set_network called.
+        set_network won't be called again for self.policy, unless the network actually
+        changes."""
+        if not self.set_policy_network:
+            self.policy.set_network(self.network)
+            self.set_policy_network = True
         output = super(recurse,self).eval(packet)
         return output
 
