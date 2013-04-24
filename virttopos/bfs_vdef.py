@@ -78,8 +78,7 @@ class BFS_vdef(object):
         self.vmap = None
         self.underlying_topology = None
 
-    def network_transform(self,network):
-        """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
+    def set_network(self,network):
         self.underlying_topology = network.topology
         if self.keep:
             tmp = network.topology.filter_nodes(self.keep)
@@ -87,12 +86,13 @@ class BFS_vdef(object):
                 self.underlying_topology = tmp
         self.vmap = topo_to_bfs_vmap(self.underlying_topology)
         
+    def derive_network(self):
+        """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
         vtopo = Topology()
-        add_nodes_from_vmap(self.vmap, vtopo)
+        add_nodes_from_vmap(self.vmap, vtopo)        
         vnetwork = Network(None)
         vnetwork.init_events()
         vnetwork.topology = vtopo
-        vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
 
         print "------- Underlying BFS Topology ---------"
         print self.underlying_topology
@@ -105,13 +105,17 @@ class BFS_vdef(object):
     def ingress_policy(self, network):
         return vmap_to_ingress_policy(self.vmap)
 
+    def fabric_policy_from_network(self, network): 
+        return shortest_path_policy(self.underlying_topology, self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network): 
-        return shortest_path_policy(self.underlying_topology, self.vmap)
+        return self.fabric_policy_from_network(network)
 
+    def egress_policy_from_network(self, network):
+        return vmap_to_egress_policy(self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-        return vmap_to_egress_policy(self.vmap)
+        return self.egress_policy_from_network(network)
 
         
 transform = BFS_vdef()

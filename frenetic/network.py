@@ -499,6 +499,21 @@ class Topology(nx.Graph):
     def __str__(self):
         return repr(self)
         
+
+class DerivedBackend(object):
+    def __init__(self, underlying_backend, injection_policy):
+        self.underlying_backend = underlying_backend
+        self.injection_policy = injection_policy
+
+    def send_packet(self, packet):
+        output = self.injection_policy.eval(packet)
+        for opacket in output.iterkeys():
+            self.underlying_backend.send_packet(opacket)
+
+    def inject_discovery_packet(self, dpid, port):
+        pass
+
+
 DEBUG_TOPO_DISCOVERY = False
 class Network(object):
     def __init__(self,backend):

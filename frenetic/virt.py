@@ -100,6 +100,38 @@ class pop_vheaders(SinglyDerivedPolicy):
     def __repr__(self):
         return "pop_vheaders"
 
+class locate_in_underlying(Policy):
+    def __init__(self):
+        self.vmap = {}
+
+    def set_vmap(self,vmap):
+        self.vmap = vmap
+        print "self.vmap is ",
+        print self.vmap
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "locate_in_underlying"
+
+    ### eval : Packet -> Counter List Packet
+    def eval(self, packet):
+        try:
+            switch = packet['switch']
+            inport = packet['inport']
+            packet = packet.push(run_fabric=True)
+        except KeyError:
+            vswitch = packet['vswitch']
+            voutport = packet['voutport']
+            (switch,outport) = self.vmap[(vswitch,voutport)][0]
+            # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
+            packet = packet.push(switch=switch)
+            if outport > 1:
+                packet = packet.push(inport=1)
+            else:
+                packet = packet.push(inport=2)    
+            packet = packet.push(outport=outport)
+        return Counter([packet])
+
         
 class virtualize_base(SinglyDerivedPolicy):
     def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
@@ -108,9 +140,13 @@ class virtualize_base(SinglyDerivedPolicy):
         self.vdef = vdef
         self.vtag = id(self)
         self.DEBUG = DEBUG
+        self.ingress_policy = self.vdef.ingress_policy
+        self.fabric_policy = self.vdef.fabric_policy
+        self.egress_policy = self.vdef.egress_policy
+        self.locate_in_underlying = locate_in_underlying()
         self.policy = (
             pkt_print("virtualize:",self.DEBUG) >>
-            self.vdef.ingress_policy >> # set vswitch and vinport
+            self.ingress_policy >> # set vswitch and vinport
             pkt_print("after ingress:",self.DEBUG) >>
             ### IF INGRESSING LIFT AND EVALUATE
             if_(match(vtag='ingress'), 
@@ -123,21 +159,40 @@ class virtualize_base(SinglyDerivedPolicy):
                 passthrough) >>
             ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
             if_(match(vtag=self.vtag), 
-                self.vdef.fabric_policy >>
+                self.fabric_policy >>
                 pkt_print("after fabric:",self.DEBUG) >>
-                self.vdef.egress_policy >>
+                self.egress_policy >>
                 pkt_print("after egress:",self.DEBUG),
                 upolicy >>
-                pkt_print("after underlying policy",self.DEBUG) ) 
+                pkt_print("after underlying policy",self.DEBUG) )
             )
-            
+        self.injection_policy = (
+            lower_packet(self.vtag) >>
+            pkt_print("after lower",self.DEBUG) >>
+            self.locate_in_underlying >>
+            pkt_print("after locate",self.DEBUG) >>
+            if_(match(run_fabric=None),
+                passthrough,
+                self.fabric_policy >>
+                pop('run_fabric') >>
+                pkt_print("after fabric",self.DEBUG)) >>
+            self.egress_policy >>
+            pkt_print("after egress",self.DEBUG) 
+            )
 
-    def set_network(self, value):
-        if not value is None:
-            vnetwork = self.vdef.network_transform(value)
+    def set_network(self, updated_network):
+        self.vdef.set_network(updated_network)
+        self.locate_in_underlying.set_vmap(self.vdef.vmap)
+        super(virtualize_base,self).set_network(updated_network)
+        if not updated_network is None:
+            # CREATE THE VNETWORK
+            vnetwork = self.vdef.derive_network()
+            # SET UP THE VNETWORK'S BACKEND
+            vnetwork.backend = \
+                DerivedBackend(updated_network.backend,self.injection_policy)
         else:
             vnetwork = None
-        super(virtualize_base,self).set_network(value)
+        
         self.vpolicy.set_network(vnetwork) 
         
     def __repr__(self):
