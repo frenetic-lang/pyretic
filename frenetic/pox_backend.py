@@ -38,9 +38,8 @@ from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
 from pox.lib.packet.lldp          import ttl, system_description
 
 from frenetic import generators as gs, network as net, virt, util
-
+import lib as lib 
 import ipdb
-
             
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
@@ -89,12 +88,12 @@ class POXBackend(revent.EventMixin):
         p = packetlib.ethernet(data)
         h["srcmac"] = net.MAC(p.src.toRaw())
         h["dstmac"] = net.MAC(p.dst.toRaw())
-        h["type"] = p.type
+        h["ethtype"] = p.type
 
         p = p.next
         if isinstance(p, packetlib.vlan):
             vlan_diff = self.diff_from_vlan(p.id, p.pcp)
-            h["type"] = p.eth_type
+            h["ethtype"] = p.eth_type
             p = p.next
         else:
             vlan_diff = util.frozendict()
@@ -114,7 +113,7 @@ class POXBackend(revent.EventMixin):
                 h["dstport"] = p.code
         elif isinstance(p, packetlib.arp):
             if p.opcode <= 255:
-                h["type"] = 2054
+                h["ethtype"] = lib.ARP_TYPE
                 h["protocol"] = p.opcode
                 h["srcip"] = net.IP(p.protosrc.toRaw())
                 h["dstip"] = net.IP(p.protodst.toRaw())
@@ -131,7 +130,7 @@ class POXBackend(revent.EventMixin):
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
         p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
         
-        p.type = 2054
+        p.type = lib.ARP_TYPE
         p.next = packetlib.arp(prev=p)
         
         p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"].to_bytes())
@@ -517,14 +516,14 @@ def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
 # 
 ################################################################################
 
-pox_valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
-                     "type", "protocol", "payload"]
+valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
+                 "ethtype", "protocol", "payload"]
 
 @util.cached
 def get_packet_diff(packet):
     diff = {}
     for k, v in packet.header.items():
-        if k not in pox_valid_headers and v:
+        if k not in valid_headers and v:
             diff[k] = v
         elif len(v) > 1:
             diff[k] = v[1:]

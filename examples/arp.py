@@ -40,17 +40,15 @@ import collections
 from frenetic.lib import *
 from examples.mac_learner import mac_learner
 
-
-ARP_TYPE = 2054
 VERBOSE_LEVEL = 1
-ARP = match([('type',ARP_TYPE)])
+ARP = match(ethtype=ARP_TYPE)
 
 def send_arp_response(network,switch,outport,srcip,srcmac,dstip,dstmac):
     """Construct an arp packet from scratch and send"""
 
     rp = Packet()
     rp = rp.push(protocol=2)
-    rp = rp.pushmany({'type' : 2054})
+    rp = rp.push(ethtype=ARP_TYPE)
     rp = rp.push(switch=switch)
     rp = rp.push(outport=outport)
     rp = rp.push(inport=outport+1)
