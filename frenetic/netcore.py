@@ -645,6 +645,44 @@ class SinglyDerivedPolicy(Policy):
     def eval(self, packet):
         return self.policy.eval(packet)
 
+class trace(SinglyDerivedPolicy):
+    def __init__(self,policy,trace_name='trace'):
+        super(trace,self).__init__(policy)
+        self.trace_name = trace_name
+        self.highest_trace_value = {}
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "[%s]\n%s" % (self.trace_name,self.policy)
+
+    def eval(self, packet):
+        v = packet.get_stack(self.trace_name)
+        try:
+            i = self.highest_trace_value[v]
+        except:
+            i = 0
+        output = super(trace,self).eval(packet)
+        c = Counter()
+        if len(output) > 1:
+            for packet, count in output.iteritems():
+                t_packet = packet.pushmany({self.trace_name : i})
+                c[t_packet] = count
+                i = i + 1
+                self.highest_trace_value[v] = i
+            return c
+        else:
+            return output
+
+class clear_trace(Policy):
+    def __init__(self,trace_name='trace'):
+        self.trace_name=trace_name
+
+    def eval(self, packet):
+        c = Counter()
+        packet = packet.clear(self.trace_name)
+        c[packet] = 1
+        return c
+
 class pol_print(SinglyDerivedPolicy):
     def __init__(self,policy,s='',on=True):
         super(pol_print,self).__init__(policy)
