@@ -35,6 +35,12 @@ from frenetic.util import singleton, Data
 import itertools
 from collections import Counter
 
+last_vtag = 0
+def new_vtag():
+    global last_vtag 
+    last_vtag = last_vtag + 1
+    return last_vtag
+
 ################################################################################
 # VMAP functions
 ################################################################################
@@ -138,7 +144,7 @@ class virtualize_base(SinglyDerivedPolicy):
         self.vpolicy = vpolicy
         self.vnetwork = None
         self.vdef = vdef
-        self.vtag = id(self)
+        self.vtag = new_vtag()
         self.DEBUG = DEBUG
         self.ingress_policy = self.vdef.ingress_policy
         self.fabric_policy = self.vdef.fabric_policy
