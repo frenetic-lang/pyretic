@@ -39,43 +39,40 @@ from frenetic.lib import *
 class GatewayVirt(object):
     def __init__(self, redo):
         self.ingress_policy = if_(match(switch=1),
+               push(vtag='ingress') >> (                                
                # At physical gateway, ethernet side. Pretend we are switch 1000.
                match(at=None, inport=1)[push(vswitch=1000, vinport=1)] |
                match(at=None, inport=2)[push(vswitch=1000, vinport=2)] |
-                
                # At physical gateway, imaginary side close to ethernet.
                match(at="vswitch 1000, vinport 3")[push(vswitch=1000, vinport=3) >> pop("at")] |
-               
                # At physical gateway, imaginary gateway.
                match(at="vswitch 1001, vinport 1")[push(vswitch=1001, vinport=1) >> pop("at")] |
                match(at="vswitch 1001, vinport 2")[push(vswitch=1001, vinport=2) >> pop("at")] |
-                
                # At physical gateway, imaginary side close to ip.
                match(at="vswitch 1002, vinport 3")[push(vswitch=1002, vinport=3) >> pop("at")] |
-                
                # At physical gateway, ip side. Pretend we are switch 1002.
                match(at=None, inport=3)[push(vswitch=1002, vinport=1)] |
-               match(at=None, inport=4)[push(vswitch=1002, vinport=2)],
-            
-               copy(vswitch="switch", vinport="inport"))
+               match(at=None, inport=4)[push(vswitch=1002, vinport=2)] ),
+               passthrough)
 
-        self.fabric_policy = parallel([
+
+        self.fabric_policy = (
             # Destined to ethernet side
-            match(vswitch=1000, voutport=1)[pop_vheaders >> fwd(1)],
-            match(vswitch=1000, voutport=2)[pop_vheaders >> fwd(2)],
-            # If we are destined to a fake switch, lets push another header that
-            # says which fake switch we are at.
-            match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1") >> pop_vheaders >> recurse(redo)],
-            match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3") >> pop_vheaders >> recurse(redo)],
-            match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3") >> pop_vheaders >> recurse(redo)],
-            match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2") >> pop_vheaders >> recurse(redo)],
+            match(vswitch=1000, voutport=1)[fwd(1)] |
+            match(vswitch=1000, voutport=2)[fwd(2)] |
+            # If we are destined to a fake switch, 
+            # push another header that says which fake switch we are at.
+            match(vswitch=1000, voutport=3)[push(at="vswitch 1001, vinport 1")] |
+            match(vswitch=1001, voutport=1)[push(at="vswitch 1000, vinport 3")] |
+            match(vswitch=1001, voutport=2)[push(at="vswitch 1002, vinport 3")] |
+            match(vswitch=1002, voutport=3)[push(at="vswitch 1001, vinport 2")] |
             # Destined to ip side
-            match(vswitch=1002, voutport=1)[pop_vheaders >> fwd(3)],
-            match(vswitch=1002, voutport=2)[pop_vheaders >> fwd(4)],
-            (~(match(vswitch=1000) | match(vswitch=1001) | match(vswitch=1002)))[lift_packet]
-        ])
+            match(vswitch=1002, voutport=1)[fwd(3)] |
+            match(vswitch=1002, voutport=2)[fwd(4)] )
 
-        self.egress_policy = passthrough
+            
+        self.egress_policy = pop_vheaders >> \
+            if_(match(at=None), passthrough, recurse(redo))
 
 
     def network_transform(self,network):
