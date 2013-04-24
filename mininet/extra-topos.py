@@ -198,6 +198,45 @@ class YTopo(Topo):
         self.addLink('s2', 's4')
 
 
+class GatewayTopoNP(Topo):
+    def __init__(self, numClients=3, numServers=3):        
+        super(GatewayTopoNP, self).__init__()
+
+        client_inds = range(1,numClients+1)
+        server_inds = range(1,numServers+1)
+
+        num_switches_left = 3
+        num_switches_right = 3
+
+        self.addSwitch('s1')
+        for switch_id in xrange(2, 2 + num_switches_left + num_switches_right): 
+            self.addSwitch('s'+str(switch_id))
+
+        from mininet.util import ipParse,ipAdd
+        
+        for c in client_inds:
+            self.addHost('h'+str(c))
+
+        for s in server_inds: 
+            self.addHost('hs'+str(s))
+        
+        # Ethernet side
+        self.addLink('s1', 's2')  # s1[1] -- s2[1]
+        self.addLink('s1', 's3')  # s1[2] -- s3[1]
+        self.addLink('s2', 's4')  # s2[2] -- s4[1]
+        self.addLink('s3', 's4')  # s3[2] -- s4[2]
+        for c in client_inds:
+            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
+
+        # IP side
+        self.addLink('s1', 's5')  # s1[3] -- s5[1]
+        self.addLink('s1', 's6')  # s1[4] -- s6[1]
+        self.addLink('s5', 's7')  # s5[2] -- s7[1]
+        self.addLink('s6', 's7')  # s6[2] -- s7[1]
+        for s in server_inds:
+            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
+
+
 class GatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
         super(GatewayTopo, self).__init__()
@@ -220,8 +259,7 @@ class GatewayTopo(Topo):
         
         for c in client_inds:
             ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
-            hoststr = 'h'+str(c)
-            self.addHost(hoststr, ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
+            self.addHost('h'+str(c), ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
 
         for s in server_inds: 
             ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
@@ -242,8 +280,7 @@ class GatewayTopo(Topo):
         self.addLink('s6', 's7')  # s6[2] -- s7[1]
         for s in server_inds:
             self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
-
-
+            
 
 class PGatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
@@ -269,8 +306,7 @@ class PGatewayTopo(Topo):
 
         for c in client_inds:
             ipstr = left_prefix + str(c+1) + '/' + str(prefix_size)
-            hoststr = 'h'+str(c)
-            self.addHost(hoststr, ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
+            self.addHost('h'+str(c), ip=ipstr, gw=left_prefix+'1', gw_mac='AA:AA:AA:AA:AA:AA')
 
         for s in server_inds: 
             ipstr = right_prefix + str(s+1) + '/' + str(prefix_size)
@@ -298,8 +334,6 @@ class PGatewayTopo(Topo):
 
 
 
-            
-
 
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
           'square': (lambda: CycleTopo(4,4)),
@@ -312,6 +346,7 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'figure3' : Figure3Topo,
           'ytopo': YTopo,
           'gateway': GatewayTopo,
+          'gateway_np': GatewayTopoNP,
           'pgateway': PGatewayTopo,
 }
  
