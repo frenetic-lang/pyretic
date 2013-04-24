@@ -102,12 +102,12 @@ class pop_vheaders(SinglyDerivedPolicy):
 
         
 class virtualize_base(SinglyDerivedPolicy):
-    def __init__(self, upolicy, vpolicy, vdef):
+    def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
         self.vpolicy = vpolicy
         self.vnetwork = None
         self.vdef = vdef
         self.vtag = id(self)
-        self.DEBUG = False
+        self.DEBUG = DEBUG
         self.policy = (
             pkt_print("virtualize:",self.DEBUG) >>
             self.vdef.ingress_policy >> # set vswitch and vinport
@@ -145,10 +145,10 @@ class virtualize_base(SinglyDerivedPolicy):
 
 
 class virtualize_full(virtualize_base):
-    def __init__(self, vpolicy, vdef):
-        super(virtualize_full,self).__init__(passthrough, vpolicy, vdef)
+    def __init__(self, vpolicy, vdef, DEBUG=False):
+        super(virtualize_full,self).__init__(passthrough, vpolicy, vdef, DEBUG)
 
 
 class virtualize_part(virtualize_base):
-    def __init__(self, policy, vdef):
-        super(virtualize_part,self).__init__(policy, policy, vdef)
+    def __init__(self, policy, vdef, DEBUG=False):
+        super(virtualize_part,self).__init__(policy, policy, vdef, DEBUG)
