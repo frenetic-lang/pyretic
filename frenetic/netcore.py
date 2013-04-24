@@ -655,7 +655,8 @@ class recurse(SinglyDerivedPolicy):
 
     def eval(self, packet):
         self.policy.set_network(self.network)
-        super(recurse,self).eval(packet)
+        output = super(recurse,self).eval(packet)
+        return output
 
     ### repr : unit -> String
     def __repr__(self):
