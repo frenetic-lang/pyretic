@@ -51,7 +51,11 @@ def send_arp_response(network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.push(ethtype=ARP_TYPE)
     rp = rp.push(switch=switch)
     rp = rp.push(outport=outport)
-    rp = rp.push(inport=outport+1)
+    # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
+    if outport > 1:
+        rp = rp.push(inport=1)
+    else:
+        rp = rp.push(inport=2)
     rp = rp.push(srcip=srcip)
     rp = rp.push(srcmac=srcmac)
     rp = rp.push(dstip=dstip)
@@ -107,6 +111,9 @@ def arp(self,mac_of={}):
                 # LEARN MAC
                 mac_of[srcip] = srcmac  
 
+                print " ---------- REQUEST RECEIVED IS ---------"
+                print pkt
+
                 # FORWARD REQUEST OUT OF ALL EGRESS PORTS
                 outstanding_requests[srcip][dstip] = True
                 for loc in network.topology.egress_locations() - {Location(switch,inport)}:
@@ -115,8 +122,12 @@ def arp(self,mac_of={}):
                     rq = rq.pop('switch')
                     rq = rq.push(switch=loc.switch)
                     rq = rq.push(outport=loc.port_no)
+                    # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
                     if rq['inport'] == loc.port_no:
-                        rq = rq.push(inport=loc.port_no+1)
+                        if loc.port_no > 1:
+                            rq = rq.push(inport=1)
+                        else:
+                            rq = rq.push(inport=2)
 
                     if VERBOSE_LEVEL > 0:
                         print "--------- INJECTING REQUEST -----------"
