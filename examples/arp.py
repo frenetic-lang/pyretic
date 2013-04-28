@@ -42,12 +42,13 @@ from examples.mac_learner import mac_learner
 
 VERBOSE_LEVEL = 1
 ARP = match(ethtype=ARP_TYPE)
+REQUEST=1
+RESPONSE=2
 
-def send_arp_response(network,switch,outport,srcip,srcmac,dstip,dstmac):
+def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     """Construct an arp packet from scratch and send"""
-
     rp = Packet()
-    rp = rp.push(protocol=2)
+    rp = rp.push(protocol=msg_type)
     rp = rp.push(ethtype=ARP_TYPE)
     rp = rp.push(switch=switch)
     rp = rp.push(outport=outport)
@@ -63,11 +64,15 @@ def send_arp_response(network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.push(payload='')
 
     if VERBOSE_LEVEL > 0:
-        print "--------- INJECTING RESPONSE -----------"
+        if msg_type == RESPONSE:
+            print "--------- INJECTING RESPONSE ON %d[%d] FOR %s TO %s -----------" % (switch,outport,srcip,dstip)
+        if msg_type == REQUEST:
+            print "--------- INJECTING REQUEST ON %d[%d] FOR %s FROM %s -----------" % (switch,outport,dstip,srcip)
         if VERBOSE_LEVEL > 1:
             print rp
 
     network.inject_packet(rp)
+
 
 @dynamic
 def arp(self,mac_of={}):
@@ -91,50 +96,33 @@ def arp(self,mac_of={}):
         if not srcip in location_of:
             location_of[srcip] = Location(switch,inport)
 
-        # GET THE NETWORK OBJECT
-        network = self.network
-
         # IF THIS PACKET IS A REQUEST
         if opcode == 1:
             if dstip in mac_of:
                 if VERBOSE_LEVEL > 0:
-                    print "RECEIVED REQUEST FOR %s FROM %s, RESPONSE AVAILABLE" % (dstip,srcip)
+                    print "RECEIVED REQUEST FOR %s FROM %s, KNOWN HOST" % (dstip,srcip)
                     if VERBOSE_LEVEL > 1:
                         print pkt
-                send_arp_response(network,switch,inport,dstip,mac_of[dstip],srcip,srcmac)
+                send_arp(RESPONSE,self.network,switch,inport,dstip,mac_of[dstip],srcip,srcmac)
             else:
                 if VERBOSE_LEVEL > 0:
-                    print "RECEIVED REQUEST FOR %s FROM %s, NO RESPONSE AVAILABLE" % (dstip,srcip)
+                    print "RECEIVED REQUEST FOR %s FROM %s, UNKNOWN HOST" % (dstip,srcip)
                     if VERBOSE_LEVEL > 1:
                         print pkt
 
                 # LEARN MAC
                 mac_of[srcip] = srcmac  
 
-                print " ---------- REQUEST RECEIVED IS ---------"
-                print pkt
-
                 # FORWARD REQUEST OUT OF ALL EGRESS PORTS
                 outstanding_requests[srcip][dstip] = True
-                for loc in network.topology.egress_locations() - {Location(switch,inport)}:
-                    # Can this just be send_response?
-                    rq = Packet(pkt.header)
-                    rq = rq.pop('switch')
-                    rq = rq.push(switch=loc.switch)
-                    rq = rq.push(outport=loc.port_no)
-                    # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
-                    if rq['inport'] == loc.port_no:
-                        if loc.port_no > 1:
-                            rq = rq.push(inport=1)
-                        else:
-                            rq = rq.push(inport=2)
-
-                    if VERBOSE_LEVEL > 0:
-                        print "--------- INJECTING REQUEST -----------"
-                        if VERBOSE_LEVEL > 1:
-                            print rq
-                            
-                    network.inject_packet(rq)
+                for loc in self.network.topology.egress_locations() - {Location(switch,inport)}:
+                    switch  = loc.switch
+                    outport = loc.port_no
+                    srcip   = pkt['srcip']
+                    srcmac  = pkt['srcmac']
+                    dstip   = pkt['dstip']
+                    dstmac  = pkt['dstmac']
+                    send_arp(REQUEST,self.network,switch,outport,srcip,srcmac,dstip,dstmac)
 
         # THIS IS A RESPONSE THAT WE WILL ALSO LEARN FROM
         elif opcode == 2:
@@ -142,17 +130,17 @@ def arp(self,mac_of={}):
                 del outstanding_requests[dstip][srcip]
 
                 if VERBOSE_LEVEL > 0:
-                    print "OUTSTANDING RESPONSE for %s to %s" % (srcip,dstip)
+                    print "OUTSTANDING RESPONSE FOR %s TO %s" % (srcip,dstip)
                     if VERBOSE_LEVEL > 1:
                         print pkt
 
                 mac_of[srcip] = srcmac
                 loc = location_of[dstip]
-                send_arp_response(network,loc.switch,loc.port_no,srcip,mac_of[srcip],dstip,mac_of[dstip])
+                send_arp(RESPONSE,self.network,loc.switch,loc.port_no,srcip,mac_of[srcip],dstip,mac_of[dstip])
             except:
 
                 if VERBOSE_LEVEL > 1:
-                    print "IGNORABLE RESPONSE for %s to %s" % (srcip,dstip)
+                    print "IGNORABLE RESPONSE FOR %s TO %s" % (srcip,dstip)
                     print pkt
                 pass
 
@@ -167,7 +155,6 @@ def pre_specified_arp():
 
 def main():
     return learn_arp()
-#    return pre_specified_arp()
 
 
 
