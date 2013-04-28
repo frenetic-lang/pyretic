@@ -76,6 +76,7 @@ class BFS_vdef(object):
     def __init__(self,keep=[]):
         self.keep = keep
         self.vmap = None
+        self.derived_topology = None
         self.underlying_topology = None
 
     def set_network(self,network):
@@ -85,19 +86,18 @@ class BFS_vdef(object):
             if tmp:
                 self.underlying_topology = tmp
         self.vmap = topo_to_bfs_vmap(self.underlying_topology)
+        self.derived_topology = Topology()
+        add_nodes_from_vmap(self.vmap, self.derived_topology)        
         
     def derive_network(self):
         """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
-        vtopo = Topology()
-        add_nodes_from_vmap(self.vmap, vtopo)        
-        vnetwork = Network(None)
-        vnetwork.init_events()
-        vnetwork.topology = vtopo
+        vnetwork = Network()
+        vnetwork.topology = self.derived_topology
 
         print "------- Underlying BFS Topology ---------"
         print self.underlying_topology
         print "------- Derived BFS Topology ---------"
-        print vnetwork.topology
+        print self.derived_topology
 
         return vnetwork
                 

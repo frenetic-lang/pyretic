@@ -516,32 +516,11 @@ class DerivedBackend(object):
 
 DEBUG_TOPO_DISCOVERY = False
 class Network(object):
-    def __init__(self,backend):
+    def __init__(self,backend=None):
         from frenetic.netcore import drop
         self._policy = gs.Behavior(drop)
         self._sub_policies = {}
         self.backend = backend
-
-    @classmethod
-    def clone(cls, network):
-        self = cls(network.backend)
-        self.inherit_events(network)
-        return self
-        
-    @classmethod
-    def fork(cls, network):
-        self = cls.clone(network)
-        self.connect(network)
-        return self
-
-    def connect(self, network):
-        @self._policy.notify
-        def change(policy):
-            network.install_sub_policy(self, policy)
-        
-    #
-    
-    def init_events(self):
         self._topology = gs.Behavior(Topology())                
         self.events = ["switch_joins", "switch_parts",
                        "port_joins", "port_parts",
@@ -551,21 +530,11 @@ class Network(object):
             setattr(self, event, e)
             e.notify(getattr(self, "_handle_%s" % event))
 
-    def inherit_events(self, network):
-        self._topology = network._topology
-        self.events = network.events
-        for event in network.events:
-            setattr(self, event, getattr(network, event))
-
-    #
-
     topology = gs.Behavior.property("_topology")
     
     @property
     def topology_changes(self):
         return iter(self._topology)
-
-    #
 
     def inject_packet(self, packet):
         self.backend.send_packet(packet)
@@ -573,9 +542,6 @@ class Network(object):
     def inject_discovery_packet(self, dpid, port_no):
         self.backend.inject_discovery_packet(dpid, port_no)
     
-    def install_policy_func(self, policy_func):
-        self.install_policy(policy_func(self))
-
     def install_policy(self, policy):
         self.install_sub_policy(self, policy)
         
