@@ -173,6 +173,7 @@ class virtualize_base(SinglyDerivedPolicy):
                 pkt_print("after underlying policy",self.DEBUG) )
             )
         self.injection_policy = (
+            pkt_print("injected packet",self.DEBUG) >>
             lower_packet(self.vtag) >>
             pkt_print("after lower",self.DEBUG) >>
             self.locate_in_underlying >>
