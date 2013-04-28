@@ -66,20 +66,23 @@ def one_to_one_fabric_policy(vmap):
 class spanning_tree_vdef(object):
     def __init__(self):
         self.vmap = None
-        
+        self.underlying_topology = None
+        self.derived_topology = None
+
+    def set_network(self,network):
+        self.underlying_topology = network.topology
+        self.derived_topology = Topology.minimum_spanning_tree(network.topology)
+        self.vmap = topo_to_st_vmap(network.topology, self.derived_topology)
+
     from frenetic import netcore
-    def network_transform(self,network):
-        vtopo = Topology.minimum_spanning_tree(network.topology)
-        self.vmap = topo_to_st_vmap(network.topology, vtopo)
-        vnetwork = Network(None)
-        vnetwork.init_events()
-        vnetwork.topology = vtopo
-        vnetwork.backend = network.backend  # UNSURE IF THIS IS PRINCIPLED OR A HACK
+    def derive_network(self):
+        vnetwork = Network()
+        vnetwork.topology = self.derived_topology
 
         print "------- Underlying Spanning Tree Topology ---------"
-        print network.topology
+        print self.underlying_topology
         print "------- Derived Spanning Tree Topology ---------"
-        print vnetwork.topology
+        print self.derived_topology
 
         return vnetwork
         
@@ -87,13 +90,17 @@ class spanning_tree_vdef(object):
     def ingress_policy(self, network):
         return vmap_to_ingress_policy(self.vmap)
 
+    def fabric_policy_from_network(self, network):
+        return one_to_one_fabric_policy(self.vmap) 
     @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network):
-        return one_to_one_fabric_policy(self.vmap)
+        return self.fabric_policy_from_network(network)
 
+    def egress_policy_from_network(self, network):
+        return vmap_to_egress_policy(self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-        return vmap_to_egress_policy(self.vmap)
+        return self.egress_policy_from_network(network)
 
 transform = spanning_tree_vdef()
 
