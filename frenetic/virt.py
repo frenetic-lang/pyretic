@@ -112,8 +112,6 @@ class locate_in_underlying(Policy):
 
     def set_vmap(self,vmap):
         self.vmap = vmap
-        print "self.vmap is ",
-        print self.vmap
 
     ### repr : unit -> String
     def __repr__(self):
