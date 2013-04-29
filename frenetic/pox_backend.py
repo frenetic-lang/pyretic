@@ -479,8 +479,14 @@ class POXBackend(revent.EventMixin):
                 
     def send_packet(self, packet):
         switch = packet["switch"]
-        inport = packet["inport"]
         outport = packet["outport"]
+        try:
+            inport = packet["inport"]
+        except KeyError:
+            if outport > 1:
+                inport = 1
+            else:
+                inport = 2
 
         packet = packet.pop("switch", "inport", "outport")
         
