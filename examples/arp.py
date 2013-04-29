@@ -78,11 +78,13 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
 def arp(self,mac_of={}):
     """Respond to arp request for any known hosts,
        learn macs of unknown hosts"""
-
     location_of = {}
     outstanding_requests = collections.defaultdict(dict)
 
-    @self.query(ARP)
+    def update_policy():
+        self.policy = if_(ARP,self.query,self.forward)
+    self.update_policy = update_policy
+
     def handle_arp(pkt):
         switch = pkt['switch']
         inport = pkt['inport']
@@ -143,6 +145,12 @@ def arp(self,mac_of={}):
                     print "IGNORABLE RESPONSE FOR %s TO %s" % (srcip,dstip)
                     print pkt
                 pass
+
+    self.query = packets()
+    self.query.register_callback(handle_arp)
+    self.forward = drop
+    self.update_policy()
+
 
 def learn_arp():
     """Handle ARPs and do MAC learning"""
