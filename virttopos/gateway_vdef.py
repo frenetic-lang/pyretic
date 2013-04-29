@@ -36,8 +36,10 @@
 
 from frenetic.lib import *
 
+
 class gateway_vdef(object):
     def __init__(self, redo):
+        self.vmap = None
         self.underlying_topology = None
         self.derived_topology = None
 
@@ -58,7 +60,6 @@ class gateway_vdef(object):
                match(at=None, inport=4)[push(vswitch=1002, vinport=2)] ),
                passthrough)
 
-
         self.fabric_policy = (
             # Destined to ethernet side
             match(vswitch=1000, voutport=1)[fwd(1)] |
@@ -72,14 +73,36 @@ class gateway_vdef(object):
             # Destined to ip side
             match(vswitch=1002, voutport=1)[fwd(3)] |
             match(vswitch=1002, voutport=2)[fwd(4)] )
-
             
         self.egress_policy = pop_vheaders >> \
             if_(match(at=None), passthrough, recurse(redo))
 
+    def make_vmap(self):
+        mapping = vmap()
+        topo = self.underlying_topology.copy()
+        try:
+            topo.remove_node(1)
+
+            for u, attrs in topo.nodes(data=True):
+                ports = attrs['ports']
+                for port in ports:
+                    l = Location(u,port)
+                    mapping.d2u[l] = [l]
+        except:
+            pass
+        mapping.d2u[Location(1000,1)] = [Location(2,1)]
+        mapping.d2u[Location(1000,2)] = [Location(3,1)]
+        mapping.d2u[Location(1000,3)] = [Location(1,None)]
+        mapping.d2u[Location(1001,1)] = [Location(1,None)]
+        mapping.d2u[Location(1001,2)] = [Location(1,None)]
+        mapping.d2u[Location(1002,1)] = [Location(1,None)]
+        mapping.d2u[Location(1002,2)] = [Location(5,1)]
+        mapping.d2u[Location(1002,3)] = [Location(6,1)]
+        return mapping
 
     def set_network(self,network):
         self.underlying_topology = network.topology
+        self.vmap = self.make_vmap()
         self.derived_topology = self.underlying_topology.copy()
         try:
             # REMOVE PHYSICAL SWITCHES ONTO WHICH VIRTUAL SWITCHES WILL BE MAPPED
@@ -99,14 +122,14 @@ class gateway_vdef(object):
             self.derived_topology.add_link(Location(6,1),Location(1002,2))    # {link(s6[1])} == {s1[4]} == s1002[2] 
             self.derived_topology.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
         except:
-            self.derived_topology = None
+            self.derived_topology = Topology()
 
     def derive_network(self):
         vnetwork = Network()
         vnetwork.topology = self.derived_topology
             
         print "--- Underlying Gateway Topology ------"
-        print self.underlying.topology
+        print self.underlying_topology
         print "--- Derived Gateway Topology ------"
         print self.derived_topology
         

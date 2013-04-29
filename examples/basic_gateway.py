@@ -93,7 +93,7 @@ def vgateway(self,pol):
     self.policy = virtualize_part(pol, gateway_vdef(self))
 
 def main():
-    return pol
-#    return vgateway(pol)
+#    return pol
+    return vgateway(pol)
 
 

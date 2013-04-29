@@ -169,13 +169,16 @@ class locate_in_underlying(Policy):
             voutport = packet['voutport']
             u = self.vmap.d2u[Location(vswitch,voutport)][0]
             (switch,outport) = (u.switch,u.port_no)
-            # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
             packet = packet.push(switch=switch)
-            if outport > 1:
-                packet = packet.push(inport=1)
+            if outport is None:
+                packet = packet.push(run_fabric=True)
             else:
-                packet = packet.push(inport=2)    
-            packet = packet.push(outport=outport)
+                # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
+                if outport > 1:
+                    packet = packet.push(inport=1)
+                else:
+                    packet = packet.push(inport=2)    
+                packet = packet.push(outport=outport)
         return Counter([packet])
 
         
