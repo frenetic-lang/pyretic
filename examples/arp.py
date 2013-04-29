@@ -52,11 +52,6 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.push(ethtype=ARP_TYPE)
     rp = rp.push(switch=switch)
     rp = rp.push(outport=outport)
-    # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
-    if outport > 1:
-        rp = rp.push(inport=1)
-    else:
-        rp = rp.push(inport=2)
     rp = rp.push(srcip=srcip)
     rp = rp.push(srcmac=srcmac)
     rp = rp.push(dstip=dstip)

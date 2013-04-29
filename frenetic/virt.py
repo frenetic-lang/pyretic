@@ -163,21 +163,13 @@ class locate_in_underlying(Policy):
         try:
             switch = packet['switch']
             inport = packet['inport']
-            packet = packet.push(run_fabric=True)
         except KeyError:
             vswitch = packet['vswitch']
             voutport = packet['voutport']
             u = self.vmap.d2u[Location(vswitch,voutport)][0]
             (switch,outport) = (u.switch,u.port_no)
             packet = packet.push(switch=switch)
-            if outport is None:
-                packet = packet.push(run_fabric=True)
-            else:
-                # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
-                if outport > 1:
-                    packet = packet.push(inport=1)
-                else:
-                    packet = packet.push(inport=2)    
+            if not outport is None:
                 packet = packet.push(outport=outport)
         return Counter([packet])
 
@@ -221,11 +213,11 @@ class virtualize_base(SinglyDerivedPolicy):
             pkt_print("after lower",self.DEBUG) >>
             self.locate_in_underlying >>
             pkt_print("after locate",self.DEBUG) >>
-            if_(match(run_fabric=None),
-                passthrough,
-                self.fabric_policy >>
+            if_(match(outport=None),   # IF NO OUTPORT 
+                self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
                 pop('run_fabric') >>
-                pkt_print("after fabric",self.DEBUG)) >>
+                pkt_print("after fabric",self.DEBUG),
+                passthrough) >>        # OTHERWISE WE PASSTHROUGH TO EGRESS POLICY
             self.egress_policy >>
             pkt_print("after egress",self.DEBUG) 
             )
