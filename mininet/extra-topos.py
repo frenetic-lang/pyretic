@@ -237,6 +237,51 @@ class GatewayTopoNP(Topo):
             self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
 
+class PGatewayTopoNP(Topo):
+    def __init__(self, numClients=3, numServers=3):        
+        super(PGatewayTopoNP, self).__init__()
+
+        client_inds = range(1,numClients+1)
+        server_inds = range(1,numServers+1)
+
+        num_switches_left = 3
+        num_switches_right = 3
+
+        self.addSwitch('s1000')
+        self.addSwitch('s1001')
+        self.addSwitch('s1002')
+        for switch_id in xrange(2, 2 + num_switches_left + num_switches_right): 
+            self.addSwitch('s'+str(switch_id))
+
+        from mininet.util import ipParse,ipAdd
+        
+        for c in client_inds:
+            self.addHost('h'+str(c))
+
+        for s in server_inds: 
+            self.addHost('hs'+str(s))
+
+        # Ethernet side
+        self.addLink('s1000', 's2')    # s1000[1] -- s2[1]
+        self.addLink('s1000', 's3')    # s1000[2] -- s3[1]
+        self.addLink('s2', 's4')       # s2[2] -- s4[1]
+        self.addLink('s3', 's4')       # s3[2] -- s4[2]
+        for c in client_inds:
+            self.addLink('s'+str(c % num_switches_left + 2), 'h'+str(c))
+        
+        # IP side
+        self.addLink('s1002', 's5')    # s1002[1] -- s5[1]
+        self.addLink('s1002', 's6')    # s1002[2] -- s6[1]
+        self.addLink('s5', 's7')       # s5[2] -- s7[1]
+        self.addLink('s6', 's7')       # s6[2] -- s7[1]
+        for s in server_inds:
+            self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
+
+        # Link up physical gateway series
+        self.addLink('s1001','s1000')  # s1001[1] -- s1000[3]
+        self.addLink('s1001','s1002')  # s1001[2] -- s1002[3]
+
+
 class GatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
         super(GatewayTopo, self).__init__()
@@ -348,5 +393,6 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'gateway': GatewayTopo,
           'gateway_np': GatewayTopoNP,
           'pgateway': PGatewayTopo,
+          'pgateway_np': PGatewayTopoNP,
 }
  
