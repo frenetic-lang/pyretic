@@ -776,12 +776,9 @@ class if_(SinglyDerivedPolicy):
 
     ### repr : unit -> String
     def __repr__(self):
-        return "if\n%s" % util.repr_plus(["PREDICATE",
-                                          self.pred,
-                                          "T BRANCH",
-                                          self.t_branch,
-                                          "F BRANCH",
-                                          self.f_branch])
+        return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
+                                               util.repr_plus([self.t_branch]),
+                                               util.repr_plus([self.f_branch]))
         
 class breakpoint(SinglyDerivedPolicy):
     ### init : Policy -> Predicate -> unit
