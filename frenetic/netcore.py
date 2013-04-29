@@ -290,7 +290,6 @@ class intersect(Predicate):
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
-    
 
 class difference(Predicate):
     """A predicate representing the difference of two predicates."""
@@ -317,25 +316,52 @@ class difference(Predicate):
                 for pred in self.diff_predicates)
     
 
-class negate(Predicate):
-    """A predicate representing the difference of two predicates."""
-
-    ### init : Predicate -> unit
+class SinglyDerivedPredicate(Predicate):
     def __init__(self, predicate):
         self.predicate = predicate
-        
-    ### repr : unit -> String
-    def __repr__(self):
-        return "negate:\n%s" % util.repr_plus([self.predicate])
 
     def set_network(self, value):
         self.predicate.set_network(value)
-        super(negate,self).set_network(value)
+        super(SinglyDerivedPredicate,self).set_network(value)
+
+    def eval(self, packet):
+        return self.predicate.eval(packet)
+
+
+class negate(SinglyDerivedPredicate):
+    """A predicate representing the difference of two predicates."""        
+    ### repr : unit -> String
+    def __repr__(self):
+        return "negate:\n%s" % util.repr_plus([self.predicate])
 
     ### eval : Packet -> bool
     def eval(self, packet):
         return not self.predicate.eval(packet)
         
+
+class _in(SinglyDerivedPredicate):
+    def __init__(self,field,group):
+        self.group = group
+        self.field = field
+        self.predicate = union([match({field : i}) 
+                                for i in self.group])
+    def __repr__(self):
+        return "_in: %s" % self.group
+
+class switch_in(_in):
+    def __init__(self,switches):
+        return super(switch_in,self).__init__('switch',switches)
+
+    def __repr__(self):
+        return "switch%s" % super(switch_in,self).__repr__()
+
+class dstip_in(_in):
+    def __init__(self,dstips):
+        return super(dstip_in,self).__init__('dstip',dstips)
+
+    def __repr__(self):
+        return "dstip%s" % super(dstip_in,self).__repr__()
+
         
 ################################################################################
 # Policies

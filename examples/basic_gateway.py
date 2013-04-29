@@ -42,8 +42,6 @@ from examples.arp import arp, translate, ARP
 from examples.monitor import dpi
 from virttopos.gateway_vdef import gateway_vdef
 
-def switch_in(l):
-    return union([match(switch=s) for s in l])
 
 ethernet = [2,3,4,1000]
 ip_core  = [5,6,7,1002]

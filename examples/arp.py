@@ -69,12 +69,12 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     network.inject_packet(rp)
 
 
-
 def translate(mac_of={}):
     """Translate dstmac based on input IP/MAC mapping"""
     known_ip = parallel([ match(dstip=ip)[modify(dstmac=mac)] for (ip,mac) in mac_of.iteritems() ])
-    unknown_ip = ~union([ match(dstip=ip) for (ip,mac) in mac_of.iteritems() ])
+    unknown_ip = ~dstip_in(mac_of.keys())
     return known_ip | unknown_ip[passthrough]
+
 
 @dynamic
 def arp(self,mac_of={}):
