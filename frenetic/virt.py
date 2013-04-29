@@ -45,29 +45,70 @@ def new_vtag():
 # VMAP functions
 ################################################################################
 
+class vmap(object):
+    def __init__(self):
+        self.d2u = {}
+        self.u2d = {}
+
+    def ingress_policy(self):
+        non_ingress = ~union(
+            union(match(switch=u.switch, inport=u.port_no) for u in us) 
+            for (d, us) in self.d2u.iteritems() )
+        ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=u.switch, inport=u.port_no) for u in us)[push(vtag='ingress', vswitch=d.switch, vinport=d.port_no)] for (d, us) in self.d2u.iteritems())
+        return ingress_policy
+
+    def egress_policy(self):
+        matches_egress = []
+        valid_match_egress = []
+        for (d, us) in self.d2u.iteritems():
+            switch_pred = union(match(switch=u.switch, outport=u.port_no) for u in us)
+            matches_egress.append(switch_pred)
+            valid_match_egress.append(match(vswitch=d.switch, voutport=d.port_no) & switch_pred)
+        return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
+
+    def one_to_one_fabric_policy(self):
+        fabric_policy = drop
+        # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
+        for (d1,[u1]) in self.d2u.items():
+            for (d2,[u2]) in self.d2u.items():
+                # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
+                if d1.switch != d2.switch:
+                    continue
+                # FORWARD OUT THE CORRECT PHYSICAL PORT
+                fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no)[fwd(u2.port_no)]
+        return fabric_policy
+
+    def shortest_path_fabric_policy(self,topo):
+        fabric_policy = drop
+        paths = Topology.all_pairs_shortest_path(topo)
+        # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
+        for (d1,[u1]) in self.d2u.items():
+            for (d2,[u2]) in self.d2u.items():
+                # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
+                if d1.switch != d2.switch:
+                    continue
+                # IF IDENTICAL VIRTUAL LOCATIONS, THEN WE KNOW FABRIC POLICY IS JUST TO FORWARD OUT MATCHING PHYSICAL PORT
+                if d1.port_no == d2.port_no:
+                    fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
+                # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
+                # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
+                # FINALLY ADD A RULE THAT FORWARDS OUT THE CORRECT PHYSICAL PORT AT THE LAST PHYSICAL SWITCH ON THE PATH
+                else:
+                    try:
+                        for loc in paths[u1.switch][u2.switch]:
+                            fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=loc.switch)[fwd(loc.port_no)]
+                        fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
+                    except KeyError:
+                        pass
+        return fabric_policy
+
 def add_nodes_from_vmap(vmap, vtopo):
-    for switch, port_no in vmap:
-        port = Port(port_no)
+    for u in vmap.d2u:
+        port = Port(u.port_no)
         try:
-            vtopo.node[switch]['ports'][port_no] = port 
+            vtopo.node[u.switch]['ports'][u.port_no] = port 
         except KeyError:
-            vtopo.add_node(switch, ports={port_no: port})
-
-def vmap_to_ingress_policy(vmap):
-    non_ingress = ~union(
-        union(match(switch=sw, inport=p) for (sw, p) in switches) 
-        for ((vsw, vp), switches) in vmap.iteritems() )
-    ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=sw, inport=p) for (sw, p) in switches)[push(vtag='ingress', vswitch=vsw, vinport=vp)] for ((vsw, vp), switches) in vmap.iteritems())
-    return ingress_policy
-
-def vmap_to_egress_policy(vmap):
-    matches_egress = []
-    valid_match_egress = []
-    for ((vsw, vp), switches) in vmap.iteritems():
-        switch_pred = union(match(switch=sw, outport=p) for (sw, p) in switches)
-        matches_egress.append(switch_pred)
-        valid_match_egress.append(match(vswitch=vsw, voutport=vp) & switch_pred)
-    return if_(union(matches_egress), union(valid_match_egress)[pop_vheaders], passthrough)
+            vtopo.add_node(u.switch, ports={u.port_no: port})
 
 
 ################################################################################
@@ -108,7 +149,7 @@ class pop_vheaders(SinglyDerivedPolicy):
 
 class locate_in_underlying(Policy):
     def __init__(self):
-        self.vmap = {}
+        self.vmap = None
 
     def set_vmap(self,vmap):
         self.vmap = vmap
@@ -126,7 +167,8 @@ class locate_in_underlying(Policy):
         except KeyError:
             vswitch = packet['vswitch']
             voutport = packet['voutport']
-            (switch,outport) = self.vmap[(vswitch,voutport)][0]
+            u = self.vmap.d2u[Location(vswitch,voutport)][0]
+            (switch,outport) = (u.switch,u.port_no)
             # STUPID HACK B/C BACKEND WON'T LET US SEND WHEN OUTPORT=INPORT
             packet = packet.push(switch=switch)
             if outport > 1:

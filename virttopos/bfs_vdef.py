@@ -37,41 +37,6 @@
 from frenetic.lib import *
 
 
-def topo_to_bfs_vmap(topo):
-    vmap = {}
-    port_no = 1
-    for loc in topo.egress_locations():
-        vmap[1, port_no] = [(loc.switch, loc.port_no)]
-        port_no += 1
-    return vmap
-
-    
-def shortest_path_policy(topo,vmap):
-    fabric_policy = drop
-    paths = Topology.all_pairs_shortest_path(topo)
-    # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
-    for (vswitch1,vport_no1),[(pswitch1,pport_no1)] in vmap.items():
-        for (vswitch2,vport_no2),[(pswitch2,pport_no2)] in vmap.items():
-            # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
-            if vswitch1 != vswitch2:
-                continue
-            # IF IDENTICAL VIRTUAL LOCATIONS, THEN WE KNOW FABRIC POLICY IS JUST TO FORWARD OUT MATCHING PHYSICAL PORT
-            if vport_no1 == vport_no2:
-                fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2)[fwd(pport_no2)]
-            # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
-            # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
-            # FINALLY ADD A RULE THAT FORWARDS OUT THE CORRECT PHYSICAL PORT AT THE LAST PHYSICAL SWITCH ON THE PATH
-            else:
-                try:
-                    for loc in paths[pswitch1][pswitch2]:
-                        fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=loc.switch)[fwd(loc.port_no)]
-                    fabric_policy |= match(vswitch=vswitch1,vinport=vport_no1,voutport=vport_no2,switch=pswitch2)[fwd(pport_no2)]
-                except KeyError:
-                    pass
-    return fabric_policy
-
-from frenetic import netcore
-
 class BFS_vdef(object):
     def __init__(self,keep=[]):
         self.keep = keep
@@ -79,13 +44,22 @@ class BFS_vdef(object):
         self.derived_topology = None
         self.underlying_topology = None
 
+    def make_vmap(self):
+        mapping = vmap()
+        port_no = 1
+        for loc in self.underlying_topology.egress_locations():
+            mapping.d2u[Location(1, port_no)] = \
+                [Location(loc.switch, loc.port_no)]
+            port_no += 1
+        return mapping
+
     def set_network(self,network):
         self.underlying_topology = network.topology
         if self.keep:
             tmp = network.topology.filter_nodes(self.keep)
             if tmp:
                 self.underlying_topology = tmp
-        self.vmap = topo_to_bfs_vmap(self.underlying_topology)
+        self.vmap = self.make_vmap()
         self.derived_topology = Topology()
         add_nodes_from_vmap(self.vmap, self.derived_topology)        
         
@@ -103,19 +77,15 @@ class BFS_vdef(object):
                 
     @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
-        return vmap_to_ingress_policy(self.vmap)
+        return self.vmap.ingress_policy()
 
-    def fabric_policy_from_network(self, network): 
-        return shortest_path_policy(self.underlying_topology, self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network): 
-        return self.fabric_policy_from_network(network)
+        return self.vmap.shortest_path_fabric_policy(self.underlying_topology)
 
-    def egress_policy_from_network(self, network):
-        return vmap_to_egress_policy(self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-        return self.egress_policy_from_network(network)
+        return self.vmap.egress_policy()
 
         
 transform = BFS_vdef()

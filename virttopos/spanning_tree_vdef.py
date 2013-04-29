@@ -36,32 +36,6 @@
 
 from frenetic.lib import *
 
-def topo_to_st_vmap(topo, mst):
-    d = {}
-    for sw, attrs in mst.nodes(data=True):
-        elocs = topo.egress_locations(sw)
-        mstlocs = set()
-        for attrs in mst[sw].itervalues():
-            mstlocs.add(attrs[sw])
-        locs = elocs | {Location(sw,p) for p in mstlocs}
-        for loc in locs:
-            d[(loc.switch,loc.port_no)] = [(loc.switch, loc.port_no)]
-    return d
-
-
-def one_to_one_fabric_policy(vmap):
-    fabric_policy = drop
-    # ITERATE THROUGH ALL PAIRS OF VIRTUAL PORTS
-    for (vswitch1,vport1),[(pswitch1,pport1)] in vmap.items():
-        for (vswitch2,vport2),[(pswitch2,pport2)] in vmap.items():
-            # FABRIC POLICY ONLY EXISTS WITHIN EACH VIRTUAL SWITCH
-            if vswitch1 != vswitch2:
-                continue
-            # FORWARD OUT THE CORRECT PHYSICAL PORT
-            fabric_policy |= match(vswitch=vswitch1,vinport=vport1,voutport=vport2)[fwd(pport2)]
-    return fabric_policy
-
-
 
 class spanning_tree_vdef(object):
     def __init__(self):
@@ -69,12 +43,24 @@ class spanning_tree_vdef(object):
         self.underlying_topology = None
         self.derived_topology = None
 
+    def make_vmap(self):
+        mapping = vmap()
+        for sw, attrs in self.derived_topology.nodes(data=True):
+            elocs = self.underlying_topology.egress_locations(sw)
+            mstlocs = set()
+            for attrs in self.derived_topology[sw].itervalues():
+                mstlocs.add(attrs[sw])
+            locs = elocs | {Location(sw,p) for p in mstlocs}
+            for loc in locs:
+                mapping.d2u[Location(loc.switch,loc.port_no)] = \
+                    [Location(loc.switch, loc.port_no)]
+        return mapping
+
     def set_network(self,network):
         self.underlying_topology = network.topology
         self.derived_topology = Topology.minimum_spanning_tree(network.topology)
-        self.vmap = topo_to_st_vmap(network.topology, self.derived_topology)
+        self.vmap = self.make_vmap()
 
-    from frenetic import netcore
     def derive_network(self):
         vnetwork = Network()
         vnetwork.topology = self.derived_topology
@@ -88,19 +74,15 @@ class spanning_tree_vdef(object):
         
     @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
-        return vmap_to_ingress_policy(self.vmap)
+        return self.vmap.ingress_policy()
 
-    def fabric_policy_from_network(self, network):
-        return one_to_one_fabric_policy(self.vmap) 
     @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network):
-        return self.fabric_policy_from_network(network)
+        return self.vmap.one_to_one_fabric_policy() 
 
-    def egress_policy_from_network(self, network):
-        return vmap_to_egress_policy(self.vmap)
     @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):
-        return self.egress_policy_from_network(network)
+        return self.vmap.egress_policy()
 
 transform = spanning_tree_vdef()
 
