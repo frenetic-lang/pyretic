@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sudo mn -c
-sudo mn --custom $HOME/pyretic/mininet/extra-topos.py --controller remote --mac $@
+sudo ~/pyretic/mininet/mn -c
+sudo ~/pyretic/mininet/mn --custom $HOME/pyretic/mininet/extra-topos.py --controller remote --mac $@
