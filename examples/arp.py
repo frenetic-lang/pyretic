@@ -74,16 +74,19 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     network.inject_packet(rp)
 
 
+
+def translate(mac_of={}):
+    """Translate dstmac based on input IP/MAC mapping"""
+    known_ip = parallel([ match(dstip=ip)[modify(dstmac=mac)] for (ip,mac) in mac_of.iteritems() ])
+    unknown_ip = ~union([ match(dstip=ip) for (ip,mac) in mac_of.iteritems() ])
+    return known_ip | unknown_ip[passthrough]
+
 @dynamic
 def arp(self,mac_of={}):
     """Respond to arp request for any known hosts,
-       learn macs of unknown hosts"""
+       learn macs of unknown hosts, rewrite macs based on dstip"""
     location_of = {}
     outstanding_requests = collections.defaultdict(dict)
-
-    def update_policy():
-        self.policy = if_(ARP,self.query,self.forward)
-    self.update_policy = update_policy
 
     def handle_arp(pkt):
         switch = pkt['switch']
@@ -136,6 +139,7 @@ def arp(self,mac_of={}):
                     if VERBOSE_LEVEL > 1:
                         print pkt
 
+                # LEARN MAC
                 mac_of[srcip] = srcmac
                 loc = location_of[dstip]
                 send_arp(RESPONSE,self.network,loc.switch,loc.port_no,srcip,mac_of[srcip],dstip,mac_of[dstip])
@@ -148,21 +152,16 @@ def arp(self,mac_of={}):
 
     self.query = packets()
     self.query.register_callback(handle_arp)
-    self.forward = drop
-    self.update_policy()
+    self.policy = self.query
 
 
-def learn_arp():
+def arp_and_mac_learn():
     """Handle ARPs and do MAC learning"""
     return if_(ARP,arp(),mac_learner())
 
-def pre_specified_arp():
-    mac_of = { IP('10.0.0.'+str(i)) : MAC('00:00:00:00:00:0'+str(i)) for i in range(1,9) }
-    return if_(ARP,arp(mac_of),mac_learner())
-
 
 def main():
-    return learn_arp()
+    return arp_and_mac_learn()
 
 
 
