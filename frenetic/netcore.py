@@ -846,7 +846,8 @@ class MutablePolicy(SinglyDerivedPolicy):
     @policy.setter
     def policy(self, value):
         self._policy = value
-        self.set_network(self.network)
+        if not self.network is None:
+            self.set_network(self.network)
 
     ### repr : unit -> String
     def __repr__(self):
