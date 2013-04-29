@@ -504,23 +504,6 @@ class push(Policy):
         packet = packet.pushmany(self.map)
         return Counter([packet])
 
-
-class fwd(Policy):
-    """Forward packet out of a particular port
-    fwd(a) equivalent to push(outport=a)"""
-    ### init : int -> unit
-    def __init__(self, outport):
-        self.outport = outport
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "fwd %s" % self.outport
-    
-    ### eval : Packet -> Counter List Packet        
-    def eval(self, packet):
-        packet = packet.push(outport=self.outport)
-        return Counter([packet])
-
         
 class pop(Policy):
     """pop('field') pops value off field stack"""
@@ -670,6 +653,20 @@ class SinglyDerivedPolicy(Policy):
 
     def eval(self, packet):
         return self.policy.eval(packet)
+
+
+class fwd(SinglyDerivedPolicy):
+    """Forward packet out of a particular port
+    fwd(a) equivalent to push(outport=a)"""
+    ### init : int -> unit
+    def __init__(self, outport):
+        self.outport = outport
+        self.policy = push(outport=self.outport)
+
+    ### repr : unit -> String
+    def __repr__(self):
+        return "fwd %s" % self.outport
+    
 
 class trace(SinglyDerivedPolicy):
     def __init__(self,policy,trace_name='trace'):
