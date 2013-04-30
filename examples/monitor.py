@@ -147,7 +147,7 @@ def summary_modules():
 
 def lowest_level_syntax():                      
     return monitor_packets_lowest_level_syntax()  \
-        | flood
+        | flood()
 
 
 ### Main ###

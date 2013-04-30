@@ -183,11 +183,10 @@ class no_packets(Predicate):
         return False
 
         
-@singleton
-class ingress(Predicate):
+class ingress_network(Predicate):
     ### repr : unit -> String
     def __repr__(self):
-        return "ingress"
+        return "ingress_network"
     
     ### eval : Packet -> bool
     def eval(self, packet):
@@ -196,11 +195,10 @@ class ingress(Predicate):
         return Location(switch,port_no) in self.network.topology.egress_locations()
 
         
-@singleton
-class egress(Predicate):
+class egress_network(Predicate):
     ### repr : unit -> String
     def __repr__(self):
-        return "egress"
+        return "egress_network"
     
     ### eval : Packet -> bool
     def eval(self, packet):
@@ -455,7 +453,6 @@ class drop(Policy):
         return Counter()
 
         
-@singleton
 class flood(Policy):
     ### repr : unit -> String
     def __repr__(self):
@@ -827,6 +824,7 @@ class breakpoint(SinglyDerivedPolicy):
 class NetworkDerivedPolicy(SinglyDerivedPolicy):
     """Generates new policy every time a new network is set"""
     def __init__(self, policy_from_network):
+        self.policy = drop
         self.policy_from_network = policy_from_network
 
     def set_network(self, value):

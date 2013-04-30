@@ -57,7 +57,7 @@ def learn(self):
 
     self.query = packets(1,['srcmac','switch'])
     self.query.register_callback(learn_new_MAC)
-    self.forward = flood
+    self.forward = flood()
     self.update_policy()
 
 

@@ -42,7 +42,7 @@ from examples.mac_learner import learn
 
 ### FIREWALLS ###
 
-drop_ingress = if_(ingress,drop,passthrough)
+drop_ingress = if_(ingress_network(),drop,passthrough)
 
 def poke(W,P):
     p = union([match(srcip=s,dstip=d) for (s,d) in W])

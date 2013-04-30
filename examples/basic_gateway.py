@@ -84,7 +84,7 @@ def policy_from(eth_pol,ip_pol,gw_pol):
         switch_in(gateway)[ gw_pol ] | \
         switch_in(ip_core)[ ip_pol ]    
     pol_dbg = pkt_print('->pol') >> trace(pol) >> pkt_print('->pol') >> \
-        if_(egress,clear_trace()) >> pkt_print('outgoing')
+        if_(egress_network(),clear_trace()) >> pkt_print('outgoing')
     
     return pol
 

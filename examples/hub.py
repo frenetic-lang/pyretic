@@ -40,7 +40,7 @@
 
 from frenetic.lib import *
 
-hub = flood
+hub = flood()
 
 def main():
     return hub
