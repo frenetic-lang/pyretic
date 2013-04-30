@@ -41,7 +41,7 @@ from virttopos.gateway_vdef import gateway_vdef
 
 @dynamic
 def virtualized_policy(self):
-    self.policy = virtualize_part(trace(flood) , gateway_vdef(self), DEBUG=True)
+    self.policy = virtualize(trace(flood()) , gateway_vdef(self), DEBUG=True)
 
 def main():
     return virtualized_policy() >> if_(egress,clear_trace()) >> pkt_print('outgoing')

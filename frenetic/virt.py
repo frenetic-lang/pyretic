@@ -243,12 +243,6 @@ class virtualize_base(SinglyDerivedPolicy):
     def __repr__(self):
         return "virtualize %s\n%s" % (self.vtag, self.vdef)
 
-
-class virtualize_full(virtualize_base):
-    def __init__(self, vpolicy, vdef, DEBUG=False):
-        super(virtualize_full,self).__init__(passthrough, vpolicy, vdef, DEBUG)
-
-
-class virtualize_part(virtualize_base):
+class virtualize(virtualize_base):
     def __init__(self, policy, vdef, DEBUG=False):
-        super(virtualize_part,self).__init__(policy, policy, vdef, DEBUG)
+        super(virtualize,self).__init__(policy, policy, vdef, DEBUG)

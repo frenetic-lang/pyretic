@@ -41,7 +41,7 @@ from virttopos.gateway_vdef import gateway_vdef
 
 @dynamic
 def vgateway(self,pol):
-    self.policy = virtualize_part(pol, gateway_vdef(self))
+    self.policy = virtualize(pol, gateway_vdef(self))
 
 def main():
     return vgateway(basic_gateway_setup())

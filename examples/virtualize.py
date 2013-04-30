@@ -36,7 +36,7 @@ def virtualize_program(virttopo, program, **kwargs):
     execfile(program, programns)
 
     vn = virttopons["transform"]
-    return virtualize_full(programns["main"](**kwargs), vn)
+    return virtualize(programns["main"](**kwargs), vn)
 
     
 main = virtualize_program
