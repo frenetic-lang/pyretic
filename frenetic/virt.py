@@ -102,14 +102,6 @@ class vmap(object):
                         pass
         return fabric_policy
 
-def add_nodes_from_vmap(vmap, vtopo):
-    for u in vmap.d2u:
-        port = Port(u.port_no)
-        try:
-            vtopo.node[u.switch]['ports'][u.port_no] = port 
-        except KeyError:
-            vtopo.add_node(u.switch, ports={u.port_no: port})
-
 
 ################################################################################
 # Virtualization policies 

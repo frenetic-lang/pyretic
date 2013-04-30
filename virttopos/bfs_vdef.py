@@ -38,31 +38,62 @@ from frenetic.lib import *
 
 
 class BFS_vdef(object):
-    def __init__(self,keep=[]):
-        self.keep = keep
+    def __init__(self,name=1,from_switches=[]):
+        self.from_switches = from_switches
         self.vmap = None
         self.derived_topology = None
         self.underlying_topology = None
+        self.kept_topology = None
 
     def make_vmap(self):
         mapping = vmap()
         port_no = 1
-        for loc in self.underlying_topology.egress_locations():
+        for loc in self.kept_topology.egress_locations():
             mapping.d2u[Location(1, port_no)] = \
                 [Location(loc.switch, loc.port_no)]
+            mapping.u2d[Location(loc.switch, loc.port_no)] = \
+                Location(1, port_no)
             port_no += 1
         return mapping
 
     def set_network(self,network):
         self.underlying_topology = network.topology
-        if self.keep:
-            tmp = network.topology.filter_nodes(self.keep)
+        self.kept_topology = self.underlying_topology
+        if self.from_switches:
+            tmp = network.topology.filter_nodes(self.from_switches)
             if tmp:
-                self.underlying_topology = tmp
+                self.kept_topology = tmp
         self.vmap = self.make_vmap()
-        self.derived_topology = Topology()
-        add_nodes_from_vmap(self.vmap, self.derived_topology)        
+        self.derived_topology = self.underlying_topology.copy()
+        relink = {}
+        if len(self.from_switches) == 0:
+            self.derived_topology = Topology()
+        else:
+            for switch in self.from_switches:
+                try:
+                    ports = self.derived_topology.node[switch]['ports']
+                    for port_no,port in ports.items():
+                        if not (port is None or port.linked_to.switch in self.from_switches):
+                            relink[self.vmap.u2d[Location(switch,port_no)]] = port.linked_to
+                except:
+                    pass
+                try:
+                    self.derived_topology.remove_node(switch)
+                except:
+                    pass
+
+        # ADD THE DERIVED SWITCH
+        for u in self.vmap.d2u:
+            port = Port(u.port_no)
+            try:
+                self.derived_topology.node[u.switch]['ports'][u.port_no] = port 
+            except KeyError:
+                self.derived_topology.add_node(u.switch, ports={u.port_no: port})
         
+        # SET UP LINKS BETWEEN DERIVED SWITCH AND REMAINING UNDERLYING SWITCHES
+        for u,v in relink.items():
+            self.derived_topology.add_link(u,v)
+
     def derive_network(self):
         """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
         vnetwork = Network()
