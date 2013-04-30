@@ -177,6 +177,7 @@ class locate_in_underlying(Policy):
 class virtualize_base(SinglyDerivedPolicy):
     def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
         self.vpolicy = vpolicy
+        self.upolicy = upolicy
         self.vnetwork = None
         self.vdef = vdef
         self.vtag = new_vtag()
@@ -197,29 +198,31 @@ class virtualize_base(SinglyDerivedPolicy):
                 pkt_print("after derived policy:",self.DEBUG) >>
                 lower_packet(self.vtag) >>
                 pkt_print("after lower:",self.DEBUG),
-                passthrough) >>
+                passthrough >>
+                pkt_print("non_ingress:",self.DEBUG)) >>
             ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
             if_(match(vtag=self.vtag), 
                 self.fabric_policy >>
                 pkt_print("after fabric:",self.DEBUG) >>
                 self.egress_policy >>
                 pkt_print("after egress:",self.DEBUG),
-                upolicy >>
-                pkt_print("after underlying policy",self.DEBUG) )
+                pkt_print ("in underlying network:",self.DEBUG) >>
+                pol_print(self.upolicy,'underlying policy is:',self.DEBUG) >>
+                pkt_print("after underlying policy:",self.DEBUG) )
             )
         self.injection_policy = (
             pkt_print("injected packet",self.DEBUG) >>
             lower_packet(self.vtag) >>
-            pkt_print("after lower",self.DEBUG) >>
+            pkt_print("after lower:",self.DEBUG) >>
             self.locate_in_underlying >>
-            pkt_print("after locate",self.DEBUG) >>
+            pkt_print("after locate:",self.DEBUG) >>
             if_(match(outport=None),   # IF NO OUTPORT 
                 self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
                 pop('run_fabric') >>
-                pkt_print("after fabric",self.DEBUG),
+                pkt_print("after fabric:",self.DEBUG),
                 passthrough) >>        # OTHERWISE WE PASSTHROUGH TO EGRESS POLICY
             self.egress_policy >>
-            pkt_print("after egress",self.DEBUG) 
+            pkt_print("after egress:",self.DEBUG) 
             )
 
     def set_network(self, updated_network):
