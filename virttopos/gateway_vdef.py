@@ -41,21 +41,24 @@ class gateway_vdef(vdef):
     def __init__(self, redo):
         super(gateway_vdef,self).__init__()
 
+        def push_vloc(switch,inport):
+            return push(vswitch=switch,vinport=inport,voutport=-1)
+
         self.ingress_policy = if_(match(switch=1),
                push(vtag='ingress') >> (                                
                # At physical gateway, ethernet side. Pretend we are switch 1000.
-               match(at=None, inport=1)[push(vswitch=1000, vinport=1)] |
-               match(at=None, inport=2)[push(vswitch=1000, vinport=2)] |
+               match(at=None, inport=1)[push_vloc(1000,1)] |
+               match(at=None, inport=2)[push_vloc(1000,2)] |
                # At physical gateway, imaginary side close to ethernet.
-               match(at="vswitch 1000, vinport 3")[push(vswitch=1000, vinport=3) >> pop("at")] |
+               match(at="vswitch 1000, vinport 3")[push_vloc(1000,3) >> pop("at")] |
                # At physical gateway, imaginary gateway.
-               match(at="vswitch 1001, vinport 1")[push(vswitch=1001, vinport=1) >> pop("at")] |
-               match(at="vswitch 1001, vinport 2")[push(vswitch=1001, vinport=2) >> pop("at")] |
+               match(at="vswitch 1001, vinport 1")[push_vloc(1001,1) >> pop("at")] |
+               match(at="vswitch 1001, vinport 2")[push_vloc(1001,2) >> pop("at")] |
                # At physical gateway, imaginary side close to ip.
-               match(at="vswitch 1002, vinport 3")[push(vswitch=1002, vinport=3) >> pop("at")] |
+               match(at="vswitch 1002, vinport 3")[push_vloc(1002,3) >> pop("at")] |
                # At physical gateway, ip side. Pretend we are switch 1002.
-               match(at=None, inport=3)[push(vswitch=1002, vinport=1)] |
-               match(at=None, inport=4)[push(vswitch=1002, vinport=2)] ),
+               match(at=None, inport=3)[push_vloc(1002,1)] |
+               match(at=None, inport=4)[push_vloc(1002,2)] ),
                passthrough)
 
         self.fabric_policy = (

@@ -54,7 +54,7 @@ class vmap(object):
         non_ingress = ~union(
             union(match(switch=u.switch, inport=u.port_no) for u in us) 
             for (d, us) in self.d2u.iteritems() )
-        ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=u.switch, inport=u.port_no) for u in us)[push(vtag='ingress', vswitch=d.switch, vinport=d.port_no)] for (d, us) in self.d2u.iteritems())
+        ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=u.switch, inport=u.port_no) for u in us)[push(vtag='ingress', vswitch=d.switch, vinport=d.port_no, voutport=-1)] for (d, us) in self.d2u.iteritems())
         return ingress_policy
 
     def egress_policy(self):
@@ -123,7 +123,6 @@ class lower_packet(SinglyDerivedPolicy):
 class lift_packet(SinglyDerivedPolicy):
     """Lifts a packet from the underlying network to the derived network"""
     def __init__(self):
-#        self.policy = (pop("switch", "inport", "outport", "vtag") >>
         self.policy = (pop("vtag") >>
                        move(outport="voutport", switch="vswitch", inport="vinport"))
         
@@ -161,8 +160,15 @@ class locate_in_underlying(Policy):
             u = self.vmap.d2u[Location(vswitch,voutport)][0]
             (switch,outport) = (u.switch,u.port_no)
             packet = packet.push(switch=switch)
+            packet = packet.push(inport=-1)
             if not outport is None:
                 packet = packet.push(outport=outport)
+            else:
+                packet = packet.push(outport=-1)
+        try:
+            outport = packet['outport']
+        except KeyError:
+            outport = -1
         return Counter([packet])
 
 
@@ -187,9 +193,10 @@ class virtualize_base(SinglyDerivedPolicy):
         self.egress_policy = self.vdef.egress_policy
         self.locate_in_underlying = locate_in_underlying()
         self.policy = (
-            self.ingress_policy >> # set vswitch and vinport
             pkt_print(repr(self),self.DEBUG) >>
+            if_(match(outport=None),push(outport=-1)) >>
             str_print("-- " + tag + " apply ingress policy",self.DEBUG) >>
+            self.ingress_policy >> # set vlocation
             pkt_print(tag + " after ingress:",self.DEBUG) >>
             ### IF INGRESSING LIFT AND EVALUATE
             if_(match(vtag='ingress'), 
@@ -224,8 +231,8 @@ class virtualize_base(SinglyDerivedPolicy):
             pkt_print(tag + " after lower:",self.DEBUG) >>
             str_print("-- " + tag + " locate packet",self.DEBUG) >>
             self.locate_in_underlying >>
-            if_(match(outport=None),   # IF NO OUTPORT 
             pkt_print(tag + " after locate:",self.DEBUG) >>
+            if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
                 str_print("-- " + tag + " apply fabric policy",self.DEBUG) >>
                 self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
                 pkt_print(tag + " after fabric:",self.DEBUG),

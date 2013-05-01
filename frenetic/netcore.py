@@ -492,14 +492,21 @@ class flood(Policy):
         switch = packet["switch"]
         inport = packet["inport"]
         if switch in self.mst:
-            port_nos = set()
-            port_nos.update({loc.port_no 
-                             for loc in self.network.topology.egress_locations(switch)})
+            port_nos = {loc.port_no 
+                        for loc in self.network.topology.egress_locations(switch)}
             for sw in self.mst.neighbors(switch):
                 port_no = self.mst[switch][sw][switch]
                 port_nos.add(port_no)
-            packets = [packet.push(outport=port_no)
-                       for port_no in port_nos if port_no != inport]
+            try:
+                if packet["outport"] == -1:
+                    packets = [packet.modify(outport=port_no) \
+                                   for port_no in port_nos if port_no != inport]
+                else:
+                    packets = [packet.push(outport=port_no) \
+                                   for port_no in port_nos if port_no != inport]
+            except:
+                    packets = [packet.push(outport=port_no) \
+                                   for port_no in port_nos if port_no != inport]
             return Counter(packets)
         else:
             return Counter()
@@ -672,12 +679,10 @@ class SinglyDerivedPolicy(Policy):
 
 
 class fwd(SinglyDerivedPolicy):
-    """Forward packet out of a particular port
-    fwd(a) equivalent to push(outport=a)"""
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
-        self.policy = push(outport=self.outport)
+        self.policy = if_(match(outport=-1),pop('outport')) >> push(outport=self.outport)
 
     ### repr : unit -> String
     def __repr__(self):

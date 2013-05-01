@@ -51,6 +51,7 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.push(protocol=msg_type)
     rp = rp.push(ethtype=ARP_TYPE)
     rp = rp.push(switch=switch)
+    rp = rp.push(inport=-1)
     rp = rp.push(outport=outport)
     rp = rp.push(srcip=srcip)
     rp = rp.push(srcmac=srcmac)

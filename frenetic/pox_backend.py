@@ -40,7 +40,13 @@ from pox.lib.packet.lldp          import ttl, system_description
 from frenetic import generators as gs, network as net, virt, util
 import lib as lib 
 import ipdb
-            
+
+def inport_value_hack(outport):
+    if outport > 1:
+        return 1
+    else:
+        return 2
+                    
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
     def __init__(self, main, show_traces, debug_packet_in, kwargs):
@@ -476,17 +482,16 @@ class POXBackend(revent.EventMixin):
         for pkt in output.elements():
             self.send_packet(pkt)
 
-                
+
     def send_packet(self, packet):
         switch = packet["switch"]
         outport = packet["outport"]
         try:
             inport = packet["inport"]
+            if inport == -1:
+                inport = inport_value_hack(outport)
         except KeyError:
-            if outport > 1:
-                inport = 1
-            else:
-                inport = 2
+            inport = inport_value_hack(outport)
 
         packet = packet.pop("switch", "inport", "outport")
         
