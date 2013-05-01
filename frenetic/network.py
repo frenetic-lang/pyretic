@@ -500,28 +500,40 @@ class Topology(nx.Graph):
         return repr(self)
         
 
-class DerivedBackend(object):
-    def __init__(self, underlying_backend, injection_policy):
-        self.underlying_backend = underlying_backend
+
+class Network(object):
+    """Abstract class for networks"""
+    def __init__(self):
+        self._topology = gs.Behavior(Topology())                
+    topology = gs.Behavior.property("_topology")
+    
+    def inject_packet(self, packet):
+        raise NotImplementedError        
+
+
+class DerivedNetwork(Network):
+    def __init__(self,underlying=None,injection_policy=None):
+        super(DerivedNetwork,self).__init__()
+        self.underlying = underlying
         self.injection_policy = injection_policy
+        self.inherited = set(underlying.topology.nodes())
 
-    def send_packet(self, packet):
-        output = self.injection_policy.eval(packet)
-        for opacket in output.iterkeys():
-            self.underlying_backend.send_packet(opacket)
+    def inject_packet(self, packet):
+        if packet['switch'] in self.inherited:
+            self.underlying.inject_packet(packet)
+        else:
+            output = self.injection_policy.eval(packet)
+            for opacket in output.iterkeys():
+                self.underlying.inject_packet(opacket)
 
-    def inject_discovery_packet(self, dpid, port):
-        pass
+
 
 
 DEBUG_TOPO_DISCOVERY = False
-class Network(object):
+class ConcreteNetwork(Network):
     def __init__(self,backend=None):
-        from frenetic.netcore import drop
-        self._policy = gs.Behavior(drop)
-        self._sub_policies = {}
+        super(ConcreteNetwork,self).__init__()
         self.backend = backend
-        self._topology = gs.Behavior(Topology())                
         self.events = ["switch_joins", "switch_parts",
                        "port_joins", "port_parts",
                        "port_mods", "link_updates"]
@@ -530,44 +542,16 @@ class Network(object):
             setattr(self, event, e)
             e.notify(getattr(self, "_handle_%s" % event))
 
-    topology = gs.Behavior.property("_topology")
-    
-    @property
-    def topology_changes(self):
-        return iter(self._topology)
-
     def inject_packet(self, packet):
         self.backend.send_packet(packet)
 
-    def inject_discovery_packet(self, dpid, port_no):
-        self.backend.inject_discovery_packet(dpid, port_no)
-    
-    def install_policy(self, policy):
-        self.install_sub_policy(self, policy)
-        
-    def install_sub_policy(self, id, policy):
-        self._sub_policies[id] = policy
-        self._policy.set(self._aggregate_policy())
-        
-    @property
-    def policy(self):
-        return self._policy.get()
-        
-    @property
-    def policy_changes(self):
-        return iter(self._policy)
-    
-    def _aggregate_policy(self):
-        from frenetic.netcore import drop
-        pol = drop
-        for policy in self._sub_policies.itervalues():
-            pol |= policy
-        return pol
-
     #
-    # Events
+    # Topology Detection
     #
            
+    def inject_discovery_packet(self, dpid, port_no):
+        self.backend.inject_discovery_packet(dpid, port_no)
+        
     def _handle_switch_joins(self, switch):
         if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
         self.topology.add_node(switch, ports={})
@@ -696,27 +680,5 @@ class Network(object):
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         if DEBUG_TOPO_DISCOVERY:  print self.topology
         self._topology.signal_mutation()
-
-
-
-    #
-    # Policies
-    #
-
-    def __ior__(self, policy):
-        self.install_policy(self._sub_policies[self] | policy)
-        return self
-        
-    def __iand__(self, policy):
-        self.install_policy(self._sub_policies[self] & policy)
-        return self
-
-    def __isub__(self, policy):
-        self.install_policy(self._sub_policies[self] - policy)
-        return self
-
-    def __irshift__(self, policy):
-        self.install_policy(self._sub_policies[self] >> policy)
-        return self
 
 

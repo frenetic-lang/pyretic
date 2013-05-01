@@ -44,7 +44,7 @@ import ipdb
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
     def __init__(self, main, show_traces, debug_packet_in, kwargs):
-        self.network = virt.Network(self)
+        self.network = virt.ConcreteNetwork(self)
         
         self.switches = {}
         self.show_traces = show_traces
