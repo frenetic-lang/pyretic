@@ -148,9 +148,12 @@ class POXBackend(revent.EventMixin):
 
     def packet_to_pox(self, packet):
         if len(packet["payload"]) == 0:
-            return self.make_pox_arp(packet).pack()
-
-        p_begin = p = packetlib.ethernet(packet["payload"])
+            if packet["ethtype"] == lib.ARP_TYPE:
+                p_begin = p = self.make_pox_arp(packet)
+            else:  # BLANK PACKET FOR NOW - MAY NEED TO SUPPORT OTHER PACKETS LATER
+                p_begin = p = packetlib.ethernet()
+        else:
+            p_begin = p = packetlib.ethernet(packet["payload"])
 
         # ETHERNET PACKET IS OUTERMOST
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
