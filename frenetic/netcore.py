@@ -389,6 +389,25 @@ class Policy(NetworkEvaluated):
         raise NotImplementedError
 
 
+class str_print(Policy):
+    def __init__(self,s='',on=True):
+        self.s = s
+        self.on = on
+
+    ### repr : unit -> String
+    def __repr__(self):
+        if self.on:
+            return "str_print %s" % self.s
+        else:
+            return ''
+
+    ### eval : Packet -> Counter List Packet
+    def eval(self, packet):
+        if self.on:
+            print self.s
+        return Counter([packet])
+
+
 class pkt_print(Policy):
     def __init__(self,s='',on=True):
         self.s = s
@@ -404,7 +423,7 @@ class pkt_print(Policy):
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
         if self.on:
-            print "---- pkt_print %s -------" % self.s
+            print "---- %s -------" % self.s
             print packet
             print "-------------------------------"
         return Counter([packet])
