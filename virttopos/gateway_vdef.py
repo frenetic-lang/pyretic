@@ -37,11 +37,9 @@
 from frenetic.lib import *
 
 
-class gateway_vdef(object):
+class gateway_vdef(vdef):
     def __init__(self, redo):
-        self.vmap = None
-        self.underlying_topology = None
-        self.derived_topology = None
+        super(gateway_vdef,self).__init__()
 
         self.ingress_policy = if_(match(switch=1),
                push(vtag='ingress') >> (                                
@@ -79,7 +77,7 @@ class gateway_vdef(object):
 
     def make_vmap(self):
         mapping = vmap()
-        topo = self.underlying_topology.copy()
+        topo = self.underlying.topology.copy()
         try:
             topo.remove_node(1)
 
@@ -101,37 +99,32 @@ class gateway_vdef(object):
         return mapping
 
     def set_network(self,network):
-        self.underlying_topology = network.topology
+        self.underlying = network
+        self.derived = DerivedNetwork(self.underlying)
         self.vmap = self.make_vmap()
-        self.derived_topology = self.underlying_topology.copy()
+        self.derived.topology = self.underlying.topology.copy()
         try:
             # REMOVE PHYSICAL SWITCHES ONTO WHICH VIRTUAL SWITCHES WILL BE MAPPED
-            self.derived_topology.remove_node(1)
+            self.derived.topology.remove_node(1)
+            self.derived.inherited.remove(1)
             
             # ADD VIRTUAL SWITCHES
-            self.derived_topology.add_node(1000, ports={i: Port(i) for i in range(1,3+1)})
-            self.derived_topology.add_node(1001, ports={i: Port(1) for i in range(1,2+1)})
-            self.derived_topology.add_node(1002, ports={i: Port(i) for i in range(1,3+1)})
+            self.derived.topology.add_node(1000, ports={i: Port(i) for i in range(1,3+1)})
+            self.derived.topology.add_node(1001, ports={i: Port(1) for i in range(1,2+1)})
+            self.derived.topology.add_node(1002, ports={i: Port(i) for i in range(1,3+1)})
 
             # WIRE UP VIRTUAL SWITCHES
             # compare to notations in mininet/extra-topos.py GatewayTopo / PGatewayTopo
-            self.derived_topology.add_link(Location(2,1),Location(1000,1))    # {link(s2[1])} == {s1[1]} == s1000[1] 
-            self.derived_topology.add_link(Location(3,1),Location(1000,2))    # {link(s3[1])} == {s1[2]} == s1000[2] 
-            self.derived_topology.add_link(Location(1001,1),Location(1000,3)) # internal  s1001[1] -- s1000[3]
-            self.derived_topology.add_link(Location(5,1),Location(1002,1))    # {link(s5[1])} == {s1[3]} == s1002[1] 
-            self.derived_topology.add_link(Location(6,1),Location(1002,2))    # {link(s6[1])} == {s1[4]} == s1002[2] 
-            self.derived_topology.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
+            self.derived.topology.add_link(Location(2,1),Location(1000,1))    # {link(s2[1])} == {s1[1]} == s1000[1] 
+            self.derived.topology.add_link(Location(3,1),Location(1000,2))    # {link(s3[1])} == {s1[2]} == s1000[2] 
+            self.derived.topology.add_link(Location(1001,1),Location(1000,3)) # internal  s1001[1] -- s1000[3]
+            self.derived.topology.add_link(Location(5,1),Location(1002,1))    # {link(s5[1])} == {s1[3]} == s1002[1] 
+            self.derived.topology.add_link(Location(6,1),Location(1002,2))    # {link(s6[1])} == {s1[4]} == s1002[2] 
+            self.derived.topology.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
         except:
-            self.derived_topology = Topology()
+            self.derived.topology = Topology()
 
-    def derive_network(self):
-        vnetwork = Network()
-        vnetwork.topology = self.derived_topology
-            
         print "--- Underlying Gateway Topology ------"
-        print self.underlying_topology
+        print self.underlying.topology
         print "--- Derived Gateway Topology ------"
-        print self.derived_topology
-        
-        return vnetwork
-
+        print self.derived.topology

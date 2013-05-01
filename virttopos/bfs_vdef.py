@@ -37,48 +37,51 @@
 from frenetic.lib import *
 
 
-class BFS_vdef(object):
+class BFS_vdef(vdef):
     def __init__(self,name=1,from_switches=[]):
+        self.name = name
         self.from_switches = from_switches
-        self.vmap = None
-        self.derived_topology = None
-        self.underlying_topology = None
         self.kept_topology = None
+        super(BFS_vdef,self).__init__()
 
     def make_vmap(self):
         mapping = vmap()
         port_no = 1
         for loc in self.kept_topology.egress_locations():
-            mapping.d2u[Location(1, port_no)] = \
+            mapping.d2u[Location(self.name, port_no)] = \
                 [Location(loc.switch, loc.port_no)]
             mapping.u2d[Location(loc.switch, loc.port_no)] = \
-                Location(1, port_no)
+                Location(self.name, port_no)
             port_no += 1
         return mapping
 
     def set_network(self,network):
-        self.underlying_topology = network.topology
-        self.kept_topology = self.underlying_topology
+        self.underlying = network
+        self.derived = DerivedNetwork(self.underlying)
+        
+        self.kept_topology = self.underlying.topology
         if self.from_switches:
             tmp = network.topology.filter_nodes(self.from_switches)
             if tmp:
                 self.kept_topology = tmp
         self.vmap = self.make_vmap()
-        self.derived_topology = self.underlying_topology.copy()
+        self.derived.topology = self.underlying.topology.copy()
         relink = {}
         if len(self.from_switches) == 0:
-            self.derived_topology = Topology()
+            self.derived.topology = Topology()
+            self.derived.inherited.clear()
         else:
             for switch in self.from_switches:
                 try:
-                    ports = self.derived_topology.node[switch]['ports']
+                    ports = self.derived.topology.node[switch]['ports']
                     for port_no,port in ports.items():
                         if not (port is None or port.linked_to.switch in self.from_switches):
                             relink[self.vmap.u2d[Location(switch,port_no)]] = port.linked_to
                 except:
                     pass
                 try:
-                    self.derived_topology.remove_node(switch)
+                    self.derived.topology.remove_node(switch)
+                    self.derived.inherited.remove(switch)
                 except:
                     pass
 
@@ -86,25 +89,19 @@ class BFS_vdef(object):
         for u in self.vmap.d2u:
             port = Port(u.port_no)
             try:
-                self.derived_topology.node[u.switch]['ports'][u.port_no] = port 
+                self.derived.topology.node[u.switch]['ports'][u.port_no] = port 
             except KeyError:
-                self.derived_topology.add_node(u.switch, ports={u.port_no: port})
+                self.derived.topology.add_node(u.switch, ports={u.port_no: port})
         
         # SET UP LINKS BETWEEN DERIVED SWITCH AND REMAINING UNDERLYING SWITCHES
         for u,v in relink.items():
-            self.derived_topology.add_link(u,v)
-
-    def derive_network(self):
-        """produces a new network object w/ transformed topology, also updates underlying_topology and vmap for use by ingress, fabric and egress"""
-        vnetwork = Network()
-        vnetwork.topology = self.derived_topology
+            self.derived.topology.add_link(u,v)
 
         print "------- Underlying BFS Topology ---------"
-        print self.underlying_topology
+        print self.underlying.topology
         print "------- Derived BFS Topology ---------"
-        print self.derived_topology
+        print self.derived.topology
 
-        return vnetwork
                 
     @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
@@ -112,7 +109,7 @@ class BFS_vdef(object):
 
     @NetworkDerivedPolicyPropertyFrom
     def fabric_policy(self, network): 
-        return self.vmap.shortest_path_fabric_policy(self.underlying_topology)
+        return self.vmap.shortest_path_fabric_policy(self.underlying.topology)
 
     @NetworkDerivedPolicyPropertyFrom
     def egress_policy(self, network):

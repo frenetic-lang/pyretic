@@ -165,7 +165,14 @@ class locate_in_underlying(Policy):
                 packet = packet.push(outport=outport)
         return Counter([packet])
 
-        
+
+class vdef(object):
+    def __init__(self):
+        self.vmap = None
+        self.underlying = None
+        self.derived = None
+
+
 class virtualize_base(SinglyDerivedPolicy):
     def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
         self.vpolicy = vpolicy
@@ -232,17 +239,9 @@ class virtualize_base(SinglyDerivedPolicy):
     def set_network(self, updated_network):
         self.vdef.set_network(updated_network)
         self.locate_in_underlying.set_vmap(self.vdef.vmap)
+        self.vdef.derived.injection_policy = self.injection_policy
         super(virtualize_base,self).set_network(updated_network)
-        if not updated_network is None:
-            # CREATE THE VNETWORK
-            vnetwork = self.vdef.derive_network()
-            # SET UP THE VNETWORK'S BACKEND
-            vnetwork.backend = \
-                DerivedBackend(updated_network.backend,self.injection_policy)
-        else:
-            vnetwork = None
-        
-        self.vpolicy.set_network(vnetwork) 
+        self.vpolicy.set_network(self.vdef.derived) 
         
     def __repr__(self):
         return "virtualize %s\n%s" % (self.vtag, self.vdef)

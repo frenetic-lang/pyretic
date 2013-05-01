@@ -37,18 +37,13 @@
 from frenetic.lib import *
 
 
-class spanning_tree_vdef(object):
-    def __init__(self):
-        self.vmap = None
-        self.underlying_topology = None
-        self.derived_topology = None
-
+class spanning_tree_vdef(vdef):
     def make_vmap(self):
         mapping = vmap()
-        for sw, attrs in self.derived_topology.nodes(data=True):
-            elocs = self.underlying_topology.egress_locations(sw)
+        for sw, attrs in self.derived.topology.nodes(data=True):
+            elocs = self.underlying.topology.egress_locations(sw)
             mstlocs = set()
-            for attrs in self.derived_topology[sw].itervalues():
+            for attrs in self.derived.topology[sw].itervalues():
                 mstlocs.add(attrs[sw])
             locs = elocs | {Location(sw,p) for p in mstlocs}
             for loc in locs:
@@ -57,20 +52,17 @@ class spanning_tree_vdef(object):
         return mapping
 
     def set_network(self,network):
-        self.underlying_topology = network.topology
-        self.derived_topology = Topology.minimum_spanning_tree(network.topology)
+        self.underlying = network
+        self.derived = DerivedNetwork(self.underlying)
+        self.derived.topology = Topology.minimum_spanning_tree(network.topology)
+        self.derived.inherited.clear()
         self.vmap = self.make_vmap()
 
-    def derive_network(self):
-        vnetwork = Network()
-        vnetwork.topology = self.derived_topology
-
         print "------- Underlying Spanning Tree Topology ---------"
-        print self.underlying_topology
+        print self.underlying.topology
         print "------- Derived Spanning Tree Topology ---------"
-        print self.derived_topology
+        print self.derived.topology
 
-        return vnetwork
         
     @NetworkDerivedPolicyPropertyFrom
     def ingress_policy(self, network):
