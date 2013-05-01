@@ -55,9 +55,9 @@ class POXBackend(revent.EventMixin):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
-        self.vlan_to_diff_db = {}
-        self.diff_to_vlan_db = {}
-        self.vlan_diff_lock = threading.RLock()
+        self.vlan_to_extended_values_db = {}
+        self.extended_values_to_vlan_db = {}
+        self.extended_values_lock = threading.RLock()
         self.packetno = 0
 
         if core.hasComponent("openflow"):
@@ -67,23 +67,25 @@ class POXBackend(revent.EventMixin):
         self.policy.set_network(self.network)
 
         
-    def vlan_from_diff(self, diff):
-        with self.vlan_diff_lock:
-            vlan = self.diff_to_vlan_db.get(diff)
+    def encode_extended_values(self, extended_values):
+        with self.extended_values_lock:
+            vlan = self.extended_values_to_vlan_db.get(extended_values)
             if vlan is not None:
                 return vlan
-            r = len(self.diff_to_vlan_db)
+            r = len(self.extended_values_to_vlan_db)
             pcp = r & 0b111000000000000
-            id = r & 0b000111111111111
-            self.diff_to_vlan_db[diff] = (id, pcp)
-            self.vlan_to_diff_db[(id, pcp)] = diff
-            return (id, pcp)
+            vid = r & 0b000111111111111
+            self.extended_values_to_vlan_db[extended_values] = (vid, pcp)
+            self.vlan_to_extended_values_db[(vid, pcp)] = extended_values
+            return (vid, pcp)
+
         
-    def diff_from_vlan(self, id, pcp):
-        with self.vlan_diff_lock:
-            diff = self.vlan_to_diff_db.get((id, pcp))
-            assert diff is not None, "use of vlan that pyretic didn't allocate! not allowed."
-            return diff
+    def decode_extended_values(self, vid, pcp):
+        with self.extended_values_lock:
+            extended_values = self.vlan_to_extended_values_db.get((vid, pcp))
+            assert extended_values is not None, "use of vlan that pyretic didn't allocate! not allowed."
+            return extended_values
+
 
     def packet_from_pox(self, switch, inport, data):
         h = {}
@@ -97,11 +99,11 @@ class POXBackend(revent.EventMixin):
 
         p = p.next
         if isinstance(p, packetlib.vlan):
-            vlan_diff = self.diff_from_vlan(p.id, p.pcp)
+            extended_values = self.decode_extended_values(p.id, p.pcp)
             h["ethtype"] = p.eth_type
             p = p.next
         else:
-            vlan_diff = util.frozendict()
+            extended_values = util.frozendict()
 
         if isinstance(p, packetlib.ipv4):
             h["srcip"] = net.IP(p.srcip.toRaw())
@@ -126,7 +128,7 @@ class POXBackend(revent.EventMixin):
 
         h["payload"] = data
         
-        packet = net.Packet(vlan_diff)
+        packet = net.Packet(extended_values)
         return packet.pushmany(h)
 
 
@@ -146,6 +148,7 @@ class POXBackend(revent.EventMixin):
 
         return p
 
+
     def packet_to_pox(self, packet):
         if len(packet["payload"]) == 0:
             if packet["ethtype"] == lib.ARP_TYPE:
@@ -159,9 +162,8 @@ class POXBackend(revent.EventMixin):
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
         p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
 
-        # DEAL WITH ETHERNET VLANS
-        diff = get_packet_diff(packet)
-        if diff:
+        extended_values = extended_values_from(packet)
+        if extended_values:
             if isinstance(p.next, packetlib.vlan):
                 p = p.next
             else:
@@ -171,7 +173,7 @@ class POXBackend(revent.EventMixin):
                 p.next = packetlib.vlan(next=p.next)
                 p = p.next
                 p.eth_type = old_eth_type
-            p.id, p.pcp = self.vlan_from_diff(diff)
+            p.id, p.pcp = self.encode_extended_values(extended_values)
         else:
             if isinstance(p.next, packetlib.vlan):
                 p.type = p.next.eth_type # Restore encapsulated eth type
@@ -194,7 +196,7 @@ class POXBackend(revent.EventMixin):
                 p.code = packet["dstport"]
 
         elif isinstance(p, packetlib.arp):
-            if diff:
+            if extended_values:
                 p.opcode = packet["protocol"]
                 p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
                 p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
@@ -502,7 +504,7 @@ class POXBackend(revent.EventMixin):
         msg.in_port = inport
         msg.data = self.packet_to_pox(packet)
         msg.actions.append(of.ofp_action_output(port = outport))
-        
+ 
         if self.show_traces:
             print "========= POX/OF SEND ================"
             print msg
@@ -525,22 +527,23 @@ def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
     backend = POXBackend(module_dict["main"], bool(show_traces), debug_packet_in, kwargs)
     pox.pyr = backend
 
+
 ################################################################################
-# 
+# Extended Values
 ################################################################################
 
-valid_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
+native_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol", "payload"]
 
 @util.cached
-def get_packet_diff(packet):
-    diff = {}
+def extended_values_from(packet):
+    extended_values = {}
     for k, v in packet.header.items():
-        if k not in valid_headers and v:
-            diff[k] = v
-        elif len(v) > 1:
-            diff[k] = v[1:]
-    return util.frozendict(diff)
+        if k not in native_headers and v:
+            extended_values[k] = v
+        elif v and len(v) > 1:
+            extended_values[k] = v[1:]
+    return util.frozendict(extended_values)
 
     
     
