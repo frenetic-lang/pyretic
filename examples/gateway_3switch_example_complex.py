@@ -29,21 +29,75 @@
 ##############################################################################################################################
 # TO TEST EXAMPLE                                                                                                            #
 # -------------------------------------------------------------------                                                        #
-# start mininet:  pyretic/mininet.sh --topo=gateway                                                                          #
-# run controller: pox.py --no-cli pyretic/examples/basic_gateway_virted.py                                                   #
-# test:           should behave same as basic_gateway run on pgateway topo                                                   #
+# start mininet:  pyretic/mininet.sh --topo=gateway3                                                                         #
+# run controller: pox.py --no-cli pyretic/examples/[this_example_file]                                                       #
+# test:           all hosts in 10.0.0.0/24 can ping one another and public ip 10.0.1.100, all other non-ARP packets blocked  #
 ##############################################################################################################################
 
 from frenetic.lib import *
 
-from examples.basic_gateway import basic_gateway_setup
-from virttopos.gateway_vdef import gateway_vdef
+from examples.gateway_forwarder import gateway_forwarder
+from examples.mac_learner import mac_learner
+from examples.arp import ARP
+from virttopos.bfs_vdef import BFS_vdef
+from examples.load_balancer import lb
+from examples.firewall import fw
 
-@dynamic
-def vgateway(self,pol):
-    self.policy = virtualize(pol, gateway_vdef(self))
+
+def fix_dstmac(ip_to_mac):
+    change = parallel(
+        [(match(dstip=k) & ~match(dstmac=v))[pop('dstmac') >> push(dstmac=v)] 
+         for k,v in ip_to_mac.items()])
+    leave = intersect(
+        [~(match(dstip=k) & ~match(dstmac=v)) 
+          for k,v in ip_to_mac.items()])[passthrough]
+    return change | leave
+
+def example_setup(num_clients=3, num_servers=3):
+    ### EXAMPLE PARAMETERS
+    # NETWORK BREAKDOWN
+    ethernet = [2,3,4,1000]
+    ip_core  = [5,6,7,1002]
+    gateway  = [1001]
+
+    # SUBNET ADDRESSING
+    eth_prefix = '10.0.0.'
+    ip_prefix  = '10.0.1.'
+    prefix_len = 24
+    eth_cidr = eth_prefix + '0/' + str(prefix_len)
+    ip_cidr = ip_prefix + '0/' + str(prefix_len)
+
+    # END HOST ADDRESSES
+    public_ip = '10.0.1.100'
+    fake_mac = MAC('BB:BB:BB:BB:BB:BB')
+    eth_macs = { IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) \
+                     for i in range(1,1+num_clients) }
+    ip_macs = { IP(ip_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i+num_clients)) \
+                    for i in range(1,1+num_servers) }
+    host_macs = dict(eth_macs.items() + ip_macs.items())
+    host_macs.update({IP(public_ip) : fake_mac})
+
+    # PARAMETERS FOR FIREWALL/LOAD BALANCER
+    R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
+    H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
+    W = {(c,public_ip) for c in H.keys()}
+
+    ### POLICIES FOR THIS EXAMPLE
+    eth_pol = mac_learner()
+    alb = dynamic(lb)(public_ip,R,H) >> fix_dstmac(ip_macs) 
+    afw = if_(ARP,passthrough,dynamic(fw)(W))
+    ip_pol = if_(match(srcip=eth_cidr), 
+                 afw >> alb, 
+                 alb >> afw) >> mac_learner() 
+    ip_pol = virtualize(ip_pol,BFS_vdef(name=5,from_switches=ip_core))
+    gw_pol = gateway_forwarder(eth_cidr,ip_cidr,host_macs)
+
+    return switch_in(ethernet)[ eth_pol ] | \
+        switch_in(gateway)[ gw_pol ] | \
+        switch_in(ip_core)[ ip_pol ]    
+
 
 def main():
-    return vgateway(basic_gateway_setup())
+    return example_setup()
 
 

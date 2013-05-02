@@ -109,7 +109,7 @@ def fw(self,W):
     self.query.register_callback(check_reverse)
     rps = [match(srcip=d,dstip=s) for (s,d) in W]
     self.H = { rp : (0,0) for rp in rps }
-    self.T = 1
+    self.T = 3
     self.inner = dynamic(fw0)(W)
     self.update_policy()
     

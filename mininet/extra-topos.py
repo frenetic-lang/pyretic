@@ -198,9 +198,9 @@ class YTopo(Topo):
         self.addLink('s2', 's4')
 
 
-class GatewayTopoNP(Topo):
+class OneSwitchGatewayTopoNoSubnets(Topo):
     def __init__(self, numClients=3, numServers=3):        
-        super(GatewayTopoNP, self).__init__()
+        super(OneSwitchGatewayTopoNoSubnets, self).__init__()
 
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
@@ -237,9 +237,9 @@ class GatewayTopoNP(Topo):
             self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
 
 
-class PGatewayTopoNP(Topo):
+class ThreeSwitchGatewayTopoNoSubnets(Topo):
     def __init__(self, numClients=3, numServers=3):        
-        super(PGatewayTopoNP, self).__init__()
+        super(ThreeSwitchGatewayTopoNoSubnets, self).__init__()
 
         client_inds = range(1,numClients+1)
         server_inds = range(1,numServers+1)
@@ -282,9 +282,9 @@ class PGatewayTopoNP(Topo):
         self.addLink('s1001','s1002')  # s1001[2] -- s1002[3]
 
 
-class GatewayTopo(Topo):
+class OneSwitchGatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
-        super(GatewayTopo, self).__init__()
+        super(OneSwitchGatewayTopo, self).__init__()
 
         prefix_size  = 24
         left_prefix  = '10.0.0.'
@@ -327,9 +327,9 @@ class GatewayTopo(Topo):
             self.addLink('s'+str(s % num_switches_right + 2 + num_switches_left), 'hs'+str(s))
             
 
-class PGatewayTopo(Topo):
+class ThreeSwitchGatewayTopo(Topo):
     def __init__(self, numClients=3, numServers=3):        
-        super(PGatewayTopo, self).__init__()
+        super(ThreeSwitchGatewayTopo, self).__init__()
 
         prefix_size  = 24
         left_prefix  = '10.0.0.'
@@ -390,9 +390,9 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'bump_clique': BumpCliqueTopo,
           'figure3' : Figure3Topo,
           'ytopo': YTopo,
-          'gateway': GatewayTopo,
-          'gateway_np': GatewayTopoNP,
-          'pgateway': PGatewayTopo,
-          'pgateway_np': PGatewayTopoNP,
+          'gateway1': OneSwitchGatewayTopo,
+          'gateway1_ns': OneSwitchGatewayTopoNoSubnets,
+          'gateway3': ThreeSwitchGatewayTopo,
+          'gateway3_ns': ThreeSwitchGatewayTopoNoSubnets,
 }
  
