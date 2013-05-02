@@ -1,0 +1,665 @@
+
+################################################################################
+# The Pyretic Project                                                          #
+# frenetic-lang.org/pyretic                                                    #
+# author: Joshua Reich (jreich@cs.princeton.edu)                               #
+# author: Christopher Monsanto (chris@monsan.to)                               #
+################################################################################
+# Licensed to the Pyretic Project by one or more contributors. See the         #
+# NOTICES file distributed with this work for additional information           #
+# regarding copyright and ownership. The Pyretic Project licenses this         #
+# file to you under the following license.                                     #
+#                                                                              #
+# Redistribution and use in source and binary forms, with or without           #
+# modification, are permitted provided the following conditions are met:       #
+# - Redistributions of source code must retain the above copyright             #
+#   notice, this list of conditions and the following disclaimer.              #
+# - Redistributions in binary form must reproduce the above copyright          #
+#   notice, this list of conditions and the following disclaimer in            #
+#   the documentation or other materials provided with the distribution.       #
+# - The names of the copyright holds and contributors may not be used to       #
+#   endorse or promote products derived from this work without specific        #
+#   prior written permission.                                                  #
+#                                                                              #
+# Unless required by applicable law or agreed to in writing, software          #
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT    #
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the     #
+# LICENSE file distributed with this work for specific language governing      #
+# permissions and limitations under the License.                               #
+################################################################################
+
+import socket
+import struct
+from abc import ABCMeta, abstractmethod, abstractproperty
+from numbers import Integral
+from itertools import chain
+
+from bitarray import bitarray
+import networkx as nx
+
+from pyretic.core import util, generators as gs
+from pyretic.core.graph_util import * 
+
+
+################################################################################
+# Fixed width stuff
+################################################################################
+
+class IP(object):
+    def __init__(self, ip):
+
+        # already a IP object
+        if isinstance(ip, IP):
+            self.bits = ip.bits
+
+        # otherwise will be in byte or string encoding
+        else:
+            assert isinstance(ip, basestring)
+            
+            b = bitarray()
+
+            # byte encoding
+            if len(ip) == 4:
+                b.frombytes(ip)
+
+            # string encoding
+            else:
+                b.frombytes(socket.inet_aton(ip))
+
+            self.bits = b
+
+    def to_bits(self):
+        return self.bits
+
+    def to01(self):
+        return self.bits.to01()
+
+    def to_bytes(self):
+        return self.bits.tobytes()
+
+    def fromRaw(self):
+        return self.to_bytes()
+
+    def __repr__(self):
+        return socket.inet_ntoa(self.to_bytes())
+
+    def __hash__(self):
+        return hash(self.to_bytes())    
+
+    def __eq__(self,other):
+        return repr(self) == repr(other)
+
+            
+class MAC(object):
+    def __init__(self, mac):
+
+        # already a MAC object
+        if isinstance(mac, MAC):
+            self.bits = mac.bits
+
+        # otherwise will be in byte or string encoding
+        else:
+            assert isinstance(mac, basestring)
+            
+            b = bitarray()
+
+            # byte encoding
+            if len(mac) == 6:
+                b.frombytes(mac)
+
+            # string encoding
+            else:
+                import re
+                m = re.match(r"""(?xi)
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})[:-]+
+                             ([0-9a-f]{1,2})
+                             """, mac)
+                if not m:
+                    raise ValueError
+                else:
+                    b.frombytes(struct.pack("!BBBBBB", *(int(s, 16) for s in m.groups())))
+
+            self.bits = b
+        
+    def to_bits(self):
+        return self.bits
+
+    def to01(self):
+        return self.bits.to01()
+
+    def to_bytes(self):
+        return self.bits.tobytes()
+
+    def __repr__(self):
+        parts = struct.unpack("!BBBBBB", self.to_bytes())
+        mac = ":".join(hex(part)[2:].zfill(2) for part in parts)
+        return mac
+
+    def __hash__(self):
+        return hash(self.to_bytes())
+
+    def __eq__(self,other):
+        return repr(self) == repr(other)
+
+        
+################################################################################
+# Packet and tools
+################################################################################
+
+class Packet(object):
+    __slots__ = ["header"]
+    
+    def __init__(self, state={}):
+        self.header = util.frozendict(state)
+
+    def available_fields(self):
+        available = []
+        for field in self.header:
+            v = self.get_stack(field)
+            if v:
+                available.append(field)
+        return available
+                
+    def get_stack(self, field):
+        return self.header.get(field, ())
+    
+    def pushmany(self, d):
+        r = {}
+        for k, v in d.iteritems():
+            r[k] = (v,) + self.get_stack(k)
+        return Packet(self.header.update(r))
+
+    def push(self, **kwargs):
+        return self.pushmany(kwargs)
+    
+    ### CHECK IF THIS IS CORRECT - WE SHOULD BE ABLE TO POP ALL VALUES OFF VIRTUAL FIELDS...
+    ### WE SHOULDN'T ERROR OUT HERE
+    def popmany(self, fields):
+        r = {}
+        for field in fields:
+            v = self.get_stack(field)
+            assert v, "can't pop only value"
+            r[field] = v[1:]
+        return Packet(self.header.update(r))
+
+    def pop(self, *args):
+        return self.popmany(args)
+
+    def clear(self, *args):
+        return self.clearmany(args)
+        
+    def clearmany(self, fields):
+        hdr = {}
+        for field in fields:
+            hdr[field] = ()
+        return Packet(self.header.update(hdr))
+            
+    def modifymany(self, map):
+        return self.popmany(map).pushmany(map)
+
+    def modify(self, **kwargs):
+        return self.modifymany(kwargs)
+
+    def __getitem__(self, item):
+        v = self.get_stack(item)
+        if not v:
+            raise KeyError
+        # Return top of stack
+        return v[0]
+
+    def __hash__(self):
+        return hash(self.header)
+        
+    def __repr__(self):
+        import hashlib
+        fixed_fields = {}
+        fixed_fields['location'] = ['switch', 'inport', 'outport']
+        fixed_fields['vlocation'] = ['vswitch', 'vinport', 'voutport']
+        fixed_fields['source']   = ['srcip', 'srcmac']
+        fixed_fields['dest']     = ['dstip', 'dstmac']
+        order = ['location','vlocation','source','dest']
+        all_fields = self.header.keys()
+        outer = []
+        size = max(map(len, self.header) or map(len, order) or [len('md5(payload)'),0]) + 3
+        ### LOCATION, VLOCATION, SOURCE, and DEST - EACH ON ONE LINE
+        for fields in order:
+            inner = ["%s:%s" % (fields, " " * (size - len(fields)))]
+            all_none = True
+            for field in fixed_fields[fields]:
+                try:             
+                    all_fields.remove(field)
+                except:          
+                    pass
+                try:             
+                    inner.append(repr(self.header[field])) 
+                    all_none = False
+                except KeyError: 
+                    inner.append('None')
+            if not all_none:
+                outer.append('\t'.join(inner))
+        ### MD5 OF PAYLOAD
+        field = 'payload'
+        outer.append("%s:%s%s" % ('md5(payload)',
+                                    " " * (size - len(field)),
+                                    hashlib.md5(self.header[field][0]).hexdigest()))
+        all_fields.remove(field)
+        ### ANY ADDITIONAL FIELDS
+        for field in sorted(all_fields):
+            try:             
+                if self.header[field]:
+                    outer.append("%s:%s\t%s" % (field,
+                                                " " * (size - len(field)),
+                                                repr(self.header[field])))
+            except KeyError: 
+                pass
+        return "\n".join(outer)
+        
+
+class Port(object):
+    def __init__(self, port_no, config=True, status=True,linked_to=None):
+        self.port_no = port_no
+        self.config = config
+        self.status = status
+        self.linked_to = linked_to
+
+    def definitely_down(self):
+        return not self.config and not self.status
+
+    def possibly_up(self):
+        """User switch reports ports having LINK_DOWN status when in fact link is up"""
+        return not self.definitely_down()
+
+    def __hash__(self):
+        return hash(self.port_no)
+
+    def __eq__(self,other):
+        return self.port_no == other.port_no
+
+    def __repr__(self):
+        return "%d:config_up=%s:status_up=%s:linked_to=%s" % (self.port_no,self.config,self.status,self.linked_to)
+
+
+
+class Location(object):
+    def __init__(self,switch,port_no):
+        self.switch = switch
+        self.port_no = port_no
+
+    def __hash__(self):
+        return hash((self.switch, self.port_no))
+
+    def __eq__(self,other):
+        return self.switch == other.switch and self.port_no == other.port_no
+
+    def __repr__(self):
+        return "%s[%s]" % (self.switch,self.port_no)
+
+
+class Topology(nx.Graph):
+
+    def add_link(self,loc1,loc2):
+        self.add_edge(loc1.switch, loc2.switch, {loc1.switch: loc1.port_no, loc2.switch: loc2.port_no})
+        self.node[loc1.switch]['ports'][loc1.port_no].linked_to = loc2
+        self.node[loc2.switch]['ports'][loc2.port_no].linked_to = loc1
+
+    def is_connected(self):
+        return nx.is_connected(self)
+
+    def egress_locations(self,switch=None):
+        locs = set()
+        if switch is None:
+            for s in self.nodes():
+                locs |= (self.egress_locations(s))
+        else:
+            try: 
+                for port in self.node[switch]['ports'].values():
+                    if port.possibly_up() and port.linked_to is None:
+                        locs.add(Location(switch,port.port_no))
+            except KeyError:
+                pass
+        return locs
+
+    def interior_locations(self,switch=None):
+        locs = set()
+        if switch is None:
+            for s in self.nodes():
+                locs |= (self.interior_locations(s))
+        else:
+            for port in self.node[switch]['ports'].values():
+                if port.possibly_up() and not port.linked_to is None:
+                    locs.add(Location(switch,port.port_no))
+        return locs
+
+    def copy_attributes(self,initial_topo):
+        """TAKES A TRANSFORMED TOPOLOGY AND COPIES IN ATTRIBUTES FROM INITIAL TOPOLOGY"""
+        for s,data in initial_topo.nodes(data=True):
+            try:
+                if self.node[s] == data:
+                    # matching node data
+                    pass
+                else:
+                    # reconcile node data
+                    for (k,v) in data.items():
+                        self.node[s][k] = v
+            except KeyError:
+                # removed node
+                pass
+
+        # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
+        for (s1,s2,data) in initial_topo.edges(data=True):
+            try:
+                if self[s1][s2] == data:
+                    # matching edge data
+                    pass
+                else:
+                    # copying edge data
+                    for (k,v) in data.items():
+                        self[s1][s2][k] = v
+            except: 
+                # no edge to copy
+                pass
+
+    ### TAKES A TRANSFORMED TOPOLOGY AND UPDATES ITS ATTRIBUTES
+    def reconcile_attributes(self,initial_topo,new_egress=False):
+        # REMOVE PORT ATTRIBUTES CORRESPONDING TO REMOVED EDGES
+        for (s1,s2,data) in initial_topo.edges(data=True):
+            try:
+                if self[s1][s2] == data:
+                    # matching edge data
+                    pass
+                else:
+                    raise RuntimeError("NON-MATCHING EDGE DATA")
+            except KeyError:  
+               # removed edge, reconcile node ports"
+                to_remove = [Location(s1,data[s1]),Location(s2,data[s2])]
+                for loc in to_remove:
+                    try:
+                        new_port_nos = self.node[loc.switch]['ports'].copy() 
+                        if new_egress:
+                            new_port_nos[loc.port_no].linked_to = None
+                        else:
+                            del new_port_nos[loc.port_no]
+                            self.node[loc.switch]['ports'] = new_port_nos
+                    except KeyError:
+                        pass                # node removed
+
+    def filter_nodes(self, switches=[]):
+        remove = [ s for s in self.nodes() if not s in switches] 
+        return self.filter_out_nodes(remove)
+
+    def filter_out_nodes(self, switches=[]):
+        filtered_copy = self.copy()
+        filtered_copy.remove_nodes_from(switches)
+        filtered_copy.reconcile_attributes(self,new_egress=True)
+        return filtered_copy
+
+    @classmethod
+    def difference(cls,topo1,topo2):
+        try:
+            self = cls(nx.difference(topo1,topo2))
+        except nx.NetworkXError:
+            return None
+
+        if len(self.edges()) == 0:
+            return None
+
+        self.copy_attributes(topo1)
+        self.reconcile_attributes(topo1)
+        return self
+
+    @classmethod
+    def minimum_spanning_tree(cls,topology):
+        self = cls(nx.minimum_spanning_tree(topology))
+        self.copy_attributes(topology)
+        self.reconcile_attributes(topology)
+        return self
+        
+    ### A RANDOMIZED MINIMUM SPANNING TREE
+    @classmethod
+    def random_minimum_spanning_tree(cls,topology):
+        self = cls(Kruskal(topology))
+        self.copy_attributes(topology)
+        self.reconcile_attributes(topology)
+        return self
+
+    ### HEURISTIC. PICKS A RANDOM MST, REMOVES FROM TOPOLOGY, ADD TO SET
+    ### WHILE TOPOLOGY STILL CONNECTED, LOOP
+    @classmethod
+    def disjoint_minimum_spanning_tree_set(cls,topology):
+        msts = set()
+        remainder = topology.copy()
+        if remainder is None or len(remainder) == 0 or not remainder.is_connected():
+            return msts
+        mst = (cls.random_minimum_spanning_tree(remainder))
+        msts.add(mst)
+        remainder = Topology.difference(remainder,mst)
+        while(not remainder is None and remainder.is_connected()):
+            mst = (cls.random_minimum_spanning_tree(remainder))
+            msts.add(mst)
+            remainder = Topology.difference(remainder,mst)
+        return msts
+
+    @classmethod
+    def all_pairs_shortest_path(cls,topology):
+        location_paths = {}
+        switch_paths = nx.all_pairs_shortest_path(topology)
+        for s1, paths in switch_paths.items():
+            location_paths[s1] = {}
+            for s2, path in paths.items():
+                location_paths[s1][s2] = []
+                cur = s1
+                for nxt in path + [s2]:
+                    if cur != nxt:
+                        link = topology[cur][nxt]
+                        loc = Location(cur,link[cur])
+                        location_paths[s1][s2].append(loc)
+                    cur = nxt
+        return location_paths
+
+    def __repr__(self):
+        output_str = ''
+        edge_str = {}
+        egress_str = {}
+        switch_str_maxlen = len('switch')
+        edge_str_maxlen = len('internal links')
+        egress_str_maxlen = len('egress ports')
+        for switch in self.nodes():
+            edge_str[switch] = \
+                ', '.join([ "%s[%s] --- %s[%s]" % (s1,port_nos[s1],s2,port_nos[s2]) \
+                                for (s1,s2,port_nos) in self.edges(data=True) \
+                                if s1 == switch or s2 == switch])
+            egress_str[switch] = \
+                ', '.join([ "%s---" % l for l in self.egress_locations(switch)])
+
+        if len(self.nodes()) > 0:
+            edge_str_maxlen = \
+                max( [len(ed) for ed in edge_str.values()] + [edge_str_maxlen] )
+            egress_str_maxlen = \
+                max( [len(eg) for eg in egress_str.values()] + [egress_str_maxlen] )
+
+        table_width = switch_str_maxlen + 5 + edge_str_maxlen + 5 + egress_str_maxlen + 3
+        output_str += '\n'.rjust(table_width+1,'-')
+        output_str += "%s  |  %s  |  %s  |\n" % \
+            ('switch','switch edges'.rjust(edge_str_maxlen/2+1).ljust(edge_str_maxlen),\
+                 'egress ports'.rjust(egress_str_maxlen/2+1).ljust(egress_str_maxlen),)        
+        output_str += '\n'.rjust(table_width+1,'-')
+        for switch in self.nodes():
+            edge_str[switch] = edge_str[switch].ljust(edge_str_maxlen)
+            egress_str[switch] = egress_str[switch].ljust(egress_str_maxlen)
+            output_str += "%s  |  %s  |  %s  |\n" % \
+                (str(switch).ljust(switch_str_maxlen),edge_str[switch],egress_str[switch])
+        output_str += ''.rjust(table_width,'-')
+        return output_str
+        
+    def __str__(self):
+        return repr(self)
+        
+
+
+class Network(object):
+    """Abstract class for networks"""
+    def __init__(self):
+        self._topology = gs.Behavior(Topology())                
+    topology = gs.Behavior.property("_topology")
+    
+    def inject_packet(self, packet):
+        raise NotImplementedError        
+
+
+DEBUG_TOPO_DISCOVERY = False
+class ConcreteNetwork(Network):
+    def __init__(self,backend=None):
+        super(ConcreteNetwork,self).__init__()
+        self.backend = backend
+        self.events = ["switch_joins", "switch_parts",
+                       "port_joins", "port_parts",
+                       "port_mods", "link_updates"]
+        for event in self.events:
+            e = gs.Event()
+            setattr(self, event, e)
+            e.notify(getattr(self, "_handle_%s" % event))
+
+    def inject_packet(self, packet):
+        self.backend.send_packet(packet)
+
+    #
+    # Topology Detection
+    #
+           
+    def inject_discovery_packet(self, dpid, port_no):
+        self.backend.inject_discovery_packet(dpid, port_no)
+        
+    def _handle_switch_joins(self, switch):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
+        self.topology.add_node(switch, ports={})
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self._topology.signal_mutation()
+
+    def remove_associated_link(self,location):
+        port = self.topology.node[location.switch]["ports"][location.port_no]
+        if not port.linked_to is None:
+            # REMOVE CORRESPONDING EDGE
+            try:      
+                self.topology.remove_edge(location.switch, port.linked_to.switch)
+            except:
+                pass  # ALREADY REMOVED
+            # UNLINK LINKED_TO PORT
+            try:      
+                self.topology.node[port.linked_to.switch]["ports"][port.linked_to.port_no].linked_to = None
+            except KeyError:
+                pass  # LINKED TO PORT ALREADY DELETED
+            # UNLINK SELF
+            self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
+        
+    def _handle_switch_parts(self, switch):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_parts"
+        # REMOVE ALL ASSOCIATED LINKS
+        for port_no in self.topology.node[switch]["ports"].keys():
+            self.remove_associated_link(Location(switch,port_no))
+        self.topology.remove_node(switch)
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self._topology.signal_mutation()
+        
+    def _handle_port_joins(self, (switch, port_no, config, status)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
+        self.topology.node[switch]["ports"][port_no] = Port(port_no,config,status)
+        if config or status:
+            self.inject_discovery_packet(switch,port_no)
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self._topology.signal_mutation()
+
+    def _handle_port_parts(self, (switch, port_no)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_parts"
+        try:
+            self.remove_associated_link(Location(switch,port_no))
+            del self.topology.node[switch]["ports"][port_no]
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self._topology.signal_mutation()
+        except KeyError:
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
+        
+    def _handle_port_mods(self, (switch, port_no, config, status)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
+        # GET PREV VALUES
+        try:
+            prev_config = self.topology.node[switch]["ports"][port_no].config
+            prev_status = self.topology.node[switch]["ports"][port_no].status
+        except KeyError:
+            print "KeyError CASE!!!!!!!!"
+            self.port_down(switch, port_no)
+            return
+
+        # UPDATE VALUES
+        self.topology.node[switch]["ports"][port_no].config = config
+        self.topology.node[switch]["ports"][port_no].status = status
+
+        # DETERMINE IF/WHAT CHANGED
+        if (prev_config and not config):
+            self.port_down(switch, port_no)
+        if (prev_status and not status):
+            self.port_down(switch, port_no,double_check=True)
+
+        if (not prev_config and config) or (not prev_status and status):
+            self.port_up(switch, port_no)
+
+    def port_up(self, switch, port_no):
+        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s"
+        self.inject_discovery_packet(switch,port_no)
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self._topology.signal_mutation()
+
+    def port_down(self, switch, port_no, double_check=False):
+        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s"
+        try:
+            self.remove_associated_link(Location(switch,port_no))
+            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self._topology.signal_mutation()
+            if double_check: self.inject_discovery_packet(switch,port_no)
+        except KeyError:  
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
+
+    def _handle_link_updates(self, (s1, p_no1, s2, p_no2)):
+        if DEBUG_TOPO_DISCOVERY:  print "_handle_link_updates"
+        try:
+            p1 = self.topology.node[s1]["ports"][p_no1]
+            p2 = self.topology.node[s2]["ports"][p_no2]
+        except KeyError:
+            return  # at least one of these ports isn't (yet) in the topology
+
+        # LINK ALREADY EXISTS
+        try:
+            link = self.topology[s1][s2]
+
+            # LINK ON SAME PORT PAIR
+            if link[s1] == p_no1 and link[s2] == p_no2:         
+                if p1.possibly_up() and p2.possibly_up():   
+                    return                                      #   NOTHING TO DO
+                else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
+                    raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
+            # LINK PORTS CHANGED
+            else:                                               
+                # REMOVE OLD LINKS
+                if link[s1] != p_no1:
+                    self.remove_associated_link(Location(s1,link[s1]))
+                if link[s2] != p_no2:
+                    self.remove_associated_link(Location(s2,link[s2]))
+
+        # COMPLETELY NEW LINK
+        except KeyError:     
+            pass
+        
+        # ADD LINK IF PORTS ARE UP
+        if p1.possibly_up() and p2.possibly_up():
+            self.topology.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
+            self.topology.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
+            self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
+            
+        # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
+        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self._topology.signal_mutation()
+
+

@@ -1,7 +1,7 @@
 
 ################################################################################
 # The Frenetic Project                                                         #
-# frenetic@frenetic-lang.org                                                   #
+# frenetic-lang.org/pyretic                                                   #
 ################################################################################
 # Licensed to the Frenetic Project by one or more contributors. See the        #
 # NOTICES file distributed with this work for additional information           #
