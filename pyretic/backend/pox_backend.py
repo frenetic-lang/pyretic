@@ -39,36 +39,38 @@ from pox.lib.packet.ethernet      import LLDP_MULTICAST, NDP_MULTICAST
 from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
 from pox.lib.packet.lldp          import ttl, system_description
 
-from pyretic.core import network as pyr_net, util as pyr_util
+from pyretic.core import network as pyr_net
+from pyretic.core import util as pyr_util
+from pyretic.core.runtime import Runtime
 from pyretic.core.defs import ARP_TYPE
 import ipdb
+
 
 def inport_value_hack(outport):
     if outport > 1:
         return 1
     else:
         return 2
-                    
+
+
 class POXBackend(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self, main, show_traces, debug_packet_in, kwargs):
-        self.network = pyr_net.ConcreteNetwork(self)
-        
+    def __init__(self,main,show_traces,debug_packet_in,kwargs):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
+        self.packetno = 0
+
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = threading.RLock()
-        self.packetno = 0
+
+        self.runtime = Runtime(self,main,show_traces,debug_packet_in,kwargs)
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
 
-        self.policy = main(**kwargs)
-        self.policy.set_network(self.network)
 
-        
     def encode_extended_values(self, extended_values):
         with self.extended_values_lock:
             vlan = self.extended_values_to_vlan_db.get(extended_values)
@@ -89,7 +91,7 @@ class POXBackend(revent.EventMixin):
             return extended_values
 
 
-    def packet_from_pox(self, switch, inport, data):
+    def packet_from_backend(self, switch, inport, data):
         h = {}
         h["switch"] = switch
         h["inport"] = inport
@@ -134,7 +136,7 @@ class POXBackend(revent.EventMixin):
         return packet.pushmany(h)
 
 
-    def make_pox_arp(self, packet):
+    def make_arp(self, packet):
         p = packetlib.ethernet()
         p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
         p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
@@ -151,10 +153,10 @@ class POXBackend(revent.EventMixin):
         return p
 
 
-    def packet_to_pox(self, packet):
+    def packet_to_backend(self, packet):
         if len(packet["payload"]) == 0:
             if packet["ethtype"] == ARP_TYPE:
-                p_begin = p = self.make_pox_arp(packet)
+                p_begin = p = self.make_arp(packet)
             else:  # BLANK PACKET FOR NOW - MAY NEED TO SUPPORT OTHER PACKETS LATER
                 p_begin = p = packetlib.ethernet()
         else:
@@ -203,7 +205,7 @@ class POXBackend(revent.EventMixin):
                 p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
                 p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
             else:
-                p_begin = self.make_pox_arp(packet)
+                p_begin = self.make_arp(packet)
         
         return p_begin.pack()
 
@@ -259,6 +261,7 @@ class POXBackend(revent.EventMixin):
         print "%speer:        " % prefix, 
         print self.active_ofp_port_features(port.peer)
 
+
     def create_discovery_packet (self, dpid, portNum, portAddr):
         """ Create LLDP packet """
         
@@ -310,7 +313,7 @@ class POXBackend(revent.EventMixin):
         msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
         self.switches[event.dpid]['connection'].send(msg)
 
-        self.network.switch_joins.signal(event.dpid)
+        self.runtime.network.switch_joins.signal(event.dpid)
 
         # port type is ofp_phy_port
         for port in event.ofp.ports:
@@ -318,41 +321,41 @@ class POXBackend(revent.EventMixin):
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
+                self.runtime.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
         
-        self.policy.set_network(self.network)
+        self.runtime.policy.set_network(self.runtime.network)
                         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
 
         del self.switches[event.dpid]
-        self.network.switch_parts.signal(event.dpid)
+        self.runtime.network.switch_parts.signal(event.dpid)
 
-        self.policy.set_network(self.network)
+        self.runtime.policy.set_network(self.runtime.network)
         
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
         if event.port <= of.OFPP_MAX:
             if event.added:
                 self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
-                self.network.port_joins.signal((event.dpid, event.port))
+                self.runtime.network.port_joins.signal((event.dpid, event.port))
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
+                self.runtime.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
                 except KeyError:
                     pass  # SWITCH ALREADY DELETED
-                self.network.port_parts.signal((event.dpid, event.port))
+                self.runtime.network.port_parts.signal((event.dpid, event.port))
             elif event.modified:
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.network.port_mods.signal((event.dpid, event.port, CONF_UP, STAT_UP))
+                self.runtime.network.port_mods.signal((event.dpid, event.port, CONF_UP, STAT_UP))
             else:
                 raise RuntimeException("Unknown port status event")
 
-        self.policy.set_network(self.network)
+        self.runtime.policy.set_network(self.runtime.network)
 
     def handle_lldp(self,packet,event):
 
@@ -442,9 +445,9 @@ class POXBackend(revent.EventMixin):
             print 'Loop detected; received our own LLDP event'
             return
 
-        self.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
+        self.runtime.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
 
-        self.policy.set_network(self.network)
+        self.runtime.policy.set_network(self.runtime.network)
         return
 #    return EventHalt # Probably nobody else needs this event
 
@@ -466,31 +469,13 @@ class POXBackend(revent.EventMixin):
             print "dpid\t%s" % event.dpid
             print
 
-        recv_packet = self.packet_from_pox(event.dpid, event.ofp.in_port, event.data)
-        
-        if self.debug_packet_in == "1":
-            ipdb.set_trace()
-        
-        with ipdb.launch_ipdb_on_exception():
-            output = self.policy.eval(recv_packet)
-            
-        if self.debug_packet_in == "drop" and not output:
-            ipdb.set_trace()
-            output = self.policy.eval(recv_packet) # So we can step through it
-        
-        if self.show_traces:
-            print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
-            print pyr_util.repr_plus([recv_packet], sep="\n\n")
-            print
-            print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
-            print pyr_util.repr_plus(output.elements(), sep="\n\n")
-            print
-        
-        for pkt in output.elements():
-            self.send_packet(pkt)
+        recv_packet = self.packet_from_backend(event.dpid, event.ofp.in_port, event.data)
 
+        self.runtime._handle_PacketIn(recv_packet)
+        
 
-    def send_packet(self, packet):
+    def send_packet(self,packet):
+
         switch = packet["switch"]
         outport = packet["outport"]
         try:
@@ -499,12 +484,11 @@ class POXBackend(revent.EventMixin):
                 inport = inport_value_hack(outport)
         except KeyError:
             inport = inport_value_hack(outport)
-
         packet = packet.pop("switch", "inport", "outport")
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
-        msg.data = self.packet_to_pox(packet)
+        msg.data = self.packet_to_backend(packet)
         msg.actions.append(of.ofp_action_output(port = outport))
  
         if self.show_traces:
