@@ -41,7 +41,6 @@ class Runtime(object):
     def __init__(self, backend, main, show_traces, debug_packet_in, kwargs):
         self.network = ConcreteNetwork(self)
         self.policy = main(**kwargs)
-        self.policy.set_network(self.network)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.backend = backend
