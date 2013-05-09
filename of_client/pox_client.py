@@ -39,11 +39,7 @@ from pox.lib.packet.ethernet      import LLDP_MULTICAST, NDP_MULTICAST
 from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
 from pox.lib.packet.lldp          import ttl, system_description
 
-from pyretic.core import network as pyr_net
-from pyretic.core import util as pyr_util
-from pyretic.core.runtime import Runtime
-from pyretic.core.defs import ARP_TYPE
-import ipdb
+from pyretic.backend.comm import *
 
 
 def inport_value_hack(outport):
@@ -53,65 +49,75 @@ def inport_value_hack(outport):
         return 2
 
 
-class POXBackend(revent.EventMixin):
+class BackendChannel(asynchat.async_chat):
+    """Sends messages to the server and receives responses.
+    """
+    def __init__(self, host, port, of_client):
+        self.of_client = of_client
+        self.received_data = []
+        asynchat.async_chat.__init__(self)
+        self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.connect((host, port))
+        self.set_terminator(TERM_CHAR)
+        return
+
+    def handle_connect(self):
+        print "Connected to pyretic frontend."
+        
+    def collect_incoming_data(self, data):
+        """Read an incoming message from the client and put it into our outgoing queue."""
+        with self.of_client.channel_lock:
+            self.received_data.append(data)
+
+    def found_terminator(self):
+        """The end of a command or message has been seen."""
+        with self.of_client.channel_lock:
+            msg = deserialize(self.received_data)
+
+        # USE DESERIALIZED MSG
+        if msg[0] == 'inject_discovery_packet':
+            self.of_client.inject_discovery_packet(msg[1], msg[2])
+        elif msg[0] == 'packet':
+            self.of_client.send_packet_to_network(msg[1])
+        else:
+            print "ERROR: Unknown msg from frontend %s" % msg
+
+
+class POXClient(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self,main,show_traces,debug_packet_in,kwargs):
+    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
         self.packetno = 0
-
-        self.vlan_to_extended_values_db = {}
-        self.extended_values_to_vlan_db = {}
-        self.extended_values_lock = threading.RLock()
-
-        self.runtime = Runtime(self,main,show_traces,debug_packet_in,kwargs)
+        self.channel_lock = threading.Lock()
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
 
+        self.backend_channel = BackendChannel(ip, port, self)
+        self.adjacency = {} # From Link to time.time() stamp
 
-    def encode_extended_values(self, extended_values):
-        with self.extended_values_lock:
-            vlan = self.extended_values_to_vlan_db.get(extended_values)
-            if vlan is not None:
-                return vlan
-            r = len(self.extended_values_to_vlan_db)
-            pcp = r & 0b111000000000000
-            vid = r & 0b000111111111111
-            self.extended_values_to_vlan_db[extended_values] = (vid, pcp)
-            self.vlan_to_extended_values_db[(vid, pcp)] = extended_values
-            return (vid, pcp)
-
-        
-    def decode_extended_values(self, vid, pcp):
-        with self.extended_values_lock:
-            extended_values = self.vlan_to_extended_values_db.get((vid, pcp))
-            assert extended_values is not None, "use of vlan that pyretic didn't allocate! not allowed."
-            return extended_values
-
-
-    def packet_from_backend(self, switch, inport, data):
+    def packet_from_network(self, switch, inport, data):
         h = {}
         h["switch"] = switch
         h["inport"] = inport
         
         p = packetlib.ethernet(data)
-        h["srcmac"] = pyr_net.MAC(p.src.toRaw())
-        h["dstmac"] = pyr_net.MAC(p.dst.toRaw())
+        h["srcmac"] = p.src.toRaw()
+        h["dstmac"] = p.dst.toRaw()
         h["ethtype"] = p.type
 
         p = p.next
         if isinstance(p, packetlib.vlan):
-            extended_values = self.decode_extended_values(p.id, p.pcp)
+            h['vlan_id'] = p.id
+            h['vlan_pcp'] = p.pcp
             h["ethtype"] = p.eth_type
             p = p.next
-        else:
-            extended_values = pyr_util.frozendict()
 
         if isinstance(p, packetlib.ipv4):
-            h["srcip"] = pyr_net.IP(p.srcip.toRaw())
-            h["dstip"] = pyr_net.IP(p.dstip.toRaw())
+            h["srcip"] = p.srcip.toRaw()
+            h["dstip"] = p.dstip.toRaw()
             h["protocol"] = p.protocol
             h["tos"] = p.tos
             p = p.next
@@ -124,38 +130,36 @@ class POXBackend(revent.EventMixin):
                 h["dstport"] = p.code
         elif isinstance(p, packetlib.arp):
             if p.opcode <= 255:
-                h["ethtype"] = ARP_TYPE
+                h["ethtype"] = packetlib.ethernet.ARP_TYPE
                 h["protocol"] = p.opcode
-                h["srcip"] = pyr_net.IP(p.protosrc.toRaw())
-                h["dstip"] = pyr_net.IP(p.protodst.toRaw())
+                h["srcip"] = p.protosrc.toRaw()
+                h["dstip"] = p.protodst.toRaw()
 
-
-        h["payload"] = data
-        
-        packet = pyr_net.Packet(extended_values)
-        return packet.pushmany(h)
+        h["payload"] = data 
+        return ascii2bytelist(h)
 
 
     def make_arp(self, packet):
         p = packetlib.ethernet()
-        p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        p.src = packetaddr.EthAddr(packet["srcmac"])
+        p.dst = packetaddr.EthAddr(packet["dstmac"])
         
-        p.type = ARP_TYPE
+        p.type = packetlib.ethernet.ARP_TYPE
         p.next = packetlib.arp(prev=p)
         
-        p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-        p.next.hwdst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
-        p.next.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
-        p.next.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
+        p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"])
+        p.next.hwdst = packetaddr.EthAddr(packet["dstmac"])
+        p.next.protosrc = packetaddr.IPAddr(packet["srcip"])
+        p.next.protodst = packetaddr.IPAddr(packet["dstip"])
         p.next.opcode = packet['protocol']
 
         return p
 
 
-    def packet_to_backend(self, packet):
+    def packet_to_network(self, packet):
+        packet = bytelist2ascii(packet)
         if len(packet["payload"]) == 0:
-            if packet["ethtype"] == ARP_TYPE:
+            if packet["ethtype"] == packetlib.ethernet.ARP_TYPE:
                 p_begin = p = self.make_arp(packet)
             else:  # BLANK PACKET FOR NOW - MAY NEED TO SUPPORT OTHER PACKETS LATER
                 p_begin = p = packetlib.ethernet()
@@ -163,11 +167,10 @@ class POXBackend(revent.EventMixin):
             p_begin = p = packetlib.ethernet(packet["payload"])
 
         # ETHERNET PACKET IS OUTERMOST
-        p.src = packetaddr.EthAddr(packet["srcmac"].to_bytes())
-        p.dst = packetaddr.EthAddr(packet["dstmac"].to_bytes())
+        p.src = packetaddr.EthAddr(packet["srcmac"])
+        p.dst = packetaddr.EthAddr(packet["dstmac"])
 
-        extended_values = extended_values_from(packet)
-        if extended_values:
+        if 'vlan_id' in packet:
             if isinstance(p.next, packetlib.vlan):
                 p = p.next
             else:
@@ -177,7 +180,8 @@ class POXBackend(revent.EventMixin):
                 p.next = packetlib.vlan(next=p.next)
                 p = p.next
                 p.eth_type = old_eth_type
-            p.id, p.pcp = self.encode_extended_values(extended_values)
+            p.id = packet['vlan_id']
+            p.pcp = packet['vlan_pcp']
         else:
             if isinstance(p.next, packetlib.vlan):
                 p.type = p.next.eth_type # Restore encapsulated eth type
@@ -186,8 +190,8 @@ class POXBackend(revent.EventMixin):
         # GET PACKET INSIDE ETHERNET/VLAN
         p = p.next
         if isinstance(p, packetlib.ipv4):
-            p.srcip = packetaddr.IPAddr(packet["srcip"].to_bytes())
-            p.dstip = packetaddr.IPAddr(packet["dstip"].to_bytes())
+            p.srcip = packetaddr.IPAddr(packet["srcip"])
+            p.dstip = packetaddr.IPAddr(packet["dstip"])
             p.protocol = packet["protocol"]
             p.tos = packet["tos"]
 
@@ -200,10 +204,10 @@ class POXBackend(revent.EventMixin):
                 p.code = packet["dstport"]
 
         elif isinstance(p, packetlib.arp):
-            if extended_values:
+            if 'vlan_id' in packet:
                 p.opcode = packet["protocol"]
-                p.protosrc = packetaddr.IPAddr(packet["srcip"].to_bytes())
-                p.protodst = packetaddr.IPAddr(packet["dstip"].to_bytes())
+                p.protosrc = packetaddr.IPAddr(packet["srcip"])
+                p.protodst = packetaddr.IPAddr(packet["dstip"])
             else:
                 p_begin = self.make_arp(packet)
         
@@ -262,45 +266,55 @@ class POXBackend(revent.EventMixin):
         print self.active_ofp_port_features(port.peer)
 
 
-    def create_discovery_packet (self, dpid, portNum, portAddr):
-        """ Create LLDP packet """
+    def create_discovery_packet (self, dpid, port_num, port_addr):
+        """
+        Build discovery packet
+        """
+        import pox.lib.packet as pkt
+        chassis_id = pkt.chassis_id(subtype=pkt.chassis_id.SUB_LOCAL)
+        chassis_id.id = bytes('dpid:' + hex(long(dpid))[2:-1])
         
-        discovery_packet = lldp()
-        
-        cid = chassis_id()
-        # Maybe this should be a MAC.  But a MAC of what?  Local port, maybe?
-        cid.fill(cid.SUB_LOCAL, bytes('dpid:' + hex(long(dpid))[2:-1]))
-        discovery_packet.add_tlv(cid)
-        
-        pid = port_id()
-        pid.fill(pid.SUB_PORT, str(portNum))
-        discovery_packet.add_tlv(pid)
-        
-        ttlv = ttl()
-        ttlv.fill(0)
-        discovery_packet.add_tlv(ttlv)
-        
-        sysdesc = system_description()
-        sysdesc.fill(bytes('dpid:' + hex(long(dpid))[2:-1]))
-        discovery_packet.add_tlv(sysdesc)
-        
-        discovery_packet.add_tlv(end_tlv())
-        
-        eth = ethernet()
-        eth.src = portAddr
-        eth.dst = NDP_MULTICAST
-        eth.set_payload(discovery_packet)
-        eth.type = ethernet.LLDP_TYPE
-        
-        po = of.ofp_packet_out(action = of.ofp_action_output(port=portNum),
-                               data = eth.pack())
-    #    log.info("discovery_packet_created")    
+        port_id = pkt.port_id(subtype=pkt.port_id.SUB_PORT, id=str(port_num))
+
+        ttl = pkt.ttl(ttl = 120)
+
+        sysdesc = pkt.system_description()
+        sysdesc.payload = bytes('dpid:' + hex(long(dpid))[2:-1])
+
+        discovery_packet = pkt.lldp()
+        discovery_packet.tlvs.append(chassis_id)
+        discovery_packet.tlvs.append(port_id)
+        discovery_packet.tlvs.append(ttl)
+        discovery_packet.tlvs.append(sysdesc)
+        discovery_packet.tlvs.append(pkt.end_tlv())
+
+        eth = pkt.ethernet(type=pkt.ethernet.LLDP_TYPE)
+        eth.src = port_addr
+        eth.dst = pkt.ETHERNET.NDP_MULTICAST
+        eth.payload = discovery_packet
+
+        po = of.ofp_packet_out(action = of.ofp_action_output(port=port_num))
+        po.data = eth.pack()
         return po.pack()
 
+
     def inject_discovery_packet(self,dpid, port):
-        hw_addr = self.switches[dpid]['ports'][port]
-        packet = self.create_discovery_packet(dpid, port, hw_addr)
-        core.openflow.sendToDPID(dpid, packet)
+        try:
+            hw_addr = self.switches[dpid]['ports'][port]
+            packet = self.create_discovery_packet(dpid, port, hw_addr)
+            core.openflow.sendToDPID(dpid, packet)
+        except KeyError:
+            pass
+
+    def send_to_pyretic(self,msg):
+        serialized_msg = serialize(msg)
+        try:
+            with self.channel_lock:
+                self.backend_channel.push(serialized_msg)
+        except IndexError as e:
+            print "ERROR PUSHING MESSAGE %s" % msg
+            pass
+
 
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switches
@@ -313,7 +327,7 @@ class POXBackend(revent.EventMixin):
         msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
         self.switches[event.dpid]['connection'].send(msg)
 
-        self.runtime.network.switch_joins.signal(event.dpid)
+        self.send_to_pyretic(['switch','join',event.dpid,'BEGIN'])
 
         # port type is ofp_phy_port
         for port in event.ofp.ports:
@@ -321,90 +335,91 @@ class POXBackend(revent.EventMixin):
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.runtime.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
-        
-        self.runtime.policy.set_network(self.runtime.network)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])                        
+   
+        self.send_to_pyretic(['switch','join',event.dpid,'END'])
+
                         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
 
         del self.switches[event.dpid]
-        self.runtime.network.switch_parts.signal(event.dpid)
+        self.send_to_pyretic(['switch','part',event.dpid])
 
-        self.runtime.policy.set_network(self.runtime.network)
         
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
         if event.port <= of.OFPP_MAX:
             if event.added:
                 self.switches[event.dpid]['ports'][event.port] = event.ofp.desc.hw_addr
-                self.runtime.network.port_joins.signal((event.dpid, event.port))
+                #self.runtime.network.port_joins.signal((event.dpid, event.port))
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.runtime.network.port_joins.signal((event.dpid, port.port_no, CONF_UP, STAT_UP))
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
                 except KeyError:
                     pass  # SWITCH ALREADY DELETED
-                self.runtime.network.port_parts.signal((event.dpid, event.port))
+                self.send_to_pyretic(['port','part',event.dpid,event.port])
             elif event.modified:
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.runtime.network.port_mods.signal((event.dpid, event.port, CONF_UP, STAT_UP))
+                self.send_to_pyretic(['port','mod',event.dpid, event.port, CONF_UP, STAT_UP])
             else:
                 raise RuntimeException("Unknown port status event")
 
-        self.runtime.policy.set_network(self.runtime.network)
 
     def handle_lldp(self,packet,event):
+        import pox.lib.packet as pkt
+        from pox.openflow.discovery import Discovery, LinkEvent
+        import time
 
-        if not packet.next:
-            print "lldp packet could not be parsed"
+        lldph = packet.find(pkt.lldp)
+        if lldph is None or not lldph.parsed:
+            return
+        if len(lldph.tlvs) < 3:
+            return
+        if lldph.tlvs[0].tlv_type != pkt.lldp.CHASSIS_ID_TLV:
+            return
+        if lldph.tlvs[1].tlv_type != pkt.lldp.PORT_ID_TLV:
+            return
+        if lldph.tlvs[2].tlv_type != pkt.lldp.TTL_TLV:
             return
 
-        assert isinstance(packet.next, lldp)
-
-        lldph = packet.next
-        if  len(lldph.tlvs) < 3 or \
-                (lldph.tlvs[0].tlv_type != lldp.CHASSIS_ID_TLV) or\
-                (lldph.tlvs[1].tlv_type != lldp.PORT_ID_TLV) or\
-                (lldph.tlvs[2].tlv_type != lldp.TTL_TLV):
-            print "lldp_input_handler invalid lldp packet"
-            return
-
-        def lookInSysDesc():
+        def lookInSysDesc ():
             r = None
             for t in lldph.tlvs[3:]:
-                if t.tlv_type == lldp.SYSTEM_DESC_TLV:
+                if t.tlv_type == pkt.lldp.SYSTEM_DESC_TLV:
                     # This is our favored way...
-                    for line in t.next.split('\n'):
+                    for line in t.payload.split('\n'):
                         if line.startswith('dpid:'):
                             try:
                                 return int(line[5:], 16)
                             except:
                                 pass
-                    if len(t.next) == 8:
+                    if len(t.payload) == 8:
                         # Maybe it's a FlowVisor LLDP...
+                        # Do these still exist?
                         try:
-                            return struct.unpack("!Q", t.next)[0]
+                            return struct.unpack("!Q", t.payload)[0]
                         except:
                             pass
-                    return None
+                        return None
 
         originatorDPID = lookInSysDesc()
 
         if originatorDPID == None:
             # We'll look in the CHASSIS ID
-            if lldph.tlvs[0].subtype == chassis_id.SUB_LOCAL:
+            if lldph.tlvs[0].subtype == pkt.chassis_id.SUB_LOCAL:
                 if lldph.tlvs[0].id.startswith('dpid:'):
                     # This is how NOX does it at the time of writing
                     try:
-                        originatorDPID = int(lldph.tlvs[0].id.tostring()[5:], 16)
+                        originatorDPID = int(lldph.tlvs[0].id[5:], 16)
                     except:
                         pass
             if originatorDPID == None:
-                if lldph.tlvs[0].subtype == chassis_id.SUB_MAC:
+                if lldph.tlvs[0].subtype == pkt.chassis_id.SUB_MAC:
                     # Last ditch effort -- we'll hope the DPID was small enough
                     # to fit into an ethernet address
                     if len(lldph.tlvs[0].id) == 6:
@@ -415,18 +430,14 @@ class POXBackend(revent.EventMixin):
                             pass
 
         if originatorDPID == None:
-            print "Couldn't find a DPID in the LLDP packet"
             return
 
-#        # if chassid is from a switch we're not connected to, ignore
-#        if originatorDPID not in self._dps:
-#            log.info('Received LLDP packet from unconnected switch')
-#            return
+        if originatorDPID not in core.openflow.connections:
+            return
 
-        # grab port ID from port tlv
-        if lldph.tlvs[1].subtype != port_id.SUB_PORT:
-            print "Thought we found a DPID, but packet didn't have a port"
-            return # not one of ours
+        # Get port number from port TLV
+        if lldph.tlvs[1].subtype != pkt.port_id.SUB_PORT:
+            return
         originatorPort = None
         if lldph.tlvs[1].id.isdigit():
             # We expect it to be a decimal value
@@ -438,18 +449,24 @@ class POXBackend(revent.EventMixin):
             except:
                 pass
         if originatorPort is None:
-            print "Thought we found a DPID, but port number didn't make sense"
             return
-
+        
         if (event.dpid, event.port) == (originatorDPID, originatorPort):
-            print 'Loop detected; received our own LLDP event'
             return
 
-        self.runtime.network.link_updates.signal((originatorDPID, originatorPort, event.dpid, event.port))
+        link = Discovery.Link(originatorDPID, originatorPort, event.dpid,
+                              event.port)
 
-        self.runtime.policy.set_network(self.runtime.network)
-        return
-#    return EventHalt # Probably nobody else needs this event
+        if link not in self.adjacency:
+            self.adjacency[link] = time.time()
+            self.raiseEventNoErrors(LinkEvent, True, link)
+        else:
+            # Just update timestamp
+            self.adjacency[link] = time.time()
+
+        self.send_to_pyretic(['link',originatorDPID, originatorPort, event.dpid, event.port])            
+        return # Probably nobody else needs this event
+
 
     def _handle_PacketIn(self, event):
         packet = event.parsed
@@ -469,26 +486,23 @@ class POXBackend(revent.EventMixin):
             print "dpid\t%s" % event.dpid
             print
 
-        recv_packet = self.packet_from_backend(event.dpid, event.ofp.in_port, event.data)
-
-        self.runtime._handle_PacketIn(recv_packet)
+        received = self.packet_from_network(event.dpid, event.ofp.in_port, event.data)
+        self.send_to_pyretic(['packet',received])
         
 
-    def send_packet(self,packet):
-
+    def send_packet_to_network(self,packet):
         switch = packet["switch"]
         outport = packet["outport"]
         try:
             inport = packet["inport"]
-            if inport == -1:
+            if inport == -1 or inport == outport:
                 inport = inport_value_hack(outport)
         except KeyError:
             inport = inport_value_hack(outport)
-        packet = packet.pop("switch", "inport", "outport")
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
-        msg.data = self.packet_to_backend(packet)
+        msg.data = self.packet_to_network(packet)
         msg.actions.append(of.ofp_action_output(port = outport))
  
         if self.show_traces:
@@ -500,36 +514,25 @@ class POXBackend(revent.EventMixin):
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
         try:
             self.switches[switch]['connection'].send(msg)
-        except RuntimeError, e:
-            print "ERROR:send_packet: %s to switch %d" % (str(e),switch)
+        except Runtimerror, e:
+            print "ERROR:send_packet_to_network: %s to switch %d" % (str(e),switch)
             # TODO - ATTEMPT TO RECONNECT SOCKET
         except KeyError, e:
-            print "ERROR:send_packet: No connection to switch %d available" % switch
+            print "ERROR:send_packet_to_network: No connection to switch %d available" % switch
             # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
+ 
+       
+def launch():
 
-        
-def launch(module_dict, show_traces=False, debug_packet_in=False, **kwargs):
-    import pox
-    backend = POXBackend(module_dict["main"], bool(show_traces), debug_packet_in, kwargs)
-    pox.pyr = backend
+    class asyncore_loop(threading.Thread):
+        def run(self):
+            asyncore.loop()
+
+    POXClient()
+    al = asyncore_loop()
+    al.start()
 
 
-################################################################################
-# Extended Values
-################################################################################
-
-native_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
-                 "ethtype", "protocol", "payload"]
-
-@pyr_util.cached
-def extended_values_from(packet):
-    extended_values = {}
-    for k, v in packet.header.items():
-        if k not in native_headers and v:
-            extended_values[k] = v
-        elif v and len(v) > 1:
-            extended_values[k] = v[1:]
-    return pyr_util.frozendict(extended_values)
 
     
     

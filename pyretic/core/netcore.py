@@ -35,6 +35,7 @@ from abc import ABCMeta, abstractmethod
 from collections import Counter
 from numbers import Integral
 from itertools import chain
+import time
 
 from bitarray import bitarray
 
@@ -851,16 +852,17 @@ class counts(queries_base):
             self.count = {}
         else:
             self.count = 0
-
-        # XXX hack! remove pox dependency!
-        from pox.lib.recoco import Timer
-
-        Timer(interval, self.report_count, recurring=True)
-        
+        import threading
+        import pyretic.core.runtime
+        self.query_thread = threading.Thread(target=self.report_count)
+        self.query_thread.daemon = True
+        self.query_thread.start()
         queries_base.__init__(self)
 
     def report_count(self):
-        queries_base.eval(self, self.count)
+        while(True):
+            queries_base.eval(self, self.count)
+            time.sleep(self.interval)
 
     ### inc : Packet -> unit
     def inc(self,pkt):
