@@ -149,6 +149,7 @@ class MAC(object):
 # Packet and tools
 ################################################################################
 
+
 class Packet(object):
     __slots__ = ["header"]
     
@@ -256,7 +257,7 @@ class Packet(object):
             except KeyError: 
                 pass
         return "\n".join(outer)
-        
+
 
 class Port(object):
     def __init__(self, port_no, config=True, status=True,linked_to=None):
@@ -511,30 +512,33 @@ class Network(object):
 
 DEBUG_TOPO_DISCOVERY = False
 class ConcreteNetwork(Network):
-    def __init__(self,backend=None):
+    def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
-        self.backend = backend
+        self.runtime = runtime
+        self._topology.notify(runtime.network_update)
         self.events = ["switch_joins", "switch_parts",
                        "port_joins", "port_parts",
                        "port_mods", "link_updates"]
         for event in self.events:
-            e = gs.Event()
+            e = util.Event()
             setattr(self, event, e)
             e.notify(getattr(self, "_handle_%s" % event))
 
     def inject_packet(self, packet):
-        self.backend.send_packet(packet)
+        self.runtime.send_packet(packet)
 
     #
     # Topology Detection
     #
            
     def inject_discovery_packet(self, dpid, port_no):
-        self.backend.inject_discovery_packet(dpid, port_no)
+        self.runtime.inject_discovery_packet(dpid, port_no)
+
         
     def _handle_switch_joins(self, switch):
         if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
-        self.topology.add_node(switch, ports={})
+        ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
+        self.topology.add_node(switch, ports={})  
         if DEBUG_TOPO_DISCOVERY:  print self.topology
         self._topology.signal_mutation()
 
@@ -627,6 +631,7 @@ class ConcreteNetwork(Network):
             p1 = self.topology.node[s1]["ports"][p_no1]
             p2 = self.topology.node[s2]["ports"][p_no2]
         except KeyError:
+            if DEBUG_TOPO_DISCOVERY: print "node doesn't yet exist"
             return  # at least one of these ports isn't (yet) in the topology
 
         # LINK ALREADY EXISTS
@@ -636,6 +641,7 @@ class ConcreteNetwork(Network):
             # LINK ON SAME PORT PAIR
             if link[s1] == p_no1 and link[s2] == p_no2:         
                 if p1.possibly_up() and p2.possibly_up():   
+                    if DEBUG_TOPO_DISCOVERY: print "nothing to do"
                     return                                      #   NOTHING TO DO
                 else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
                     raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
