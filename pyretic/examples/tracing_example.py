@@ -39,8 +39,8 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
-from pyretic.examples.mac_learner import mac_learner
-from pyretic.virttopos.gateway_vdef import gateway_vdef
+from pyretic.modules.mac_learner import mac_learner
+from pyretic.vdef.gateway_vdef import gateway_vdef
 
 @dynamic
 def virtualized_policy(self):

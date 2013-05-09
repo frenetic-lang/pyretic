@@ -40,8 +40,8 @@
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
-from pyretic.examples.hub import hub
-from pyretic.examples.mac_learner import learn
+from pyretic.modules.hub import hub
+from pyretic.modules.mac_learner import learn
 
 ### FIREWALLS ###
 

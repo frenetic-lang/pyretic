@@ -39,8 +39,8 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
-from pyretic.examples.gateway_forwarder import gateway_forwarder
-from pyretic.examples.mac_learner import mac_learner
+from pyretic.modules.gateway_forwarder import gateway_forwarder
+from pyretic.modules.mac_learner import mac_learner
 
 
 def example_setup(num_clients=3, num_servers=3):

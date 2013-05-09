@@ -40,10 +40,10 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.virt import *
 
-from pyretic.examples.gateway_forwarder import gateway_forwarder
-from pyretic.examples.mac_learner import mac_learner
-from pyretic.examples.arp import ARP
-from pyretic.virttopos.bfs_vdef import BFS_vdef
+from pyretic.modules.gateway_forwarder import gateway_forwarder
+from pyretic.modules.mac_learner import mac_learner
+from pyretic.modules.arp import ARP
+from pyretic.vdef.bfs_vdef import BFS_vdef
 from pyretic.examples.load_balancer import lb
 from pyretic.examples.firewall import fw
 

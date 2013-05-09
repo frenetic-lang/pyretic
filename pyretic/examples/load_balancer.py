@@ -106,7 +106,7 @@ def lb(self,p,R,H):
 
 
 def main(clients, servers):
-    from pyretic.examples.mac_learner import learn
+    from pyretic.modules.mac_learner import learn
     
     num_clients = int(clients)
     num_servers = int(servers)

@@ -37,7 +37,7 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
-from pyretic.examples.arp import arp, translate, ARP
+from pyretic.modules.arp import arp, translate, ARP
 
 
 def gateway_addr(subnet):

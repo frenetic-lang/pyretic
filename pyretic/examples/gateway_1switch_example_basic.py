@@ -41,7 +41,7 @@ from pyretic.lib.std import *
 from pyretic.lib.virt import *
 
 from pyretic.examples.gateway_3switch_example_basic import example_setup
-from pyretic.virttopos.gateway_vdef import gateway_vdef
+from pyretic.vdef.gateway_vdef import gateway_vdef
 
 @dynamic
 def vgateway(self,pol):

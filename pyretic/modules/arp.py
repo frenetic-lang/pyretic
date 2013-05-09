@@ -42,7 +42,7 @@ import collections
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
-from pyretic.examples.mac_learner import mac_learner
+from pyretic.modules.mac_learner import mac_learner
 
 VERBOSE_LEVEL = 1
 ARP = match(ethtype=ARP_TYPE)
