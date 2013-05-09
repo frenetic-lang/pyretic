@@ -37,8 +37,7 @@ from itertools import chain
 from bitarray import bitarray
 import networkx as nx
 
-from pyretic.core import util, generators as gs
-from pyretic.core.graph_util import * 
+from pyretic.core import util
 
 
 ################################################################################
@@ -503,8 +502,8 @@ class Topology(nx.Graph):
 class Network(object):
     """Abstract class for networks"""
     def __init__(self):
-        self._topology = gs.Behavior(Topology())                
-    topology = gs.Behavior.property("_topology")
+        self._topology = util.Behavior(Topology())                
+    topology = util.Behavior.property("_topology")
     
     def inject_packet(self, packet):
         raise NotImplementedError        

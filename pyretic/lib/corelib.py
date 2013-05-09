@@ -34,8 +34,9 @@ import networkx as nx
 
 from pyretic.core.netcore import *
 from pyretic.core.network import *
-from pyretic.core.defs import *
 from pyretic.backend.pox_backend import launch
+
+
 
 
 

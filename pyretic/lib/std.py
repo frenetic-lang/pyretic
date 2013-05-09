@@ -31,6 +31,9 @@
 from pyretic.core.netcore import match, union, SinglyDerivedPredicate, Policy, SinglyDerivedPolicy
 from collections import Counter
 
+### DEFINITIONS
+ARP_TYPE = 2054
+
 ### CONVENIENCE PREDICATES
 
 class _in(SinglyDerivedPredicate):

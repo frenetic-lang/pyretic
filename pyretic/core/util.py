@@ -30,68 +30,13 @@
 # Utility functions                                                            #
 ################################################################################
 
-
-from collections import namedtuple
 from functools import wraps
 
 
-# Adapted from http://code.activestate.com/recipes/577629-namedtupleabc-abstract-base-class-mix-in-for-named/
-class RecordMeta(type):
-    '''The metaclass for the abstract base class + mix-in for named tuples.'''
-    def __new__(mcls, name, bases, namespace):
-        fields = namespace.get('_fields')
-
-        if isinstance(fields, basestring):
-            fields = tuple(fields.split())
-            
-        for base in bases:
-            next_fields = getattr(base, '_fields', None)
-            if fields is None:
-                fields = next_fields
-            elif isinstance(next_fields, tuple):
-                fields += next_fields
+def singleton(f):
+    return f()
         
-        basetuple = namedtuple("Record_" + name, fields)
-        basetuple.__is_namedtuple__ = True
-        bases = (basetuple,) + bases 
-        namespace.pop('_fields', None)
-        namespace["__real_base__"] = basetuple
-        namespace["__is_namedtuple__"] = False
-        namespace.setdefault('__doc__', basetuple.__doc__)
-        namespace.setdefault('__slots__', ())
-        
-        return type.__new__(mcls, name, bases, namespace)
 
-    def mro(cls):
-        oldmro = type.mro(cls)
-        found_nt = None
-        newmro = []
-        for cls in oldmro:
-            if getattr(cls, "__is_namedtuple__", False):
-                if found_nt is None:
-                    found_nt = cls
-            else:
-                if cls == tuple:
-                    newmro.append(found_nt)
-                newmro.append(cls)
-        return newmro
-            
-
-class Record(object):
-    '''The abstract base class + mix-in for named tuples.'''
-    __metaclass__ = RecordMeta
-    _fields = ""
-
-    def __new__(cls, *args, **kwargs):
-        return cls.__real_base__.__new__(cls, *args, **kwargs)
-
-        
-def Data(fields):
-    class _Record(Record):
-        _fields = fields
-    return _Record
-
-        
 def cached(f):
     @wraps(f)
     def wrapper(*args):
@@ -103,7 +48,7 @@ def cached(f):
     wrapper.cache = {}
     return wrapper
         
-# TODO optimize this
+
 class frozendict(object):
     __slots__ = ["_dict", "_cached_hash"]
 
@@ -184,47 +129,74 @@ class frozendict(object):
     def __len__(self):
         return len(self._dict)
 
+
 def indent_str(s, indent=4):
     return "\n".join(indent * " " + i for i in s.splitlines())
+
 
 def repr_plus(ss, indent=4, sep="\n", prefix=""):
     if isinstance(ss, basestring):
         ss = [ss]
-    return indent_str(sep.join(prefix + repr(s) for s in ss), indent)
-    
-class ReprPlusMixin(object):
-    """must be used w/ data objects"""
+    return indent_str(sep.join(prefix + repr(s) for s in ss), indent)    
 
-    _mes_attrs = None
-    _mes_drop = None
-    _repr_plus_args = ()
-    
-    def __repr__(self):
-        mes = self.__squash_mes__()
-        
-        if self._mes_attrs is None and len(mes) == 1:
-            return "%s" % repr(mes[0])
-        else:
-            return "%s:\n%s" % (self.__class__.__name__, repr_plus(mes, *self._repr_plus_args))
-        
-    def __squash_mes__(self):
-        mes = []
-        
-        for k, v in self._asdict().iteritems():
-            if self._mes_attrs is None:
-                cls = self.__class__
-            else:
-                cls = self._mes_attrs.get(k)
-                if cls == 0:
-                    cls = self.__class__
-            if cls is not None and issubclass(v.__class__, cls):
-                mes += v.__squash_mes__()
-            elif self._mes_drop is None or not issubclass(v.__class__, self._mes_drop):
-                mes.append(v)
+"""Generator magic"""
 
-        return mes
+from Queue import Queue
+import threading
+import weakref
+import itertools
+
+
+# This was using weakrefs, but for simplicity let us just use lists for now.
+class Event(object):
+    def __init__(self):
+        self.listeners = []
+
+    def notify(self, listener):
+        self.listeners.append(listener)
+        return listener # for decorators
         
-            
-def singleton(f):
-    return f()
+    def signal(self, item=None):
+        for listener in self.listeners:
+            listener(item)
     
+    def __iter__(self):
+        queue = Queue()
+        
+        self.notify(queue.put)
+        
+        def gen():
+            while True: yield queue.get()
+
+        return gen()
+
+_property = property
+class Behavior(Event):
+    def __init__(self, value=None):
+        self.value = value
+        super(Behavior, self).__init__()
+
+    def get(self):
+        return self.value
+
+    def notify(self, listener):
+        # Always let the listener know the current value.
+        listener(self.value)
+        return super(Behavior, self).notify(listener)
+        
+    def signal(self, value):
+        self.value = value
+        super(Behavior, self).signal(value)
+
+    set = signal
+
+    def signal_mutation(self):
+        super(Behavior, self).signal(self.value)
+
+    @classmethod
+    def property(cls, name):
+        def get(self):
+            return getattr(self, name).get()
+        def set(self, value):
+            return getattr(self, name).set(value)
+        return _property(get, set)
