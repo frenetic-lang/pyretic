@@ -28,14 +28,6 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# start mininet:  pyretic/mininet.sh --topo=gateway                                                                          #
-# run controller: pox.py --no-cli pyretic/examples/gateway.py                                                                #
-# test:           pingall                                                                                                    #
-##############################################################################################################################
-
 from pyretic.lib.corelib import *
 from pyretic.lib.virt import *
 

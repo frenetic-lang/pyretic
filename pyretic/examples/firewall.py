@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,15 +27,18 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE                                                                       #
-# start mininet:  pyretic/mininet.sh --topo=clique,5,5                                                                       #
-# test:           pingall. odd nodes should reach odd nodes w/ higher IP, likewise for even ones                             #
-#                 controller prints one message "punching hole for reverse traffic [IP1]:[IP2]" for each pair where IP1<IP2  #
-#                 timeout seconds after last time punched hole used, it will close w/ corresponding print statement          #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet: mininet.sh --topo=clique,5,5 (or other single subnet network)       #
+# test:    pingall. odd nodes should reach odd nodes w/ higher IP,             #
+#          likewise for even ones                                              #
+#          controller prints one message                                       #
+#          e.g., "punching hole for reverse traffic [IP1]:[IP2]"               #
+#          for each pair where IP1<IP2.                                        #
+#          Timeout seconds after last time punched hole used,                  #
+#          it will close w/ corresponding print statement                      #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *

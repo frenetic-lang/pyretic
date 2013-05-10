@@ -35,7 +35,6 @@ from functools import wraps
 
 def singleton(f):
     return f()
-        
 
 def cached(f):
     @wraps(f)
@@ -47,7 +46,6 @@ def cached(f):
             return v
     wrapper.cache = {}
     return wrapper
-        
 
 class frozendict(object):
     __slots__ = ["_dict", "_cached_hash"]

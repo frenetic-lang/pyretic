@@ -30,10 +30,6 @@
 
 import socket
 import struct
-from abc import ABCMeta, abstractmethod, abstractproperty
-from numbers import Integral
-from itertools import chain
-
 from bitarray import bitarray
 import networkx as nx
 

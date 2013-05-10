@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,16 +27,17 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-############################################################################################################################
-# TO TEST MODULE                                                                                                           #
-# -------------------------------------------------------------------                                                      #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE                                                                     #
-# start mininet:  pyretic/mininet.sh --mac --topo linear,3                                                                 #
-# start xterms:   xterm h1 h2 h3                                                                                           #
-# start tcpdump:  in each xterm,                                                                                           #
-# > IFACE=`ifconfig | head -n 1 | awk '{print $1}'`; tcpdump -XX -vvv -t -n -i $IFACE not ether proto 0x88cc > $IFACE.dump #
-# test:           run h1 ping -c 2 h3, examine tcpdumps and confirm that h2 does not see packets on second go around       #
-############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet:  mininet.sh --topo linear,3 (or other single subnet)                #
+# test:     start xterms - e.g., 'xterm h1 h2 h3' in mininet console           #
+#           start tcpdump:  in each xterm,                                     #
+#           IF=`ifconfig | head -n 1 | awk '{print $1}'`;                      #
+#           tcpdump -XX -vvv -t -n -i $IF not ether proto 0x88cc > $IF.dump    #
+#           h1 ping -c 2 h3                                                    #
+#           examine dumps, confirm that h2 does not see packets on second ping #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *

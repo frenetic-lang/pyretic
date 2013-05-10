@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,13 +27,12 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE                                                                       # 
-# start mininet:  pyretic/mininet.sh --topo=gateway3                                                                         #
-# test:           pingall                                                                                                    #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet:  mininet.sh --topo=gateway3                                         #
+# test:     full host connectivity (pingall)                                   #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *

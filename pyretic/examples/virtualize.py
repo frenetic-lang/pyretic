@@ -5,9 +5,9 @@
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
 # author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
-# Licensed to the Pyretic Project by one or more contributors. See the          #
+# Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
-# regarding copyright and ownership. The Pyretic Project licenses this          #
+# regarding copyright and ownership. The Pyretic Project licenses this         #
 # file to you under the following license.                                     #
 #                                                                              #
 # Redistribution and use in source and binary forms, with or without           #
@@ -28,27 +28,28 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE --program=PATH_TO_EXAMPLE_TO_BE_VIRTUALIZED --virttopo=PATH_TO_VDEF   #
-# start mininet:  pyretic/mininet.sh --topo cycle,4,4                                                                        #
-# run pingall:    once or twice, clear a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping           # 
-# test:           NO RESPONSE AVAILABLE message should only show up once for each end host IP address                        #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# input:    --module=MODULE_OR_EXAMPLE --vdef=VDEF                             #
+# mininet:  any topology with which vdef works                                 #
+# test:     behavior should match that of module being virtualized             #
+#           on topology defined by vdef                                        #
+################################################################################
+
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.virt import *
+ 
+def virtualize_module(vdef, module, **kwargs):
+    vdefns = {}
+    modulens = {}
+    execfile(vdef, vdefns)
+    execfile(module, modulens)
 
-def virtualize_program(virttopo, program, **kwargs):
-    virttopons = {}
-    programns = {}
-    execfile(virttopo, virttopons)
-    execfile(program, programns)
-
-    vn = virttopons["transform"]
-    return virtualize(programns["main"](**kwargs), vn)
+    vn = vdefns["transform"]
+    return virtualize(modulens["main"](**kwargs), vn)
 
     
-main = virtualize_program
+main = virtualize_module

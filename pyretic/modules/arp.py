@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,14 +27,14 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST MODULE                                                                                                             #
-# -------------------------------------------------------------------                                                        #
-# run controller: pox.py --no-cli PATH_TO_THIS_MODULE                                                                        #
-# start mininet:  pyretic/mininet.sh --topo cycle,4,4                                                                        #
-# run pingall:    once or twice, clear a node's arp entry for one of its neighbors - e.g., h1 arp -d h2 - and ping           # 
-# test:           NO RESPONSE AVAILABLE message should only show up once for each end host IP address                        #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet:  mininet.sh --topo cycle,4,4 (or other single subnet)               #
+# test:     ping a neighbor - e.g., h1 ping -c5 h2                             #
+#           then clear the arp entry for that neighbor - e.g., h1 arp -d h2    #
+#           "NO RESPONSE AVAILABLE" message for h2 should only show up once    #
+################################################################################
 
 import collections
 

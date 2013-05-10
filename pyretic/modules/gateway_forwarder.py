@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,11 +27,11 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST MODULE                                                                                                             #
-# -------------------------------------------------------------------                                                        #
-# run any of the gateway_* examples                                                                                          #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# see any of gateway examples                                                  #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *

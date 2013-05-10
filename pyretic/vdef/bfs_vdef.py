@@ -28,14 +28,6 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-############################################################################################################################
-# TO TEST EXAMPLE                                                                                                          #
-# -------------------------------------------------------------------                                                      #
-# start mininet:  ./pyretic/mininet.sh --switch ovsk --topo=clique,4,4                                                     #
-# run controller: pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/bfs.py
-############################################################################################################################
-
-
 from pyretic.lib.corelib import *
 from pyretic.lib.virt import *
 

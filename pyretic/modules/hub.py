@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -27,18 +28,18 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-############################################################################################################################
-# TO TEST EXAMPLE                                                                                                          #
-# -------------------------------------------------------------------                                                      #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE                                                                     #
-# start mininet:  ./pyretic/mininet.sh --topo clique,4,4                                                                   # 
-# start xterms:   xterm h1 h2 h3                                                                                           #
-# start tcpdump:  in each xterm,                                                                                           #
-# > IFACE=`ifconfig | head -n 1 | awk '{print $1}'`; tcpdump -XX -vvv -t -n -i $IFACE not ether proto 0x88cc > $IFACE.dump #
-# test:           run pingall, check that tcpdump outputted identical packets on each term                                 #
-#                 NOTE: diff'ing for equality isn't foolproof as packets in tcpdumps may be reordered                      #
-############################################################################################################################
 
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet:  mininet.sh --topo clique,4,4 (or other single subnet)              #
+# test:     start xterms - e.g., 'xterm h1 h2 h3' in mininet console           #
+#           start tcpdump:  in each xterm,                                     #
+#           IF=`ifconfig | head -n 1 | awk '{print $1}'`;                      #
+#           pingall, check dumps show identical packets for each host          #
+# NOTE:     diff'ing for equality isn't foolproof                              #
+#           as packets in tcpdumps may be reordered                            #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *

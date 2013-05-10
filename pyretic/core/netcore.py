@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -31,12 +32,8 @@
 import functools
 import itertools
 import struct
-from abc import ABCMeta, abstractmethod
 from collections import Counter
-from numbers import Integral
-from itertools import chain
 import time
-
 from bitarray import bitarray
 
 from pyretic.core import util

@@ -6,7 +6,7 @@
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
-# regarding copyright and ownership. The Core Project licenses this        #
+# regarding copyright and ownership. The Pyretic Project licenses this         #
 # file to you under the following license.                                     #
 #                                                                              #
 # Redistribution and use in source and binary forms, with or without           #

@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -31,7 +32,6 @@ import threading
 from collections import Counter
 
 import pox.openflow.libopenflow_01 as of
-#import pox.openflow.discovery as discovery
 from pox.core import core
 from pox.lib import revent, addresses as packetaddr, packet as packetlib
 from pox.lib.packet.ethernet      import ethernet

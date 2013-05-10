@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,16 +27,17 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-##############################################################################################################################
-# TO TEST EXAMPLE                                                                                                            #
-# -------------------------------------------------------------------                                                        #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE > tmp                                                                 #
-# start mininet:  pyretic/mininet.sh --topo=gateway1_ns                                                                      #
-# test:           h1 ping -c 1 hs1, then kill controller and examine tmp file                                                #
-##############################################################################################################################
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# pyretic:  direct output to tmp file                                          #
+# mininet:  mininet.sh --topo=gateway1_ns                                      #
+# test:     h1 ping -c 1 hs1, then kill controller and examine tmp file        #
+################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
+from pyretic.lib.virt import *
 
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.vdef.gateway_vdef import gateway_vdef
@@ -47,6 +47,6 @@ def virtualized_policy(self):
     self.policy = virtualize(trace(flood()) , gateway_vdef(self), DEBUG=True)
 
 def main():
-    return virtualized_policy() >> if_(egress,clear_trace()) >> pkt_print('outgoing')
+    return virtualized_policy() >> if_(egress_network(),clear_trace()) >> pkt_print('outgoing')
 
 

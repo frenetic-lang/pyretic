@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -27,14 +26,6 @@
 # LICENSE file distributed with this work for specific language governing      #
 # permissions and limitations under the License.                               #
 ################################################################################
-
-############################################################################################################################
-# TO TEST EXAMPLE                                                                                                          #
-# -------------------------------------------------------------------                                                      #
-# start mininet:  ./pyretic/mininet.sh --switch ovsk --topo=clique,4,4                                                     #
-# run controller: pox.py --no-cli pyretic/examples/virtualize.py --program=pyretic/examples/mac_learner.py --virttopo=pyretic/virttopos/spanning_tree.py
-############################################################################################################################
-
 
 from pyretic.lib.corelib import *
 from pyretic.lib.virt import *

@@ -3,7 +3,6 @@
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
-# author: Christopher Monsanto (chris@monsan.to)                               #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -28,24 +27,24 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-###############################################################################################################################
-# TO TEST MODULE                                                                                                              #
-# -------------------------------------------------------------------                                                         #
-# start mininet:  pyretic/mininet.sh --topo=bump_clique,1,5,3                                                                 #
-# run controller: pox.py --no-cli PATH_TO_THIS_EXAMPLE --clients=5 --servers=3                                                #
-# test:           hX ping -c 1 10.0.0.100 will work from each host                                                            #
-#                 all nodes will be able to ping each other, except hosts to their load-balanced instance                     #
-#                 pingall will output                                                                                         #
-#                 h1 -> h2 h3 h4 h5 X hs2 hs3                                                                                 #
-#                 h2 -> h1 h3 h4 h5 hs1 X hs3                                                                                 #
-#                 h3 -> h1 h2 h4 h5 hs1 hs2 X                                                                                 #
-#                 h4 -> h1 h2 h3 h5 X hs2 hs3                                                                                 #
-#                 h5 -> h1 h2 h3 h4 hs1 X hs3                                                                                 #
-#                 hs1 -> h1 h2 h3 h4 h5 hs2 hs3                                                                               #
-#                 hs2 -> h1 h2 h3 h4 h5 hs1 hs3                                                                               #
-#                 hs3 -> h1 h2 h3 h4 h5 hs1 hs2                                                                               #
-###############################################################################################################################
-
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# input:    --clients=NUM_CLIENTS --servers=NUM_SERVERS                        #
+# mininet:  mininet.sh --topo=bump_clique,3,NUM_CLIENTS,NUM_SERVERS            #
+# test:     hX ping -c 1 10.0.0.100 will work from each host                   #
+#           all nodes will be able to ping each other,                         #
+#           except hosts to their load-balanced instance                       #
+#           pingall will output                                                #
+#                 h1 -> h2 h3 h4 h5 X hs2 hs3                                  #
+#                 h2 -> h1 h3 h4 h5 hs1 X hs3                                  #
+#                 h3 -> h1 h2 h4 h5 hs1 hs2 X                                  #
+#                 h4 -> h1 h2 h3 h5 X hs2 hs3                                  #
+#                 h5 -> h1 h2 h3 h4 hs1 X hs3                                  #
+#                 hs1 -> h1 h2 h3 h4 h5 hs2 hs3                                #
+#                 hs2 -> h1 h2 h3 h4 h5 hs1 hs3                                #
+#                 hs3 -> h1 h2 h3 h4 h5 hs1 hs2                                #
+################################################################################
 
 import math
 from pyretic.lib.corelib import *
