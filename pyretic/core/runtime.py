@@ -54,22 +54,22 @@ class Runtime(object):
         self.policy.set_network(self.network.copy())
        
     def handle_switch_join(self,switch_id):
-        self.network.switch_joins.signal(switch_id)
+        self.network.handle_switch_join(switch_id)
 
     def handle_switch_part(self,switch_id):
-        self.network.switch_parts.signal(switch_id)
+        self.network.handle_switch_part(switch_id)
 
     def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.port_joins.signal((switch_id,port_id,conf_up,stat_up))
+        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
 
     def handle_port_mod(self, switch, port_no, config, status):
-        self.network.port_mods.signal((switch, port_no, config, status))
+        self.network.handle_port_mod(switch, port_no, config, status)
 
     def handle_port_part(self, switch, port_no):
-        self.network.port_parts.signal((switch, port_no))
+        self.network.handle_port_part(switch, port_no)
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
-        self.network.link_updates.signal((s1, p_no1, s2, p_no2))
+        self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
     def handle_packet_in(self, concrete_pkt):
 
@@ -198,13 +198,6 @@ class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
-        self.events = ["switch_joins", "switch_parts",
-                       "port_joins", "port_parts",
-                       "port_mods", "link_updates"]
-        for event in self.events:
-            e = util.Event()
-            setattr(self, event, e)
-            e.notify(getattr(self, "_handle_%s" % event))
 
     def inject_packet(self, packet):
         self.runtime.send_packet(packet)
@@ -219,8 +212,8 @@ class ConcreteNetwork(Network):
     def inject_discovery_packet(self, dpid, port_no):
         self.runtime.inject_discovery_packet(dpid, port_no)
         
-    def _handle_switch_joins(self, switch):
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
+    def handle_switch_join(self, switch):
+        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_joins"
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
         self.topology.add_node(switch, ports={})  
         print "OpenFlow switch %s connected" % switch
@@ -243,9 +236,9 @@ class ConcreteNetwork(Network):
             # UNLINK SELF
             self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
-    def _handle_switch_parts(self, switch):
+    def handle_switch_part(self, switch):
         print "OpenFlow switch %s disconnected" % switch
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_parts"
+        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_parts"
         # REMOVE ALL ASSOCIATED LINKS
         for port_no in self.topology.node[switch]["ports"].keys():
             self.remove_associated_link(Location(switch,port_no))
@@ -253,26 +246,26 @@ class ConcreteNetwork(Network):
         if DEBUG_TOPO_DISCOVERY:  print self.topology
         self.update_network()
         
-    def _handle_port_joins(self, (switch, port_no, config, status)):
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
+    def handle_port_join(self, switch, port_no, config, status):
+        if DEBUG_TOPO_DISCOVERY:  print "handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
         self.topology.node[switch]["ports"][port_no] = Port(port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             if DEBUG_TOPO_DISCOVERY:  print self.topology
             self.update_network()
 
-    def _handle_port_parts(self, (switch, port_no)):
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_parts"
+    def handle_port_part(self, switch, port_no):
+        if DEBUG_TOPO_DISCOVERY:  print "handle_port_parts"
         try:
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
             if DEBUG_TOPO_DISCOVERY:  print self.topology
             self.update_network()
         except KeyError:
-            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
-    def _handle_port_mods(self, (switch, port_no, config, status)):
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
+    def handle_port_mod(self, switch, port_no, config, status):
+        if DEBUG_TOPO_DISCOVERY:  print "handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
         # GET PREV VALUES
         try:
             prev_config = self.topology.node[switch]["ports"][port_no].config
@@ -309,10 +302,10 @@ class ConcreteNetwork(Network):
             self.update_network()
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
-            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
+            pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
 
-    def _handle_link_updates(self, (s1, p_no1, s2, p_no2)):
-        if DEBUG_TOPO_DISCOVERY:  print "_handle_link_updates"
+    def handle_link_update(self, s1, p_no1, s2, p_no2):
+        if DEBUG_TOPO_DISCOVERY:  print "handle_link_updates"
         try:
             p1 = self.topology.node[s1]["ports"][p_no1]
             p2 = self.topology.node[s2]["ports"][p_no2]

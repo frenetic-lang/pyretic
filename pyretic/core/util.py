@@ -136,34 +136,3 @@ def repr_plus(ss, indent=4, sep="\n", prefix=""):
     if isinstance(ss, basestring):
         ss = [ss]
     return indent_str(sep.join(prefix + repr(s) for s in ss), indent)    
-
-"""Generator magic"""
-
-from Queue import Queue
-import threading
-import weakref
-import itertools
-
-
-# This was using weakrefs, but for simplicity let us just use lists for now.
-class Event(object):
-    def __init__(self):
-        self.listeners = []
-
-    def notify(self, listener):
-        self.listeners.append(listener)
-        return listener # for decorators
-        
-    def signal(self, item=None):
-        for listener in self.listeners:
-            listener(item)
-    
-    def __iter__(self):
-        queue = Queue()
-        
-        self.notify(queue.put)
-        
-        def gen():
-            while True: yield queue.get()
-
-        return gen()
