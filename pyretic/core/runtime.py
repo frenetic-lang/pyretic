@@ -50,12 +50,9 @@ class Runtime(object):
         self.extended_values_lock = threading.RLock()
         self.threads = set()
 
-    def network_update(self,ignore):
-        try:
-            self.policy.set_network(self.network)
-        except:
-            pass
-
+    def update_network(self):
+        self.policy.set_network(self.network.copy())
+       
     def handle_switch_join(self,switch_id):
         self.network.switch_joins.signal(switch_id)
 
@@ -201,7 +198,6 @@ class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
-        self._topology.notify(runtime.network_update)
         self.events = ["switch_joins", "switch_parts",
                        "port_joins", "port_parts",
                        "port_mods", "link_updates"]
@@ -216,10 +212,12 @@ class ConcreteNetwork(Network):
     #
     # Topology Detection
     #
+
+    def update_network(self):
+        self.runtime.update_network()
            
     def inject_discovery_packet(self, dpid, port_no):
         self.runtime.inject_discovery_packet(dpid, port_no)
-
         
     def _handle_switch_joins(self, switch):
         if DEBUG_TOPO_DISCOVERY:  print "_handle_switch_joins"
@@ -227,7 +225,7 @@ class ConcreteNetwork(Network):
         self.topology.add_node(switch, ports={})  
         print "OpenFlow switch %s connected" % switch
         if DEBUG_TOPO_DISCOVERY:  print self.topology
-        self._topology.signal_mutation()
+        self.update_network()
 
     def remove_associated_link(self,location):
         port = self.topology.node[location.switch]["ports"][location.port_no]
@@ -253,7 +251,7 @@ class ConcreteNetwork(Network):
             self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
         if DEBUG_TOPO_DISCOVERY:  print self.topology
-        self._topology.signal_mutation()
+        self.update_network()
         
     def _handle_port_joins(self, (switch, port_no, config, status)):
         if DEBUG_TOPO_DISCOVERY:  print "_handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
@@ -261,7 +259,7 @@ class ConcreteNetwork(Network):
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             if DEBUG_TOPO_DISCOVERY:  print self.topology
-            self._topology.signal_mutation()
+            self.update_network()
 
     def _handle_port_parts(self, (switch, port_no)):
         if DEBUG_TOPO_DISCOVERY:  print "_handle_port_parts"
@@ -269,7 +267,7 @@ class ConcreteNetwork(Network):
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
             if DEBUG_TOPO_DISCOVERY:  print self.topology
-            self._topology.signal_mutation()
+            self.update_network()
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
         
@@ -301,14 +299,14 @@ class ConcreteNetwork(Network):
         if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s"
         self.inject_discovery_packet(switch,port_no)
         if DEBUG_TOPO_DISCOVERY:  print self.topology
-        self._topology.signal_mutation()
+        self.update_network()
 
     def port_down(self, switch, port_no, double_check=False):
         if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s"
         try:
             self.remove_associated_link(Location(switch,port_no))
             if DEBUG_TOPO_DISCOVERY:  print self.topology
-            self._topology.signal_mutation()
+            self.update_network()
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY _handle_switch_parts
@@ -353,5 +351,5 @@ class ConcreteNetwork(Network):
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         if DEBUG_TOPO_DISCOVERY:  print self.topology
-        self._topology.signal_mutation()
+        self.update_network()
 

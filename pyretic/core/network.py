@@ -497,10 +497,20 @@ class Topology(nx.Graph):
 
 class Network(object):
     """Abstract class for networks"""
-    def __init__(self):
-        self._topology = util.Behavior(Topology())                
-    topology = util.Behavior.property("_topology")
+    def __init__(self,topology=None):
+        if topology is None:
+            self._topology = Topology()
+        else:
+            self._topology = topology
+
+    @property
+    def topology(self):
+        return self._topology
     
+    @topology.setter
+    def topology(self,topology):
+        self._topology = topology
+
     def inject_packet(self, packet):
         raise NotImplementedError
 
