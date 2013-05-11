@@ -52,6 +52,8 @@ module = import_module(module_name)
 main = module.main
 kwargs = { k : v for [k,v] in [ i.lstrip('--').split('=') for i in kwargs ]}
 
+sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
+
 runtime = Runtime(Backend(),main,False,False,kwargs)
 if not FRONTEND_ONLY:
     of_client = subprocess.Popen([sys.executable, 
