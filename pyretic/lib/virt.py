@@ -113,20 +113,24 @@ class lower_packet(SinglyDerivedPolicy):
     """Lowers a packet from the derived network to the underlying network"""
     def __init__(self, vtag):
         self.vtag = vtag
-        self.policy = (push(vtag=self.vtag) >> move(voutport="outport",
-                                                    vswitch="switch",
-                                                    vinport="inport"))
+        super(lower_packet,self).__init__(push(vtag=self.vtag) >> 
+                                          move(voutport="outport",
+                                               vswitch="switch",
+                                               vinport="inport"))
         
-    def __repr__(self):
-        return "lower_packet %s" % self.vtag
+        def __repr__(self):
+            return "lower_packet %s" % self.vtag
 
         
 @singleton
 class lift_packet(SinglyDerivedPolicy):
     """Lifts a packet from the underlying network to the derived network"""
     def __init__(self):
-        self.policy = (pop("vtag") >>
-                       move(outport="voutport", switch="vswitch", inport="vinport"))
+        SinglyDerivedPolicy.__init__(self, 
+                                     pop("vtag") >>
+                                     move(outport="voutport", 
+                                          switch="vswitch", 
+                                          inport="vinport"))
         
     def __repr__(self):
         return "lift_packet"
@@ -135,14 +139,20 @@ class lift_packet(SinglyDerivedPolicy):
 @singleton
 class pop_vheaders(SinglyDerivedPolicy):
     def __init__(self):
-        self.policy = pop("vswitch", "vinport", "voutport", "vtag")
+        SinglyDerivedPolicy.__init__(self,
+                                     pop("vswitch", 
+                                         "vinport", 
+                                         "voutport", 
+                                         "vtag"))
         
     def __repr__(self):
         return "pop_vheaders"
 
+
 class locate_in_underlying(Policy):
     def __init__(self):
         self.vmap = None
+        super(locate_in_underlying,self).__init__()
 
     def set_vmap(self,vmap):
         self.vmap = vmap
@@ -210,7 +220,7 @@ class virtualize_base(SinglyDerivedPolicy):
         self.fabric_policy = self.vdef.fabric_policy
         self.egress_policy = self.vdef.egress_policy
         self.locate_in_underlying = locate_in_underlying()
-        self.policy = (
+        super(virtualize_base,self).__init__(
             pkt_print(repr(self),self.DEBUG) >>
             if_(match(outport=None),push(outport=-1)) >>
             str_print("-- " + tag + " apply ingress policy",self.DEBUG) >>
@@ -261,15 +271,18 @@ class virtualize_base(SinglyDerivedPolicy):
             str_print("-- " + tag + " injection_policy end ",self.DEBUG) 
             )
 
-    def set_network(self, updated_network):
-        self.vdef.set_network(updated_network)
+    def set_network(self, network):
+        if network == self._network:
+            return
+        self.vdef.set_network(network)
         self.locate_in_underlying.set_vmap(self.vdef.vmap)
         self.vdef.derived.injection_policy = self.injection_policy
-        super(virtualize_base,self).set_network(updated_network)
+        super(virtualize_base,self).set_network(network)
         self.vpolicy.set_network(self.vdef.derived) 
         
     def __repr__(self):
         return "virtualize %s\n%s" % (self.vtag, self.vdef)
+
 
 class virtualize(virtualize_base):
     def __init__(self, policy, vdef, DEBUG=False):

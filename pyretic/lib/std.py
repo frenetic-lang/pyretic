@@ -121,9 +121,9 @@ class net_print(_print):
 
 class pol_print(SinglyDerivedPolicy):
     def __init__(self,policy,s='',on=True):
-        super(pol_print,self).__init__(policy)
         self.s = s    
         self.on = on
+        super(pol_print,self).__init__(policy)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -143,9 +143,9 @@ class pol_print(SinglyDerivedPolicy):
 
 class trace(SinglyDerivedPolicy):
     def __init__(self,policy,trace_name='trace'):
-        super(trace,self).__init__(policy)
         self.trace_name = trace_name
         self.highest_trace_value = {}
+        super(trace,self).__init__(policy)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -172,6 +172,7 @@ class trace(SinglyDerivedPolicy):
 class clear_trace(Policy):
     def __init__(self,trace_name='trace'):
         self.trace_name=trace_name
+        super(clear_trace,self).__init__()
 
     def eval(self, packet):
         c = Counter()
@@ -186,10 +187,12 @@ class breakpoint(SinglyDerivedPolicy):
         self.condition = condition
         super(breakpoint,self).__init__(policy)
 
-    def set_network(self, value):
-        self.condition.set_network(value)
-        super(breakpoint,self).set_network(value)
-
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(breakpoint,self).set_network(network)
+        self.condition.set_network(network)
+                    
     def eval(self, packet):
         import ipdb
         if self.condition(packet):

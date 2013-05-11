@@ -113,15 +113,17 @@ register_field("dstip", PrefixMatch)
 ################################################################################
 
 class NetworkEvaluated(object):
+    def __init__(self):
+        self._network = None
+
     @property
     def network(self):
-        try:
-            return self._network
-        except:
-            return None
-
-    def set_network(self, value):
-        self._network = value
+        return self._network
+        
+    def set_network(self, network):
+        if network == self._network:
+            return 
+        self._network = network
 
     def eval(self, packet):
         raise NotImplementedError        
@@ -224,6 +226,7 @@ class match(Predicate):
             else: 
                 init_map[k] = None
         self.map = util.frozendict(init_map)
+        super(match,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -256,15 +259,18 @@ class union(Predicate):
     ### init : List Predicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
-        
+        super(union,self).__init__()        
+
     ### repr : unit -> String
     def __repr__(self):
         return "union:\n%s" % util.repr_plus(self.predicates)
 
-    def set_network(self, value):
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(union,self).set_network(network)
         for pred in self.predicates:
-            pred.set_network(value)
-        super(union,self).set_network(value)
+            pred.set_network(network)
 
     def eval(self, packet):
         return any(predicate.eval(packet) for predicate in self.predicates)
@@ -275,28 +281,33 @@ class intersect(Predicate):
 
     def __init__(self, predicates):
         self.predicates = list(predicates)
+        super(intersect,self).__init__()
         
     ### repr : unit -> String
     def __repr__(self):
         return "intersect:\n%s" % util.repr_plus(self.predicates)
 
-    def set_network(self, value):
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(intersect,self).set_network(network)
         for pred in self.predicates:
-            pred.set_network(value)
-        super(intersect,self).set_network(value)
+            pred.set_network(network)
 
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
     
-
 class SinglyDerivedPredicate(Predicate):
     def __init__(self, predicate):
         self.predicate = predicate
+        super(SinglyDerivedPredicate,self).__init__()
 
-    def set_network(self, value):
-        self.predicate.set_network(value)
-        super(SinglyDerivedPredicate,self).set_network(value)
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(SinglyDerivedPredicate,self).set_network(network)
+        self.predicate.set_network(network)
 
     def eval(self, packet):
         return self.predicate.eval(packet)
@@ -385,10 +396,13 @@ class flood(Policy):
         except:
             return "flood"
 
-    def set_network(self, value):
-        if not value is None:
-            self.mst = Topology.minimum_spanning_tree(value.topology)
-            self._network = value
+    def set_network(self, network):
+        if network == self._network:
+            return
+        if not network is None:
+            self.mst = Topology.minimum_spanning_tree(network.topology)
+            self._network = network
+        super(flood,self).set_network(network) 
         
     def eval(self, packet):
         if self.network is None:
@@ -422,6 +436,7 @@ class push(Policy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
+        super(push,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -438,6 +453,7 @@ class pop(Policy):
     ### init : List String -> unit
     def __init__(self, *args):
         self.fields = list(args)
+        super(pop,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -463,6 +479,7 @@ class modify(Policy):
            else:
                init_map[k] = v
        self.map = util.frozendict(init_map)
+       super(modify,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -480,6 +497,7 @@ class copy(Policy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
+        super(copy,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -500,6 +518,7 @@ class move(Policy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
+        super(move,self).__init__()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -529,11 +548,14 @@ class MultiplyDerivedPolicy(Policy):
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
+        super(MultiplyDerivedPolicy,self).__init__()
 
-    def set_network(self, value):
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(MultiplyDerivedPolicy,self).set_network(network)
         for policy in self.policies:
-            policy.set_network(value) 
-        super(MultiplyDerivedPolicy,self).set_network(value)
+            policy.set_network(network) 
 
                     
 class parallel(MultiplyDerivedPolicy):
@@ -573,11 +595,14 @@ class sequential(MultiplyDerivedPolicy):
 class SinglyDerivedPolicy(Policy):
     def __init__(self, policy):
         self.policy = policy
+        super(SinglyDerivedPolicy,self).__init__()
 
-    def set_network(self, value):
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(SinglyDerivedPolicy,self).set_network(network)            
         if not self.policy is None:
-            self.policy.set_network(value) 
-        super(SinglyDerivedPolicy,self).set_network(value)
+            self.policy.set_network(network) 
 
     def eval(self, packet):
         return self.policy.eval(packet)
@@ -596,20 +621,10 @@ class fwd(SinglyDerivedPolicy):
     
 
 class recurse(SinglyDerivedPolicy):
-    def set_network(self, value):
-        """Don't set_network for self.policy, as this will lead to infinite recursion."""
-        self._network = value
-        self.set_policy_network = False
-
-    def eval(self, packet):
-        """Instead set_network for self.policy on first eval after set_network called.
-        set_network won't be called again for self.policy, unless the network actually
-        changes."""
-        if not self.set_policy_network:
-            self.policy.set_network(self.network)
-            self.set_policy_network = True
-        output = super(recurse,self).eval(packet)
-        return output
+    def set_network(self, network):
+        if network == self.policy._network:
+            return
+        super(recurse,self).set_network(network)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -621,9 +636,11 @@ class remove(SinglyDerivedPolicy):
         self.predicate = predicate
         super(remove,self).__init__(policy)
 
-    def set_network(self, value):
-        self.predicate.set_network(value)
-        super(remove,self).set_network(value)
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(remove,self).set_network(network)
+        self.predicate.set_network(network)
 
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
@@ -643,9 +660,11 @@ class restrict(SinglyDerivedPolicy):
         self.predicate = predicate
         super(restrict,self).__init__(policy) 
 
-    def set_network(self, value):
-        self.predicate.set_network(value)
-        super(restrict,self).set_network(value) 
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(restrict,self).set_network(network)
+        self.predicate.set_network(network)
 
     ### eval : Packet -> Counter List Packet
     def eval(self, packet):
@@ -678,15 +697,17 @@ class if_(SinglyDerivedPolicy):
 class NetworkDerivedPolicy(SinglyDerivedPolicy):
     """Generates new policy every time a new network is set"""
     def __init__(self, policy_from_network):
-        super(NetworkDerivedPolicy,self).__init__(drop)
         self.policy_from_network = policy_from_network
+        super(NetworkDerivedPolicy,self).__init__(drop)
 
-    def set_network(self, value):
-        if not value is None:
-            self.policy = self.policy_from_network(value)
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(NetworkDerivedPolicy,self).set_network(network)
+        if not network is None:
+            self.policy = self.policy_from_network(network)
         else:
             self.policy = drop
-        super(NetworkDerivedPolicy,self).set_network(value)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -707,6 +728,7 @@ class MutablePolicy(SinglyDerivedPolicy):
     ### init : unit -> unit
     def __init__(self):
         self._policy = drop
+        super(SinglyDerivedPolicy,self).__init__()
         
     @property
     def policy(self):
@@ -715,8 +737,7 @@ class MutablePolicy(SinglyDerivedPolicy):
     @policy.setter
     def policy(self, value):
         self._policy = value
-        if not self.network is None:
-            self.set_network(self.network)
+        self._policy.set_network(self.network)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -779,6 +800,7 @@ class queries_base(Policy):
     ### init : unit -> unit
     def __init__(self):
         self.listeners = []
+        super(queries_base,self).__init__()
 
     ### eval : Packet -> unit
     def eval(self, packet):

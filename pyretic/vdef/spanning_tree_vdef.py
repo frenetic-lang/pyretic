@@ -45,6 +45,8 @@ class spanning_tree_vdef(vdef):
         return mapping
 
     def set_network(self,network):
+        if network == self.underlying:
+            return
         self.underlying = network
         self.derived = DerivedNetwork(self.underlying)
         self.derived.topology = Topology.minimum_spanning_tree(network.topology)

@@ -514,3 +514,14 @@ class Network(object):
     def inject_packet(self, packet):
         raise NotImplementedError
 
+    def __eq__(self,other):
+        try:
+            return self._topology == other._topology
+        except:
+            return False
+
+    def copy(self):
+        topology = self._topology.copy()
+        network = Network(topology)
+        network.inject_packet = self.inject_packet
+        return network
