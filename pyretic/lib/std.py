@@ -138,6 +138,13 @@ class pol_print(SinglyDerivedPolicy):
             print self.policy
         return super(pol_print,self).eval(packet)
 
+    def track_eval(self, packet):
+        if self.on:
+            print self.s 
+            print self.policy
+        (result,traversed) = super(pol_print,self).track_eval(packet)
+        return (result,[self,traversed])
+
 
 ### TRACING POLICIES
 
@@ -168,6 +175,25 @@ class trace(SinglyDerivedPolicy):
             return c
         else:
             return output
+
+    def track_eval(self, packet):
+        v = packet.get_stack(self.trace_name)
+        try:
+            i = self.highest_trace_value[v]
+        except:
+            i = 0
+        (output,traversed) = super(trace,self).track_eval(packet)
+        c = Counter()
+        if len(output) > 1:
+            for packet, count in output.iteritems():
+                t_packet = packet.pushmany({self.trace_name : i})
+                c[t_packet] = count
+                i = i + 1
+                self.highest_trace_value[v] = i
+            return (c,[self,traversed])
+        else:
+            return (output,[self,traversed])
+
 
 class clear_trace(Policy):
     def __init__(self,trace_name='trace'):
@@ -201,6 +227,16 @@ class breakpoint(SinglyDerivedPolicy):
                 import pdb as debugger
             debugger.set_trace()
         return SinglyDerivedPolicy.eval(self, packet)
+
+    def track_eval(self, packet):
+        if self.condition(packet):
+            try:
+                import ipdb as debugger
+            except:
+                import pdb as debugger
+            debugger.set_trace()
+        (result,traversed) = SinglyDerivedPolicy.track_eval(self, packet)
+        return (result,[self,traversed])        
 
     ### repr : unit -> String
     def __repr__(self):

@@ -40,6 +40,7 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.util import frozendict, singleton
 
+
 ################################################################################
 # Matching
 ################################################################################
@@ -127,6 +128,12 @@ class NetworkEvaluated(object):
 
     def eval(self, packet):
         raise NotImplementedError        
+
+    def track_eval(self, packet):
+        return (self.eval(packet),[self])
+
+    def name(self):
+        return self.__class__.__name__
 
     
 ################################################################################
@@ -297,6 +304,14 @@ class intersect(Predicate):
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
+    def track_eval(self, packet):
+        traversed = list()
+        for predicate in self.predicates:
+            (result,ptraversed) = predicate.track_eval(packet)
+            traversed.append(ptraversed)
+            if not result:
+                return (False,[self,traversed])
+        return (True,[self,traversed])
     
 class SinglyDerivedPredicate(Predicate):
     def __init__(self, predicate):
@@ -312,6 +327,10 @@ class SinglyDerivedPredicate(Predicate):
     def eval(self, packet):
         return self.predicate.eval(packet)
 
+    def track_eval(self,packet):
+        (result,traversed) = self.predicate.track_eval(packet)
+        return (result,[self,traversed])
+
 
 class negate(SinglyDerivedPredicate):
     ### repr : unit -> String
@@ -322,6 +341,9 @@ class negate(SinglyDerivedPredicate):
     def eval(self, packet):
         return not self.predicate.eval(packet)
         
+    def track_eval(self,packet):
+        (result,traversed) = self.predicate.track_eval(packet)
+        return (not result,[self,traversed])
 
 
 class difference(SinglyDerivedPredicate):
@@ -565,6 +587,15 @@ class parallel(MultiplyDerivedPolicy):
             rc = policy.eval(packet)
             c.update(rc)
         return c
+
+    def track_eval(self, packet):
+        traversed = list()
+        c = Counter()
+        for policy in self.policies:
+            (rc,rtraversed) = policy.track_eval(packet)
+            c.update(rc)
+            traversed.append(rtraversed)
+        return (c,[self,traversed])
     
     ### repr : unit -> String
     def __repr__(self):
@@ -582,6 +613,19 @@ class sequential(MultiplyDerivedPolicy):
                     c[rpacket] = lcount * rcount
             lc = c
         return lc
+
+    def track_eval(self, packet):
+        traversed = list()
+        lc = Counter([packet])
+        for policy in self.policies:
+            c = Counter()
+            for lpacket, lcount in lc.iteritems():
+                (rc,rtraversed) = policy.track_eval(lpacket)
+                traversed.append(rtraversed)
+                for rpacket, rcount in rc.iteritems():
+                    c[rpacket] = lcount * rcount
+            lc = c
+        return (lc,[self,traversed])
     
     ### repr : unit -> String
     def __repr__(self):
@@ -606,6 +650,10 @@ class SinglyDerivedPolicy(Policy):
 
     def eval(self, packet):
         return self.policy.eval(packet)
+
+    def track_eval(self, packet):
+        (result,traversed) = self.policy.track_eval(packet)
+        return (result,[self,traversed])
 
 
 class fwd(SinglyDerivedPolicy):
@@ -649,6 +697,14 @@ class remove(SinglyDerivedPolicy):
         else:
             return Counter()
 
+    def track_eval(self, packet):
+        (result1,traversed1) = self.predicate.track_eval(packet)
+        if not result1:
+            (result2,traversed2) = self.policy.track_eval(packet)
+            return (result2,[self,traversed1,traversed2])
+        else:
+            return (Counter(),[self,traversed1])
+
     ### repr : unit -> String
     def __repr__(self):
         return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
@@ -672,6 +728,14 @@ class restrict(SinglyDerivedPolicy):
             return self.policy.eval(packet)
         else:
             return Counter()
+
+    def track_eval(self, packet):
+        (result1,traversed1) = self.predicate.track_eval(packet)
+        if result1:
+            (result2,traversed2) = self.policy.track_eval(packet)
+            return (result2,[self,traversed1,traversed2])
+        else:
+            return (Counter(),[self,traversed1])
 
     ### repr : unit -> String
     def __repr__(self):
@@ -843,6 +907,18 @@ class packets(Policy):
             self.predicate = ~match(val) & self.predicate
             self.predicate.set_network(self.network)
         return Counter()
+
+    def track_eval(self,pkt):
+        """Don't look any more such packets"""
+        (result,traversed) = self.predicate.track_eval(pkt)
+        if result:
+            (result,traversed2) = self.pwfb.track_eval(pkt)
+            traversed += traversed2
+            if not result:
+                val = {h : pkt[h] for h in self.fields}
+                self.predicate = ~match(val) & self.predicate
+                self.predicate.set_network(self.network)
+        return (Counter(),[self,traversed])
         
 
 class AggregateFwdBucket(FwdBucket):
