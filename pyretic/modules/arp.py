@@ -60,7 +60,7 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.push(srcmac=srcmac)
     rp = rp.push(dstip=dstip)
     rp = rp.push(dstmac=dstmac)
-    rp = rp.push(payload='')
+    rp = rp.push(raw='')
 
     if VERBOSE_LEVEL > 0:
         if msg_type == RESPONSE:

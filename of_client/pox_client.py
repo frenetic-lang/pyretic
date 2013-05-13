@@ -98,12 +98,14 @@ class POXClient(revent.EventMixin):
         self.backend_channel = BackendChannel(ip, port, self)
         self.adjacency = {} # From Link to time.time() stamp
 
-    def packet_from_network(self, switch, inport, data):
+    def packet_from_network(self, switch, inport, raw):
         h = {}
         h["switch"] = switch
         h["inport"] = inport
         
-        p = packetlib.ethernet(data)
+        p = packetlib.ethernet(raw)
+        h["header_len"] = p.hdr_len
+        h["payload_len"] = p.payload_len
         h["srcmac"] = p.src.toRaw()
         h["dstmac"] = p.dst.toRaw()
         h["ethtype"] = p.type
@@ -135,7 +137,7 @@ class POXClient(revent.EventMixin):
                 h["srcip"] = p.protosrc.toRaw()
                 h["dstip"] = p.protodst.toRaw()
 
-        h["payload"] = data 
+        h["raw"] = raw 
         return ascii2bytelist(h)
 
 
@@ -158,13 +160,13 @@ class POXClient(revent.EventMixin):
 
     def packet_to_network(self, packet):
         packet = bytelist2ascii(packet)
-        if len(packet["payload"]) == 0:
+        if len(packet["raw"]) == 0:
             if packet["ethtype"] == packetlib.ethernet.ARP_TYPE:
                 p_begin = p = self.make_arp(packet)
             else:  # BLANK PACKET FOR NOW - MAY NEED TO SUPPORT OTHER PACKETS LATER
                 p_begin = p = packetlib.ethernet()
         else:
-            p_begin = p = packetlib.ethernet(packet["payload"])
+            p_begin = p = packetlib.ethernet(packet["raw"])
 
         # ETHERNET PACKET IS OUTERMOST
         p.src = packetaddr.EthAddr(packet["srcmac"])

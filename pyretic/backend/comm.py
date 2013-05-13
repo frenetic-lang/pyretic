@@ -69,7 +69,7 @@ def deserialize(serialized_msgs):
 
 def bytelist2ascii(packet_dict):
     def convert(h,val):
-        if h in ['srcmac','dstmac','srcip','dstip','payload']:
+        if h in ['srcmac','dstmac','srcip','dstip','raw']:
             return ''.join([chr(d) for d in val])
         else:
             return val
@@ -78,7 +78,7 @@ def bytelist2ascii(packet_dict):
 
 def ascii2bytelist(packet_dict):
     def convert(h,val):
-        if h in ['srcmac','dstmac','srcip','dstip','payload']:
+        if h in ['srcmac','dstmac','srcip','dstip','raw']:
             return [ord(c) for c in val]
         else:
             return val

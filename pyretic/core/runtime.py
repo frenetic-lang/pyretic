@@ -181,7 +181,7 @@ class Runtime(object):
 ################################################################################
 
 native_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
-                 "ethtype", "protocol", "payload"]
+                 "ethtype", "protocol", "raw", "payload", "header_len", "payload_len"]
 
 @util.cached
 def extended_values_from(packet):

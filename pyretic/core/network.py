@@ -220,7 +220,7 @@ class Packet(object):
         order = ['location','vlocation','source','dest']
         all_fields = self.header.keys()
         outer = []
-        size = max(map(len, self.header) or map(len, order) or [len('md5(payload)'),0]) + 3
+        size = max(map(len, self.header) or map(len, order) or [len('md5'),0]) + 3
         ### LOCATION, VLOCATION, SOURCE, and DEST - EACH ON ONE LINE
         for fields in order:
             inner = ["%s:%s" % (fields, " " * (size - len(fields)))]
@@ -238,8 +238,8 @@ class Packet(object):
             if not all_none:
                 outer.append('\t'.join(inner))
         ### MD5 OF PAYLOAD
-        field = 'payload'
-        outer.append("%s:%s%s" % ('md5(payload)',
+        field = 'raw'
+        outer.append("%s:%s%s" % ('md5',
                                     " " * (size - len(field)),
                                     hashlib.md5(self.header[field][0]).hexdigest()))
         all_fields.remove(field)
