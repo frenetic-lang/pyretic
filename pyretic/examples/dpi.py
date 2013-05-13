@@ -29,19 +29,57 @@
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
-from pyretic.modules.mac_learner import mac_learner
 
 
 def printer(pkt):
-  print pkt
+    print "------packet--------"
+    print pkt
+    if pkt['ethtype'] == 0x800:
+        print "Ethernet packet, try to decode"
+        raw_bytes = [ord(c) for c in pkt['raw']]
+        print "ethernet payload is %d" % pkt['payload_len']    
+        eth_payload_bytes = raw_bytes[pkt['header_len']:]   
+        print "ethernet payload is %d bytes" % len(eth_payload_bytes)
+        ip_version = (eth_payload_bytes[0] & 0b11110000) >> 4
+        ihl = (eth_payload_bytes[0] & 0b00001111)
+        ip_header_len = ihl * 4
+        ip_payload_bytes = eth_payload_bytes[ip_header_len:]
+        ip_proto = eth_payload_bytes[9]
+        print "ip_version = %d" % ip_version
+        print "ip_header_len = %d" % ip_header_len
+        print "ip_proto = %d" % ip_proto
+        print "ip payload is %d bytes" % len(ip_payload_bytes)
+        if ip_proto == 0x06:
+            print "TCP packet, try to decode"
+            tcp_data_offset = (ip_payload_bytes[12] & 0b11110000) >> 4
+            tcp_header_len = tcp_data_offset * 4
+            print "tcp_header_len = %d" % tcp_header_len
+            tcp_payload_bytes = ip_payload_bytes[tcp_header_len:]
+            print "tcp payload is %d bytes" % len(tcp_payload_bytes)
+            if len(tcp_payload_bytes) > 0:
+                print "payload:\t",
+                print ''.join([chr(d) for d in tcp_payload_bytes])
+        elif ip_proto == 0x11:
+            print "UDP packet, try to decode"
+            udp_header_len = 8
+            print "udp_header_len = %d" % udp_header_len
+            udp_payload_bytes = ip_payload_bytes[udp_header_len:]
+            print "udp payload is %d bytes" % len(udp_payload_bytes)
+            if len(udp_payload_bytes) > 0:
+                print "payload:\t",
+                print ''.join([chr(d) for d in udp_payload_bytes])
+        elif ip_proto == 0x01:
+            print "ICMP packet"
+        else:
+            print "Unhandled packet type"
 
 def dpi():
-  q = packets(None,[])
+  q = packets()
   q.register_callback(printer)
   return q
 
 ### Main ###
 
 def main():
-    return dpi()
+    return dpi() | flood()
 
