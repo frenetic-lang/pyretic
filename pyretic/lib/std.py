@@ -194,9 +194,12 @@ class breakpoint(SinglyDerivedPolicy):
         self.condition.set_network(network)
                     
     def eval(self, packet):
-        import ipdb
         if self.condition(packet):
-            ipdb.set_trace()
+            try:
+                import ipdb as debugger
+            except:
+                import pdb as debugger
+            debugger.set_trace()
         return SinglyDerivedPolicy.eval(self, packet)
 
     ### repr : unit -> String

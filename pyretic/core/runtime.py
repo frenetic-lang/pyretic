@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -34,7 +35,13 @@ from pyretic.core.network import *
 
 
 import threading
-import ipdb
+try:
+    import ipdb as debugger
+    USE_IPDB=True
+except:
+    import pdb as debugger
+    import traceback, sys
+    USE_IPDB=False
 
 
 class Runtime(object):
@@ -76,10 +83,18 @@ class Runtime(object):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
         if self.debug_packet_in:
-            ipdb.set_trace()
+            debugger.set_trace()
         
-        with ipdb.launch_ipdb_on_exception():
-            output = self.policy.eval(pyretic_pkt)
+        if USE_IPDB:
+             with debugger.launch_ipdb_on_exception():
+                 output = self.policy.eval(pyretic_pkt)
+        else:
+            try:
+                output = self.policy.eval(pyretic_pkt)
+            except :
+                type, value, tb = sys.exc_info()
+                traceback.print_exc()
+                debugger.post_mortem(tb)
             
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
