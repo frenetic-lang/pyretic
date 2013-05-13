@@ -288,28 +288,6 @@ class intersect(Predicate):
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
-
-class difference(Predicate):
-    """A predicate representing the difference of two predicates."""
-
-    ### init : Predicate -> List Predicate -> unit
-    def __init__(self, base_predicate, diff_predicates):
-        self.base_predicate = base_predicate
-        self.diff_union = union(self.diff_predicates)
-        
-    ### repr : unit -> String
-    def __repr__(self):
-        return "difference:\n%s" % util.repr_plus([self.base_predicate,
-                                                   self.diff_union])
-
-    def set_network(self, value):
-        self.base_predicate.set_network(value)
-        self.diff_union.set_network(value)
-        super(difference,self).set_network(value)
-
-    def eval(self, packet):
-        return self.base_predicate.eval(packet) and \
-            not self.diff_union.eval(packet)
     
 
 class SinglyDerivedPredicate(Predicate):
@@ -325,7 +303,6 @@ class SinglyDerivedPredicate(Predicate):
 
 
 class negate(SinglyDerivedPredicate):
-    """A predicate representing the difference of two predicates."""        
     ### repr : unit -> String
     def __repr__(self):
         return "negate:\n%s" % util.repr_plus([self.predicate])
@@ -336,6 +313,18 @@ class negate(SinglyDerivedPredicate):
         
 
 
+class difference(SinglyDerivedPredicate):
+    """A predicate representing the difference of two predicates."""
+    ### init : Predicate -> List Predicate -> unit
+    def __init__(self,pred1,pred2):
+        self.pred1 = pred1
+        self.pred2 = pred1
+        super(difference,self).__init__((~pred2) & pred1)
+        
+    ### repr : unit -> String
+    def __repr__(self):
+        return "difference:\n%s" % util.repr_plus([self.pred1,
+                                                   self.pred2])
 
         
 ################################################################################
