@@ -743,31 +743,6 @@ class MutablePolicy(SinglyDerivedPolicy):
     def __repr__(self):
         return "[MutablePolicy]\n%s" % repr(self.policy)
 
-    ### query : Predicate -> ((Packet -> unit) -> (Packet -> unit))
-    def query(self, pred=all_packets):
-        b = packets()
-        self.policy |= pred[b]
-        return b.register_callback
-
-    ### query_limit : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
-    def query_limit(self, pred=all_packets, limit=None, fields=[]):
-        if limit:
-            b = packets(limit,fields)
-            self.policy |= pred[b]
-            return b.register_callback
-        else:
-            return self.query(pred)
-
-    ### query_unique : Predicate -> List String -> ((Packet -> unit) -> (Packet -> unit))
-    def query_unique(self, pred=all_packets, fields=[]):
-        return self.query_limit(pred,1,fields)
-
-    ### query_count : Predicate -> int -> List String -> ((Packet -> unit) -> (Packet -> unit))
-    def query_count(self, pred=all_packets, interval=None, group_by=[]):
-        b = counts(interval,group_by)
-        self.policy |= pred[b]
-        return b.register_callback
-
         
 # dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
 def dynamic(fn):
@@ -815,9 +790,6 @@ class queries_base(Policy):
     def register_callback(self, fn):
         self.listeners.append(fn)
         return fn
-
-    def when(self, fn):
-        return self.register_callback(fn)
 
         
 class packets(queries_base):
