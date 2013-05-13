@@ -295,23 +295,21 @@ class difference(Predicate):
     ### init : Predicate -> List Predicate -> unit
     def __init__(self, base_predicate, diff_predicates):
         self.base_predicate = base_predicate
-        self.diff_predicates = list(diff_predicates)
+        self.diff_union = union(self.diff_predicates)
         
     ### repr : unit -> String
     def __repr__(self):
         return "difference:\n%s" % util.repr_plus([self.base_predicate,
-                                                   self.diff_predicates])
+                                                   self.diff_union])
 
     def set_network(self, value):
         self.base_predicate.set_network(value)
-        for pred in self.diff_predicates:
-            pred.set_network(value)
+        self.diff_union.set_network(value)
         super(difference,self).set_network(value)
 
     def eval(self, packet):
-        return self.base_predicate.eval(packet) and not \
-            any(pred.eval(packet)
-                for pred in self.diff_predicates)
+        return self.base_predicate.eval(packet) and \
+            not self.diff_union.eval(packet)
     
 
 class SinglyDerivedPredicate(Predicate):
@@ -341,21 +339,22 @@ class _in(SinglyDerivedPredicate):
     def __init__(self,field,group):
         self.group = group
         self.field = field
-        self.predicate = union([match({field : i}) 
-                                for i in self.group])
+        super(_in,self).__init__(union([match({field : i}) 
+                                for i in group]))
+
     def __repr__(self):
         return "_in: %s" % self.group
 
 class switch_in(_in):
     def __init__(self,switches):
-        return super(switch_in,self).__init__('switch',switches)
+        super(switch_in,self).__init__('switch',switches)
 
     def __repr__(self):
         return "switch%s" % super(switch_in,self).__repr__()
 
 class dstip_in(_in):
     def __init__(self,dstips):
-        return super(dstip_in,self).__init__('dstip',dstips)
+        super(dstip_in,self).__init__('dstip',dstips)
 
     def __repr__(self):
         return "dstip%s" % super(dstip_in,self).__repr__()
@@ -388,12 +387,13 @@ class Policy(NetworkEvaluated):
     def __eq__(self, other):
         raise NotImplementedError
 
-
-class str_print(Policy):
+class _print(Policy):
     def __init__(self,s='',on=True):
+        super(_print,self).__init__()
         self.s = s
         self.on = on
 
+class str_print(_print):
     ### repr : unit -> String
     def __repr__(self):
         if self.on:
@@ -408,11 +408,7 @@ class str_print(Policy):
         return Counter([packet])
 
 
-class pkt_print(Policy):
-    def __init__(self,s='',on=True):
-        self.s = s
-        self.on = on
-
+class pkt_print(_print):
     ### repr : unit -> String
     def __repr__(self):
         if self.on:
@@ -429,11 +425,7 @@ class pkt_print(Policy):
         return Counter([packet])
 
 
-class net_print(Policy):
-    def __init__(self,s='',on=True):
-        self.s = s
-        self.on = on
-
+class net_print(_print):
     ### repr : unit -> String
     def __repr__(self):
         if self.on:
@@ -682,7 +674,8 @@ class fwd(SinglyDerivedPolicy):
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
-        self.policy = if_(match(outport=-1),pop('outport')) >> push(outport=self.outport)
+        super(fwd,self).__init__(if_(match(outport=-1),pop('outport')) 
+                                 >> push(outport=self.outport))
 
     ### repr : unit -> String
     def __repr__(self):
@@ -816,7 +809,8 @@ class if_(SinglyDerivedPolicy):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
-        self.policy = self.pred[self.t_branch] | (~self.pred)[self.f_branch]
+        super(if_,self).__init__(self.pred[self.t_branch] | 
+                                 (~self.pred)[self.f_branch])
 
     ### repr : unit -> String
     def __repr__(self):
@@ -848,7 +842,7 @@ class breakpoint(SinglyDerivedPolicy):
 class NetworkDerivedPolicy(SinglyDerivedPolicy):
     """Generates new policy every time a new network is set"""
     def __init__(self, policy_from_network):
-        self.policy = drop
+        super(NetworkDerivedPolicy,self).__init__(drop)
         self.policy_from_network = policy_from_network
 
     def set_network(self, value):
@@ -857,9 +851,6 @@ class NetworkDerivedPolicy(SinglyDerivedPolicy):
         else:
             self.policy = drop
         super(NetworkDerivedPolicy,self).set_network(value)
-
-    def eval(self, packet):
-        return self.policy.eval(packet)
 
     ### repr : unit -> String
     def __repr__(self):
@@ -1038,7 +1029,7 @@ class counts(queries_base):
     ### eval : Packet -> unit
     def eval(self, packet):
         self.inc(packet)
-        return Counter([])
+        return Counter()
 
 
 
