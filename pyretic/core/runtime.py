@@ -33,7 +33,6 @@ import pyretic.core.util as util
 from pyretic.core.netcore import *
 from pyretic.core.network import *
 
-
 import threading
 try:
     import ipdb as debugger
@@ -43,13 +42,20 @@ except:
     import traceback, sys
     USE_IPDB=False
 
+def namify(item):
+    if isinstance(item,list):
+        return map(namify,item)
+    else:
+        return item.name()
 
 class Runtime(object):
-    def __init__(self, backend, main, show_traces, debug_packet_in, kwargs):
+
+    def __init__(self, backend, main, kwargs, mode='interpret', show_traces=False, debug_packet_in=False):
         self.network = ConcreteNetwork(self)
         self.policy = main(**kwargs)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
+        self.mode = mode
         self.backend = backend
         self.backend.runtime = self
         self.vlan_to_extended_values_db = {}
@@ -87,10 +93,16 @@ class Runtime(object):
         
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
-                 output = self.policy.eval(pyretic_pkt)
+                 if self.mode == 'interpret':
+                     output = self.policy.eval(pyretic_pkt)
+                 else:
+                     (output,traversed) = self.policy.track_eval(pyretic_pkt)
         else:
             try:
-                output = self.policy.eval(pyretic_pkt)
+                if self.mode == 'interpret':
+                    output = self.policy.eval(pyretic_pkt)
+                else:
+                    (output,traversed) = self.policy.track_eval(pyretic_pkt)
             except :
                 type, value, tb = sys.exc_info()
                 traceback.print_exc()
