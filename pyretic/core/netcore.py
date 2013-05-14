@@ -770,12 +770,11 @@ def dynamic(fn):
 # Query classes
 ############################
 
-        
-class queries_base(Policy):
+class FwdBucket(Policy):
     ### init : unit -> unit
     def __init__(self):
         self.listeners = []
-        super(queries_base,self).__init__()
+        super(FwdBucket,self).__init__()
 
     ### eval : Packet -> unit
     def eval(self, packet):
@@ -791,76 +790,110 @@ class queries_base(Policy):
         self.listeners.append(fn)
         return fn
 
+
+class packets(Policy):
+
+    class PredicateWrappedFwdBucket(Predicate):
+        def __init__(self,limit=None,fields=[]):
+            self.limit = limit
+            self.fields = fields
+            self.seen = {}
+            self.fwd_bucket = FwdBucket()
+            self.register_callback = self.fwd_bucket.register_callback
+            super(packets.PredicateWrappedFwdBucket,self).__init__()
+
+        def eval(self,packet):
+            if not self.limit is None:
+                if self.fields:    # MATCH ON PROVIDED FIELDS
+                    pred = match([(field,packet[field]) for field in self.fields])
+                else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
+                    pred = match([(field,packet[field]) 
+                                  for field in packet.available_fields()])
+                # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
+                try:
+                    self.seen[pred] += 1
+                except KeyError:
+                    self.seen[pred] = 1
+
+                if self.seen[pred] > self.limit:
+                    return False
+            self.fwd_bucket.eval(packet)
+            return True
         
-class packets(queries_base):
-    ### init : int -> List String
     def __init__(self,limit=None,fields=[]):
         self.limit = limit
         self.seen = {}
         self.fields = fields
-        queries_base.__init__(self)        
+        self.pwfb = self.PredicateWrappedFwdBucket(limit,fields)
+        self.register_callback = self.pwfb.register_callback
+        self.predicate = all_packets
+        super(packets,self).__init__()
 
-    ### eval : Packet -> unit
-    def eval(self, packet):
-        if not self.limit is None:
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(packets,self).set_network(network)
+        self.pwfb.set_network(network)
+        self.predicate.set_network(network)
 
-            if self.fields:    # MATCH ON PROVIDED FIELDS
-                pred = match([(field,packet[field]) for field in self.fields])
-                
-            else:              # OTHERWISE, MATCH ON ALL AVAILABLE FIELDS
-                pred = match([(field,packet[field]) 
-                              for field in packet.available_fields()])
-
-            # INCREMENT THE NUMBER OF TIMES MATCHING PACKET SEEN
-            try:
-                self.seen[pred] += 1
-            except KeyError:
-                self.seen[pred] = 1
-
-            if self.seen[pred] > self.limit:
-                return
-
-        return queries_base.eval(self, packet)
-
+    def eval(self,pkt):
+        """Don't look any more such packets"""
+        if self.predicate.eval(pkt) and not self.pwfb.eval(pkt):
+            val = {h : pkt[h] for h in self.fields}
+            self.predicate = ~match(val) & self.predicate
+            self.predicate.set_network(self.network)
+        return Counter()
         
-class counts(queries_base):
+
+class AggregateFwdBucket(FwdBucket):
     ### init : int -> List String
     def __init__(self, interval, group_by=[]):
         self.interval = interval
         self.group_by = group_by
         if group_by:
-            self.count = {}
+            self.aggregate = {}
         else:
-            self.count = 0
+            self.aggregate = 0
         import threading
         import pyretic.core.runtime
         self.query_thread = threading.Thread(target=self.report_count)
         self.query_thread.daemon = True
         self.query_thread.start()
-        queries_base.__init__(self)
+        FwdBucket.__init__(self)
 
     def report_count(self):
         while(True):
-            queries_base.eval(self, self.count)
+            FwdBucket.eval(self, self.aggregate)
             time.sleep(self.interval)
 
-    ### inc : Packet -> unit
-    def inc(self,pkt):
+    def aggregator(self,aggregate,pkt):
+        raise NotImplementedError
+
+    ### update : Packet -> unit
+    def update_aggregate(self,pkt):
         if self.group_by:
             from pyretic.core.netcore import match
             groups = set(self.group_by) & set(pkt.available_fields())
             pred = match([(field,pkt[field]) for field in groups])
             try:
-                self.count[pred] += 1
+                self.aggregate[pred] = self.aggregator(self.aggregate[pred],pkt)
             except KeyError:
-                self.count[pred] = 1
+                self.aggregate[pred] = self.aggregator(0,pkt)
         else:
-            self.count += 1
+            self.aggregate = self.aggregator(self.aggregate,pkt)
 
     ### eval : Packet -> unit
     def eval(self, packet):
-        self.inc(packet)
+        self.update_aggregate(packet)
         return Counter()
 
 
+class counts(AggregateFwdBucket):
+    def aggregator(self,aggregate,pkt):
+        return aggregate + 1
+
+
+class sizes(AggregateFwdBucket):
+    def aggregator(self,aggregate,pkt):
+        return aggregate + pkt['header_len'] + pkt['payload_len']
 
