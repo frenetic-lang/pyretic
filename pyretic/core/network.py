@@ -296,6 +296,11 @@ class Location(object):
 
 
 class Topology(nx.Graph):
+    def add_switch(self,switch):
+        self.add_node(switch, name=switch, ports={})  
+
+    def add_port(self,switch,port_no,config,status):
+        self.node[switch]["ports"][port_no] = Port(port_no,config,status)
 
     def add_link(self,loc1,loc2):
         self.add_edge(loc1.switch, loc2.switch, {loc1.switch: loc1.port_no, loc2.switch: loc2.port_no})

@@ -242,7 +242,7 @@ class ConcreteNetwork(Network):
     def handle_switch_join(self, switch):
         if DEBUG_TOPO_DISCOVERY:  print "handle_switch_joins"
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
-        self.topology.add_node(switch, ports={})  
+        self.topology.add_switch(switch)
         print "OpenFlow switch %s connected" % switch
         if DEBUG_TOPO_DISCOVERY:  print self.topology
         self.update_network()
@@ -275,7 +275,7 @@ class ConcreteNetwork(Network):
         
     def handle_port_join(self, switch, port_no, config, status):
         if DEBUG_TOPO_DISCOVERY:  print "handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
-        self.topology.node[switch]["ports"][port_no] = Port(port_no,config,status)
+        self.topology.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             if DEBUG_TOPO_DISCOVERY:  print self.topology
@@ -316,13 +316,13 @@ class ConcreteNetwork(Network):
             self.port_up(switch, port_no)
 
     def port_up(self, switch, port_no):
-        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s"
+        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s" % (switch,port_no)
         self.inject_discovery_packet(switch,port_no)
         if DEBUG_TOPO_DISCOVERY:  print self.topology
         self.update_network()
 
     def port_down(self, switch, port_no, double_check=False):
-        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s"
+        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s" % (switch,port_no,double_check)
         try:
             self.remove_associated_link(Location(switch,port_no))
             if DEBUG_TOPO_DISCOVERY:  print self.topology
