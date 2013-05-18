@@ -273,7 +273,10 @@ class Port(object):
         return hash(self.port_no)
 
     def __eq__(self,other):
-        return self.port_no == other.port_no
+        return (self.port_no == other.port_no and 
+                self.config == other.config and 
+                self.status == other.status and 
+                self.linked_to == other.linked_to)
 
     def __repr__(self):
         return "%d:config_up=%s:status_up=%s:linked_to=%s" % (self.port_no,self.config,self.status,self.linked_to)
@@ -296,6 +299,13 @@ class Location(object):
 
 
 class Topology(nx.Graph):
+    def __eq__(self,other):
+        def exact_node_match(n1,n2):
+            return n1 == n2
+        def exact_edge_match(e1,e2):
+            return e1 == e2
+        return nx.is_isomorphic(self,other,node_match=exact_node_match,edge_match=exact_edge_match)
+
     def add_switch(self,switch):
         self.add_node(switch, name=switch, ports={})  
 
@@ -520,10 +530,9 @@ class Network(object):
         raise NotImplementedError
 
     def __eq__(self,other):
-        try:
-            return self._topology == other._topology
-        except:
+        if other is None:
             return False
+        return self._topology == other._topology
 
     def copy(self):
         topology = self._topology.copy()
