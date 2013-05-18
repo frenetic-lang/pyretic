@@ -306,6 +306,15 @@ class union(Predicate):
     def eval(self, packet):
         return any(predicate.eval(packet) for predicate in self.predicates)
 
+    def track_eval(self, packet):
+        traversed = list()
+        for predicate in self.predicates:
+            (result,ptraversed) = predicate.track_eval(packet)
+            traversed.append(ptraversed)
+            if result:
+                return (True,[self,traversed])
+        return (False,[self,traversed])
+
         
 class intersect(Predicate):
     """A predicate representing the intersection of a list of predicates."""
