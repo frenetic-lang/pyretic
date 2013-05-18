@@ -116,6 +116,8 @@ register_field("dstip", PrefixMatch)
 class NetworkEvaluated(object):
     def __init__(self):
         self._network = None
+        self.parent = None
+        self.callback_on_change = set()
 
     @property
     def network(self):
@@ -126,11 +128,23 @@ class NetworkEvaluated(object):
             return 
         self._network = network
 
+    def set_parent(self,parent):
+        self.parent = parent
+
     def eval(self, packet):
         raise NotImplementedError        
 
     def track_eval(self, packet):
         return (self.eval(packet),[self])
+
+    def on_change_do(self,fn):
+        self.callback_on_change.add(fn)
+
+    def changed(self, pathlist=[]):
+        if self.parent:
+            self.parent.changed([self] + pathlist)
+        for callback in self.callback_on_change:
+            callback([self] + pathlist)
 
     def name(self):
         return self.__class__.__name__
@@ -208,6 +222,7 @@ class ingress_network(Predicate):
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
+            self.changed()
     
     ### eval : Packet -> bool
     def eval(self, packet):
@@ -232,6 +247,7 @@ class egress_network(Predicate):
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
+            self.changed()
  
     ### eval : Packet -> bool
     def eval(self, packet):
@@ -290,6 +306,8 @@ class union(Predicate):
     ### init : List Predicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
+        for predicate in self.predicates:
+            predicate.set_parent(self)
         super(union,self).__init__()        
 
     ### repr : unit -> String
@@ -321,6 +339,8 @@ class intersect(Predicate):
 
     def __init__(self, predicates):
         self.predicates = list(predicates)
+        for predicate in self.predicates:
+            predicate.set_parent(self)
         super(intersect,self).__init__()
         
     ### repr : unit -> String
@@ -346,9 +366,11 @@ class intersect(Predicate):
                 return (False,[self,traversed])
         return (True,[self,traversed])
     
+
 class SinglyDerivedPredicate(Predicate):
     def __init__(self, predicate):
         self.predicate = predicate
+        self.predicate.set_parent(self)
         super(SinglyDerivedPredicate,self).__init__()
 
     def set_network(self, network):
@@ -385,6 +407,8 @@ class difference(SinglyDerivedPredicate):
     def __init__(self,pred1,pred2):
         self.pred1 = pred1
         self.pred2 = pred1
+        self.pred1.set_parent(self)
+        self.pred2.set_parent(self)
         super(difference,self).__init__((~pred2) & pred1)
         
     ### repr : unit -> String
@@ -457,19 +481,25 @@ class flood(Policy):
             return "flood"
 
     def set_network(self, network):
+        changed = False
         if network == self._network:
             return
         if not network is None:
             updated_egresses = network.topology.egress_locations()
             if not self.egresses == updated_egresses:
                 self.egresses = updated_egresses
+                changed = True
             updated_mst = Topology.minimum_spanning_tree(network.topology)
             if not self.mst is None:
                 if self.mst != updated_mst:
                     self.mst = updated_mst
+                    changed = True
             else:
                 self.mst = updated_mst
+                changed = True
         super(flood,self).set_network(network) 
+        if changed:
+            self.changed()
         
     def eval(self, packet):
         if self.network is None:
@@ -615,6 +645,8 @@ class MultiplyDerivedPolicy(Policy):
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
+        for policy in self.policies:
+            policy.set_parent(self)
         super(MultiplyDerivedPolicy,self).__init__()
 
     def set_network(self, network):
@@ -684,6 +716,7 @@ class sequential(MultiplyDerivedPolicy):
 class SinglyDerivedPolicy(Policy):
     def __init__(self, policy):
         self.policy = policy
+        self.policy.set_parent(self)
         super(SinglyDerivedPolicy,self).__init__()
 
     def set_network(self, network):
@@ -727,6 +760,7 @@ class remove(SinglyDerivedPolicy):
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
         self.predicate = predicate
+        self.predicate.set_parent(self)
         super(remove,self).__init__(policy)
 
     def set_network(self, network):
@@ -759,6 +793,7 @@ class restrict(SinglyDerivedPolicy):
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
         self.predicate = predicate
+        self.predicate.set_parent(self)
         super(restrict,self).__init__(policy) 
 
     def set_network(self, network):
@@ -793,6 +828,9 @@ class if_(SinglyDerivedPolicy):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
+        self.pred.set_parent(self)
+        self.t_branch.set_parent(self)
+        self.f_branch.set_parent(self)
         super(if_,self).__init__(self.pred[self.t_branch] | 
                                  (~self.pred)[self.f_branch])
 
@@ -817,6 +855,8 @@ class NetworkDerivedPolicy(SinglyDerivedPolicy):
             self.policy = self.policy_from_network(network)
         else:
             self.policy = drop
+        self.policy.set_parent(self)
+        self.changed()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -837,6 +877,7 @@ class MutablePolicy(SinglyDerivedPolicy):
     ### init : unit -> unit
     def __init__(self):
         self._policy = drop
+        self._policy.set_parent(self)
         super(SinglyDerivedPolicy,self).__init__()
         
     @property
@@ -844,9 +885,11 @@ class MutablePolicy(SinglyDerivedPolicy):
         return self._policy
         
     @policy.setter
-    def policy(self, value):
-        self._policy = value
+    def policy(self, policy):
+        self._policy = policy
+        self._policy.set_parent(self)
         self._policy.set_network(self.network)
+        self.changed()
 
     ### repr : unit -> String
     def __repr__(self):
@@ -936,6 +979,7 @@ class packets(Policy):
         self.pwfb = self.PredicateWrappedFwdBucket(limit,fields)
         self.register_callback = self.pwfb.register_callback
         self.predicate = all_packets
+        self.predicate.set_parent(self)
         super(packets,self).__init__()
 
     def set_network(self, network):
@@ -951,6 +995,8 @@ class packets(Policy):
             val = {h : pkt[h] for h in self.fields}
             self.predicate = ~match(val) & self.predicate
             self.predicate.set_network(self.network)
+            self.predicate.set_parent(self)
+            self.changed()
         return Counter()
 
     def track_eval(self,pkt):
@@ -963,6 +1009,8 @@ class packets(Policy):
                 val = {h : pkt[h] for h in self.fields}
                 self.predicate = ~match(val) & self.predicate
                 self.predicate.set_network(self.network)
+                self.predicate.set_parent(self)
+                self.changed()
         return (Counter(),[self,traversed])
         
 

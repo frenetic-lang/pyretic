@@ -53,6 +53,8 @@ class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpret', show_traces=False, debug_packet_in=False):
         self.network = ConcreteNetwork(self)
         self.policy = main(**kwargs)
+        if mode == 'microflow':
+            self.policy.on_change_do(self.handle_policy_change)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.mode = mode
@@ -83,6 +85,9 @@ class Runtime(object):
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
         self.network.handle_link_update(s1, p_no1, s2, p_no2)
+
+    def handle_policy_change(self, changed):
+        pass
 
     def handle_packet_in(self, concrete_pkt):
 
