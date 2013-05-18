@@ -193,22 +193,46 @@ class no_packets(Predicate):
 
         
 class ingress_network(Predicate):
+    def __init__(self):
+        self.egresses = None
+        super(ingress_network,self).__init__()
+
     ### repr : unit -> String
     def __repr__(self):
         return "ingress_network"
+
+    def set_network(self, network):
+        if network == self._network:
+            return 
+        self._network = network
+        updated_egresses = network.topology.egress_locations()
+        if not self.egresses == updated_egresses:
+            self.egresses = updated_egresses
     
     ### eval : Packet -> bool
     def eval(self, packet):
         switch = packet["switch"]
         port_no = packet["inport"]
-        return Location(switch,port_no) in self.network.topology.egress_locations()
+        return Location(switch,port_no) in self.egresses
 
         
 class egress_network(Predicate):
+    def __init__(self):
+        self.egresses = None
+        super(egress_network,self).__init__()
+
     ### repr : unit -> String
     def __repr__(self):
         return "egress_network"
     
+    def set_network(self, network):
+        if network == self._network:
+            return 
+        self._network = network
+        updated_egresses = network.topology.egress_locations()
+        if not self.egresses == updated_egresses:
+            self.egresses = updated_egresses
+ 
     ### eval : Packet -> bool
     def eval(self, packet):
         switch = packet["switch"]
@@ -216,7 +240,7 @@ class egress_network(Predicate):
             port_no = packet["outport"]
         except:
             return False
-        return Location(switch,port_no) in self.network.topology.egress_locations()
+        return Location(switch,port_no) in self.egresses
 
         
 class match(Predicate):
@@ -411,6 +435,11 @@ class drop(Policy):
 
         
 class flood(Policy):
+    def __init__(self):
+        self.egresses = None
+        self.mst = None
+        super(flood,self).__init__()
+
     ### repr : unit -> String
     def __repr__(self):
         try: 
@@ -422,8 +451,15 @@ class flood(Policy):
         if network == self._network:
             return
         if not network is None:
-            self.mst = Topology.minimum_spanning_tree(network.topology)
-            self._network = network
+            updated_egresses = network.topology.egress_locations()
+            if not self.egresses == updated_egresses:
+                self.egresses = updated_egresses
+            updated_mst = Topology.minimum_spanning_tree(network.topology)
+            if not self.mst is None:
+                if self.mst != updated_mst:
+                    self.mst = updated_mst
+            else:
+                self.mst = updated_mst
         super(flood,self).set_network(network) 
         
     def eval(self, packet):
@@ -434,7 +470,7 @@ class flood(Policy):
         inport = packet["inport"]
         if switch in self.mst:
             port_nos = {loc.port_no 
-                        for loc in self.network.topology.egress_locations(switch)}
+                        for loc in self.egresses if loc.switch == switch}
             for sw in self.mst.neighbors(switch):
                 port_no = self.mst[switch][sw][switch]
                 port_nos.add(port_no)
