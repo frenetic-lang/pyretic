@@ -58,10 +58,18 @@ def learn(self):
                           self.forward) 
         self.update_policy()
 
-    self.query = packets(1,['srcmac','switch'])
-    self.query.register_callback(learn_new_MAC)
-    self.forward = flood()
-    self.update_policy()
+    def set_initial_state():
+        self.query = packets(1,['srcmac','switch'])
+        self.query.register_callback(learn_new_MAC)
+        self.forward = flood()
+        self.update_policy()
+
+    def set_network(network):
+        set_initial_state()
+        super(MutablePolicy,self).set_network(network)
+       
+    self.set_network = set_network
+    set_initial_state()
 
 
 def mac_learner():
