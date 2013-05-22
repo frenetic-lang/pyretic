@@ -48,16 +48,24 @@ def namify(item):
     else:
         return item.name()
 
-class Runtime(object):
+def in_namified(name,item):
+    if isinstance(item,list):
+        return any(map(lambda x: in_namified(name,x),item))
+    else:
+        return name == item
 
-    def __init__(self, backend, main, kwargs, mode='interpret', show_traces=False, debug_packet_in=False):
+
+class Runtime(object):
+    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
+                 show_traces=False, debug_packet_in=False):
         self.network = ConcreteNetwork(self)
         self.policy = main(**kwargs)
-        if mode == 'microflow':
+        if mode == 'reactive0':
             self.policy.on_change_do(self.handle_policy_change)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.mode = mode
+        self.verbosity = verbosity
         self.backend = backend
         self.backend.runtime = self
         self.vlan_to_extended_values_db = {}
@@ -89,7 +97,7 @@ class Runtime(object):
     def handle_policy_change(self, changed):
         self.clear_all()  ## PLAY IT VERY CONSERVATIVE
 
-    def microflow_match(self, pkt):
+    def match_on_all_fields_pred(self, pkt):
         try:
             return match(
                 switch=pkt['switch'],
@@ -172,12 +180,19 @@ class Runtime(object):
                                     return no_packets
 
 
-    def make_microflow_rule(self, pkt_in, pkts_out):
+    def match_on_all_fields_rule(self, pkt_in, pkts_out):
         concrete_pkt_in = self.pyretic2concrete(pkt_in)
-        pred = self.microflow_match(concrete_pkt_in)
+        pred = self.match_on_all_fields_pred(concrete_pkt_in)
         action_list = []
+        
+        ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
+        if len(pkts_out) == 0:
+            return (pred,action_list)
+
         for pkt_out in pkts_out.elements():
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
+            if concrete_pkt_out['outport'] == concrete_pkt_in['inport']:
+                continue  ### CURRENTLY HAVING PROBLEM SENDING PACKETS OUT THE PORT THEY ARRIVED
             actions = {}
             header_fields = set(concrete_pkt_out.keys()) | set(concrete_pkt_in.keys())
             for field in header_fields:
@@ -194,7 +209,12 @@ class Runtime(object):
                 if not out_val == in_val: 
                     actions[field] = out_val
             action_list.append(actions)
-        return (pred,action_list)
+
+        ### IF WE'VE REACHED HERE
+        if action_list:  # EITHER WE HAVE A NON-DROP RULE TO INSTALL
+            return (pred,action_list)
+        else:            # OR WE CAN'T INSTALL A RULE
+            return None
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
@@ -202,13 +222,13 @@ class Runtime(object):
             debugger.set_trace()
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
-                 if self.mode == 'interpret':
+                 if self.mode == 'interpreted':
                      output = self.policy.eval(pyretic_pkt)
                  else:
                      (output,traversed) = self.policy.track_eval(pyretic_pkt)
         else:
             try:
-                if self.mode == 'interpret':
+                if self.mode == 'interpreted':
                     output = self.policy.eval(pyretic_pkt)
                 else:
                     (output,traversed) = self.policy.track_eval(pyretic_pkt)
@@ -216,7 +236,26 @@ class Runtime(object):
                 type, value, tb = sys.exc_info()
                 traceback.print_exc()
                 debugger.post_mortem(tb)
-            
+        if self.mode == 'reactive0':
+            rule = None
+            names_traversed = namify(traversed)
+            ### DON'T INSTALL RULES THAT CONTAIN QUERIES
+            if in_namified('PredicateWrappedFwdBucket', names_traversed):
+                pass
+            elif in_namified('counts', names_traversed):
+                pass
+            elif in_namified('sizes', names_traversed):
+                pass
+            else:
+                rule = self.match_on_all_fields_rule(pyretic_pkt,output)
+                if rule:
+                    self.install_rule(rule)
+                    if self.verbosity == 'high':
+                        from datetime import datetime
+                        print str(datetime.now()),
+                        print " | install rule"
+                        print rule[0]
+                        print rule[1]
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
             print util.repr_plus([pyretic_pkt], sep="\n\n")
@@ -224,10 +263,9 @@ class Runtime(object):
             print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
             print util.repr_plus(output.elements(), sep="\n\n")
             print
-        
         for pkt in output.elements():
             self.send_packet(pkt)
-        
+  
     def pyretic2concrete(self,packet):
         concrete_packet = ConcretePacket()
         for header in ['switch','inport','outport']:
@@ -267,15 +305,23 @@ class Runtime(object):
         d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
         return pyretic_packet.pushmany(d)
 
-
     def send_packet(self,pyretic_packet):
         concrete_packet = self.pyretic2concrete(pyretic_packet)
         self.backend.send_packet(concrete_packet)
 
+    def install_rule(self,(pred,action_list)):
+        concrete_pred = { k:v.pattern for (k,v) in pred.map.items() }
+        self.backend.send_install(concrete_pred,action_list)
+
+    def clear_all(self):
+        self.backend.send_clear_all()
+        if self.verbosity == 'high':
+            from datetime import datetime
+            print str(datetime.now()),
+            print " | clear_all"
 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
-
 
     def encode_extended_values(self, extended_values):
         with self.extended_values_lock:
@@ -288,7 +334,6 @@ class Runtime(object):
             self.extended_values_to_vlan_db[extended_values] = (vid, pcp)
             self.vlan_to_extended_values_db[(vid, pcp)] = extended_values
             return (vid, pcp)
-
         
     def decode_extended_values(self, vid, pcp):
         with self.extended_values_lock:

@@ -94,6 +94,12 @@ class BackendChannel(asynchat.async_chat):
         elif msg[0] == 'packet':
             packet = self.dict2OF(msg[1])
             self.of_client.send_to_switch(packet)
+        elif msg[0] == 'install':
+            pred = self.dict2OF(msg[1])
+            actions = map(self.dict2OF,msg[2])
+            self.of_client.install_flow(pred,actions)
+        elif msg[0] == 'clear_all':
+            self.of_client.clear_all()
         else:
             print "ERROR: Unknown msg from frontend %s" % msg
 
@@ -365,11 +371,91 @@ class POXClient(revent.EventMixin):
             # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
 
+    def install_flow(self,pred,action_list):
+        switch = pred['switch']
+
+        ### BUILD OF MATCH
+        inport = pred['inport']
+        match = of.ofp_match()
+        match.in_port = pred['inport']
+        match.dl_src = pred['srcmac']
+        match.dl_dst = pred['dstmac']
+        match.dl_type = pred['ethtype']
+        if 'vlan_id' in pred:
+            match.dl_vlan = pred['vlan_id']
+        else:
+            match.dl_vlan = 0xffff
+        if 'vlan_pcp' in pred:
+            match.dl_vlan_pcp = pred['vlan_pcp']
+        else:
+            match.dl_vlan_pcp = 0
+        match.nw_proto = pred['protocol']
+        if 'srcip' in pred:
+            match.nw_src = pred['srcip']
+        if 'dstip' in pred:
+            match.nw_dst = pred['dstip']
+        if 'tos' in pred:
+            match.nw_tos = pred['tos']
+        if 'srcport' in pred:
+            match.tp_src = pred['srcport']
+        if 'dstport' in pred:
+            match.tp_dst = pred['dstport']
+
+        ### BUILD OF ACTIONS
+        of_actions = []
+        for actions in action_list:
+            outport = actions['outport']
+            del actions['outport']
+            if 'srcmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
+            if 'dstmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_dst(actions['dstmac']))
+            if 'srcip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
+            if 'dstip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
+            if 'vlan_id' in actions:
+                if actions['vlan_id'] is None:
+                    of_actions.append(of.ofp_action_strip_vlan())
+                else:
+                    of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
+            if 'vlan_pcp' in actions:
+                if actions['vlan_pcp'] is None:
+                    if not actions['vlan_id'] is None:
+                        raise RuntimeError("vlan_id and vlan_pcp must be set together!")
+                    pass
+                else:
+                    of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
+            of_actions.append(of.ofp_action_output(port = outport))
+
+        msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
+                              idle_timeout=of.OFP_FLOW_PERMANENT,
+                              hard_timeout=of.OFP_FLOW_PERMANENT,
+                              match=match,
+                              actions=of_actions)
+        try:
+            self.switches[switch]['connection'].send(msg)
+        except RuntimeError, e:
+            print "ERROR:install_flow: %s to switch %d" % (str(e),switch)
+        except KeyError, e:
+            print "ERROR:install_flow: No connection to switch %d available" % switch
+
 
     def send_all_flows_to_controller(self,switch):
         msg = of.ofp_flow_mod(match = of.ofp_match())
         msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
         self.switches[switch]['connection'].send(msg) 
+
+
+    def clear_switch(self,switch):
+        d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
+        self.switches[switch]['connection'].send(d) 
+    
+
+    def clear_all(self):
+        for switch in self.switches.keys():
+            self.clear_switch(switch)
+            self.send_all_flows_to_controller(switch)
 
 
     def _handle_ConnectionUp(self, event):

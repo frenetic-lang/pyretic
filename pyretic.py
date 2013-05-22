@@ -63,13 +63,13 @@ def parseArgs():
     op.add_option( '--frontend-only', '-f', action="store_true", 
                      dest="frontend_only", help = 'only start the frontend'  )
     op.add_option( '--mode', '-m', type='choice',
-                     choices=['interpreter','microflow'], 
+                     choices=['interpreted','reactive0'], 
                      help = '|'.join( ['quiet','verbose'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
-                     choices=['quiet','verbose'], default = 'quiet',
-                     help = '|'.join( ['quiet','verbose'] )  )
+                     choices=['low','normal','high'], default = 'low',
+                     help = '|'.join( ['quiet','high'] )  )
 
-    op.set_defaults(frontend_only=False,mode='interpreter')
+    op.set_defaults(frontend_only=False,mode='reactive0')
     options, args = op.parse_args()
     return (options, args, kwargs_to_pass)
 
@@ -84,7 +84,7 @@ def main():
 
     sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
     
-    runtime = Runtime(Backend(),main,kwargs,options.mode,False,False)
+    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity,False,False)
     if not options.frontend_only:
         of_client = subprocess.Popen([sys.executable, 
                                       '/home/mininet/pox/pox.py', 
