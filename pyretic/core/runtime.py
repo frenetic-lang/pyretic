@@ -282,7 +282,7 @@ class Runtime(object):
             vlan = self.extended_values_to_vlan_db.get(extended_values)
             if vlan is not None:
                 return vlan
-            r = len(self.extended_values_to_vlan_db)
+            r = 1+len(self.extended_values_to_vlan_db) #VLAN ZERO IS RESERVED
             pcp = r & 0b111000000000000
             vid = r & 0b000111111111111
             self.extended_values_to_vlan_db[extended_values] = (vid, pcp)
