@@ -365,6 +365,13 @@ class POXClient(revent.EventMixin):
             # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
 
+
+    def send_all_flows_to_controller(self,switch):
+        msg = of.ofp_flow_mod(match = of.ofp_match())
+        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+        self.switches[switch]['connection'].send(msg) 
+
+
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switches
         
@@ -372,9 +379,7 @@ class POXClient(revent.EventMixin):
         self.switches[event.dpid]['connection'] = event.connection
         self.switches[event.dpid]['ports'] = {}
 
-        msg = of.ofp_flow_mod(match = of.ofp_match())
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        self.switches[event.dpid]['connection'].send(msg)
+        self.send_all_flows_to_controller(event.dpid)
 
         self.send_to_pyretic(['switch','join',event.dpid,'BEGIN'])
 
