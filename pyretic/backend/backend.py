@@ -101,7 +101,7 @@ class BackendChannel(asynchat.async_chat):
         elif msg[0] == 'link':
             self.backend.runtime.handle_link_update(msg[1],msg[2],msg[3],msg[4])
         elif msg[0] == 'packet':
-            packet = ConcretePacket(bytelist2ascii(msg[1]))
+            packet = ConcretePacket(msg[1])
             self.backend.runtime.handle_packet_in(packet)
         else:
             print 'ERROR: Unknown msg from backend %s' % msg
@@ -127,8 +127,8 @@ class Backend(object):
         self.al.start()
         
     def send_packet(self,packet):
-        packet_dict = ascii2bytelist(packet.to_ascii())
-        self.send_to_OF_client(['packet',packet_dict])
+        self.send_to_OF_client(['packet',packet])
+
         
     def inject_discovery_packet(self,dpid, port):
         self.send_to_OF_client(['inject_discovery_packet',dpid,port])

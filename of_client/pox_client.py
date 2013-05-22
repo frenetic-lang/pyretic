@@ -69,6 +69,18 @@ class BackendChannel(asynchat.async_chat):
         with self.of_client.channel_lock:
             self.received_data.append(data)
 
+    def dict2OF(self,d):
+        def convert(h,val):
+            if h in ['srcmac','dstmac']:
+                return packetaddr.EthAddr(val)
+            elif h in ['srcip','dstip']:
+                return packetaddr.IPAddr(val)
+            elif h in ['vlan_id','vlan_pcp'] and val == 'None':
+                return None
+            else:
+                return val
+        return { h : convert(h,val) for (h, val) in d.items()}
+
     def found_terminator(self):
         """The end of a command or message has been seen."""
         with self.of_client.channel_lock:
@@ -76,9 +88,12 @@ class BackendChannel(asynchat.async_chat):
 
         # USE DESERIALIZED MSG
         if msg[0] == 'inject_discovery_packet':
-            self.of_client.inject_discovery_packet(msg[1], msg[2])
+            switch = msg[1]
+            port = msg[2]
+            self.of_client.inject_discovery_packet(switch,port)
         elif msg[0] == 'packet':
-            self.of_client.send_packet_to_network(msg[1])
+            packet = self.dict2OF(msg[1])
+            self.of_client.send_to_switch(packet)
         else:
             print "ERROR: Unknown msg from frontend %s" % msg
 
@@ -138,28 +153,27 @@ class POXClient(revent.EventMixin):
                 h["dstip"] = p.protodst.toRaw()
 
         h["raw"] = raw 
-        return ascii2bytelist(h)
+        return h
 
 
     def make_arp(self, packet):
         p = packetlib.ethernet()
-        p.src = packetaddr.EthAddr(packet["srcmac"])
-        p.dst = packetaddr.EthAddr(packet["dstmac"])
+        p.src = packet["srcmac"]
+        p.dst = packet["dstmac"]
         
         p.type = packetlib.ethernet.ARP_TYPE
         p.next = packetlib.arp(prev=p)
         
-        p.next.hwsrc = packetaddr.EthAddr(packet["srcmac"])
-        p.next.hwdst = packetaddr.EthAddr(packet["dstmac"])
-        p.next.protosrc = packetaddr.IPAddr(packet["srcip"])
-        p.next.protodst = packetaddr.IPAddr(packet["dstip"])
+        p.next.hwsrc = packet["srcmac"]
+        p.next.hwdst = packet["dstmac"]
+        p.next.protosrc = packet["srcip"]
+        p.next.protodst = packet["dstip"]
         p.next.opcode = packet['protocol']
 
         return p
 
 
     def packet_to_network(self, packet):
-        packet = bytelist2ascii(packet)
         if len(packet["raw"]) == 0:
             if packet["ethtype"] == packetlib.ethernet.ARP_TYPE:
                 p_begin = p = self.make_arp(packet)
@@ -169,8 +183,8 @@ class POXClient(revent.EventMixin):
             p_begin = p = packetlib.ethernet(packet["raw"])
 
         # ETHERNET PACKET IS OUTERMOST
-        p.src = packetaddr.EthAddr(packet["srcmac"])
-        p.dst = packetaddr.EthAddr(packet["dstmac"])
+        p.src = packet["srcmac"]
+        p.dst = packet["dstmac"]
 
         if 'vlan_id' in packet:
             if isinstance(p.next, packetlib.vlan):
@@ -192,8 +206,8 @@ class POXClient(revent.EventMixin):
         # GET PACKET INSIDE ETHERNET/VLAN
         p = p.next
         if isinstance(p, packetlib.ipv4):
-            p.srcip = packetaddr.IPAddr(packet["srcip"])
-            p.dstip = packetaddr.IPAddr(packet["dstip"])
+            p.srcip = packet["srcip"]
+            p.dstip = packet["dstip"]
             p.protocol = packet["protocol"]
             p.tos = packet["tos"]
 
@@ -208,8 +222,8 @@ class POXClient(revent.EventMixin):
         elif isinstance(p, packetlib.arp):
             if 'vlan_id' in packet:
                 p.opcode = packet["protocol"]
-                p.protosrc = packetaddr.IPAddr(packet["srcip"])
-                p.protodst = packetaddr.IPAddr(packet["dstip"])
+                p.protosrc = packet["srcip"]
+                p.protodst = packet["dstip"]
             else:
                 p_begin = self.make_arp(packet)
         
@@ -300,13 +314,14 @@ class POXClient(revent.EventMixin):
         return po.pack()
 
 
-    def inject_discovery_packet(self,dpid, port):
+    def inject_discovery_packet(self,switch, port):
         try:
-            hw_addr = self.switches[dpid]['ports'][port]
-            packet = self.create_discovery_packet(dpid, port, hw_addr)
-            core.openflow.sendToDPID(dpid, packet)
+            hw_addr = self.switches[switch]['ports'][port]
+            packet = self.create_discovery_packet(switch, port, hw_addr)
+            core.openflow.sendToDPID(switch, packet)
         except KeyError:
             pass
+
 
     def send_to_pyretic(self,msg):
         serialized_msg = serialize(msg)
@@ -316,6 +331,38 @@ class POXClient(revent.EventMixin):
         except IndexError as e:
             print "ERROR PUSHING MESSAGE %s" % msg
             pass
+
+
+    def send_to_switch(self,packet):
+        switch = packet["switch"]
+        outport = packet["outport"]
+        try:
+            inport = packet["inport"]
+            if inport == -1 or inport == outport:
+                inport = inport_value_hack(outport)
+        except KeyError:
+            inport = inport_value_hack(outport)
+        
+        msg = of.ofp_packet_out()
+        msg.in_port = inport
+        msg.data = self.packet_to_network(packet)
+        msg.actions.append(of.ofp_action_output(port = outport))
+ 
+        if self.show_traces:
+            print "========= POX/OF SEND ================"
+            print msg
+            print packetlib.ethernet(msg._get_data())
+            print
+
+        ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
+        try:
+            self.switches[switch]['connection'].send(msg)
+        except Runtimerror, e:
+            print "ERROR:send_to_switch: %s to switch %d" % (str(e),switch)
+            # TODO - ATTEMPT TO RECONNECT SOCKET
+        except KeyError, e:
+            print "ERROR:send_to_switch: No connection to switch %d available" % switch
+            # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
 
     def _handle_ConnectionUp(self, event):
@@ -491,38 +538,6 @@ class POXClient(revent.EventMixin):
         received = self.packet_from_network(event.dpid, event.ofp.in_port, event.data)
         self.send_to_pyretic(['packet',received])
         
-
-    def send_packet_to_network(self,packet):
-        switch = packet["switch"]
-        outport = packet["outport"]
-        try:
-            inport = packet["inport"]
-            if inport == -1 or inport == outport:
-                inport = inport_value_hack(outport)
-        except KeyError:
-            inport = inport_value_hack(outport)
-        
-        msg = of.ofp_packet_out()
-        msg.in_port = inport
-        msg.data = self.packet_to_network(packet)
-        msg.actions.append(of.ofp_action_output(port = outport))
- 
-        if self.show_traces:
-            print "========= POX/OF SEND ================"
-            print msg
-            print packetlib.ethernet(msg._get_data())
-            print
-
-        ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
-        try:
-            self.switches[switch]['connection'].send(msg)
-        except Runtimerror, e:
-            print "ERROR:send_packet_to_network: %s to switch %d" % (str(e),switch)
-            # TODO - ATTEMPT TO RECONNECT SOCKET
-        except KeyError, e:
-            print "ERROR:send_packet_to_network: No connection to switch %d available" % switch
-            # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
- 
        
 def launch():
 

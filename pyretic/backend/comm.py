@@ -37,7 +37,8 @@ BACKEND_PORT=41414
 TERM_CHAR='\n'
 
 def serialize(msg):
-    jsoned_msg = json.dumps(msg)
+    jsonable_msg = to_jsonable_format(msg)
+    jsoned_msg = json.dumps(jsonable_msg)
     serialized_msg = jsoned_msg + TERM_CHAR
     return serialized_msg
 
@@ -46,8 +47,9 @@ def deserialize(serialized_msgs):
         if isinstance(item, unicode):
             return item.encode('ascii')
         elif isinstance(item, dict):
-            return { json2python(k) : json2python(v) 
-                     for (k,v) in item.items() }
+            return bytelist2ascii({ 
+                    json2python(k) : json2python(v) 
+                    for (k,v) in item.items() })
         elif isinstance(item, list):
             return [ json2python(l)
                      for l in item ]
@@ -67,6 +69,16 @@ def deserialize(serialized_msgs):
     return msg
 
 
+def dict_to_ascii(d):
+    def convert(h,v):
+        if (isinstance(v,str) or
+            isinstance(v,int)):
+            return v
+        else:
+            return repr(v)
+    return { h : convert(h,v) for (h,v) in d.items() }
+
+
 def bytelist2ascii(packet_dict):
     def convert(h,val):
         if h in ['srcmac','dstmac','srcip','dstip','raw']:
@@ -83,3 +95,14 @@ def ascii2bytelist(packet_dict):
         else:
             return val
     return { h : convert(h,val) for (h, val) in packet_dict.items()}
+
+
+def to_jsonable_format(item):
+    if isinstance(item, dict):
+        ascii_item = dict_to_ascii(item)
+        bytelist_item = ascii2bytelist(ascii_item)
+        return bytelist_item
+    elif isinstance(item, list):
+        return map(to_jsonable_format,item)
+    else:
+        return item

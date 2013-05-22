@@ -216,14 +216,7 @@ def extended_values_from(packet):
 ################################################################################
 
 class ConcretePacket(dict):
-    def to_ascii(self):
-        def convert(h,v):
-            if h in ['srcip','dstip','srcmac','dstmac']:
-                return repr(v)
-            else:
-                return v
-        return { h : convert(h,v) for (h,v) in self.items() }
-
+    pass
 
 DEBUG_TOPO_DISCOVERY = False
 class ConcreteNetwork(Network):
