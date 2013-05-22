@@ -87,15 +87,119 @@ class Runtime(object):
         self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
     def handle_policy_change(self, changed):
-        pass
+        self.clear_all()  ## PLAY IT VERY CONSERVATIVE
+
+    def microflow_match(self, pkt):
+        try:
+            return match(
+                switch=pkt['switch'],
+                inport=pkt['inport'],
+                srcmac=pkt['srcmac'],
+                dstmac=pkt['dstmac'],
+                ethtype=pkt['ethtype'],
+                srcip=pkt['srcip'],
+                dstip=pkt['dstip'],
+                protocol=pkt['protocol'],
+                tos=pkt['tos'],
+                srcport=pkt['srcport'],
+                dstport=pkt['dstport'],
+                vlan_id=pkt['vlan_id'],
+                vlan_pcp=pkt['vlan_pcp'])
+        except:
+            try:
+                return match(
+                    switch=pkt['switch'],
+                    inport=pkt['inport'],
+                    srcmac=pkt['srcmac'],
+                    dstmac=pkt['dstmac'],
+                    ethtype=pkt['ethtype'],
+                    srcip=pkt['srcip'],
+                    dstip=pkt['dstip'],
+                    protocol=pkt['protocol'],
+                    tos=pkt['tos'],
+                    srcport=pkt['srcport'],
+                    dstport=pkt['dstport'])
+            except:
+                try:
+                    return match(
+                        switch=pkt['switch'],
+                        inport=pkt['inport'],
+                        srcmac=pkt['srcmac'],
+                        dstmac=pkt['dstmac'],
+                        ethtype=pkt['ethtype'],
+                        srcip=pkt['srcip'],
+                        dstip=pkt['dstip'],
+                        protocol=pkt['protocol'],
+                        vlan_id=pkt['vlan_id'],
+                        vlan_pcp=pkt['vlan_pcp'])
+                except:
+                    try:
+                        return match(
+                            switch=pkt['switch'],
+                            inport=pkt['inport'],
+                            srcmac=pkt['srcmac'],
+                            dstmac=pkt['dstmac'],
+                            ethtype=pkt['ethtype'],
+                            srcip=pkt['srcip'],
+                            dstip=pkt['dstip'],
+                            protocol=pkt['protocol'])
+                    except:
+                        try:
+                            return match(
+                                switch=pkt['switch'],
+                                inport=pkt['inport'],
+                                srcmac=pkt['srcmac'],
+                                dstmac=pkt['dstmac'],
+                                ethtype=pkt['ethtype'],
+                                protocol=pkt['protocol'],
+                                vlan_id=pkt['vlan_id'],
+                                vlan_pcp=pkt['vlan_pcp'])
+                        except:
+                            try:
+                                return match(
+                                    switch=pkt['switch'],
+                                    inport=pkt['inport'],
+                                    srcmac=pkt['srcmac'],
+                                    dstmac=pkt['dstmac'],
+                                    ethtype=pkt['ethtype'],
+                                    protocol=pkt['protocol'])
+                            except:
+                                try:
+                                    return match(
+                                        vlan_id=pkt['vlan_id'],
+                                        vlan_pcp=pkt['vlan_pcp'])
+                                except:
+                                    return no_packets
+
+
+    def make_microflow_rule(self, pkt_in, pkts_out):
+        concrete_pkt_in = self.pyretic2concrete(pkt_in)
+        pred = self.microflow_match(concrete_pkt_in)
+        action_list = []
+        for pkt_out in pkts_out.elements():
+            concrete_pkt_out = self.pyretic2concrete(pkt_out)
+            actions = {}
+            header_fields = set(concrete_pkt_out.keys()) | set(concrete_pkt_in.keys())
+            for field in header_fields:
+                if field not in native_headers + ['outport']:
+                    continue
+                try:
+                    in_val = concrete_pkt_in[field]
+                except:
+                    in_val = None
+                try:
+                    out_val = concrete_pkt_out[field]
+                except:
+                    out_val = None
+                if not out_val == in_val: 
+                    actions[field] = out_val
+            action_list.append(actions)
+        return (pred,action_list)
 
     def handle_packet_in(self, concrete_pkt):
-
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-
         if self.debug_packet_in:
             debugger.set_trace()
-        
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
                  if self.mode == 'interpret':
@@ -132,7 +236,7 @@ class Runtime(object):
                 packet = packet.pop(header)
             except:
                 pass
-        for header in native_headers:
+        for header in native_headers + content_headers:
             try:
                 val = packet[header]
                 concrete_packet[header] = val
@@ -197,14 +301,17 @@ class Runtime(object):
 # Extended Values
 ################################################################################
 
-native_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
-                 "ethtype", "protocol", "raw", "payload", "header_len", "payload_len"]
+basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
+                 "ethtype", "protocol"]
+tagging_headers = ["vlan_id", "vlan_pcp"]
+native_headers = basic_headers + tagging_headers
+content_headers = [ "raw", "header_len", "payload_len"]
 
 @util.cached
 def extended_values_from(packet):
     extended_values = {}
     for k, v in packet.header.items():
-        if k not in native_headers and v:
+        if k not in basic_headers + content_headers and v:
             extended_values[k] = v
         elif v and len(v) > 1:
             extended_values[k] = v[1:]
