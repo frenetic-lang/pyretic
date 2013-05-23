@@ -27,7 +27,7 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.netcore import match, union, SinglyDerivedPredicate, Policy, SinglyDerivedPolicy
+from pyretic.core.language import match, union, SinglyDerivedPredicate, Policy, SinglyDerivedPolicy, passthrough
 
 ### DEFINITIONS
 ARP_TYPE = 2054

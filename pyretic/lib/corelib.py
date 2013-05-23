@@ -32,8 +32,9 @@
 # This module is designed for import *.
 import networkx as nx
 
-from pyretic.core.netcore import *
 from pyretic.core.network import *
+from pyretic.core.language import *
+
 
 
 

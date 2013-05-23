@@ -30,7 +30,7 @@
 
 from pyretic.core.network import Network
 import pyretic.core.util as util
-from pyretic.core.netcore import *
+from pyretic.core.language import *
 from pyretic.core.network import *
 
 import threading

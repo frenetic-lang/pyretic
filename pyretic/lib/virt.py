@@ -29,7 +29,7 @@
 
 # This module is designed for import *.
 from pyretic.core.network import *
-from pyretic.core.netcore import *
+from pyretic.core.language import *
 from pyretic.core import util
 from pyretic.core.util import singleton
 from pyretic.lib.std import pkt_print, str_print

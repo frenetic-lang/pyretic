@@ -109,7 +109,7 @@ register_field("srcip", PrefixMatch)
 register_field("dstip", PrefixMatch)
 
 ################################################################################
-# Netcore Policy Language
+# Policy Language
 ################################################################################
 
 class NetworkEvaluated(object):
@@ -1038,7 +1038,7 @@ class AggregateFwdBucket(FwdBucket):
     ### update : Packet -> unit
     def update_aggregate(self,pkt):
         if self.group_by:
-            from pyretic.core.netcore import match
+            from pyretic.core.language import match
             groups = set(self.group_by) & set(pkt.available_fields())
             pred = match([(field,pkt[field]) for field in groups])
             try:
