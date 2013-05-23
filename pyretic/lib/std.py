@@ -203,7 +203,7 @@ class clear_trace(Policy):
 
 class breakpoint(SinglyDerivedPolicy):
     ### init : Policy -> Predicate -> unit
-    def __init__(self, policy, condition=lambda ps: True):
+    def __init__(self, policy=passthrough, condition=lambda ps: True):
         self.condition = condition
         super(breakpoint,self).__init__(policy)
 
