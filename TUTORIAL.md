@@ -17,6 +17,8 @@ Via Command Line
 $ pyretic.py pyretic.modules.mac_learner
 - the example pyretic_dir/pyretic/pyretic/examples/kitchen_sink.py
 $ pyretic.py pyretic.examples.kitchen_sink
+- pyretic in interpreter mode (all packets go through controller)
+$ pyretic.py -m i MODULE_NAME
 - pyretic frontend and OF client backend seperately
 (first start pyretic)
 $ pyretic.py -f MODULE_NAME

@@ -31,7 +31,7 @@
 ################################################################################
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
-# input:    --module=MODULE_OR_EXAMPLE --vdef=VDEF                             #
+# input:    --module=PATH_TO_MODULE_OR_EXAMPLE --vdef=PATH_TO_VDEF             #
 # mininet:  any topology with which vdef works                                 #
 # test:     behavior should match that of module being virtualized             #
 #           on topology defined by vdef                                        #

@@ -27,6 +27,13 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet: mininet.sh --topo=clique,5,5 (or other single subnet network)       #
+# test:    updated network traffic statistics should be printed every second   #
+################################################################################
+
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner

@@ -27,6 +27,15 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet: mininet.sh (or other single subnet network)                         #
+# test:    packet contents will be printed for each packet sent                #
+#          to generate a packets with a payload try                            #
+#          h1 hping3 -c 10 -d 100 -E ~/pyretic/mininet/test_payload.txt -S h2  #
+################################################################################
+
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 

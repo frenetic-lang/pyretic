@@ -30,7 +30,7 @@
 ################################################################################
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
-# pyretic:  direct output to tmp file                                          #
+# pyretic:  use interpreter mode, direct output to tmp file                    #
 # mininet:  mininet.sh --topo=gateway1_ns                                      #
 # test:     h1 ping -c 1 hs1, then kill controller and examine tmp file        #
 ################################################################################
