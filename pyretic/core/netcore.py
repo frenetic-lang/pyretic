@@ -32,7 +32,6 @@
 import functools
 import itertools
 import struct
-from collections import Counter
 import time
 from bitarray import bitarray
 
@@ -449,9 +448,9 @@ class passthrough(Policy):
     def __repr__(self):
         return "passthrough"
         
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
-        return Counter([packet])
+        return {packet}
 
         
 @singleton
@@ -461,9 +460,9 @@ class drop(Policy):
     def __repr__(self):
         return "drop"
         
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
-        return Counter()
+        return set()
 
         
 class flood(Policy):
@@ -502,7 +501,7 @@ class flood(Policy):
         
     def eval(self, packet):
         if self.network is None:
-            return Counter()
+            return set()
         
         switch = packet["switch"]
         inport = packet["inport"]
@@ -514,17 +513,20 @@ class flood(Policy):
                 port_nos.add(port_no)
             try:
                 if packet["outport"] == -1:
-                    packets = [packet.modify(outport=port_no) \
-                                   for port_no in port_nos if port_no != inport]
+                    packets = {packet.modify(outport=port_no) 
+                               for port_no in port_nos 
+                               if port_no != inport}
                 else:
-                    packets = [packet.push(outport=port_no) \
-                                   for port_no in port_nos if port_no != inport]
+                    packets = {packet.push(outport=port_no) 
+                               for port_no in port_nos 
+                               if port_no != inport}
             except:
-                    packets = [packet.push(outport=port_no) \
-                                   for port_no in port_nos if port_no != inport]
-            return Counter(packets)
+                packets = {packet.push(outport=port_no) 
+                           for port_no in port_nos 
+                           if port_no != inport}
+            return packets
         else:
-            return Counter()
+            return set()
         
         
 class push(Policy):
@@ -538,10 +540,10 @@ class push(Policy):
     def __repr__(self):
         return "push:\n%s" % util.repr_plus(self.map.items())
         
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         packet = packet.pushmany(self.map)
-        return Counter([packet])
+        return {packet}
 
         
 class pop(Policy):
@@ -555,10 +557,10 @@ class pop(Policy):
     def __repr__(self):
         return "pop:\n%s" % util.repr_plus(self.fields)
         
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         packet = packet.popmany(self.fields)
-        return Counter([packet])
+        return {packet}
 
 
 class modify(Policy):
@@ -581,10 +583,10 @@ class modify(Policy):
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
 
-    ### eval : Packet -> Counter List Packet        
+    ### eval : Packet -> Set Packet        
     def eval(self, packet):
         packet = packet.modifymany(self.map)
-        return Counter([packet])
+        return {packet}
 
 
 class copy(Policy):
@@ -599,13 +601,13 @@ class copy(Policy):
     def __repr__(self):
         return "copy:\n%s" % util.repr_plus(self.map.items())
   
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         pushes = {}
         for (dstfield, srcfield) in self.map.iteritems():
             pushes[dstfield] = packet[srcfield]
         packet = packet.pushmany(pushes)
-        return Counter([packet])
+        return {packet}
         
         
 class move(Policy):
@@ -620,7 +622,7 @@ class move(Policy):
     def __repr__(self):
         return "move:\n%s" % util.repr_plus(self.map.items())
   
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         pushes = {}
         pops = []
@@ -631,7 +633,7 @@ class move(Policy):
             except KeyError:
                 pass
         packet = packet.pushmany(pushes).popmany(pops)
-        return Counter([packet])
+        return {packet}
 
 
 
@@ -658,20 +660,19 @@ class MultiplyDerivedPolicy(Policy):
                     
 class parallel(MultiplyDerivedPolicy):
     def eval(self, packet):
-        c = Counter()
+        output = set()
         for policy in self.policies:
-            rc = policy.eval(packet)
-            c.update(rc)
-        return c
+            output |= policy.eval(packet)
+        return output
 
     def track_eval(self, packet):
         traversed = list()
-        c = Counter()
+        output = set()
         for policy in self.policies:
-            (rc,rtraversed) = policy.track_eval(packet)
-            c.update(rc)
-            traversed.append(rtraversed)
-        return (c,[self,traversed])
+            (p_output,p_traversed) = policy.track_eval(packet)
+            traversed.append(p_traversed)
+            output |= p_output
+        return (output,[self,traversed])
     
     ### repr : unit -> String
     def __repr__(self):
@@ -680,28 +681,25 @@ class parallel(MultiplyDerivedPolicy):
 
 class sequential(MultiplyDerivedPolicy):
     def eval(self, packet):
-        lc = Counter([packet])
+        input_set = {packet}
         for policy in self.policies:
-            c = Counter()
-            for lpacket, lcount in lc.iteritems():
-                rc = policy.eval(lpacket)
-                for rpacket, rcount in rc.iteritems():
-                    c[rpacket] = lcount * rcount
-            lc = c
-        return lc
+            output_set = set()
+            for packet in input_set:
+                output_set |= policy.eval(packet)
+            input_set = output_set
+        return output_set
 
     def track_eval(self, packet):
         traversed = list()
-        lc = Counter([packet])
+        input_set = {packet}
         for policy in self.policies:
-            c = Counter()
-            for lpacket, lcount in lc.iteritems():
-                (rc,rtraversed) = policy.track_eval(lpacket)
-                traversed.append(rtraversed)
-                for rpacket, rcount in rc.iteritems():
-                    c[rpacket] = lcount * rcount
-            lc = c
-        return (lc,[self,traversed])
+            output_set = set()
+            for packet in input_set:
+                (p_output_set,p_traversed) = policy.track_eval(packet)
+                traversed.append(p_traversed)
+                output_set |= p_output_set
+            input_set = output_set
+        return (output_set,[self,traversed])
     
     ### repr : unit -> String
     def __repr__(self):
@@ -768,12 +766,12 @@ class remove(SinglyDerivedPolicy):
         super(remove,self).set_network(network)
         self.predicate.set_network(network)
 
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if not self.predicate.eval(packet):
             return self.policy.eval(packet)
         else:
-            return Counter()
+            return set()
 
     def track_eval(self, packet):
         (result1,traversed1) = self.predicate.track_eval(packet)
@@ -781,7 +779,7 @@ class remove(SinglyDerivedPolicy):
             (result2,traversed2) = self.policy.track_eval(packet)
             return (result2,[self,traversed1,traversed2])
         else:
-            return (Counter(),[self,traversed1])
+            return (set(),[self,traversed1])
 
     ### repr : unit -> String
     def __repr__(self):
@@ -801,12 +799,12 @@ class restrict(SinglyDerivedPolicy):
         super(restrict,self).set_network(network)
         self.predicate.set_network(network)
 
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if self.predicate.eval(packet):
             return self.policy.eval(packet)
         else:
-            return Counter()
+            return set()
 
     def track_eval(self, packet):
         (result1,traversed1) = self.predicate.track_eval(packet)
@@ -814,7 +812,7 @@ class restrict(SinglyDerivedPolicy):
             (result2,traversed2) = self.policy.track_eval(packet)
             return (result2,[self,traversed1,traversed2])
         else:
-            return (Counter(),[self,traversed1])
+            return (set(),[self,traversed1])
 
     ### repr : unit -> String
     def __repr__(self):
@@ -931,7 +929,7 @@ class FwdBucket(Policy):
     def eval(self, packet):
         for listener in self.listeners:
             listener(packet)
-        return Counter()
+        return set()
 
     ### register_callback : (Packet -> unit) -> (Packet -> unit)  
     # UNCLEAR IF THIS SIGNATURE IS OVERLY RESTRICTIVE 
@@ -996,7 +994,7 @@ class packets(Policy):
             self.predicate.set_network(self.network)
             self.predicate.set_parent(self)
             self.changed()
-        return Counter()
+        return set()
 
     def track_eval(self,pkt):
         """Don't look any more such packets"""
@@ -1010,7 +1008,7 @@ class packets(Policy):
                 self.predicate.set_network(self.network)
                 self.predicate.set_parent(self)
                 self.changed()
-        return (Counter(),[self,traversed])
+        return (set(),[self,traversed])
         
 
 class AggregateFwdBucket(FwdBucket):
@@ -1053,7 +1051,7 @@ class AggregateFwdBucket(FwdBucket):
     ### eval : Packet -> unit
     def eval(self, packet):
         self.update_aggregate(packet)
-        return Counter()
+        return set()
 
 
 class counts(AggregateFwdBucket):

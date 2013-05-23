@@ -189,7 +189,7 @@ class Runtime(object):
         if len(pkts_out) == 0:
             return (pred,action_list)
 
-        for pkt_out in pkts_out.elements():
+        for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
             if concrete_pkt_out['outport'] == concrete_pkt_in['inport']:
                 continue  ### CURRENTLY HAVING PROBLEM SENDING PACKETS OUT THE PORT THEY ARRIVED
@@ -261,10 +261,9 @@ class Runtime(object):
             print util.repr_plus([pyretic_pkt], sep="\n\n")
             print
             print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
-            print util.repr_plus(output.elements(), sep="\n\n")
+            print util.repr_plus(output, sep="\n\n")
             print
-        for pkt in output.elements():
-            self.send_packet(pkt)
+        map(self.send_packet,output)
   
     def pyretic2concrete(self,packet):
         concrete_packet = ConcretePacket()

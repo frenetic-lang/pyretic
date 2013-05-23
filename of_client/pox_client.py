@@ -29,7 +29,6 @@
 ################################################################################
 
 import threading
-from collections import Counter
 
 import pox.openflow.libopenflow_01 as of
 from pox.core import core

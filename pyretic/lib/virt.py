@@ -35,7 +35,6 @@ from pyretic.core.util import singleton
 from pyretic.lib.std import pkt_print, str_print
 
 import itertools
-from collections import Counter
 
 last_vtag = 0
 def new_vtag():
@@ -161,7 +160,7 @@ class locate_in_underlying(Policy):
     def __repr__(self):
         return "locate_in_underlying"
 
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         try:
             switch = packet['switch']
@@ -181,7 +180,7 @@ class locate_in_underlying(Policy):
             outport = packet['outport']
         except KeyError:
             outport = -1
-        return Counter([packet])
+        return {packet}
 
 
 class DerivedNetwork(Network):
@@ -196,8 +195,7 @@ class DerivedNetwork(Network):
             self.underlying.inject_packet(packet)
         else:
             output = self.injection_policy.eval(packet)
-            for opacket in output.iterkeys():
-                self.underlying.inject_packet(opacket)
+            map(self.underlying.inject_packet,output)
 
 
 class vdef(object):

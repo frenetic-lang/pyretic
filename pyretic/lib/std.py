@@ -28,7 +28,6 @@
 
 """Pyretic Standard Library"""
 from pyretic.core.netcore import match, union, SinglyDerivedPredicate, Policy, SinglyDerivedPolicy
-from collections import Counter
 
 ### DEFINITIONS
 ARP_TYPE = 2054
@@ -78,11 +77,11 @@ class str_print(_print):
         else:
             return ''
 
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if self.on:
             print self.s
-        return Counter([packet])
+        return {packet}
 
 
 class pkt_print(_print):
@@ -93,13 +92,13 @@ class pkt_print(_print):
         else:
             return ''
         
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if self.on:
             print "---- %s -------" % self.s
             print packet
             print "-------------------------------"
-        return Counter([packet])
+        return {packet}
 
 
 class net_print(_print):
@@ -110,13 +109,13 @@ class net_print(_print):
         else:
             return ''
 
-    ### eval : Packet -> Counter List Packet
+    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if self.on:
             print "---- net_print %s -------" % self.s
             print self.network
             print "-------------------------------"
-        return Counter([packet])
+        return {packet}
 
 
 class pol_print(SinglyDerivedPolicy):
@@ -165,14 +164,13 @@ class trace(SinglyDerivedPolicy):
         except:
             i = 0
         output = super(trace,self).eval(packet)
-        c = Counter()
         if len(output) > 1:
-            for packet, count in output.iteritems():
-                t_packet = packet.pushmany({self.trace_name : i})
-                c[t_packet] = count
+            tagged_output = set()
+            for packet in output:
+                tagged_output.add(packet.pushmany({self.trace_name : i}))
                 i = i + 1
                 self.highest_trace_value[v] = i
-            return c
+            return tagged_output
         else:
             return output
 
@@ -183,14 +181,13 @@ class trace(SinglyDerivedPolicy):
         except:
             i = 0
         (output,traversed) = super(trace,self).track_eval(packet)
-        c = Counter()
         if len(output) > 1:
-            for packet, count in output.iteritems():
-                t_packet = packet.pushmany({self.trace_name : i})
-                c[t_packet] = count
+            tagged_output = set()
+            for packet in output:
+                tagged_output.add(packet.pushmany({self.trace_name : i}))
                 i = i + 1
                 self.highest_trace_value[v] = i
-            return (c,[self,traversed])
+            return (tagged_output,[self,traversed])
         else:
             return (output,[self,traversed])
 
@@ -201,10 +198,7 @@ class clear_trace(Policy):
         super(clear_trace,self).__init__()
 
     def eval(self, packet):
-        c = Counter()
-        packet = packet.clear(self.trace_name)
-        c[packet] = 1
-        return c
+        return {packet.clear(self.trace_name)}
 
 
 class breakpoint(SinglyDerivedPolicy):
