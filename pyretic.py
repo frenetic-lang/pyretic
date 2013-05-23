@@ -63,8 +63,8 @@ def parseArgs():
     op.add_option( '--frontend-only', '-f', action="store_true", 
                      dest="frontend_only", help = 'only start the frontend'  )
     op.add_option( '--mode', '-m', type='choice',
-                     choices=['interpreted','reactive0'], 
-                     help = '|'.join( ['quiet','verbose'] )  )
+                     choices=['interpreted','i','reactive0','r0'], 
+                     help = '|'.join( ['interpreted/i','reactive0/r0'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
                      choices=['low','normal','high'], default = 'low',
                      help = '|'.join( ['quiet','high'] )  )
@@ -76,6 +76,10 @@ def parseArgs():
 
 def main():
     (options, args, kwargs_to_pass) = parseArgs()
+    if options.mode == 'i':
+        options.mode = 'interpreted'
+    elif options.mode == 'r0':
+        options.mode = 'reactive0'
 
     module_name = args[0]
     module = import_module(module_name)
