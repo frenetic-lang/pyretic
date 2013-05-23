@@ -47,7 +47,7 @@ def learn(self):
 
     def update_policy():
         """Update the policy based on current forward and query policies"""
-        self.policy = self.forward | self.query
+        self.policy = self.forward + self.query
     self.update_policy = update_policy
 
     def learn_new_MAC(pkt):

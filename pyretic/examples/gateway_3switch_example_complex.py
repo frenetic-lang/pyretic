@@ -54,7 +54,7 @@ def fix_dstmac(ip_to_mac):
     leave = intersect(
         [~(match(dstip=k) & ~match(dstmac=v)) 
           for k,v in ip_to_mac.items()])[passthrough]
-    return change | leave
+    return change + leave
 
 def example_setup(num_clients=3, num_servers=3):
     ### EXAMPLE PARAMETERS
@@ -95,9 +95,9 @@ def example_setup(num_clients=3, num_servers=3):
     ip_pol = virtualize(ip_pol,BFS_vdef(name=5,from_switches=ip_core))
     gw_pol = gateway_forwarder(eth_cidr,ip_cidr,host_macs)
 
-    return switch_in(ethernet)[ eth_pol ] | \
-        switch_in(gateway)[ gw_pol ] | \
-        switch_in(ip_core)[ ip_pol ]    
+    return (switch_in(ethernet)[ eth_pol ] + 
+            switch_in(gateway)[  gw_pol  ] +
+            switch_in(ip_core)[  ip_pol  ])    
 
 
 def main():

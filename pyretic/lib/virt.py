@@ -56,7 +56,7 @@ class vmap(object):
         non_ingress = ~union(
             union(match(switch=u.switch, inport=u.port_no) for u in us) 
             for (d, us) in self.d2u.iteritems() )
-        ingress_policy = non_ingress[passthrough] | parallel(union(match(switch=u.switch, inport=u.port_no) for u in us)[push(vtag='ingress', vswitch=d.switch, vinport=d.port_no, voutport=-1)] for (d, us) in self.d2u.iteritems())
+        ingress_policy = non_ingress[passthrough] + parallel(union(match(switch=u.switch, inport=u.port_no) for u in us)[push(vtag='ingress', vswitch=d.switch, vinport=d.port_no, voutport=-1)] for (d, us) in self.d2u.iteritems())
         return ingress_policy
 
     def egress_policy(self):
@@ -77,7 +77,7 @@ class vmap(object):
                 if d1.switch != d2.switch:
                     continue
                 # FORWARD OUT THE CORRECT PHYSICAL PORT
-                fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no)[fwd(u2.port_no)]
+                fabric_policy += match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no)[fwd(u2.port_no)]
         return fabric_policy
 
     def shortest_path_fabric_policy(self,topo):
@@ -91,15 +91,15 @@ class vmap(object):
                     continue
                 # IF IDENTICAL VIRTUAL LOCATIONS, THEN WE KNOW FABRIC POLICY IS JUST TO FORWARD OUT MATCHING PHYSICAL PORT
                 if d1.port_no == d2.port_no:
-                    fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
+                    fabric_policy += match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
                 # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
                 # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
                 # FINALLY ADD A RULE THAT FORWARDS OUT THE CORRECT PHYSICAL PORT AT THE LAST PHYSICAL SWITCH ON THE PATH
                 else:
                     try:
                         for loc in paths[u1.switch][u2.switch]:
-                            fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=loc.switch)[fwd(loc.port_no)]
-                        fabric_policy |= match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
+                            fabric_policy += match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=loc.switch)[fwd(loc.port_no)]
+                        fabric_policy += match(vswitch=d1.switch,vinport=d1.port_no,voutport=d2.port_no,switch=u2.switch)[fwd(u2.port_no)]
                     except KeyError:
                         pass
         return fabric_policy

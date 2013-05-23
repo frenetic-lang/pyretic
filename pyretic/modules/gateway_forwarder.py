@@ -49,7 +49,7 @@ def gateway_forwarder(subnet1,subnet2,host_macs):
     print gw_mapping
     subnet1_to_subnet2 = match(inport=1) & match(dstip=subnet2)
     subnet2_to_subnet1 = match(inport=2) & match(dstip=subnet1)
-    subnet_forwarder = subnet1_to_subnet2[fwd(2)] | subnet2_to_subnet1[fwd(1)]
+    subnet_forwarder = subnet1_to_subnet2[fwd(2)] + subnet2_to_subnet1[fwd(1)]
     return if_(ARP,
                arp(gw_mapping),
                translate(host_macs) >> subnet_forwarder)

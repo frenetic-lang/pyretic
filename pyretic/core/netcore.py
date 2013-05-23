@@ -423,17 +423,16 @@ class difference(SinglyDerivedPredicate):
 
 class Policy(NetworkEvaluated):
     """Top-level abstract description of a static network program."""
-
     ### sub : Predicate -> Policy
     def __sub__(self, pred):
         return remove(self, pred)
 
-    ### add : Predicate -> Policy
+    ### and : Predicate -> Policy
     def __and__(self, pred):
         return restrict(self, pred)
 
-    ### or : Policy -> Policy
-    def __or__(self, other):
+    ### add : Policy -> Policy
+    def __add__(self, other):
         return parallel([self, other])
         
     ### rshift : Policy -> Policy
@@ -831,7 +830,7 @@ class if_(SinglyDerivedPolicy):
         self.pred.set_parent(self)
         self.t_branch.set_parent(self)
         self.f_branch.set_parent(self)
-        super(if_,self).__init__(self.pred[self.t_branch] | 
+        super(if_,self).__init__(self.pred[self.t_branch] + 
                                  (~self.pred)[self.f_branch])
 
     ### repr : unit -> String

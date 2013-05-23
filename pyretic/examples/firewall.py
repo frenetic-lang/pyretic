@@ -63,7 +63,7 @@ def fw0(self,W):
     wp = union([match(srcip=s,dstip=d) for (s,d) in W])
     def update_policy():
         """Update the policy based on current forward and query policies"""
-        self.policy = self.forward | wp[self.query] 
+        self.policy = self.forward + wp[self.query] 
     self.update_policy = update_policy
 
     def allow_reverse(p):
@@ -94,7 +94,7 @@ def fw(self,W):
 
     def update_policy():
         """Update policy based on current inner and query policies"""
-        self.policy = self.inner | union(rps)[self.query]
+        self.policy = self.inner + union(rps)[self.query]
     self.update_policy = update_policy
     
     def check_reverse(stats):

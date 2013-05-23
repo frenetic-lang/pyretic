@@ -55,7 +55,9 @@ def subs(c,r,p):
     from server, substitute public address for replica address"""
     c_to_p = match(srcip=c,dstip=p)
     r_to_c = match(srcip=r,dstip=c)
-    return c_to_p[modify(dstip=r)] | r_to_c[modify(srcip=p)] | (~r_to_c & ~c_to_p)[passthrough]
+    return (c_to_p[modify(dstip=r)] + 
+            r_to_c[modify(srcip=p)] + 
+            (~r_to_c & ~c_to_p)[passthrough])
 
 def rewrite(d,p):
     "substitute for all client/replica mappings in d"
@@ -87,7 +89,7 @@ def lb(self,p,R,H):
 
     def update_policy():
         """Update the policy based on current modify and query policies"""
-        self.policy = self.modify | match(dstip=p)[self.query]
+        self.policy = self.modify + match(dstip=p)[self.query]
     self.update_policy = update_policy
 
     def rebalance(stats):

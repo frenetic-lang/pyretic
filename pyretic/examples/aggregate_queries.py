@@ -53,4 +53,6 @@ def packet_sizes():
 ### Main ###
 
 def main():
-    return packet_counts() | packet_sizes() | mac_learner()
+    return (packet_counts() + 
+            packet_sizes() + 
+            mac_learner())

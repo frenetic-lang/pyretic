@@ -81,5 +81,5 @@ def dpi():
 ### Main ###
 
 def main():
-    return dpi() | flood()
+    return dpi() + flood()
 
