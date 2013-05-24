@@ -123,8 +123,6 @@ class NetworkEvaluated(object):
         return self._network
         
     def set_network(self, network):
-        if network == self._network:
-            return 
         self._network = network
 
     def set_parent(self,parent):
@@ -219,9 +217,7 @@ class ingress_network(PrimitivePredicate):
         super(ingress_network,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return 
-        self._network = network
+        super(ingress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
@@ -242,9 +238,7 @@ class egress_network(PrimitivePredicate):
         super(egress_network,self).__init__()
     
     def set_network(self, network):
-        if network == self._network:
-            return 
-        self._network = network
+        super(egress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
@@ -319,8 +313,6 @@ class negate(CombinatorPredicate):
         super(negate,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(negate,self).set_network(network)
         self.predicate.set_network(network)
 
@@ -345,8 +337,6 @@ class union(CombinatorPredicate):
         super(union,self).__init__()        
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(union,self).set_network(network)
         for pred in self.predicates:
             pred.set_network(network)
@@ -377,8 +367,6 @@ class intersect(CombinatorPredicate):
         super(intersect,self).__init__()
                 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(intersect,self).set_network(network)
         for pred in self.predicates:
             pred.set_network(network)
@@ -412,8 +400,6 @@ class DerivedPredicate(Predicate):
         super(DerivedPredicate,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(DerivedPredicate,self).set_network(network)
         self.predicate.set_network(network)
 
@@ -513,8 +499,7 @@ class flood(PrimitivePolicy):
 
     def set_network(self, network):
         changed = False
-        if network == self._network:
-            return
+        super(flood,self).set_network(network) 
         if not network is None:
             updated_egresses = network.topology.egress_locations()
             if not self.egresses == updated_egresses:
@@ -528,7 +513,6 @@ class flood(PrimitivePolicy):
             else:
                 self.mst = updated_mst
                 changed = True
-        super(flood,self).set_network(network) 
         if changed:
             self.changed()
         
@@ -635,8 +619,6 @@ class remove(CombinatorPolicy):
         super(remove,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(remove,self).set_network(network)
         self.policy.set_network(network) 
         self.predicate.set_network(network)
@@ -669,8 +651,6 @@ class restrict(CombinatorPolicy):
         super(restrict,self).__init__() 
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(restrict,self).set_network(network)
         self.policy.set_network(network) 
         self.predicate.set_network(network)
@@ -703,8 +683,6 @@ class parallel(CombinatorPolicy):
         super(parallel,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(parallel,self).set_network(network)
         for policy in self.policies:
             policy.set_network(network) 
@@ -737,8 +715,6 @@ class sequential(CombinatorPolicy):
         super(sequential,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(sequential,self).set_network(network)
         for policy in self.policies:
             policy.set_network(network) 
@@ -779,8 +755,6 @@ class DerivedPolicy(Policy):
         super(DerivedPolicy,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(DerivedPolicy,self).set_network(network)            
         if not self.policy is None:
             self.policy.set_network(network) 
@@ -939,8 +913,6 @@ class packets(Policy):
         super(packets,self).__init__()
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(packets,self).set_network(network)
         self.pwfb.set_network(network)
         self.predicate.set_network(network)
@@ -1033,8 +1005,6 @@ class NetworkDerivedPolicy(DerivedPolicy):
         super(NetworkDerivedPolicy,self).__init__(drop)
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(NetworkDerivedPolicy,self).set_network(network)
         if not network is None:
             self.policy = self.policy_from_network(network)
@@ -1072,7 +1042,8 @@ class MutablePolicy(DerivedPolicy):
     def policy(self, policy):
         self._policy = policy
         self._policy.set_parent(self)
-        self._policy.set_network(self.network)
+        if self.network:
+            self._policy.set_network(self.network)
         self.changed()
 
     def __repr__(self):

@@ -28,7 +28,6 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.network import Network
 import pyretic.core.util as util
 from pyretic.core.language import *
 from pyretic.core.network import *
@@ -59,6 +58,7 @@ class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
                  show_traces=False, debug_packet_in=False):
         self.network = ConcreteNetwork(self)
+        self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         if mode == 'reactive0':
             self.policy.on_change_do(self.handle_policy_change)
@@ -74,7 +74,9 @@ class Runtime(object):
         self.threads = set()
 
     def update_network(self):
-        self.policy.set_network(self.network.copy())
+        if self.network.topology != self.prev_network.topology:
+            self.prev_network = self.network.copy()
+            self.policy.set_network(self.prev_network)
        
     def handle_switch_join(self,switch_id):
         self.network.handle_switch_join(switch_id)

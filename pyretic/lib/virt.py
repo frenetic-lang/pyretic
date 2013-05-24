@@ -268,13 +268,14 @@ class virtualize_base(DerivedPolicy):
             )
 
     def set_network(self, network):
-        if network == self._network:
-            return
         self.vdef.set_network(network)
         self.locate_in_underlying.set_vmap(self.vdef.vmap)
         self.vdef.derived.injection_policy = self.injection_policy
         super(virtualize_base,self).set_network(network)
-        self.vpolicy.set_network(self.vdef.derived) 
+        if ((not self.vnetwork) or 
+            self.vdef.derived.topology != self.vnetwork.topology):
+            self.vnetwork = self.vdef.derived.copy()
+            self.vpolicy.set_network(self.vnetwork) 
         
     def __repr__(self):
         return "virtualize %s\n%s" % (self.vtag, self.vdef)

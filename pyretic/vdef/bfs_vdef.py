@@ -50,11 +50,8 @@ class BFS_vdef(vdef):
         return mapping
 
     def set_network(self,network):
-        if network == self.underlying:
-            return
         self.underlying = network
         self.derived = DerivedNetwork(self.underlying)
-        
         self.kept_topology = self.underlying.topology
         if self.from_switches:
             tmp = network.topology.filter_nodes(self.from_switches)

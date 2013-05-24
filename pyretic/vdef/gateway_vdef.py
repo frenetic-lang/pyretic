@@ -96,8 +96,6 @@ class gateway_vdef(vdef):
         return mapping
 
     def set_network(self,network):
-        if network == self.underlying:
-            return
         self.underlying = network
         self.derived = DerivedNetwork(self.underlying)
         self.vmap = self.make_vmap()

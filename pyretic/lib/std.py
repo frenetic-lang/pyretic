@@ -200,8 +200,6 @@ class breakpoint(DerivedPolicy):
         super(breakpoint,self).__init__(policy)
 
     def set_network(self, network):
-        if network == self._network:
-            return
         super(breakpoint,self).set_network(network)
         self.condition.set_network(network)
                     
