@@ -425,7 +425,10 @@ class POXClient(revent.EventMixin):
                     pass
                 else:
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
-            of_actions.append(of.ofp_action_output(port = outport))
+            if outport == inport:
+                of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+            else:
+                of_actions.append(of.ofp_action_output(port=outport))
 
         msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
                               idle_timeout=of.OFP_FLOW_PERMANENT,

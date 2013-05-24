@@ -191,8 +191,6 @@ class Runtime(object):
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
-            if concrete_pkt_out['outport'] == concrete_pkt_in['inport']:
-                continue  ### CURRENTLY HAVING PROBLEM SENDING PACKETS OUT THE PORT THEY ARRIVED
             actions = {}
             header_fields = set(concrete_pkt_out.keys()) | set(concrete_pkt_in.keys())
             for field in header_fields:
@@ -209,12 +207,8 @@ class Runtime(object):
                 if not out_val == in_val: 
                     actions[field] = out_val
             action_list.append(actions)
+        return (pred,action_list)
 
-        ### IF WE'VE REACHED HERE
-        if action_list:  # EITHER WE HAVE A NON-DROP RULE TO INSTALL
-            return (pred,action_list)
-        else:            # OR WE CAN'T INSTALL A RULE
-            return None
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
