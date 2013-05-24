@@ -41,7 +41,7 @@ from pyretic.core.util import frozendict, singleton
 
 
 ################################################################################
-# Matching
+# Matching                                                                     #
 ################################################################################
 
 class ExactMatch(object):
@@ -94,7 +94,7 @@ class PrefixMatch(object):
             return "%s/%d" % (repr(self.pattern),self.masklen)
 
 ################################################################################
-# Determine how each field will be matched
+# Determine how each field will be matched                                     #
 ################################################################################
         
 _field_to_patterntype = {}
@@ -109,7 +109,7 @@ register_field("srcip", PrefixMatch)
 register_field("dstip", PrefixMatch)
 
 ################################################################################
-# Policy Language
+# Policy Language                                                              #
 ################################################################################
 
 class NetworkEvaluated(object):
@@ -150,12 +150,11 @@ class NetworkEvaluated(object):
 
     
 ################################################################################
-# Predicates
+# Predicates                                                                   #
 ################################################################################
 
 class Predicate(NetworkEvaluated):
     """Top-level abstract class for predicates."""
-
     ### sub : Predicate -> Predicate
     def __sub__(self, other):
         return difference(self, other)
@@ -176,43 +175,48 @@ class Predicate(NetworkEvaluated):
     def __invert__(self):
         return negate(self)
 
-    ### eq : Predicate -> bool
-    def __eq__(self, other):
+    ### eval : Packet -> bool
+    def __eval__(self, packet):
         raise NotImplementedError
 
-        
-@singleton
-class all_packets(Predicate):
-    """The always-true predicate."""
     ### repr : unit -> String
     def __repr__(self):
-        return "all packets"
+        raise NotImplementedError
 
-    ### eval : Packet -> bool
+
+################################################################################
+# Primitive Predicates                                                         #
+################################################################################
+
+class PrimitivePredicate(Predicate):
+    """Abstract class for primitive predicates."""
+    pass
+
+        
+@singleton
+class all_packets(PrimitivePredicate):
+    """The always-true predicate."""
     def eval(self, packet):
         return True
+
+    def __repr__(self):
+        return "all packets"
         
         
 @singleton
-class no_packets(Predicate):
+class no_packets(PrimitivePredicate):
     """The always-false predicate."""
-    ### repr : unit -> String
-    def __repr__(self):
-        return "no packets"
-
-    ### eval : Packet -> bool
     def eval(self, packet):
         return False
 
+    def __repr__(self):
+        return "no packets"
+
         
-class ingress_network(Predicate):
+class ingress_network(PrimitivePredicate):
     def __init__(self):
         self.egresses = None
         super(ingress_network,self).__init__()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "ingress_network"
 
     def set_network(self, network):
         if network == self._network:
@@ -223,21 +227,19 @@ class ingress_network(Predicate):
             self.egresses = updated_egresses
             self.changed()
     
-    ### eval : Packet -> bool
     def eval(self, packet):
         switch = packet["switch"]
         port_no = packet["inport"]
         return Location(switch,port_no) in self.egresses
 
+    def __repr__(self):
+        return "ingress_network"
+
         
-class egress_network(Predicate):
+class egress_network(PrimitivePredicate):
     def __init__(self):
         self.egresses = None
         super(egress_network,self).__init__()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "egress_network"
     
     def set_network(self, network):
         if network == self._network:
@@ -248,7 +250,6 @@ class egress_network(Predicate):
             self.egresses = updated_egresses
             self.changed()
  
-    ### eval : Packet -> bool
     def eval(self, packet):
         switch = packet["switch"]
         try:
@@ -257,10 +258,12 @@ class egress_network(Predicate):
             return False
         return Location(switch,port_no) in self.egresses
 
+    def __repr__(self):
+        return "egress_network"
+
         
-class match(Predicate):
+class match(PrimitivePredicate):
     """A set of field matches (one per field)"""
-    
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         init_map = {}
@@ -274,19 +277,17 @@ class match(Predicate):
         self.map = util.frozendict(init_map)
         super(match,self).__init__()
 
-    ### repr : unit -> String
-    def __repr__(self):
-        return "match:\n%s" % util.repr_plus(self.map.items())
-
     ### hash : unit -> int
     def __hash__(self):
         return hash(self.map)
     
-    ### eq : Predicate -> bool
+    ### eq : PrimitivePredicate -> bool
     def __eq__(self, other):
-        return self.map == other.map
+        try:
+            return self.map == other.map
+        except:
+            return False
 
-    ### eval : Packet -> bool
     def eval(self, packet):
         for field, pattern in self.map.iteritems():
             v = packet.get_stack(field)
@@ -298,20 +299,50 @@ class match(Predicate):
                     return False
         return True
 
-        
-class union(Predicate):
-    """A predicate representing the union of a list of predicates."""
+    def __repr__(self):
+        return "match:\n%s" % util.repr_plus(self.map.items())
 
-    ### init : List Predicate -> unit
+
+################################################################################
+# Combinator Predicates                                                        #
+################################################################################
+
+class CombinatorPredicate(Predicate):
+    """Abstract class for predicate combinators."""
+    pass
+
+
+class negate(CombinatorPredicate):
+    def __init__(self, predicate):
+        self.predicate = predicate
+        self.predicate.set_parent(self)
+        super(negate,self).__init__()
+
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(negate,self).set_network(network)
+        self.predicate.set_network(network)
+
+    def eval(self, packet):
+        return not self.predicate.eval(packet)
+        
+    def track_eval(self,packet):
+        (result,traversed) = self.predicate.track_eval(packet)
+        return (not result,[self,traversed])
+
+    def __repr__(self):
+        return "negate:\n%s" % util.repr_plus([self.predicate])
+
+        
+class union(CombinatorPredicate):
+    """A predicate representing the union of a list of predicates."""
+    ### init : List PrimitivePredicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
         for predicate in self.predicates:
             predicate.set_parent(self)
         super(union,self).__init__()        
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "union:\n%s" % util.repr_plus(self.predicates)
 
     def set_network(self, network):
         if network == self._network:
@@ -332,20 +363,19 @@ class union(Predicate):
                 return (True,[self,traversed])
         return (False,[self,traversed])
 
-        
-class intersect(Predicate):
-    """A predicate representing the intersection of a list of predicates."""
+    def __repr__(self):
+        return "union:\n%s" % util.repr_plus(self.predicates)
 
+        
+class intersect(CombinatorPredicate):
+    """A predicate representing the intersection of a list of predicates."""
+    ### init : List PrimitivePredicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
         for predicate in self.predicates:
             predicate.set_parent(self)
         super(intersect,self).__init__()
-        
-    ### repr : unit -> String
-    def __repr__(self):
-        return "intersect:\n%s" % util.repr_plus(self.predicates)
-
+                
     def set_network(self, network):
         if network == self._network:
             return
@@ -364,18 +394,27 @@ class intersect(Predicate):
             if not result:
                 return (False,[self,traversed])
         return (True,[self,traversed])
-    
 
-class SinglyDerivedPredicate(Predicate):
+    def __repr__(self):
+        return "intersect:\n%s" % util.repr_plus(self.predicates)
+
+
+################################################################################
+# Derived Predicates                                                           #
+################################################################################
+
+class DerivedPredicate(Predicate):
+    """Abstract class for predicates derived from primitive predicates and combinators."""
+    ### init : PrimitivePredicate -> unit
     def __init__(self, predicate):
         self.predicate = predicate
         self.predicate.set_parent(self)
-        super(SinglyDerivedPredicate,self).__init__()
+        super(DerivedPredicate,self).__init__()
 
     def set_network(self, network):
         if network == self._network:
             return
-        super(SinglyDerivedPredicate,self).set_network(network)
+        super(DerivedPredicate,self).set_network(network)
         self.predicate.set_network(network)
 
     def eval(self, packet):
@@ -386,23 +425,9 @@ class SinglyDerivedPredicate(Predicate):
         return (result,[self,traversed])
 
 
-class negate(SinglyDerivedPredicate):
-    ### repr : unit -> String
-    def __repr__(self):
-        return "negate:\n%s" % util.repr_plus([self.predicate])
-
-    ### eval : Packet -> bool
-    def eval(self, packet):
-        return not self.predicate.eval(packet)
-        
-    def track_eval(self,packet):
-        (result,traversed) = self.predicate.track_eval(packet)
-        return (not result,[self,traversed])
-
-
-class difference(SinglyDerivedPredicate):
+class difference(DerivedPredicate):
     """A predicate representing the difference of two predicates."""
-    ### init : Predicate -> List Predicate -> unit
+    ### init : Predicate -> Predicate -> unit
     def __init__(self,pred1,pred2):
         self.pred1 = pred1
         self.pred2 = pred1

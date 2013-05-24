@@ -27,14 +27,14 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.language import match, union, SinglyDerivedPredicate, Policy, SinglyDerivedPolicy, passthrough
+from pyretic.core.language import match, union, DerivedPredicate, Policy, SinglyDerivedPolicy, passthrough
 
 ### DEFINITIONS
 ARP_TYPE = 2054
 
 ### CONVENIENCE PREDICATES
 
-class _in(SinglyDerivedPredicate):
+class _in(DerivedPredicate):
     def __init__(self,field,group):
         self.group = group
         self.field = field
