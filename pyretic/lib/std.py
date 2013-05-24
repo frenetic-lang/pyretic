@@ -27,7 +27,7 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.language import match, union, DerivedPredicate, Policy, SinglyDerivedPolicy, passthrough
+from pyretic.core.language import match, union, DerivedPredicate, Policy, DerivedPolicy, passthrough
 
 ### DEFINITIONS
 ARP_TYPE = 2054
@@ -70,29 +70,19 @@ class _print(Policy):
 
 
 class str_print(_print):
-    ### repr : unit -> String
+    def eval(self, packet):
+        if self.on:
+            print self.s
+        return {packet}
+
     def __repr__(self):
         if self.on:
             return "str_print %s" % self.s
         else:
             return ''
 
-    ### eval : Packet -> Set Packet
-    def eval(self, packet):
-        if self.on:
-            print self.s
-        return {packet}
-
 
 class pkt_print(_print):
-    ### repr : unit -> String
-    def __repr__(self):
-        if self.on:
-            return "pkt_print %s" % self.s
-        else:
-            return ''
-        
-    ### eval : Packet -> Set Packet
     def eval(self, packet):
         if self.on:
             print "---- %s -------" % self.s
@@ -100,16 +90,14 @@ class pkt_print(_print):
             print "-------------------------------"
         return {packet}
 
-
-class net_print(_print):
-    ### repr : unit -> String
     def __repr__(self):
         if self.on:
-            return "net_print %s" % self.s
+            return "pkt_print %s" % self.s
         else:
             return ''
 
-    ### eval : Packet -> Set Packet
+
+class net_print(_print):
     def eval(self, packet):
         if self.on:
             print "---- net_print %s -------" % self.s
@@ -117,19 +105,18 @@ class net_print(_print):
             print "-------------------------------"
         return {packet}
 
+    def __repr__(self):
+        if self.on:
+            return "net_print %s" % self.s
+        else:
+            return ''
 
-class pol_print(SinglyDerivedPolicy):
+
+class pol_print(DerivedPolicy):
     def __init__(self,policy,s='',on=True):
         self.s = s    
         self.on = on
         super(pol_print,self).__init__(policy)
-
-    ### repr : unit -> String
-    def __repr__(self):
-        if self.on:
-            return "[pol_print %s]\n%s" % (self.s,self.policy)
-        else:
-            return ''
 
     def eval(self, packet):
         if self.on:
@@ -144,18 +131,20 @@ class pol_print(SinglyDerivedPolicy):
         (result,traversed) = super(pol_print,self).track_eval(packet)
         return (result,[self,traversed])
 
+    def __repr__(self):
+        if self.on:
+            return "[pol_print %s]\n%s" % (self.s,self.policy)
+        else:
+            return ''
+
 
 ### TRACING POLICIES
 
-class trace(SinglyDerivedPolicy):
+class trace(DerivedPolicy):
     def __init__(self,policy,trace_name='trace'):
         self.trace_name = trace_name
         self.highest_trace_value = {}
         super(trace,self).__init__(policy)
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "[%s]\n%s" % (self.trace_name,self.policy)
 
     def eval(self, packet):
         v = packet.get_stack(self.trace_name)
@@ -191,6 +180,9 @@ class trace(SinglyDerivedPolicy):
         else:
             return (output,[self,traversed])
 
+    def __repr__(self):
+        return "[%s]\n%s" % (self.trace_name,self.policy)
+
 
 class clear_trace(Policy):
     def __init__(self,trace_name='trace'):
@@ -201,7 +193,7 @@ class clear_trace(Policy):
         return {packet.clear(self.trace_name)}
 
 
-class breakpoint(SinglyDerivedPolicy):
+class breakpoint(DerivedPolicy):
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy=passthrough, condition=lambda ps: True):
         self.condition = condition
@@ -220,7 +212,7 @@ class breakpoint(SinglyDerivedPolicy):
             except:
                 import pdb as debugger
             debugger.set_trace()
-        return SinglyDerivedPolicy.eval(self, packet)
+        return DerivedPolicy.eval(self, packet)
 
     def track_eval(self, packet):
         if self.condition(packet):
@@ -229,9 +221,8 @@ class breakpoint(SinglyDerivedPolicy):
             except:
                 import pdb as debugger
             debugger.set_trace()
-        (result,traversed) = SinglyDerivedPolicy.track_eval(self, packet)
+        (result,traversed) = DerivedPolicy.track_eval(self, packet)
         return (result,[self,traversed])        
 
-    ### repr : unit -> String
     def __repr__(self):
         return "***debug***\n%s" % util.repr_plus([self.policy])

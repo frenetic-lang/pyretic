@@ -442,11 +442,11 @@ class difference(DerivedPredicate):
 
         
 ################################################################################
-# Policies
+# Policies                                                                     #
 ################################################################################
 
 class Policy(NetworkEvaluated):
-    """Top-level abstract description of a static network program."""
+    """Top-level abstract description of a policy."""
     ### sub : Predicate -> Policy
     def __sub__(self, pred):
         return remove(self, pred)
@@ -466,42 +466,50 @@ class Policy(NetworkEvaluated):
     ### eq : Policy -> bool
     def __eq__(self, other):
         raise NotImplementedError
-        
-@singleton
-class passthrough(Policy):
+
+    ### eval : Packet -> Set Packet
+    def __eval__(self, packet):
+        raise NotImplementedError
+
     ### repr : unit -> String
     def __repr__(self):
-        return "passthrough"
+        raise NotImplementedError
+
+
+################################################################################
+# Primitive Policies                                                           #
+################################################################################
+
+class PrimitivePolicy(Policy):
+    """Top-level abstract description of a primitive static policy."""
         
-    ### eval : Packet -> Set Packet
+
+@singleton
+class passthrough(PrimitivePolicy):
+    """The identity policy"""
     def eval(self, packet):
         return {packet}
 
+    def __repr__(self):
+        return "passthrough"
+
         
 @singleton
-class drop(Policy):
-    """Policy that drops everything."""
-    ### repr : unit -> String
-    def __repr__(self):
-        return "drop"
-        
-    ### eval : Packet -> Set Packet
+class drop(PrimitivePolicy):
+    """The policy that drops a packet"""
     def eval(self, packet):
         return set()
 
+    def __repr__(self):
+        return "drop"
+
         
-class flood(Policy):
+class flood(PrimitivePolicy):
+    """The policy that floods packets on a minimum spanning tree"""
     def __init__(self):
         self.egresses = None
         self.mst = None
         super(flood,self).__init__()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        try: 
-            return "flood on:\n%s" % self.mst
-        except:
-            return "flood"
 
     def set_network(self, network):
         changed = False
@@ -552,69 +560,45 @@ class flood(Policy):
             return packets
         else:
             return set()
+
+    def __repr__(self):
+        try: 
+            return "flood on:\n%s" % self.mst
+        except:
+            return "flood"
+
         
-        
-class push(Policy):
+class push(PrimitivePolicy):
     """push(field=value) pushes value onto header field stack"""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
         super(push,self).__init__()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "push:\n%s" % util.repr_plus(self.map.items())
         
-    ### eval : Packet -> Set Packet
     def eval(self, packet):
         packet = packet.pushmany(self.map)
         return {packet}
 
+    def __repr__(self):
+        return "push:\n%s" % util.repr_plus(self.map.items())
+
         
-class pop(Policy):
+class pop(PrimitivePolicy):
     """pop('field') pops value off field stack"""
     ### init : List String -> unit
     def __init__(self, *args):
         self.fields = list(args)
         super(pop,self).__init__()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "pop:\n%s" % util.repr_plus(self.fields)
         
-    ### eval : Packet -> Set Packet
     def eval(self, packet):
         packet = packet.popmany(self.fields)
         return {packet}
 
-
-class modify(Policy):
-    """modify(field=value) is equivalent to
-    pop('field') >> push(field=value)"""
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit
-    def __init__(self, *args, **kwargs):
-       init_map = {}
-       for (k, v) in dict(*args, **kwargs).iteritems():
-           if k == 'srcip' or k == 'dstip':
-               init_map[k] = IP(v) 
-           elif k == 'srcmac' or k == 'dstmac':
-               init_map[k] = MAC(v)
-           else:
-               init_map[k] = v
-       self.map = util.frozendict(init_map)
-       super(modify,self).__init__()
-
-    ### repr : unit -> String
     def __repr__(self):
-        return "modify:\n%s" % util.repr_plus(self.map.items())
-
-    ### eval : Packet -> Set Packet        
-    def eval(self, packet):
-        packet = packet.modifymany(self.map)
-        return {packet}
+        return "pop:\n%s" % util.repr_plus(self.fields)
 
 
-class copy(Policy):
+class copy(PrimitivePolicy):
     """copy(field1='field2') pushes the value stored at the top of 
     the field2 stack unto the field1 stack"""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
@@ -622,11 +606,6 @@ class copy(Policy):
         self.map = dict(*args, **kwargs)
         super(copy,self).__init__()
 
-    ### repr : unit -> String
-    def __repr__(self):
-        return "copy:\n%s" % util.repr_plus(self.map.items())
-  
-    ### eval : Packet -> Set Packet
     def eval(self, packet):
         pushes = {}
         for (dstfield, srcfield) in self.map.iteritems():
@@ -634,56 +613,102 @@ class copy(Policy):
         packet = packet.pushmany(pushes)
         return {packet}
         
-        
-class move(Policy):
-    """move(field1='field2') is equivalent to 
-    copy(field1='field2') >> pop('field2')"""
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-        super(move,self).__init__()
-
-    ### repr : unit -> String
     def __repr__(self):
-        return "move:\n%s" % util.repr_plus(self.map.items())
-  
-    ### eval : Packet -> Set Packet
+        return "copy:\n%s" % util.repr_plus(self.map.items())
+
+
+################################################################################
+# Combinator Policies                                                          #
+################################################################################
+
+class CombinatorPolicy(Policy):
+    pass
+
+
+class remove(CombinatorPolicy):
+    ### init : Policy -> Predicate -> unit
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+        self.policy.set_parent(self)
+        self.predicate.set_parent(self)
+        super(remove,self).__init__()
+
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(remove,self).set_network(network)
+        self.policy.set_network(network) 
+        self.predicate.set_network(network)
+
     def eval(self, packet):
-        pushes = {}
-        pops = []
-        for (dstfield, srcfield) in self.map.iteritems():
-            try:
-                pushes[dstfield] = packet[srcfield]
-                pops.append(srcfield)
-            except KeyError:
-                pass
-        packet = packet.pushmany(pushes).popmany(pops)
-        return {packet}
+        if not self.predicate.eval(packet):
+            return self.policy.eval(packet)
+        else:
+            return set()
 
+    def track_eval(self, packet):
+        (result1,traversed1) = self.predicate.track_eval(packet)
+        if not result1:
+            (result2,traversed2) = self.policy.track_eval(packet)
+            return (result2,[self,traversed1,traversed2])
+        else:
+            return (set(),[self,traversed1])
 
+    def __repr__(self):
+        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
 
+    
+class restrict(CombinatorPolicy):
+    ### init : Policy -> Predicate -> unit
+    def __init__(self, policy, predicate):
+        self.policy = policy
+        self.predicate = predicate
+        self.policy.set_parent(self)
+        self.predicate.set_parent(self)
+        super(restrict,self).__init__() 
 
-################################################################################
-# Policy Derived from Multiple Policies
-################################################################################
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(restrict,self).set_network(network)
+        self.policy.set_network(network) 
+        self.predicate.set_network(network)
 
-class MultiplyDerivedPolicy(Policy):
+    def eval(self, packet):
+        if self.predicate.eval(packet):
+            return self.policy.eval(packet)
+        else:
+            return set()
+
+    def track_eval(self, packet):
+        (result1,traversed1) = self.predicate.track_eval(packet)
+        if result1:
+            (result2,traversed2) = self.policy.track_eval(packet)
+            return (result2,[self,traversed1,traversed2])
+        else:
+            return (set(),[self,traversed1])
+
+    def __repr__(self):
+        return "restrict:\n%s" % util.repr_plus([self.predicate,
+                                                 self.policy])
+
+                    
+class parallel(CombinatorPolicy):
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
         for policy in self.policies:
             policy.set_parent(self)
-        super(MultiplyDerivedPolicy,self).__init__()
+        super(parallel,self).__init__()
 
     def set_network(self, network):
         if network == self._network:
             return
-        super(MultiplyDerivedPolicy,self).set_network(network)
+        super(parallel,self).set_network(network)
         for policy in self.policies:
             policy.set_network(network) 
 
-                    
-class parallel(MultiplyDerivedPolicy):
     def eval(self, packet):
         output = set()
         for policy in self.policies:
@@ -699,12 +724,25 @@ class parallel(MultiplyDerivedPolicy):
             output |= p_output
         return (output,[self,traversed])
     
-    ### repr : unit -> String
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
         
 
-class sequential(MultiplyDerivedPolicy):
+class sequential(CombinatorPolicy):
+    ### init : List Policy -> unit
+    def __init__(self, policies):
+        self.policies = list(policies)
+        for policy in self.policies:
+            policy.set_parent(self)
+        super(sequential,self).__init__()
+
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(sequential,self).set_network(network)
+        for policy in self.policies:
+            policy.set_network(network) 
+
     def eval(self, packet):
         input_set = {packet}
         for policy in self.policies:
@@ -726,25 +764,24 @@ class sequential(MultiplyDerivedPolicy):
             input_set = output_set
         return (output_set,[self,traversed])
     
-    ### repr : unit -> String
     def __repr__(self):
         return "sequential:\n%s" % util.repr_plus(self.policies)
-
+  
 
 ################################################################################
-# Policy Derived from a Single Policy
+# Derived Policies                                                             #
 ################################################################################
         
-class SinglyDerivedPolicy(Policy):
+class DerivedPolicy(Policy):
     def __init__(self, policy):
         self.policy = policy
         self.policy.set_parent(self)
-        super(SinglyDerivedPolicy,self).__init__()
+        super(DerivedPolicy,self).__init__()
 
     def set_network(self, network):
         if network == self._network:
             return
-        super(SinglyDerivedPolicy,self).set_network(network)            
+        super(DerivedPolicy,self).set_network(network)            
         if not self.policy is None:
             self.policy.set_network(network) 
 
@@ -756,95 +793,66 @@ class SinglyDerivedPolicy(Policy):
         return (result,[self,traversed])
 
 
-class fwd(SinglyDerivedPolicy):
+class modify(Policy):
+    """modify(field=value) is equivalent to
+    pop('field') >> push(field=value)"""
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+       init_map = {}
+       for (k, v) in dict(*args, **kwargs).iteritems():
+           if k == 'srcip' or k == 'dstip':
+               init_map[k] = IP(v) 
+           elif k == 'srcmac' or k == 'dstmac':
+               init_map[k] = MAC(v)
+           else:
+               init_map[k] = v
+       self.map = util.frozendict(init_map)
+       super(modify,self).__init__()
+
+    def eval(self, packet):
+        packet = packet.modifymany(self.map)
+        return {packet}
+
+    def __repr__(self):
+        return "modify:\n%s" % util.repr_plus(self.map.items())
+
+        
+class move(Policy):
+    """move(field1='field2') is equivalent to 
+    copy(field1='field2') >> pop('field2')"""
+    ### init : List (String * FieldVal) -> List KeywordArg -> unit
+    def __init__(self, *args, **kwargs):
+        self.map = dict(*args, **kwargs)
+        super(move,self).__init__()
+  
+    def eval(self, packet):
+        pushes = {}
+        pops = []
+        for (dstfield, srcfield) in self.map.iteritems():
+            try:
+                pushes[dstfield] = packet[srcfield]
+                pops.append(srcfield)
+            except KeyError:
+                pass
+        packet = packet.pushmany(pushes).popmany(pops)
+        return {packet}
+
+    def __repr__(self):
+        return "move:\n%s" % util.repr_plus(self.map.items())
+
+
+class fwd(DerivedPolicy):
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
         super(fwd,self).__init__(if_(match(outport=-1),pop('outport')) 
                                  >> push(outport=self.outport))
 
-    ### repr : unit -> String
     def __repr__(self):
         return "fwd %s" % self.outport
     
 
-class recurse(SinglyDerivedPolicy):
-    def set_network(self, network):
-        if network == self.policy._network:
-            return
-        super(recurse,self).set_network(network)
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "[recurse]:\n%s" % repr(self.policy)
-
-class remove(SinglyDerivedPolicy):
-    ### init : Policy -> Predicate -> unit
-    def __init__(self, policy, predicate):
-        self.predicate = predicate
-        self.predicate.set_parent(self)
-        super(remove,self).__init__(policy)
-
-    def set_network(self, network):
-        if network == self._network:
-            return
-        super(remove,self).set_network(network)
-        self.predicate.set_network(network)
-
-    ### eval : Packet -> Set Packet
-    def eval(self, packet):
-        if not self.predicate.eval(packet):
-            return self.policy.eval(packet)
-        else:
-            return set()
-
-    def track_eval(self, packet):
-        (result1,traversed1) = self.predicate.track_eval(packet)
-        if not result1:
-            (result2,traversed2) = self.policy.track_eval(packet)
-            return (result2,[self,traversed1,traversed2])
-        else:
-            return (set(),[self,traversed1])
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "remove:\n%s" % util.repr_plus([self.predicate, self.policy])
-
-    
-class restrict(SinglyDerivedPolicy):
-    ### init : Policy -> Predicate -> unit
-    def __init__(self, policy, predicate):
-        self.predicate = predicate
-        self.predicate.set_parent(self)
-        super(restrict,self).__init__(policy) 
-
-    def set_network(self, network):
-        if network == self._network:
-            return
-        super(restrict,self).set_network(network)
-        self.predicate.set_network(network)
-
-    ### eval : Packet -> Set Packet
-    def eval(self, packet):
-        if self.predicate.eval(packet):
-            return self.policy.eval(packet)
-        else:
-            return set()
-
-    def track_eval(self, packet):
-        (result1,traversed1) = self.predicate.track_eval(packet)
-        if result1:
-            (result2,traversed2) = self.policy.track_eval(packet)
-            return (result2,[self,traversed1,traversed2])
-        else:
-            return (set(),[self,traversed1])
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "restrict:\n%s" % util.repr_plus([self.predicate,
-                                                 self.policy])
-
-class if_(SinglyDerivedPolicy):
+class if_(DerivedPolicy):
     ### init : Predicate -> Policy -> Policy -> unit
     def __init__(self, pred, t_branch, f_branch=passthrough):
         self.pred = pred
@@ -856,117 +864,43 @@ class if_(SinglyDerivedPolicy):
         super(if_,self).__init__(self.pred[self.t_branch] + 
                                  (~self.pred)[self.f_branch])
 
-    ### repr : unit -> String
     def __repr__(self):
         return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
                                                util.repr_plus([self.t_branch]),
                                                util.repr_plus([self.f_branch]))
-        
 
-class NetworkDerivedPolicy(SinglyDerivedPolicy):
-    """Generates new policy every time a new network is set"""
-    def __init__(self, policy_from_network):
-        self.policy_from_network = policy_from_network
-        super(NetworkDerivedPolicy,self).__init__(drop)
 
+class recurse(DerivedPolicy):
     def set_network(self, network):
-        if network == self._network:
+        if network == self.policy._network:
             return
-        super(NetworkDerivedPolicy,self).set_network(network)
-        if not network is None:
-            self.policy = self.policy_from_network(network)
-        else:
-            self.policy = drop
-        self.policy.set_parent(self)
-        self.changed()
+        super(recurse,self).set_network(network)
 
-    ### repr : unit -> String
     def __repr__(self):
-        return "[NetworkDerivedPolicy]\n%s" % repr(self.policy)
-
-    
-def NetworkDerivedPolicyPropertyFrom(network_to_policy):
-    """Makes a NetworkDerivedPolicy that is a property of a virtualization defintion 
-    from a policy taking a network and returning a policy"""
-    @property
-    @functools.wraps(network_to_policy)
-    def wrapper(self):
-        return NetworkDerivedPolicy(functools.partial(network_to_policy, self))
-    return wrapper
+        return "[recurse]:\n%s" % repr(self.policy)
 
 
-class MutablePolicy(SinglyDerivedPolicy):
-    ### init : unit -> unit
-    def __init__(self):
-        self._policy = drop
-        self._policy.set_parent(self)
-        super(SinglyDerivedPolicy,self).__init__()
-        
-    @property
-    def policy(self):
-        return self._policy
-        
-    @policy.setter
-    def policy(self, policy):
-        self._policy = policy
-        self._policy.set_parent(self)
-        self._policy.set_network(self.network)
-        self.changed()
-
-    ### repr : unit -> String
-    def __repr__(self):
-        return "[MutablePolicy]\n%s" % repr(self.policy)
-
-        
-# dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
-def dynamic(fn):
-    class DecoratedPolicy(MutablePolicy):
-        def __init__(self, *args, **kwargs):
-            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
-            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
-            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
-            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
-            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
-            MutablePolicy.__init__(self)
-            fn(self, *args, **kwargs)
-
-        ### repr : unit -> String
-        def __repr__(self):
-            return "[DecoratedPolicy]\n%s" % repr(self.policy)
-            
-    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
-    DecoratedPolicy.__name__ = fn.__name__
-    return DecoratedPolicy
-
-
-
-############################
-# Query classes
-############################
+################################################################################
+# Query Policies                                                               #
+################################################################################
 
 class FwdBucket(Policy):
     ### init : unit -> unit
     def __init__(self):
-        self.listeners = []
+        self.callbacks = []
         super(FwdBucket,self).__init__()
 
-    ### eval : Packet -> unit
     def eval(self, packet):
-        for listener in self.listeners:
-            listener(packet)
+        for callback in self.callbacks:
+            callback(packet)
         return set()
 
-    ### register_callback : (Packet -> unit) -> (Packet -> unit)  
-    # UNCLEAR IF THIS SIGNATURE IS OVERLY RESTRICTIVE 
-    # CODE COULD PERMIT (Packet -> X) WHERE X not unit
-    # CURRENT EXAMPLES USE SOLELY SIDE-EFFECTING FUNCTIONS
+    ### register_callback : (Packet -> X) -> unit 
     def register_callback(self, fn):
-        self.listeners.append(fn)
-        return fn
+        self.callbacks.append(fn)
 
 
 class packets(Policy):
-
     class PredicateWrappedFwdBucket(Predicate):
         def __init__(self,limit=None,fields=[]):
             self.limit = limit
@@ -1073,7 +1007,6 @@ class AggregateFwdBucket(FwdBucket):
         else:
             self.aggregate = self.aggregator(self.aggregate,pkt)
 
-    ### eval : Packet -> unit
     def eval(self, packet):
         self.update_aggregate(packet)
         return set()
@@ -1088,3 +1021,79 @@ class sizes(AggregateFwdBucket):
     def aggregator(self,aggregate,pkt):
         return aggregate + pkt['header_len'] + pkt['payload_len']
 
+
+################################################################################
+# Dynamic Policies                                                             #
+################################################################################
+
+class NetworkDerivedPolicy(DerivedPolicy):
+    """Generates new policy every time a new network is set"""
+    def __init__(self, policy_from_network):
+        self.policy_from_network = policy_from_network
+        super(NetworkDerivedPolicy,self).__init__(drop)
+
+    def set_network(self, network):
+        if network == self._network:
+            return
+        super(NetworkDerivedPolicy,self).set_network(network)
+        if not network is None:
+            self.policy = self.policy_from_network(network)
+        else:
+            self.policy = drop
+        self.policy.set_parent(self)
+        self.changed()
+
+    def __repr__(self):
+        return "[NetworkDerivedPolicy]\n%s" % repr(self.policy)
+
+    
+def NetworkDerivedPolicyPropertyFrom(network_to_policy):
+    """Makes a NetworkDerivedPolicy that is a property of a virtualization defintion 
+    from a policy taking a network and returning a policy"""
+    @property
+    @functools.wraps(network_to_policy)
+    def wrapper(self):
+        return NetworkDerivedPolicy(functools.partial(network_to_policy, self))
+    return wrapper
+
+
+class MutablePolicy(DerivedPolicy):
+    ### init : unit -> unit
+    def __init__(self):
+        self._policy = drop
+        self._policy.set_parent(self)
+        super(DerivedPolicy,self).__init__()
+        
+    @property
+    def policy(self):
+        return self._policy
+        
+    @policy.setter
+    def policy(self, policy):
+        self._policy = policy
+        self._policy.set_parent(self)
+        self._policy.set_network(self.network)
+        self.changed()
+
+    def __repr__(self):
+        return "[MutablePolicy]\n%s" % repr(self.policy)
+
+        
+# dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
+def dynamic(fn):
+    class DecoratedPolicy(MutablePolicy):
+        def __init__(self, *args, **kwargs):
+            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
+            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
+            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
+            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
+            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
+            MutablePolicy.__init__(self)
+            fn(self, *args, **kwargs)
+
+        def __repr__(self):
+            return "[DecoratedPolicy]\n%s" % repr(self.policy)
+            
+    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
+    DecoratedPolicy.__name__ = fn.__name__
+    return DecoratedPolicy

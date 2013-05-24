@@ -108,7 +108,7 @@ class vmap(object):
 # Virtualization policies 
 ################################################################################
 
-class lower_packet(SinglyDerivedPolicy):
+class lower_packet(DerivedPolicy):
     """Lowers a packet from the derived network to the underlying network"""
     def __init__(self, vtag):
         self.vtag = vtag
@@ -122,27 +122,27 @@ class lower_packet(SinglyDerivedPolicy):
 
         
 @singleton
-class lift_packet(SinglyDerivedPolicy):
+class lift_packet(DerivedPolicy):
     """Lifts a packet from the underlying network to the derived network"""
     def __init__(self):
-        SinglyDerivedPolicy.__init__(self, 
-                                     pop("vtag") >>
-                                     move(outport="voutport", 
-                                          switch="vswitch", 
-                                          inport="vinport"))
+        DerivedPolicy.__init__(self, 
+                               pop("vtag") >>
+                               move(outport="voutport", 
+                                    switch="vswitch", 
+                                    inport="vinport"))
         
     def __repr__(self):
         return "lift_packet"
 
         
 @singleton
-class pop_vheaders(SinglyDerivedPolicy):
+class pop_vheaders(DerivedPolicy):
     def __init__(self):
-        SinglyDerivedPolicy.__init__(self,
-                                     pop("vswitch", 
-                                         "vinport", 
-                                         "voutport", 
-                                         "vtag"))
+        DerivedPolicy.__init__(self,
+                               pop("vswitch", 
+                                   "vinport", 
+                                   "voutport", 
+                                   "vtag"))
         
     def __repr__(self):
         return "pop_vheaders"
@@ -156,11 +156,6 @@ class locate_in_underlying(Policy):
     def set_vmap(self,vmap):
         self.vmap = vmap
 
-    ### repr : unit -> String
-    def __repr__(self):
-        return "locate_in_underlying"
-
-    ### eval : Packet -> Set Packet
     def eval(self, packet):
         try:
             switch = packet['switch']
@@ -181,6 +176,9 @@ class locate_in_underlying(Policy):
         except KeyError:
             outport = -1
         return {packet}
+
+    def __repr__(self):
+        return "locate_in_underlying"
 
 
 class DerivedNetwork(Network):
@@ -205,7 +203,7 @@ class vdef(object):
         self.derived = None
 
 
-class virtualize_base(SinglyDerivedPolicy):
+class virtualize_base(DerivedPolicy):
     def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
         self.vpolicy = vpolicy
         self.upolicy = upolicy
