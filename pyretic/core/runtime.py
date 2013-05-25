@@ -212,26 +212,7 @@ class Runtime(object):
         return (pred,action_list)
 
 
-    def handle_packet_in(self, concrete_pkt):
-        pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        if self.debug_packet_in:
-            debugger.set_trace()
-        if USE_IPDB:
-             with debugger.launch_ipdb_on_exception():
-                 if self.mode == 'interpreted':
-                     output = self.policy.eval(pyretic_pkt)
-                 else:
-                     (output,traversed) = self.policy.track_eval(pyretic_pkt)
-        else:
-            try:
-                if self.mode == 'interpreted':
-                    output = self.policy.eval(pyretic_pkt)
-                else:
-                    (output,traversed) = self.policy.track_eval(pyretic_pkt)
-            except :
-                type, value, tb = sys.exc_info()
-                traceback.print_exc()
-                debugger.post_mortem(tb)
+    def reactive0(self,in_pkt,out_pkts,traversed):
         if self.mode == 'reactive0':
             rule = None
             names_traversed = namify(traversed)
@@ -243,7 +224,7 @@ class Runtime(object):
             elif in_namified('sizes', names_traversed):
                 pass
             else:
-                rule = self.match_on_all_fields_rule(pyretic_pkt,output)
+                rule = self.match_on_all_fields_rule(in_pkt,out_pkts)
                 if rule:
                     self.install_rule(rule)
                     if self.verbosity == 'high':
@@ -252,6 +233,30 @@ class Runtime(object):
                         print " | install rule"
                         print rule[0]
                         print rule[1]
+
+
+    def handle_packet_in(self, concrete_pkt):
+        pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+        if self.debug_packet_in:
+            debugger.set_trace()
+        if USE_IPDB:
+             with debugger.launch_ipdb_on_exception():
+                 if self.mode == 'interpreted':
+                     output = self.policy.eval(pyretic_pkt)
+                 else:
+                     (output,traversed) = self.policy.track_eval(pyretic_pkt)
+                     self.reactive0(pyretic_pkt,output,traversed)
+        else:
+            try:
+                if self.mode == 'interpreted':
+                    output = self.policy.eval(pyretic_pkt)
+                else:
+                    (output,traversed) = self.policy.track_eval(pyretic_pkt)
+                    self.reactive0(pyretic_pkt,output,traversed)
+            except :
+                type, value, tb = sys.exc_info()
+                traceback.print_exc()
+                debugger.post_mortem(tb)
         if self.show_traces:
             print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
             print util.repr_plus([pyretic_pkt], sep="\n\n")
