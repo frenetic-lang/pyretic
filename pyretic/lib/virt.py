@@ -211,7 +211,10 @@ class virtualize_base(DerivedPolicy):
         self.vdef = vdef
         self.vtag = new_vtag()
         tag = str(self.vtag)
-        self.DEBUG = DEBUG
+        if DEBUG:
+            self.DEBUG = all_packets
+        else:
+            self.DEBUG = no_packets
         self.ingress_policy = self.vdef.ingress_policy
         self.fabric_policy = self.vdef.fabric_policy
         self.egress_policy = self.vdef.egress_policy
