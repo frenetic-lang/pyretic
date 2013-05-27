@@ -44,7 +44,6 @@ from pyretic.lib.std import *
 
 def learn(self):
     """Standard MAC-learning logic"""
-
     def update_policy():
         """Update the policy based on current forward and query policies"""
         self.policy = self.forward + self.query
@@ -61,14 +60,15 @@ def learn(self):
     def set_initial_state():
         self.query = packets(1,['srcmac','switch'])
         self.query.register_callback(learn_new_MAC)
-        self.forward = flood()
+        self.forward = self.flood  # REUSE A SINGLE FLOOD INSTANCE
         self.update_policy()
 
     def set_network(network):
+        Policy.set_network(self,network)  # AVOID UNECESSARY CALCULATIONS IN INTERNAL POLICY ABOUT TO BE REPLACED
         set_initial_state()
-        super(MutablePolicy,self).set_network(network)
        
     self.set_network = set_network
+    self.flood = flood()           # REUSE A SINGLE FLOOD INSTANCE
     set_initial_state()
 
 
