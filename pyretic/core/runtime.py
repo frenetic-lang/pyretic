@@ -72,12 +72,22 @@ class Runtime(object):
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = threading.RLock()
         self.threads = set()
+        self.in_update_network = False
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
+            self.in_update_network = True
             self.prev_network = self.network.copy()
             self.policy.set_network(self.prev_network)
-       
+            self.clear_all()
+            self.in_update_network = False
+
+    def handle_policy_change(self, changed):
+        if self.in_update_network:
+            pass
+        else:
+            self.clear_all()  ## PLAY IT VERY CONSERVATIVE
+
     def handle_switch_join(self,switch_id):
         self.network.handle_switch_join(switch_id)
 
@@ -95,9 +105,6 @@ class Runtime(object):
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
         self.network.handle_link_update(s1, p_no1, s2, p_no2)
-
-    def handle_policy_change(self, changed):
-        self.clear_all()  ## PLAY IT VERY CONSERVATIVE
 
     def match_on_all_fields_pred(self, pkt):
         try:
