@@ -37,6 +37,7 @@ import subprocess
 from importlib import import_module
 from optparse import OptionParser
 import re
+import os
 
 
 def signal_handler(signal, frame):
@@ -56,8 +57,10 @@ def parseArgs():
     for arg in sys.argv[1:]:
         if not re.match('-',arg):
             end_args = sys.argv.index(arg)
-    kwargs_to_pass = sys.argv[end_args+1:]
-    sys.argv = sys.argv[:end_args+1]
+    kwargs_to_pass = None
+    if end_args > 0:
+        kwargs_to_pass = sys.argv[end_args+1:]
+        sys.argv = sys.argv[:end_args+1]
 
     op = OptionParser( description=desc, usage=usage )
     op.add_option( '--frontend-only', '-f', action="store_true", 
@@ -71,18 +74,34 @@ def parseArgs():
 
     op.set_defaults(frontend_only=False,mode='reactive0')
     options, args = op.parse_args()
-    return (options, args, kwargs_to_pass)
+
+    return (op, options, args, kwargs_to_pass)
 
 
 def main():
-    (options, args, kwargs_to_pass) = parseArgs()
+    (op, options, args, kwargs_to_pass) = parseArgs()
     if options.mode == 'i':
         options.mode = 'interpreted'
     elif options.mode == 'r0':
         options.mode = 'reactive0'
+    try:
+        module_name = args[0]
+    except IndexError:
+        print 'Module must be specified'
+        print ''
+        op.print_usage()
+        sys.exit(1)
+    try:
+        module = import_module(module_name)
+    except ImportError:
+        print 'Must be a valid python module'
+        print 'e.g, full module name,'
+        print '     no .py suffix,'
+        print '     located on the system PYTHONPATH'
+        print ''
+        op.print_usage()
+        sys.exit(1)
 
-    module_name = args[0]
-    module = import_module(module_name)
     main = module.main
     kwargs = { k : v for [k,v] in [ i.lstrip('--').split('=') for i in kwargs_to_pass ]}
 
@@ -90,8 +109,22 @@ def main():
     
     runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity,False,False)
     if not options.frontend_only:
+        try:
+            output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
+        except:
+            print 'Error: Unable to obtain PYTHONPATH'
+            sys.exit(1)
+        poxpath = None
+        for p in output.split(':'):
+             if re.match('.*pox/?$',p):
+                 poxpath = os.path.abspath(p)
+                 break
+        if poxpath is None:
+            print 'Error: pox not found in PYTHONPATH'
+            sys.exit(1)
+        pox_exec = os.path.join(poxpath,'pox.py')
         of_client = subprocess.Popen([sys.executable, 
-                                      '/home/mininet/pox/pox.py', 
+                                      pox_exec,
                                       'of_client.pox_client' ],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     
