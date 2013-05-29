@@ -38,6 +38,38 @@ class BFS_vdef(vdef):
         self.kept_topology = None
         super(BFS_vdef,self).__init__()
 
+        @dynamic
+        def ingress_policy(self):
+            def set_network(network):
+                if not self.vmap is None:
+                    self.policy = self.vmap.ingress_policy()
+                    DynamicPolicy.set_network(self,network)            
+            self.policy = drop
+            self.set_network = set_network
+
+        @dynamic
+        def fabric_policy(self):
+            def set_network(network):
+                if not self.vmap is None:
+                    self.policy = self.vmap.shortest_path_fabric_policy(network.topology)
+                    DynamicPolicy.set_network(self,network)            
+            self.policy = drop
+            self.set_network = set_network
+
+        @dynamic
+        def egress_policy(self):
+            def set_network(network):
+                if not self.vmap is None:
+                    self.policy = self.vmap.egress_policy()
+                    DynamicPolicy.set_network(self,network)            
+            self.policy = drop
+            self.set_network = set_network
+
+        self.ingress_policy = ingress_policy()
+        self.fabric_policy = fabric_policy()
+        self.egress_policy = egress_policy()
+    
+
     def make_vmap(self):
         mapping = vmap()
         port_no = 1
@@ -58,6 +90,9 @@ class BFS_vdef(vdef):
             if tmp:
                 self.kept_topology = tmp
         self.vmap = self.make_vmap()
+        self.ingress_policy.vmap = self.vmap
+        self.fabric_policy.vmap = self.vmap
+        self.egress_policy.vmap = self.vmap
         self.derived.topology = self.underlying.topology.copy()
         relink = {}
         if len(self.from_switches) == 0:
@@ -95,18 +130,5 @@ class BFS_vdef(vdef):
         print "------- Derived BFS Topology ---------"
         print self.derived.topology
 
-                
-    @NetworkDerivedPolicyPropertyFrom
-    def ingress_policy(self, network):
-        return self.vmap.ingress_policy()
-
-    @NetworkDerivedPolicyPropertyFrom
-    def fabric_policy(self, network): 
-        return self.vmap.shortest_path_fabric_policy(self.underlying.topology)
-
-    @NetworkDerivedPolicyPropertyFrom
-    def egress_policy(self, network):
-        return self.vmap.egress_policy()
-
-        
+                        
 transform = BFS_vdef()

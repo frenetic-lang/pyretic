@@ -998,36 +998,7 @@ class sizes(AggregateFwdBucket):
 # Dynamic Policies                                                             #
 ################################################################################
 
-class NetworkDerivedPolicy(DerivedPolicy):
-    """Generates new policy every time a new network is set"""
-    def __init__(self, policy_from_network):
-        self.policy_from_network = policy_from_network
-        super(NetworkDerivedPolicy,self).__init__(drop)
-
-    def set_network(self, network):
-        super(NetworkDerivedPolicy,self).set_network(network)
-        if not network is None:
-            self.policy = self.policy_from_network(network)
-        else:
-            self.policy = drop
-        self.policy.set_parent(self)
-        self.changed()
-
-    def __repr__(self):
-        return "[NetworkDerivedPolicy]\n%s" % repr(self.policy)
-
-    
-def NetworkDerivedPolicyPropertyFrom(network_to_policy):
-    """Makes a NetworkDerivedPolicy that is a property of a virtualization defintion 
-    from a policy taking a network and returning a policy"""
-    @property
-    @functools.wraps(network_to_policy)
-    def wrapper(self):
-        return NetworkDerivedPolicy(functools.partial(network_to_policy, self))
-    return wrapper
-
-
-class MutablePolicy(DerivedPolicy):
+class DynamicPolicy(DerivedPolicy):
     ### init : unit -> unit
     def __init__(self):
         self._policy = drop
@@ -1047,24 +1018,24 @@ class MutablePolicy(DerivedPolicy):
         self.changed()
 
     def __repr__(self):
-        return "[MutablePolicy]\n%s" % repr(self.policy)
+        return "[DynamicPolicy]\n%s" % repr(self.policy)
 
         
 # dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
 def dynamic(fn):
-    class DecoratedPolicy(MutablePolicy):
+    class DecoratedDynamicPolicy(DynamicPolicy):
         def __init__(self, *args, **kwargs):
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
             # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
             # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
             # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
             # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
-            MutablePolicy.__init__(self)
+            DynamicPolicy.__init__(self)
             fn(self, *args, **kwargs)
 
         def __repr__(self):
-            return "[DecoratedPolicy]\n%s" % repr(self.policy)
+            return "[dynamic]\n%s" % repr(self.policy)
             
     # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
-    DecoratedPolicy.__name__ = fn.__name__
-    return DecoratedPolicy
+    DecoratedDynamicPolicy.__name__ = fn.__name__
+    return DecoratedDynamicPolicy
