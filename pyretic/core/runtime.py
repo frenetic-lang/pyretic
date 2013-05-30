@@ -79,14 +79,17 @@ class Runtime(object):
             self.in_update_network = True
             self.prev_network = self.network.copy()
             self.policy.set_network(self.prev_network)
-            self.clear_all()
+            if self.mode == 'reactive0':
+                self.clear_all()
             self.in_update_network = False
 
     def handle_policy_change(self, changed):
         if self.in_update_network:
             pass
         else:
-            self.clear_all()  ## PLAY IT VERY CONSERVATIVE
+            if self.mode == 'reactive0':
+                self.clear_all()  ## PLAY IT VERY CONSERVATIVE
+            pass
 
     def handle_switch_join(self,switch_id):
         self.network.handle_switch_join(switch_id)
