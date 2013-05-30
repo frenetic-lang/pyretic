@@ -115,7 +115,7 @@ register_field("dstip", PrefixMatch)
 class NetworkEvaluated(object):
     def __init__(self):
         self._network = None
-        self.parent = None
+        self.parents = set()
         self.callback_on_change = set()
 
     @property
@@ -126,7 +126,19 @@ class NetworkEvaluated(object):
         self._network = network
 
     def set_parent(self,parent):
-        self.parent = parent
+        self.parents.add(parent)
+
+    def attach(self,parent):
+        self.set_parent(parent)
+
+    def unset_parent(self,parent):
+        try:
+            self.parents.remove(parent)
+        except:
+            pass
+
+    def detach(self,parent):
+        self.unset_parent(parent)
 
     def eval(self, packet):
         raise NotImplementedError        
@@ -138,8 +150,8 @@ class NetworkEvaluated(object):
         self.callback_on_change.add(fn)
 
     def changed(self, pathlist=[]):
-        if self.parent:
-            self.parent.changed([self] + pathlist)
+        for parent in self.parents:
+            parent.changed([self] + pathlist)
         for callback in self.callback_on_change:
             callback([self] + pathlist)
 
@@ -222,6 +234,12 @@ class ingress_network(PrimitivePredicate):
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
             self.changed()
+
+    def attach(self,parent):
+        self.set_parent(parent)
+
+    def detach(self,parent):
+        self.unset_parent(parent)
     
     def eval(self, packet):
         switch = packet["switch"]
@@ -243,6 +261,12 @@ class egress_network(PrimitivePredicate):
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
             self.changed()
+
+    def attach(self,parent):
+        self.set_parent(parent)
+
+    def detach(self,parent):
+        self.unset_parent(parent)
  
     def eval(self, packet):
         switch = packet["switch"]
@@ -316,6 +340,14 @@ class negate(CombinatorPredicate):
         super(negate,self).set_network(network)
         self.predicate.set_network(network)
 
+    def attach(self,parent):
+        self.predicate.attach(self)
+        super(negate,self).attach(parent)
+
+    def detach(self,parent):
+        self.predicate.detach(self)
+        super(negate,self).detach(parent)
+
     def eval(self, packet):
         return not self.predicate.eval(packet)
         
@@ -340,6 +372,16 @@ class union(CombinatorPredicate):
         super(union,self).set_network(network)
         for pred in self.predicates:
             pred.set_network(network)
+
+    def attach(self,parent):
+        for predicate in self.predicates:
+            predicate.attach(self)
+        super(union,self).attach(parent)
+
+    def detach(self,parent):
+        for predicate in self.predicates:
+            predicate.detach(self)
+        super(union,self).detach(parent)
 
     def eval(self, packet):
         return any(predicate.eval(packet) for predicate in self.predicates)
@@ -370,6 +412,16 @@ class intersect(CombinatorPredicate):
         super(intersect,self).set_network(network)
         for pred in self.predicates:
             pred.set_network(network)
+
+    def attach(self,parent):
+        for predicate in self.predicates:
+            predicate.attach(self)
+        super(intersect,self).attach(parent)
+
+    def detach(self,parent):
+        for predicate in self.predicates:
+            predicate.detach(self)
+        super(intersect,self).detach(parent)
 
     def eval(self, packet):
         return all(predicate.eval(packet) for predicate in self.predicates)
@@ -402,6 +454,14 @@ class DerivedPredicate(Predicate):
     def set_network(self, network):
         super(DerivedPredicate,self).set_network(network)
         self.predicate.set_network(network)
+
+    def attach(self,parent):
+        self.predicate.attach(self)
+        super(DerivedPredicate,self).attach(parent)
+
+    def detach(self,parent):
+        self.predicate.detach(self)
+        super(DerivedPredicate,self).detach(parent)
 
     def eval(self, packet):
         return self.predicate.eval(packet)
@@ -511,6 +571,12 @@ class flood(PrimitivePolicy):
                 changed = True
         if changed:
             self.changed()
+
+    def attach(self,parent):
+        self.set_parent(parent)
+
+    def detach(self,parent):
+        self.unset_parent(parent)
         
     def eval(self, packet):
         if self.network is None:
@@ -619,6 +685,16 @@ class remove(CombinatorPolicy):
         self.policy.set_network(network) 
         self.predicate.set_network(network)
 
+    def attach(self,parent):
+        self.predicate.attach(self)
+        self.policy.attach(self)
+        super(remove,self).attach(parent)
+
+    def detach(self,parent):
+        self.predicate.detach(self)
+        self.policy.detach(self)
+        super(remove,self).detach(parent)
+
     def eval(self, packet):
         if not self.predicate.eval(packet):
             return self.policy.eval(packet)
@@ -650,6 +726,16 @@ class restrict(CombinatorPolicy):
         super(restrict,self).set_network(network)
         self.policy.set_network(network) 
         self.predicate.set_network(network)
+
+    def detach(self,parent):
+        self.predicate.detach(self)
+        self.policy.detach(self)
+        super(restrict,self).detach(parent)
+
+    def attach(self,parent):
+        self.predicate.attach(self)
+        self.policy.attach(self)
+        super(restrict,self).attach(parent)
 
     def eval(self, packet):
         if self.predicate.eval(packet):
@@ -683,6 +769,16 @@ class parallel(CombinatorPolicy):
         for policy in self.policies:
             policy.set_network(network) 
 
+    def attach(self,parent):
+        for policy in self.policies:
+            policy.attach(self)
+        super(parallel,self).attach(parent)
+
+    def detach(self,parent):
+        for policy in self.policies:
+            policy.detach(self)
+        super(parallel,self).detach(parent)
+
     def eval(self, packet):
         output = set()
         for policy in self.policies:
@@ -714,6 +810,16 @@ class sequential(CombinatorPolicy):
         super(sequential,self).set_network(network)
         for policy in self.policies:
             policy.set_network(network) 
+
+    def attach(self,parent):
+        for policy in self.policies:
+            policy.attach(self)
+        super(sequential,self).attach(parent)
+
+    def detach(self,parent):
+        for policy in self.policies:
+            policy.detach(self)
+        super(sequential,self).detach(parent)
 
     def eval(self, packet):
         input_set = {packet}
@@ -754,6 +860,14 @@ class DerivedPolicy(Policy):
         super(DerivedPolicy,self).set_network(network)            
         if not self.policy is None:
             self.policy.set_network(network) 
+
+    def attach(self,parent):
+        self.policy.attach(self)
+        super(DerivedPolicy,self).attach(parent)
+
+    def detach(self,parent):
+        self.policy.detach(self)
+        super(DerivedPolicy,self).detach(parent)
 
     def eval(self, packet):
         return self.policy.eval(packet)
@@ -828,9 +942,6 @@ class if_(DerivedPolicy):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
-        self.pred.set_parent(self)
-        self.t_branch.set_parent(self)
-        self.f_branch.set_parent(self)
         super(if_,self).__init__(self.pred[self.t_branch] + 
                                  (~self.pred)[self.f_branch])
 
@@ -845,6 +956,20 @@ class recurse(DerivedPolicy):
         if network == self.policy._network:
             return
         super(recurse,self).set_network(network)
+
+    def changed(self, pathlist=[]):
+        for parent in self.parents:
+            if id(parent) in map(id,pathlist):
+                continue
+            parent.changed([self] + pathlist)
+        for callback in self.callback_on_change:
+            callback([self] + pathlist)
+
+    def attach(self,parent):
+        super(DerivedPolicy,self).attach(parent)
+
+    def detach(self,parent):
+        super(DerivedPolicy,self).detach(parent)
 
     def __repr__(self):
         return "[recurse]:\n%s" % repr(self.policy)
@@ -912,6 +1037,14 @@ class packets(Policy):
         super(packets,self).set_network(network)
         self.pwfb.set_network(network)
         self.predicate.set_network(network)
+
+    def attach(self,parent):
+        self.set_parent(parent)
+        super(packets,self).attach(parent)
+
+    def detach(self,parent):
+        self.unset_parent(parent)
+        super(packets,self).detach(parent)
 
     def eval(self,pkt):
         """Don't look any more such packets"""
@@ -1007,11 +1140,22 @@ class DynamicPolicy(DerivedPolicy):
         
     @policy.setter
     def policy(self, policy):
+        self._policy.detach(self)
         self._policy = policy
-        self._policy.set_parent(self)
+        self._policy.attach(self)
         if self.network:
             self._policy.set_network(self.network)
         self.changed()
+
+    def attach(self,parent):
+        self._policy.attach(self)
+        self.set_parent(parent)
+        super(DynamicPolicy,self).attach(parent)
+
+    def detach(self,parent):
+        self._policy.detach(self)
+        self.unset_parent(parent)
+        super(DynamicPolicy,self).detach(parent)
 
     def __repr__(self):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
