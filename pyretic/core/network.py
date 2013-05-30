@@ -292,6 +292,8 @@ class Location(object):
         return hash((self.switch, self.port_no))
 
     def __eq__(self,other):
+        if other is None:
+            return False
         return self.switch == other.switch and self.port_no == other.port_no
 
     def __repr__(self):
