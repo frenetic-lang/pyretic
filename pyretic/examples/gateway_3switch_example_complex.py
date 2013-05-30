@@ -71,7 +71,7 @@ def example_setup(num_clients=3, num_servers=3):
     ip_cidr = ip_prefix + '0/' + str(prefix_len)
 
     # END HOST ADDRESSES
-    public_ip = '10.0.1.100'
+    public_ip = IP('10.0.1.100')
     fake_mac = MAC('BB:BB:BB:BB:BB:BB')
     eth_macs = { IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) \
                      for i in range(1,1+num_clients) }
@@ -81,8 +81,8 @@ def example_setup(num_clients=3, num_servers=3):
     host_macs.update({IP(public_ip) : fake_mac})
 
     # PARAMETERS FOR FIREWALL/LOAD BALANCER
-    R = [ip_prefix + str(i) for i in range(2, 2+num_servers)]
-    H = {eth_prefix + str(i) : 0 for i in range(2,2+num_clients)}
+    R = [IP(ip_prefix + str(i)) for i in range(2, 2+num_servers)]
+    H = {IP(eth_prefix + str(i)) : 0 for i in range(2,2+num_clients)}
     W = {(c,public_ip) for c in H.keys()}
 
     ### POLICIES FOR THIS EXAMPLE

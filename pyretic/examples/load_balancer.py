@@ -117,12 +117,12 @@ def main(clients, servers):
 
     # CALCULATE IPS
     ip_prefix = '10.0.0.'
-    public_ip = ip_prefix + str(100)
+    public_ip = IP(ip_prefix + str(100))
     print "public_ip = %s" % public_ip
     
-    client_ips = [ip_prefix + str(i) for i in range(1, 1+num_clients)]
+    client_ips = [IP(ip_prefix + str(i)) for i in range(1, 1+num_clients)]
     H = {c : 0 for c in client_ips}
-    R = [ip_prefix + str(i) for i in range(1+num_clients, 1+num_clients+num_servers)]
+    R = [IP(ip_prefix + str(i)) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
     return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
 #    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  

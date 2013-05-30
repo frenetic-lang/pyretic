@@ -56,7 +56,7 @@ def example_setup(num_clients=3, num_servers=3):
     ip_cidr = ip_prefix + '0/' + str(prefix_len)
 
     # END HOST ADDRESSES
-    public_ip = '10.0.1.100'
+    public_ip = IP('10.0.1.100')
     fake_mac = MAC('BB:BB:BB:BB:BB:BB')
     eth_macs = { IP(eth_prefix+str(i+1)) : MAC('00:00:00:00:00:0'+str(i)) \
                      for i in range(1,1+num_clients) }
