@@ -49,7 +49,8 @@ def act_like_hub():
 def act_like_switch(self):
     """
     Implement switch-like behavior.
-
+    """
+    """ # DELETE BOTH THIS LINE AND THE ONE BELOW TO START WORKING ON THE TUTORIAL # 
     # Here's some psuedocode to start you off implementing a learning
     # switch.  You'll need to rewrite it as real Python code using Pyretic predicates
     # and policies - all of which are defined and documented in pyretic/core/language.py
@@ -81,7 +82,10 @@ def act_like_switch(self):
         # and don't forget to update the policy
         ...
 
-    """ # DELETE THIS LINE TO START WORKING ON THIS #
+    # And don't forget to make sure learn_from_a_packet is called back every time our
+    # query sees a new packet
+    self.query.register_callback(learn_from_a_packet)
+    """ # DELETE BOTH THIS LINE AND THE ONE ABOVE TO START WORKING ON THE TUTORIAL # 
 
 
 def main():
