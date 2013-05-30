@@ -37,27 +37,24 @@ class spanning_tree_vdef(vdef):
         @dynamic
         def ingress_policy(self):
             def set_network(network):
-                if not self.vmap is None:
-                    self.policy = self.vmap.ingress_policy()
-                    DynamicPolicy.set_network(self,network)            
+                self.policy = self.vmap.ingress_policy()
+                DynamicPolicy.set_network(self,network)            
             self.policy = drop
             self.set_network = set_network
 
         @dynamic
         def fabric_policy(self):
             def set_network(network):
-                if not self.vmap is None:
-                    self.policy = self.vmap.one_to_one_fabric_policy() 
-                    DynamicPolicy.set_network(self,network)            
+                self.policy = self.vmap.one_to_one_fabric_policy() 
+                DynamicPolicy.set_network(self,network)            
             self.policy = drop
             self.set_network = set_network
 
         @dynamic
         def egress_policy(self):
             def set_network(network):
-                if not self.vmap is None:
-                    self.policy = self.vmap.egress_policy()
-                    DynamicPolicy.set_network(self,network)            
+                self.policy = self.vmap.egress_policy()
+                DynamicPolicy.set_network(self,network)            
             self.policy = drop
             self.set_network = set_network
 
@@ -82,13 +79,10 @@ class spanning_tree_vdef(vdef):
 
     def set_network(self,network):
         self.underlying = network
-        self.derived = DerivedNetwork(self.underlying)
+        self.derived = self.DerivedNetwork(self.underlying)
         self.derived.topology = Topology.minimum_spanning_tree(network.topology)
         self.derived.inherited.clear()
-        self.vmap = self.make_vmap()
-        self.ingress_policy.vmap = self.vmap
-        self.fabric_policy.vmap = self.vmap
-        self.egress_policy.vmap = self.vmap
+        super(spanning_tree_vdef,self).set_network(network)
         print "------- Underlying Spanning Tree Topology ---------"
         print self.underlying.topology
         print "------- Derived Spanning Tree Topology ---------"

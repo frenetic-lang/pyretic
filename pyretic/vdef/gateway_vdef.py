@@ -97,8 +97,7 @@ class gateway_vdef(vdef):
 
     def set_network(self,network):
         self.underlying = network
-        self.derived = DerivedNetwork(self.underlying)
-        self.vmap = self.make_vmap()
+        self.derived = self.DerivedNetwork(self.underlying)
         self.derived.topology = self.underlying.topology.copy()
         try:
             # REMOVE PHYSICAL SWITCHES ONTO WHICH VIRTUAL SWITCHES WILL BE MAPPED
@@ -120,7 +119,7 @@ class gateway_vdef(vdef):
             self.derived.topology.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
         except:
             self.derived.topology = Topology()
-
+        super(gateway_vdef,self).set_network(network)
         print "--- Underlying Gateway Topology ------"
         print self.underlying.topology
         print "--- Derived Gateway Topology ------"

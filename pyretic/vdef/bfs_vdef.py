@@ -83,17 +83,14 @@ class BFS_vdef(vdef):
 
     def set_network(self,network):
         self.underlying = network
-        self.derived = DerivedNetwork(self.underlying)
+        self.derived = self.DerivedNetwork(self.underlying)
         self.kept_topology = self.underlying.topology
         if self.from_switches:
             tmp = network.topology.filter_nodes(self.from_switches)
             if tmp:
                 self.kept_topology = tmp
-        self.vmap = self.make_vmap()
-        self.ingress_policy.vmap = self.vmap
-        self.fabric_policy.vmap = self.vmap
-        self.egress_policy.vmap = self.vmap
         self.derived.topology = self.underlying.topology.copy()
+        super(BFS_vdef,self).set_network(network)
         relink = {}
         if len(self.from_switches) == 0:
             self.derived.topology = Topology()

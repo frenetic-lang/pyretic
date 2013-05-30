@@ -1,3 +1,4 @@
+
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -36,17 +37,70 @@ from pyretic.lib.std import pkt_print, str_print
 
 import itertools
 
+################################################################################
+# Unique virtual network tags                                                  #
+################################################################################
+
 last_vtag = 0
 def new_vtag():
+    """Returns a new unique tag"""
     global last_vtag 
     last_vtag = last_vtag + 1
     return last_vtag
+
+
+################################################################################
+# Virtualization helper policies                                               #
+################################################################################
+
+class lower_packet(DerivedPolicy):
+    """Lowers a packet from the derived network to the underlying network"""
+    def __init__(self, vtag):
+        self.vtag = vtag
+        super(lower_packet,self).__init__(push(vtag=self.vtag) >> 
+                                          move(voutport="outport",
+                                               vswitch="switch",
+                                               vinport="inport"))
+        
+        def __repr__(self):
+            return "lower_packet %s" % self.vtag
+
+        
+@singleton
+class lift_packet(DerivedPolicy):
+    """Lifts a packet from the underlying network to the derived network"""
+    def __init__(self):
+        DerivedPolicy.__init__(self, 
+                               pop("vtag") >>
+                               move(outport="voutport", 
+                                    switch="vswitch", 
+                                    inport="vinport"))
+        
+    def __repr__(self):
+        return "lift_packet"
+
+        
+@singleton
+class pop_vheaders(DerivedPolicy):
+    """Removes all headers used by this library"""
+    def __init__(self):
+        DerivedPolicy.__init__(self,
+                               pop("vswitch", 
+                                   "vinport", 
+                                   "voutport", 
+                                   "vtag"))
+        
+    def __repr__(self):
+        return "pop_vheaders"
+
 
 ################################################################################
 # VMAP functions
 ################################################################################
 
 class vmap(object):
+    """The mapping between underlying and physical ports.
+    Also helper methods to generate various often-used implementation policies."""
     def __init__(self):
         self.d2u = {}
         self.u2d = {}
@@ -105,176 +159,149 @@ class vmap(object):
 
 
 ################################################################################
-# Virtualization policies 
+# Virtualization definition base class                                         #
 ################################################################################
 
-class lower_packet(DerivedPolicy):
-    """Lowers a packet from the derived network to the underlying network"""
-    def __init__(self, vtag):
-        self.vtag = vtag
-        super(lower_packet,self).__init__(push(vtag=self.vtag) >> 
-                                          move(voutport="outport",
-                                               vswitch="switch",
-                                               vinport="inport"))
-        
-        def __repr__(self):
-            return "lower_packet %s" % self.vtag
-
-        
-@singleton
-class lift_packet(DerivedPolicy):
-    """Lifts a packet from the underlying network to the derived network"""
-    def __init__(self):
-        DerivedPolicy.__init__(self, 
-                               pop("vtag") >>
-                               move(outport="voutport", 
-                                    switch="vswitch", 
-                                    inport="vinport"))
-        
-    def __repr__(self):
-        return "lift_packet"
-
-        
-@singleton
-class pop_vheaders(DerivedPolicy):
-    def __init__(self):
-        DerivedPolicy.__init__(self,
-                               pop("vswitch", 
-                                   "vinport", 
-                                   "voutport", 
-                                   "vtag"))
-        
-    def __repr__(self):
-        return "pop_vheaders"
-
-
-class locate_in_underlying(Policy):
-    def __init__(self):
-        self.vmap = None
-        super(locate_in_underlying,self).__init__()
-
-    def set_vmap(self,vmap):
-        self.vmap = vmap
-
-    def eval(self, packet):
-        try:
-            switch = packet['switch']
-            inport = packet['inport']
-        except KeyError:
-            vswitch = packet['vswitch']
-            voutport = packet['voutport']
-            u = self.vmap.d2u[Location(vswitch,voutport)][0]
-            (switch,outport) = (u.switch,u.port_no)
-            packet = packet.push(switch=switch)
-            packet = packet.push(inport=-1)
-            if not outport is None:
-                packet = packet.push(outport=outport)
-            else:
-                packet = packet.push(outport=-1)
-        try:
-            outport = packet['outport']
-        except KeyError:
-            outport = -1
-        return {packet}
-
-    def __repr__(self):
-        return "locate_in_underlying"
-
-
-class DerivedNetwork(Network):
-    def __init__(self,underlying=None,injection_policy=None):
-        super(DerivedNetwork,self).__init__()
-        self.underlying = underlying
-        self.injection_policy = injection_policy
-        self.inherited = set(underlying.topology.nodes())
-
-    def inject_packet(self, packet):
-        if packet['switch'] in self.inherited:
-            self.underlying.inject_packet(packet)
-        else:
-            output = self.injection_policy.eval(packet)
-            map(self.underlying.inject_packet,output)
-
-
 class vdef(object):
+    """Defines/implements a virtual network."""
+    class DerivedNetwork(Network):
+        def __init__(self,underlying=None,injection_policy=None):
+            super(vdef.DerivedNetwork,self).__init__()
+            self.underlying = underlying
+            self.injection_policy = injection_policy
+            self.inherited = set(underlying.topology.nodes())
+
+        def inject_packet(self, packet):
+            if packet['switch'] in self.inherited:
+                self.underlying.inject_packet(packet)
+            else:
+                output = self.injection_policy.eval(packet)
+                map(self.underlying.inject_packet,output)
+
+    class locate_packet_in_underlying(Policy):
+        def __init__(self):
+            self.vmap = None
+            super(vdef.locate_packet_in_underlying,self).__init__()
+
+        def eval(self, packet):
+            try:
+                switch = packet['switch']
+                inport = packet['inport']
+            except KeyError:
+                vswitch = packet['vswitch']
+                voutport = packet['voutport']
+                u = self.vmap.d2u[Location(vswitch,voutport)][0]
+                (switch,outport) = (u.switch,u.port_no)
+                packet = packet.push(switch=switch)
+                packet = packet.push(inport=-1)
+                if not outport is None:
+                    packet = packet.push(outport=outport)
+                else:
+                    packet = packet.push(outport=-1)
+            try:
+                outport = packet['outport']
+            except KeyError:
+                outport = -1
+            return {packet}
+
+        def __repr__(self):
+            return "locate_packet_in_underlying"
+
     def __init__(self):
         self.vmap = None
         self.underlying = None
         self.derived = None
+        self.DEBUG = no_packets
+        self.locate_in_underlying = self.locate_packet_in_underlying()
+
+    def make_vmap(self):
+        raise NotImplementedError
+
+    def set_network(self,network):
+        self.vmap = self.make_vmap()
+        self.ingress_policy.vmap = self.vmap
+        self.fabric_policy.vmap = self.vmap
+        self.egress_policy.vmap = self.vmap
+        self.locate_in_underlying.vmap = self.vmap
+        self.ingress_policy.set_network(network)
+        self.fabric_policy.set_network(network)
+        self.egress_policy.set_network(network)
+        self.derived.injection_policy = (
+            str_print("-- " + str(self.vtag) + " injection_policy start ",self.DEBUG) >>
+            pkt_print(str(self.vtag) + " injected packet",self.DEBUG) >>
+            str_print("-- " + str(self.vtag) + " lower packet",self.DEBUG) >>
+            lower_packet(self.vtag) >>
+            pkt_print(str(self.vtag) + " after lower:",self.DEBUG) >>
+            str_print("-- " + str(self.vtag) + " locate packet",self.DEBUG) >>
+            self.locate_in_underlying >>
+            pkt_print(str(self.vtag) + " after locate:",self.DEBUG) >>
+            if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
+                str_print("-- " + str(self.vtag) + " apply fabric policy",self.DEBUG) >>
+                self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
+                pkt_print(str(self.vtag) + " after fabric:",self.DEBUG),
+                passthrough) >>        # OTHERWISE WE PASSTHROUGH TO EGRESS POLICY
+            str_print("-- " + str(self.vtag) + " apply egress policy",self.DEBUG) >>
+            self.egress_policy >>
+            pkt_print(str(self.vtag) + " after egress:",self.DEBUG) >>
+            str_print("-- " + str(self.vtag) + " injection_policy end ",self.DEBUG) 
+            )
 
 
-class virtualize_base(DerivedPolicy):
-    def __init__(self, upolicy, vpolicy, vdef, DEBUG=False):
+################################################################################
+# Virtualize input policies based on virtualization definition                 #
+################################################################################
+
+class virtualize(DerivedPolicy):
+    """Takes a policy for the unvirtualized components of the network, 
+    another for the virtualized components of the network,
+    and a virtualization defintion,
+    and outputs a single policy for the underlying network."""
+    def __init__(self, vpolicy, vdef, DEBUG=False):
         self.vpolicy = vpolicy
-        self.upolicy = upolicy
         self.vnetwork = None
-        self.vdef = vdef
         self.vtag = new_vtag()
-        tag = str(self.vtag)
         if DEBUG:
             self.DEBUG = all_packets
         else:
             self.DEBUG = no_packets
-        self.ingress_policy = self.vdef.ingress_policy
-        self.fabric_policy = self.vdef.fabric_policy
-        self.egress_policy = self.vdef.egress_policy
-        self.locate_in_underlying = locate_in_underlying()
-        super(virtualize_base,self).__init__(
+        self.vdef = vdef
+        self.vdef.DEBUG = self.DEBUG
+        self.vdef.vtag = self.vtag
+        super(virtualize,self).__init__(
             pkt_print(repr(self),self.DEBUG) >>
             if_(match(outport=None),push(outport=-1)) >>
-            str_print("-- " + tag + " apply ingress policy",self.DEBUG) >>
-            self.ingress_policy >> # set vlocation
-            pkt_print(tag + " after ingress:",self.DEBUG) >>
+            str_print("-- " + str(self.vtag) + " apply ingress policy",self.DEBUG) >>
+            self.vdef.ingress_policy >> # set vlocation
+            pkt_print(str(self.vtag) + " after ingress:",self.DEBUG) >>
             ### IF INGRESSING LIFT AND EVALUATE
             if_(match(vtag='ingress'), 
-                str_print("-- " + tag + " lift packet",self.DEBUG) >>
+                str_print("-- " + str(self.vtag) + " lift packet",self.DEBUG) >>
                 lift_packet >>
-                pkt_print(tag + " after lift:",self.DEBUG) >>
-                str_print("-- " + tag + " run derived policy",self.DEBUG) >>
+                pkt_print(str(self.vtag) + " after lift:",self.DEBUG) >>
+                str_print("-- " + str(self.vtag) + " run derived policy",self.DEBUG) >>
                 self.vpolicy >>
-                pkt_print(tag + " after derived policy:",self.DEBUG) >>
-                str_print("-- " + tag + " lower packet",self.DEBUG) >>
+                pkt_print(str(self.vtag) + " after derived policy:",self.DEBUG) >>
+                str_print("-- " + str(self.vtag) + " lower packet",self.DEBUG) >>
                 lower_packet(self.vtag) >>
-                pkt_print(tag + " after lower:",self.DEBUG),
+                pkt_print(str(self.vtag) + " after lower:",self.DEBUG),
                 passthrough >>
-                str_print("-- " + tag + " non_ingress",self.DEBUG)) >>
+                str_print("-- " + str(self.vtag) + " non_ingress",self.DEBUG)) >>
             ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
             if_(match(vtag=self.vtag), 
-                str_print("-- " + tag + " run fabric policy",self.DEBUG) >>
-                self.fabric_policy >>
-                pkt_print(tag + " after fabric:",self.DEBUG) >>
-                str_print("-- " + tag + " run egress policy",self.DEBUG) >>
-                self.egress_policy >>
-                pkt_print(tag + " after egress:",self.DEBUG),
-                str_print("-- " + tag + " run underlying policy",self.DEBUG) >>
-                self.upolicy >>
-                pkt_print(tag + " after underlying policy:",self.DEBUG) )
-            )
-        self.injection_policy = (
-            str_print("-- " + tag + " injection_policy start ",self.DEBUG) >>
-            pkt_print(tag + " injected packet",self.DEBUG) >>
-            str_print("-- " + tag + " lower packet",self.DEBUG) >>
-            lower_packet(self.vtag) >>
-            pkt_print(tag + " after lower:",self.DEBUG) >>
-            str_print("-- " + tag + " locate packet",self.DEBUG) >>
-            self.locate_in_underlying >>
-            pkt_print(tag + " after locate:",self.DEBUG) >>
-            if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
-                str_print("-- " + tag + " apply fabric policy",self.DEBUG) >>
-                self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
-                pkt_print(tag + " after fabric:",self.DEBUG),
-                passthrough) >>        # OTHERWISE WE PASSTHROUGH TO EGRESS POLICY
-            str_print("-- " + tag + " apply egress policy",self.DEBUG) >>
-            self.egress_policy >>
-            pkt_print(tag + " after egress:",self.DEBUG) >>
-            str_print("-- " + tag + " injection_policy end ",self.DEBUG) 
+                str_print("-- " + str(self.vtag) + " run fabric policy",self.DEBUG) >>
+                self.vdef.fabric_policy >>
+                pkt_print(str(self.vtag) + " after fabric:",self.DEBUG) >>
+                str_print("-- " + str(self.vtag) + " run egress policy",self.DEBUG) >>
+                self.vdef.egress_policy >>
+                pkt_print(str(self.vtag) + " after egress:",self.DEBUG),
+                str_print("-- " + str(self.vtag) + " run derived policy on inherited nodes",self.DEBUG) >>
+                self.vpolicy >>
+                pkt_print(str(self.vtag) + " after derived policy on inherited nodes:",self.DEBUG) )
             )
 
     def set_network(self, network):
+        Policy.set_network(self,network)            
         self.vdef.set_network(network)
-        self.locate_in_underlying.set_vmap(self.vdef.vmap)
-        self.vdef.derived.injection_policy = self.injection_policy
-        super(virtualize_base,self).set_network(network)
         if ((not self.vnetwork) or 
             self.vdef.derived.topology != self.vnetwork.topology):
             self.vnetwork = self.vdef.derived.copy()
@@ -282,8 +309,3 @@ class virtualize_base(DerivedPolicy):
         
     def __repr__(self):
         return "virtualize %s\n%s" % (self.vtag, self.vdef)
-
-
-class virtualize(virtualize_base):
-    def __init__(self, policy, vdef, DEBUG=False):
-        super(virtualize,self).__init__(policy, policy, vdef, DEBUG)
