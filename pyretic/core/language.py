@@ -146,6 +146,10 @@ class NetworkEvaluated(object):
     def name(self):
         return self.__class__.__name__
 
+    ### repr : unit -> String
+    def __repr__(self):
+        return "%s : %d" % (self.name(),id(self))
+
     
 ################################################################################
 # Predicates                                                                   #
@@ -175,10 +179,6 @@ class Predicate(NetworkEvaluated):
 
     ### eval : Packet -> bool
     def __eval__(self, packet):
-        raise NotImplementedError
-
-    ### repr : unit -> String
-    def __repr__(self):
         raise NotImplementedError
 
 
@@ -455,10 +455,6 @@ class Policy(NetworkEvaluated):
 
     ### eval : Packet -> Set Packet
     def __eval__(self, packet):
-        raise NotImplementedError
-
-    ### repr : unit -> String
-    def __repr__(self):
         raise NotImplementedError
 
 
@@ -1034,8 +1030,8 @@ def dynamic(fn):
             fn(self, *args, **kwargs)
 
         def __repr__(self):
-            return "[dynamic]\n%s" % repr(self.policy)
-            
+            return "[dynamic(%s)]\n%s" % (self.name(), repr(self.policy))
+        
     # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
     DecoratedDynamicPolicy.__name__ = fn.__name__
     return DecoratedDynamicPolicy
