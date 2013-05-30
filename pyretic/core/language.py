@@ -46,7 +46,6 @@ from pyretic.core.util import frozendict, singleton
 
 class ExactMatch(object):
     """Pattern type for exact match"""
-
     def __init__(self, pattern):
         self.pattern = pattern
 
@@ -63,9 +62,9 @@ class ExactMatch(object):
     def __repr__(self):
         return repr(self.pattern)
 
+
 class PrefixMatch(object):
     """Pattern type for IP prefix match"""
-
     def __init__(self, pattern):
         self.masklen = 32
         if isinstance(pattern, IP):     # IP OBJECT
@@ -113,6 +112,7 @@ register_field("dstip", PrefixMatch)
 ################################################################################
 
 class NetworkEvaluated(object):
+    """An abstract class whose direct decendants are Predicate and Policy"""
     def __init__(self):
         self._network = None
         self.parents = set()
@@ -168,7 +168,9 @@ class NetworkEvaluated(object):
 ################################################################################
 
 class Predicate(NetworkEvaluated):
-    """Top-level abstract class for predicates."""
+    """Top-level abstract class for predicates.
+    All Pyretic predicates evaluate on a single packet and return either True 
+    or False."""
     ### sub : Predicate -> Predicate
     def __sub__(self, other):
         return difference(self, other)
@@ -199,7 +201,8 @@ class Predicate(NetworkEvaluated):
 ################################################################################
 
 class PrimitivePredicate(Predicate):
-    """Abstract class for primitive predicates."""
+    """Abstact class for primitive (static) predicates.
+    The behavior of a primite predicate never changes."""
     pass
 
         
@@ -224,7 +227,7 @@ class no_packets(PrimitivePredicate):
 
                 
 class match(PrimitivePredicate):
-    """A set of field matches (one per field)"""
+    """A set of field matches on a packet (one per field)."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         init_map = {}
@@ -269,11 +272,14 @@ class match(PrimitivePredicate):
 ################################################################################
 
 class CombinatorPredicate(Predicate):
-    """Abstract class for predicate combinators."""
+    """Abstract class for predicate combinators.
+    A predicate combinator takes one or more predicates and produces a new 
+    predicate with the specified semantics."""
     pass
 
 
 class negate(CombinatorPredicate):
+    """Boolean negation of input predicate."""
     def __init__(self, predicate):
         self.predicate = predicate
         self.predicate.set_parent(self)
@@ -303,7 +309,7 @@ class negate(CombinatorPredicate):
 
         
 class union(CombinatorPredicate):
-    """A predicate representing the union of a list of predicates."""
+    """Boolean union over list of predicates."""
     ### init : List PrimitivePredicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
@@ -343,7 +349,7 @@ class union(CombinatorPredicate):
 
         
 class intersect(CombinatorPredicate):
-    """A predicate representing the intersection of a list of predicates."""
+    """Boolean intersection over list of predicates."""
     ### init : List PrimitivePredicate -> unit
     def __init__(self, predicates):
         self.predicates = list(predicates)
@@ -387,7 +393,7 @@ class intersect(CombinatorPredicate):
 ################################################################################
 
 class DerivedPredicate(Predicate):
-    """Abstract class for predicates derived from primitive predicates and combinators."""
+    """Abstract class for predicates derived from other predicates."""
     ### init : PrimitivePredicate -> unit
     def __init__(self, predicate):
         self.predicate = predicate
@@ -415,7 +421,7 @@ class DerivedPredicate(Predicate):
 
 
 class difference(DerivedPredicate):
-    """A predicate representing the difference of two predicates."""
+    """The Boolean difference of two predicates."""
     ### init : Predicate -> Predicate -> unit
     def __init__(self,pred1,pred2):
         self.pred1 = pred1
@@ -433,7 +439,9 @@ class difference(DerivedPredicate):
 ################################################################################
 
 class Policy(NetworkEvaluated):
-    """Top-level abstract description of a policy."""
+    """Top-level abstract class for policies.
+    All Pyretic policies evaluate on a single packet and return a set of packets.
+    """
     ### sub : Predicate -> Policy
     def __sub__(self, pred):
         return remove(self, pred)
@@ -464,7 +472,9 @@ class Policy(NetworkEvaluated):
 ################################################################################
 
 class PrimitivePolicy(Policy):
-    """Top-level abstract description of a primitive static policy."""
+    """Abstact class for primitive (static) policies.
+    The behavior of a primite policy never changes."""
+    pass
         
 
 @singleton
@@ -488,7 +498,7 @@ class drop(PrimitivePolicy):
 
 
 class push(PrimitivePolicy):
-    """push(field=value) pushes value onto header field stack"""
+    """push(field=value) pushes value onto header field stack."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
@@ -503,7 +513,7 @@ class push(PrimitivePolicy):
 
         
 class pop(PrimitivePolicy):
-    """pop('field') pops value off field stack"""
+    """pop('field') pops value off header field stack"""
     ### init : List String -> unit
     def __init__(self, *args):
         self.fields = list(args)
@@ -519,7 +529,7 @@ class pop(PrimitivePolicy):
 
 class copy(PrimitivePolicy):
     """copy(field1='field2') pushes the value stored at the top of 
-    the field2 stack unto the field1 stack"""
+    the header field2 stack unto header field1 stack"""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
@@ -541,10 +551,15 @@ class copy(PrimitivePolicy):
 ################################################################################
 
 class CombinatorPolicy(Policy):
+    """Abstract class for policy combinators.
+    A policy combinator takes one or more policies and produces a new 
+    policy with the specified semantics."""
     pass
 
     
 class restrict(CombinatorPolicy):
+    """restrict(policy,predicate) evaluates to policy if predicate evaluates to
+    True, drop if predicate evalutes to False."""
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
         self.policy = policy
@@ -588,6 +603,8 @@ class restrict(CombinatorPolicy):
 
                     
 class parallel(CombinatorPolicy):
+    """parallel(policies) evaluates to the set union of the evaluation
+    of each policy in policies."""
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
@@ -630,6 +647,8 @@ class parallel(CombinatorPolicy):
         
 
 class sequential(CombinatorPolicy):
+    """sequential(policies) evaluates the set union of each policy in policies 
+    on each packet in the output of previous policy."""
     ### init : List Policy -> unit
     def __init__(self, policies):
         self.policies = list(policies)
@@ -682,6 +701,7 @@ class sequential(CombinatorPolicy):
 ################################################################################
         
 class DerivedPolicy(Policy):
+    """Abstract class for policies derived from other policies."""
     def __init__(self, policy):
         self.policy = policy
         self.policy.set_parent(self)
@@ -709,6 +729,7 @@ class DerivedPolicy(Policy):
 
 
 class remove(DerivedPolicy):
+    """remove(policy,predicate) is equivalent to (~predicate)[policy]."""
     ### init : Policy -> Predicate -> unit
     def __init__(self, policy, predicate):
         self.policy = policy
@@ -746,6 +767,9 @@ class move(DerivedPolicy):
 
 
 class fwd(DerivedPolicy):
+    """fwd(port) is equivalent to pushing port onto the top of the outport
+    stack, unless the topmost outport stack value is placeholder -1 
+    (in which case we first pop, then push).""" 
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
@@ -757,6 +781,8 @@ class fwd(DerivedPolicy):
 
 
 class xfwd(DerivedPolicy):
+    """xfwd(outport) is equivalent to fwd(outport), except when inport=outport.
+    (The same semantics as OpenFlow's fwd action)"""
     def __init__(self, outport):
         self.outport = outport    
         super(xfwd,self).__init__(fwd(outport) - match(inport=outport))
@@ -766,6 +792,8 @@ class xfwd(DerivedPolicy):
 
 
 class if_(DerivedPolicy):
+    """if(predicate,pol1,pol2) - evaluates pol1 if predicate evaluates to True,
+    pol2 if predicate evalutes to False."""
     ### init : Predicate -> Policy -> Policy -> unit
     def __init__(self, pred, t_branch, f_branch=passthrough):
         self.pred = pred
@@ -781,6 +809,7 @@ class if_(DerivedPolicy):
 
 
 class recurse(DerivedPolicy):
+    """A policy that can refer to itself w/o causing the runtime/compiler to die."""
     def set_network(self, network):
         if network == self.policy._network:
             return
@@ -809,6 +838,9 @@ class recurse(DerivedPolicy):
 ################################################################################
 
 class DynamicPredicate(DerivedPredicate):
+    """Abstact class for dynamic predicates.
+    The behavior of a dynamic predicate changes each time its internal property
+    named 'predicate' is reassigned."""
     ### init : unit -> unit
     def __init__(self):
         self._predicate = drop
@@ -843,6 +875,8 @@ class DynamicPredicate(DerivedPredicate):
 
 
 class ingress_network(DynamicPredicate):
+    """Returns True if a packet is located at a (switch,inport) pair entering
+    the network, False otherwise."""
     def __init__(self):
         self.egresses = None
         super(ingress_network,self).__init__()
@@ -868,6 +902,8 @@ class ingress_network(DynamicPredicate):
 
         
 class egress_network(DynamicPredicate):
+    """Returns True if a packet is located at a (switch,outport) pair leaving
+    the network, False otherwise."""
     def __init__(self):
         self.egresses = None
         super(egress_network,self).__init__()
@@ -893,6 +929,9 @@ class egress_network(DynamicPredicate):
 
 
 class DynamicPolicy(DerivedPolicy):
+    """Abstact class for dynamic policies.
+    The behavior of a dynamic policy changes each time its internal property
+    named 'policy' is reassigned."""
     ### init : unit -> unit
     def __init__(self):
         self._policy = drop
@@ -928,6 +967,11 @@ class DynamicPolicy(DerivedPolicy):
         
 # dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
 def dynamic(fn):
+    """Decorator for dynamic policies.
+    Will initialize a dynamic policy based on the input function (fn)
+    and return a new dynamic policy class whose name is identical to that of fn.
+    Calling the constructor of the returned policy class creates an instance which
+    can then be used like any other policy."""
     class DecoratedDynamicPolicy(DynamicPolicy):
         def __init__(self, *args, **kwargs):
             # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
@@ -947,7 +991,8 @@ def dynamic(fn):
 
 
 class flood(DynamicPolicy):
-    """The policy that floods packets on a minimum spanning tree"""
+    """Policy that floods packets on a minimum spanning tree, recalculated 
+    every time the network is updated (set_network)."""
     def __init__(self):
         self.mst = None
         super(flood,self).__init__()
@@ -982,6 +1027,9 @@ class flood(DynamicPolicy):
 ################################################################################
 
 class FwdBucket(Policy):
+    """Abstract class representing a data structure 
+    into which packets (conceptually) go and with which callbacks can register.
+    """
     ### init : unit -> unit
     def __init__(self):
         self.callbacks = []
@@ -998,6 +1046,13 @@ class FwdBucket(Policy):
 
 
 class packets(Policy):
+    """Effectively a FwdBucket which calls back all registered routines on each 
+    packet evaluated.
+    A positive integer limit will cause callback to cease after limit packets of
+    a given group have been seen.  group_by defines the set of headers used for 
+    grouping - two packets are in the same group if they match on all headers in the
+    group_by.  If no group_by is specified, the default is to match on all available
+    headers."""
     class PredicateWrappedFwdBucket(Predicate):
         def __init__(self,limit=None,group_by=[]):
             self.limit = limit
@@ -1074,6 +1129,11 @@ class packets(Policy):
         
 
 class AggregateFwdBucket(FwdBucket):
+    """An abstract FwdBucket which calls back all registered routines every interval
+    seconds (can take positive fractional values) with an aggregate value/dict.
+    If group_by is empty, registered routines are called back with a single aggregate
+    value.  Otherwise, group_by defines the set of headers used to group counts which
+    are then returned as a dictionary."""
     ### init : int -> List String
     def __init__(self, interval, group_by=[]):
         self.interval = interval
@@ -1116,10 +1176,12 @@ class AggregateFwdBucket(FwdBucket):
 
 
 class counts(AggregateFwdBucket):
+    """AggregateFwdBucket that calls back with aggregate count of packets."""
     def aggregator(self,aggregate,pkt):
         return aggregate + 1
 
 
 class sizes(AggregateFwdBucket):
+    """AggregateFwdBucket that calls back with aggregate bytesize of packets."""
     def aggregator(self,aggregate,pkt):
         return aggregate + pkt['header_len'] + pkt['payload_len']
