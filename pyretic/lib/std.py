@@ -29,6 +29,7 @@
 """Pyretic Standard Library"""
 from pyretic.core.language import match, union, DerivedPredicate, Policy, DerivedPolicy, passthrough, all_packets, no_packets
 import pyretic.core.util as util
+from datetime import datetime
 
 ### DEFINITIONS
 ARP_TYPE = 2054
@@ -91,6 +92,8 @@ class _print(DerivedPolicy):
 
 class str_print(_print):
     def print_fn(self, packet):
+        print str(datetime.now()),
+        print " | ",
         print self.s
 
 
@@ -98,6 +101,7 @@ class pkt_print(_print):
     def print_fn(self, packet):
         if self.s != '':
             print "---- %s -------" % self.s
+        print str(datetime.now())
         print packet
         if self.s != '':
             print "-------------------------------"
@@ -107,6 +111,7 @@ class topo_print(_print):
     def print_fn(self, packet):
         if self.s != '':
             print "---- %s -------" % self.s
+        print str(datetime.now())
         print self.network.topology
         if self.s != '':
             print "-------------------------------"
@@ -119,6 +124,7 @@ class pol_print(_print):
     def print_fn(self,packet):
         if self.s != '':
             print "---- %s -------" % self.s
+        print str(datetime.now())
         print self.policy
         if self.s != '':
             print "-------------------------------"
