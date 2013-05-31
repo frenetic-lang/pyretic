@@ -89,5 +89,29 @@ def act_like_switch(self):
 
 
 def main():
+### Part 0 - hub  ###
     return act_like_hub()
+
+### Part 1 - write a basic mac learning module ###
 #    return act_like_switch()
+
+### Part 2 - learn more about composition and debugging tools ###
+## first, delete print statements inside act_like_switch - we don't want to have to hack
+## every function to figure out what effect it is having
+
+### now try printing packets as they enter and leave act_like_switch()
+#    return (pkt_print('BEFORE act_like_switch') >> 
+#            act_like_switch() >> 
+#            pkt_print('AFTER act_like_switch') )
+
+### here we use 'sequential compostion (>>)' to run one policy on the output of the previous
+### the 'passthrough' policy takes a packet and returns a set containing just that packet
+### hence 'passthrough' is the idenity policy for sequential composition
+#   return act_like_switch() >> passthrough
+#   return passthrough >> act_like_switch()
+### likewise the 'drop' policy is the identity for parallel composition
+#   return act_like_switch() + drop
+#   return drop + act_like_switch()
+
+# next let's set up a debugging breakpoint
+#    return breakpoint(match(switch=1),act_like_switch())

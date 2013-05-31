@@ -150,7 +150,7 @@ class breakpoint(DerivedPolicy):
             except:
                 import pdb as debugger
             debugger.set_trace()
-        return super(breakpoint,self).eval(packet)
+        return self.policy.eval(packet)
 
     def track_eval(self, packet):
         if self.condition.eval(packet):
@@ -159,7 +159,7 @@ class breakpoint(DerivedPolicy):
             except:
                 import pdb as debugger
             debugger.set_trace()
-        (result,traversed) = super(breakpoint,self).track_eval(packet)
+        (result,traversed) = self.policy.track_eval(packet)
         return (result,[self,traversed])        
 
     def __repr__(self):
