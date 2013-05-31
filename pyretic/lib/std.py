@@ -165,8 +165,8 @@ class breakpoint(DerivedPolicy):
             except:
                 import pdb as debugger
             debugger.set_trace()
-        (result,traversed) = self.policy.track_eval(packet)
-        return (result,[self,traversed])        
+        (result,trace) = self.policy.track_eval(packet)
+        return (result,EvalTrace(self,trace))        
 
     def __repr__(self):
         return "***breakpoint on %s***\n%s" % (self.condition,util.repr_plus([self.policy]))
@@ -201,16 +201,17 @@ class trace(DerivedPolicy):
             i = self.highest_trace_value[v]
         except:
             i = 0
-        (output,traversed) = super(trace,self).track_eval(packet)
+        (output,trace) = super(trace,self).track_eval(packet)
+        eval_trace = EvalTrace(self,trace)
         if len(output) > 1:
             tagged_output = set()
             for packet in output:
                 tagged_output.add(packet.pushmany({self.trace_name : i}))
                 i = i + 1
                 self.highest_trace_value[v] = i
-            return (tagged_output,[self,traversed])
+            return (tagged_output,eval_trace)
         else:
-            return (output,[self,traversed])
+            return (output,eval_trace)
 
     def __repr__(self):
         return "[%s]\n%s" % (self.trace_name,self.policy)

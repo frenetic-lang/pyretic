@@ -41,18 +41,6 @@ except:
     import traceback, sys
     USE_IPDB=False
 
-def namify(item):
-    if isinstance(item,list):
-        return map(namify,item)
-    else:
-        return item.name()
-
-def in_namified(name,item):
-    if isinstance(item,list):
-        return any(map(lambda x: in_namified(name,x),item))
-    else:
-        return name == item
-
 
 class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
@@ -222,16 +210,15 @@ class Runtime(object):
         return (pred,action_list)
 
 
-    def reactive0(self,in_pkt,out_pkts,traversed):
+    def reactive0(self,in_pkt,out_pkts,eval_trace):
         if self.mode == 'reactive0':
             rule = None
-            names_traversed = namify(traversed)
             ### DON'T INSTALL RULES THAT CONTAIN QUERIES
-            if in_namified('PredicateWrappedFwdBucket', names_traversed):
+            if eval_trace.contains_class(packets.PredicateWrappedFwdBucket):
                 pass
-            elif in_namified('counts', names_traversed):
+            elif eval_trace.contains_class(counts):
                 pass
-            elif in_namified('sizes', names_traversed):
+            elif eval_trace.contains_class(sizes):
                 pass
             else:
                 rule = self.match_on_all_fields_rule(in_pkt,out_pkts)
@@ -254,15 +241,15 @@ class Runtime(object):
                  if self.mode == 'interpreted':
                      output = self.policy.eval(pyretic_pkt)
                  else:
-                     (output,traversed) = self.policy.track_eval(pyretic_pkt)
-                     self.reactive0(pyretic_pkt,output,traversed)
+                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt)
+                     self.reactive0(pyretic_pkt,output,eval_trace)
         else:
             try:
                 if self.mode == 'interpreted':
                     output = self.policy.eval(pyretic_pkt)
                 else:
-                    (output,traversed) = self.policy.track_eval(pyretic_pkt)
-                    self.reactive0(pyretic_pkt,output,traversed)
+                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt)
+                    self.reactive0(pyretic_pkt,output,eval_trace)
             except :
                 type, value, tb = sys.exc_info()
                 traceback.print_exc()

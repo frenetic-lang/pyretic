@@ -107,6 +107,7 @@ def field_patterntype(field):
 register_field("srcip", PrefixMatch)
 register_field("dstip", PrefixMatch)
 
+
 ################################################################################
 # Policy Language                                                              #
 ################################################################################
@@ -144,7 +145,7 @@ class NetworkEvaluated(object):
         raise NotImplementedError        
 
     def track_eval(self, packet):
-        return (self.eval(packet),[self])
+        return (self.eval(packet), EvalTrace(self))
 
     def on_change_do(self,fn):
         self.callback_on_change.add(fn)
@@ -161,6 +162,32 @@ class NetworkEvaluated(object):
     ### repr : unit -> String
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
+
+
+class EvalTrace(object):
+    def __init__(self,ne,trace=None):
+        self.ne = ne
+        if trace is None:
+            self.traces = []
+        else:
+            self.traces = [trace]
+
+    def add_trace(self,trace):
+        self.traces.append(trace)
+
+    def contains_class(self,cls):
+        if self.ne.__class__ == cls:
+            return True
+        for trace in self.traces:
+            if trace.contains_class(cls):
+                return True
+        return False
+            
+    def __repr__(self):
+        if self.traces:
+            return self.ne.name() + '[' + ']['.join(map(repr,self.traces))+']'
+        else:
+            return self.ne.name()
 
     
 ################################################################################
@@ -301,8 +328,8 @@ class negate(CombinatorPredicate):
         return not self.predicate.eval(packet)
         
     def track_eval(self,packet):
-        (result,traversed) = self.predicate.track_eval(packet)
-        return (not result,[self,traversed])
+        (result,eval_trace) = self.predicate.track_eval(packet)
+        return (not result,EvalTrace(self,eval_trace))
 
     def __repr__(self):
         return "negate:\n%s" % util.repr_plus([self.predicate])
@@ -336,13 +363,13 @@ class union(CombinatorPredicate):
         return any(predicate.eval(packet) for predicate in self.predicates)
 
     def track_eval(self, packet):
-        traversed = list()
+        eval_trace = EvalTrace(self)
         for predicate in self.predicates:
-            (result,ptraversed) = predicate.track_eval(packet)
-            traversed.append(ptraversed)
+            (result,trace) = predicate.track_eval(packet)
+            eval_trace.add_trace(trace)
             if result:
-                return (True,[self,traversed])
-        return (False,[self,traversed])
+                return (True,eval_trace)
+        return (False,eval_trace)
 
     def __repr__(self):
         return "union:\n%s" % util.repr_plus(self.predicates)
@@ -376,13 +403,13 @@ class intersect(CombinatorPredicate):
         return all(predicate.eval(packet) for predicate in self.predicates)
 
     def track_eval(self, packet):
-        traversed = list()
+        eval_trace = EvalTrace(self)
         for predicate in self.predicates:
-            (result,ptraversed) = predicate.track_eval(packet)
-            traversed.append(ptraversed)
+            (result,trace) = predicate.track_eval(packet)
+            eval_trace.add_trace(trace)
             if not result:
-                return (False,[self,traversed])
-        return (True,[self,traversed])
+                return (False,eval_trace)
+        return (True,eval_trace)
 
     def __repr__(self):
         return "intersect:\n%s" % util.repr_plus(self.predicates)
@@ -416,8 +443,8 @@ class DerivedPredicate(Predicate):
         return self.predicate.eval(packet)
 
     def track_eval(self,packet):
-        (result,traversed) = self.predicate.track_eval(packet)
-        return (result,[self,traversed])
+        (result,trace) = self.predicate.track_eval(packet)
+        return (result,EvalTrace(self,trace))
 
 
 class difference(DerivedPredicate):
@@ -590,12 +617,14 @@ class restrict(CombinatorPolicy):
             return set()
 
     def track_eval(self, packet):
-        (result1,traversed1) = self.predicate.track_eval(packet)
-        if result1:
-            (result2,traversed2) = self.policy.track_eval(packet)
-            return (result2,[self,traversed1,traversed2])
+        (result,trace) = self.predicate.track_eval(packet)
+        eval_trace = EvalTrace(self,trace)
+        if result:
+            (result,trace) = self.policy.track_eval(packet)
+            eval_trace.add_trace(trace)
+            return (result,eval_trace)
         else:
-            return (set(),[self,traversed1])
+            return (set(),eval_trace)
 
     def __repr__(self):
         return "restrict:\n%s" % util.repr_plus([self.predicate,
@@ -634,13 +663,13 @@ class parallel(CombinatorPolicy):
         return output
 
     def track_eval(self, packet):
-        traversed = list()
+        eval_trace = EvalTrace(self)
         output = set()
         for policy in self.policies:
-            (p_output,p_traversed) = policy.track_eval(packet)
-            traversed.append(p_traversed)
-            output |= p_output
-        return (output,[self,traversed])
+            (result,trace) = policy.track_eval(packet)
+            eval_trace.add_trace(trace)
+            output |= result
+        return (output,eval_trace)
     
     def __repr__(self):
         return "parallel:\n%s" % util.repr_plus(self.policies)
@@ -681,16 +710,16 @@ class sequential(CombinatorPolicy):
         return output_set
 
     def track_eval(self, packet):
-        traversed = list()
+        eval_trace = EvalTrace(self)
         input_set = {packet}
         for policy in self.policies:
             output_set = set()
             for packet in input_set:
-                (p_output_set,p_traversed) = policy.track_eval(packet)
-                traversed.append(p_traversed)
-                output_set |= p_output_set
+                (result,trace) = policy.track_eval(packet)
+                eval_trace.add_trace(trace)
+                output_set |= result
             input_set = output_set
-        return (output_set,[self,traversed])
+        return (output_set,eval_trace)
     
     def __repr__(self):
         return "sequential:\n%s" % util.repr_plus(self.policies)
@@ -724,8 +753,8 @@ class DerivedPolicy(Policy):
         return self.policy.eval(packet)
 
     def track_eval(self, packet):
-        (result,traversed) = self.policy.track_eval(packet)
-        return (result,[self,traversed])
+        (result,trace) = self.policy.track_eval(packet)
+        return (result,EvalTrace(self,trace))
 
 
 class remove(DerivedPolicy):
@@ -1115,17 +1144,18 @@ class packets(Policy):
 
     def track_eval(self,pkt):
         """Don't look any more such packets"""
-        (result,traversed) = self.predicate.track_eval(pkt)
+        (result,trace) = self.predicate.track_eval(pkt)
+        eval_trace = EvalTrace(self,trace)
         if result:
-            (result,traversed2) = self.pwfb.track_eval(pkt)
-            traversed += traversed2
+            (result,trace) = self.pwfb.track_eval(pkt)
+            eval_trace.add_trace(trace)
             if not result:
                 val = {h : pkt[h] for h in self.group_by}
                 self.predicate = ~match(val) & self.predicate
                 self.predicate.set_network(self.network)
                 self.predicate.set_parent(self)
                 self.changed()
-        return (set(),[self,traversed])
+        return (set(),eval_trace)
         
 
 class AggregateFwdBucket(FwdBucket):
