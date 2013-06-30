@@ -39,10 +39,18 @@ from optparse import OptionParser
 import re
 import os
 
+of_client = None
 
 def signal_handler(signal, frame):
-    for thread in threading.enumerate():
-        print (thread,thread.isAlive())
+    print '\n----starting pyretic shutdown------'
+#    for thread in threading.enumerate():
+#        print (thread,thread.isAlive())
+    print "attempting to kill of_client"
+    of_client.kill()
+    print "attempting get output of of_client:"
+    output = of_client.communicate()[0]
+    print output
+    print "pyretic.py done"
     sys.exit(0)
 
 
@@ -79,6 +87,7 @@ def parseArgs():
 
 
 def main():
+    global of_client
     (op, options, args, kwargs_to_pass) = parseArgs()
     if options.mode == 'i':
         options.mode = 'interpreted'
@@ -123,7 +132,8 @@ def main():
             print 'Error: pox not found in PYTHONPATH'
             sys.exit(1)
         pox_exec = os.path.join(poxpath,'pox.py')
-        of_client = subprocess.Popen([sys.executable, 
+        python=sys.executable
+        of_client = subprocess.Popen([python, 
                                       pox_exec,
                                       'of_client.pox_client' ],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -131,11 +141,5 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
 
-
 if __name__ == '__main__':
     main()
-
-
-
-
-
