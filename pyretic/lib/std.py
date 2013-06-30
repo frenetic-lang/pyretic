@@ -27,20 +27,37 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.language import match, union, DerivedPredicate, Policy, DerivedPolicy, passthrough, all_packets, no_packets
+from pyretic.core.language import StaticPolicy, DerivedPolicy, identity, all_packets, passthrough, no_packets, match, parallel
 import pyretic.core.util as util
 from datetime import datetime
 
 ### DEFINITIONS
 ARP_TYPE = 2054
 
-### CONVENIENCE PREDICATES
 
-class _in(DerivedPredicate):
+### BREAKPOINT policy
+
+class breakpoint(DerivedPolicy):
+    def eval(self, pkt):
+        if self.policy.eval(pkt):
+            try:
+                import ipdb as debugger
+            except:
+                import pdb as debugger
+            debugger.set_trace()
+        return {pkt}
+
+    def __repr__(self):
+        return "***breakpoint on %s***" % util.repr_plus([self.policy])
+
+
+### CONVENIENCE policies
+
+class _in(DerivedPolicy):
     def __init__(self,field,group):
         self.group = group
         self.field = field
-        super(_in,self).__init__(union([match({field : i}) 
+        super(_in,self).__init__(parallel([match({field : i}) 
                                 for i in group]))
     def __repr__(self):
         return "_in: %s" % self.group
@@ -62,165 +79,42 @@ class dstip_in(_in):
         return "dstip%s" % super(dstip_in,self).__repr__()
 
 
-### PRINTING POLICIES
+### PRINTING policies
 
-class _print(DerivedPolicy):
-    def __init__(self,s='',condition=all_packets, policy=passthrough):
+class _print(StaticPolicy):
+    def __init__(self,s=''):
         self.s = s
-        self.condition = condition
-        super(_print,self).__init__(policy)
-
-    def print_fn(self,packet):
-        raise NotImplementedError        
-
-    def eval(self, packet):
-        if self.condition.eval(packet):
-            self.print_fn(packet)
-        return super(_print,self).eval(packet)
-
-    def track_eval(self, packet):
-        if self.condition.eval(packet):
-            self.print_fn(packet)
-        return super(_print,self).track_eval(packet)
+        super(_print,self).__init__()
 
     def __repr__(self):
-        if self.condition == no_packets:
-            return ''
-        else:
-            return "[%s %s %s]" % (self.name(),self.condition,self.s)
+        return "[%s %s]" % (self.name(),self.s)
 
 
 class str_print(_print):
-    def print_fn(self, packet):
+    def eval(self, pkt):
         print str(datetime.now()),
         print " | ",
         print self.s
+        return set()
 
 
 class pkt_print(_print):
-    def print_fn(self, packet):
+    def eval(self, pkt):
         if self.s != '':
             print "---- %s -------" % self.s
         print str(datetime.now())
-        print packet
+        print pkt
         if self.s != '':
             print "-------------------------------"
+        return set()
 
 
 class topo_print(_print):
-    def print_fn(self, packet):
+    def print_fn(self, pkt):
         if self.s != '':
             print "---- %s -------" % self.s
         print str(datetime.now())
         print self.network.topology
         if self.s != '':
             print "-------------------------------"
-
-
-class pol_print(_print):
-    def __init__(self,policy,s='',condition=all_packets):
-        super(pol_print,self).__init__(s,condition,policy)
-
-    def print_fn(self,packet):
-        if self.s != '':
-            print "---- %s -------" % self.s
-        print str(datetime.now())
-        print self.policy
-        if self.s != '':
-            print "-------------------------------"
-
-    def __repr__(self):
-        if self.condition == no_packets:
-            return ''
-        else:
-            return "[pol_print %s %s]\n%s" % (self.condition,self.s,self.policy)
-
-
-### TRACING POLICIES
-
-
-class breakpoint(DerivedPolicy):
-    ### init : Policy -> Predicate -> unit
-    def __init__(self, condition=all_packets, policy=passthrough):
-        self.condition = condition
-        super(breakpoint,self).__init__(policy)
-
-    def set_network(self, network):
-        super(breakpoint,self).set_network(network)
-        self.condition.set_network(network)
-                    
-    def eval(self, packet):
-        if self.condition.eval(packet):
-            try:
-                import ipdb as debugger
-            except:
-                import pdb as debugger
-            debugger.set_trace()
-        return self.policy.eval(packet)
-
-    def track_eval(self, packet):
-        if self.condition.eval(packet):
-            try:
-                import ipdb as debugger
-            except:
-                import pdb as debugger
-            debugger.set_trace()
-        (result,trace) = self.policy.track_eval(packet)
-        return (result,EvalTrace(self,trace))        
-
-    def __repr__(self):
-        return "***breakpoint on %s***\n%s" % (self.condition,util.repr_plus([self.policy]))
-
-
-class trace(DerivedPolicy):
-    def __init__(self,policy,trace_name='trace'):
-        self.trace_name = trace_name
-        self.highest_trace_value = {}
-        super(trace,self).__init__(policy)
-
-    def eval(self, packet):
-        v = packet.get_stack(self.trace_name)
-        try:
-            i = self.highest_trace_value[v]
-        except:
-            i = 0
-        output = super(trace,self).eval(packet)
-        if len(output) > 1:
-            tagged_output = set()
-            for packet in output:
-                tagged_output.add(packet.pushmany({self.trace_name : i}))
-                i = i + 1
-                self.highest_trace_value[v] = i
-            return tagged_output
-        else:
-            return output
-
-    def track_eval(self, packet):
-        v = packet.get_stack(self.trace_name)
-        try:
-            i = self.highest_trace_value[v]
-        except:
-            i = 0
-        (output,trace) = super(trace,self).track_eval(packet)
-        eval_trace = EvalTrace(self,trace)
-        if len(output) > 1:
-            tagged_output = set()
-            for packet in output:
-                tagged_output.add(packet.pushmany({self.trace_name : i}))
-                i = i + 1
-                self.highest_trace_value[v] = i
-            return (tagged_output,eval_trace)
-        else:
-            return (output,eval_trace)
-
-    def __repr__(self):
-        return "[%s]\n%s" % (self.trace_name,self.policy)
-
-
-class clear_trace(Policy):
-    def __init__(self,trace_name='trace'):
-        self.trace_name=trace_name
-        super(clear_trace,self).__init__()
-
-    def eval(self, packet):
-        return {packet.clear(self.trace_name)}
+        return set()

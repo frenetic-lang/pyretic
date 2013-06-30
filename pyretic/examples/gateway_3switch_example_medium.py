@@ -71,9 +71,9 @@ def example_setup(num_clients=3, num_servers=3):
     ip_pol = virtualize(mac_learner(),BFS_vdef(name=5,from_switches=ip_core))
     gw_pol = gateway_forwarder(eth_cidr,ip_cidr,host_macs)
 
-    return (switch_in(ethernet)[ eth_pol ] + 
-            switch_in(gateway)[  gw_pol  ] +
-            switch_in(ip_core)[  ip_pol  ])    
+    return ((switch_in(ethernet) & eth_pol) + 
+            (switch_in(gateway)  & gw_pol ) +
+            (switch_in(ip_core)  & ip_pol ))    
 
 
 def main():

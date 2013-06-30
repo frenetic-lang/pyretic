@@ -526,7 +526,7 @@ class Network(object):
     def topology(self,topology):
         self._topology = topology
 
-    def inject_packet(self, packet):
+    def inject_packet(self, pkt):
         raise NotImplementedError
 
     def __eq__(self,other):

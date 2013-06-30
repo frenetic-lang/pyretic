@@ -49,7 +49,33 @@ class Runtime(object):
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         if mode == 'reactive0':
-            self.policy.on_change_do(self.handle_policy_change)
+            self.active_dynamic_policies = set()
+            def find_dynamic_sub_pols(policy,recursive_pols_seen):
+                dynamic_sub_pols = set()
+                if isinstance(policy,DynamicPolicy):
+                    dynamic_sub_pols.add(policy)
+                    dynamic_sub_pols |= find_dynamic_sub_pols(policy._policy,
+                                                              recursive_pols_seen)
+                elif isinstance(policy,CombinatorPolicy):
+                    for sub_policy in policy.policies:
+                        dynamic_sub_pols |= find_dynamic_sub_pols(sub_policy,
+                                                                  recursive_pols_seen)
+                elif isinstance(policy,recurse):
+                    if policy in recursive_pols_seen:
+                        return dynamic_sub_pols
+                    recursive_pols_seen.add(policy)
+                    dynamic_sub_pols |= find_dynamic_sub_pols(policy.policy,
+                                                              recursive_pols_seen)
+                elif isinstance(policy,DerivedPolicy):
+                    dynamic_sub_pols |= find_dynamic_sub_pols(policy.policy,
+                                                              recursive_pols_seen)
+                else:
+                    pass
+                return dynamic_sub_pols
+            self.find_dynamic_sub_pols = find_dynamic_sub_pols
+            dynamic_sub_pols = self.find_dynamic_sub_pols(self.policy,set())
+            for p in dynamic_sub_pols:
+                p.attach(self.handle_policy_change)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.mode = mode
@@ -71,7 +97,13 @@ class Runtime(object):
                 self.clear_all()
             self.in_update_network = False
 
-    def handle_policy_change(self, changed):
+    def handle_policy_change(self, changed, old, new):
+        old_dynamics = self.find_dynamic_sub_pols(old,set())
+        new_dynamics = self.find_dynamic_sub_pols(new,set())
+        for p in (old_dynamics - new_dynamics):
+            p.detach()
+        for p in (new_dynamics - old_dynamics):
+            p.attach(self.handle_policy_change)
         if self.in_update_network:
             pass
         else:
@@ -214,7 +246,7 @@ class Runtime(object):
         if self.mode == 'reactive0':
             rule = None
             ### DON'T INSTALL RULES THAT CONTAIN QUERIES
-            if eval_trace.contains_class(packets.PredicateWrappedFwdBucket):
+            if eval_trace.contains_class(packets.BoolWrappedFwdBucket):
                 pass
             elif eval_trace.contains_class(counts):
                 pass
@@ -241,14 +273,14 @@ class Runtime(object):
                  if self.mode == 'interpreted':
                      output = self.policy.eval(pyretic_pkt)
                  else:
-                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt)
+                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
                      self.reactive0(pyretic_pkt,output,eval_trace)
         else:
             try:
                 if self.mode == 'interpreted':
                     output = self.policy.eval(pyretic_pkt)
                 else:
-                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt)
+                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
                     self.reactive0(pyretic_pkt,output,eval_trace)
             except :
                 type, value, tb = sys.exc_info()
@@ -373,8 +405,8 @@ class ConcreteNetwork(Network):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
 
-    def inject_packet(self, packet):
-        self.runtime.send_packet(packet)
+    def inject_packet(self, pkt):
+        self.runtime.send_packet(pkt)
 
     #
     # Topology Detection
