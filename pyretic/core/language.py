@@ -778,6 +778,7 @@ class AggregateFwdBucket(FwdBucket):
     are then returned as a dictionary."""
     ### init : int -> List String
     def __init__(self, interval, group_by=[]):
+        FwdBucket.__init__(self)
         self.interval = interval
         self.group_by = group_by
         if group_by:
@@ -789,7 +790,6 @@ class AggregateFwdBucket(FwdBucket):
         self.query_thread = threading.Thread(target=self.report_count)
         self.query_thread.daemon = True
         self.query_thread.start()
-        FwdBucket.__init__(self)
 
     def report_count(self):
         while(True):
