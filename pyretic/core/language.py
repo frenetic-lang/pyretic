@@ -132,10 +132,6 @@ class Policy(object):
             return parallel([self] + pol.policies)
         else:
             return parallel([self, pol])
-
-    ### or : Policy -> Policy
-    def __or__(self, pol):
-        return self + pol
         
     ### rshift : Policy -> Policy
     def __rshift__(self, pol):
@@ -143,18 +139,6 @@ class Policy(object):
             return sequential([self] + pol.policies)
         else:
             return sequential([self, pol])
-
-    ### and : Policy -> Policy
-    def __and__(self, pol):
-        return self >> pol
-
-    ### sub : Policy -> Policy
-    def __sub__(self, pol):
-        return difference([self, pol])
-    
-    ### invert : unit -> Policy
-    def __invert__(self):
-        return negate(self)
 
     ### eq : Policy -> bool
     def __eq__(self,pol):
@@ -173,6 +157,34 @@ class Policy(object):
     ### repr : unit -> String
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
+
+
+class Filter(Policy):
+    """Abstact class for filter policies."""
+    ### or : Filter -> Filter
+    def __or__(self, pol):
+        if isinstance(pol,Filter):
+            return union((self + pol).policies)
+        else:
+            raise TypeError
+
+    ### and : Filter -> Filter
+    def __and__(self, pol):
+        if isinstance(pol,Filter):
+            return intersection((self >> pol).policies)
+        else:
+            raise TypeError
+
+    ### sub : Filter -> Filter
+    def __sub__(self, pol):
+        if isinstance(pol,Filter):
+            return difference([self, pol])
+        else:
+            raise TypeError
+    
+    ### invert : unit -> Filter
+    def __invert__(self):
+        return negate(self)
 
 
 class EvalTrace(object):
@@ -209,7 +221,7 @@ class PrimitivePolicy(StaticPolicy):
 
 
 @singleton
-class identity(PrimitivePolicy):
+class identity(PrimitivePolicy,Filter):
     """The identity policy"""
     def eval(self, pkt):
         return {pkt}
@@ -221,7 +233,7 @@ all_packets = identity   # Logic alias
 
         
 @singleton
-class none(PrimitivePolicy):
+class none(PrimitivePolicy,Filter):
     """The policy that drops a pkt"""
     def eval(self, pkt):
         return set()
@@ -232,7 +244,7 @@ drop = none              # Imperative alias
 no_packets = none        # Logic alias
 
 
-class match(PrimitivePolicy):
+class match(PrimitivePolicy,Filter):
     """A set of field matches on a packet (one per field)."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
@@ -341,7 +353,7 @@ class CombinatorPolicy(StaticPolicy):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
 
 
-class difference(CombinatorPolicy):
+class difference(CombinatorPolicy,Filter):
     def eval(self, pkt):
         return self.policies[0].eval(pkt) - self.policies[1].eval(pkt)
 
@@ -377,8 +389,12 @@ class parallel(CombinatorPolicy):
             output |= results
             eval_trace.add_trace(trace)
         return (output,eval_trace)
-    
 
+
+class union(parallel,Filter):
+    pass
+
+    
 class sequential(CombinatorPolicy):
     """sequential(policies) evaluates the set union of each policy in policies 
     on each packet in the output of previous policy."""
@@ -426,6 +442,10 @@ class sequential(CombinatorPolicy):
         return (output,eval_trace)
   
 
+class intersection(sequential,Filter):
+    pass
+
+
 ################################################################################
 # Derived Policies                                                             #
 ################################################################################
@@ -451,13 +471,13 @@ class DerivedPolicy(Policy):
         return (results,eval_trace)
 
 
-class negate(DerivedPolicy):
-    def __init__(self, policy_to_negate):
-        self.policy_to_negate = policy_to_negate
-        super(negate,self).__init__(identity - policy_to_negate)
+class negate(DerivedPolicy,Filter):
+    def __init__(self, to_negate):
+        self.to_negate = to_negate
+        super(negate,self).__init__(identity - to_negate)
 
     def __repr__(self):
-        return "negate:\n%s" % util.repr_plus([self.policy_to_negate])
+        return "negate:\n%s" % util.repr_plus([self.to_negate])
 
 
 class modify(DerivedPolicy):
@@ -493,8 +513,8 @@ class if_(DerivedPolicy):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
-        super(if_,self).__init__((self.pred & self.t_branch) + 
-                                 ((~self.pred) & self.f_branch))
+        super(if_,self).__init__((self.pred >> self.t_branch) + 
+                                 ((~self.pred) >> self.f_branch))
 
     def __repr__(self):
         return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
@@ -579,8 +599,12 @@ class DynamicPolicy(DerivedPolicy):
     def __repr__(self):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
 
+
+class DynamicFilter(DerivedPolicy,Filter):
+    pass
+
         
-# dynamic : (DecoratedPolicy ->  unit) -> DecoratedPolicy
+# dynamic : (DecoratedDynamicPolicy ->  unit) -> DecoratedDynamicPolicy
 def dynamic(fn):
     """Decorator for dynamic policies.
     Will initialize a dynamic policy based on the input function (fn)
@@ -603,6 +627,31 @@ def dynamic(fn):
     # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
     DecoratedDynamicPolicy.__name__ = fn.__name__
     return DecoratedDynamicPolicy
+
+
+# dynamic_filter : (DecoratedDynamicFilter ->  unit) -> DecoratedDynamicFilter
+def dynamic_filter(fn):
+    """Decorator for dynamic policies.
+    Will initialize a dynamic policy based on the input function (fn)
+    and return a new dynamic policy class whose name is identical to that of fn.
+    Calling the constructor of the returned policy class creates an instance which
+    can then be used like any other policy."""
+    class DecoratedDynamicFilter(DynamicFilter):
+        def __init__(self, *args, **kwargs):
+            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
+            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
+            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
+            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
+            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
+            DynamicFilter.__init__(self)
+            fn(self, *args, **kwargs)
+
+        def __repr__(self):
+            return "[dynamic_filter(%s)]\n%s" % (self.name(), repr(self.policy))
+        
+    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
+    DecoratedDynamicFilter.__name__ = fn.__name__
+    return DecoratedDynamicFilter
 
 
 class flood(DynamicPolicy):
@@ -637,7 +686,7 @@ class flood(DynamicPolicy):
             return "flood"
 
 
-class ingress_network(DynamicPolicy):
+class ingress_network(DynamicFilter):
     """Returns True if a packet is located at a (switch,inport) pair entering
     the network, False otherwise."""
     def __init__(self):
@@ -657,7 +706,7 @@ class ingress_network(DynamicPolicy):
         return "ingress_network"
 
         
-class egress_network(DynamicPolicy):
+class egress_network(DynamicFilter):
     """Returns True if a packet is located at a (switch,outport) pair leaving
     the network, False otherwise."""
     def __init__(self):
@@ -708,14 +757,14 @@ class packets(DynamicPolicy):
     grouping - two packets are in the same group if they match on all headers in the
     group_by.  If no group_by is specified, the default is to match on all available
     headers."""
-    class BoolWrappedFwdBucket(Policy):
+    class FilterWrappedFwdBucket(Policy):
         def __init__(self,limit=None,group_by=[]):
             self.limit = limit
             self.group_by = group_by
             self.seen = {}
             self.fwd_bucket = FwdBucket()
             self.register_callback = self.fwd_bucket.register_callback
-            super(packets.BoolWrappedFwdBucket,self).__init__()
+            super(packets.FilterWrappedFwdBucket,self).__init__()
 
         def eval(self,pkt):
             if not self.limit is None:
@@ -739,7 +788,7 @@ class packets(DynamicPolicy):
         self.limit = limit
         self.seen = {}
         self.group_by = group_by
-        self.pwfb = self.BoolWrappedFwdBucket(limit,group_by)
+        self.pwfb = self.FilterWrappedFwdBucket(limit,group_by)
         self.register_callback = self.pwfb.register_callback
         super(packets,self).__init__(all_packets)
 

@@ -27,7 +27,7 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.language import StaticPolicy, DerivedPolicy, identity, all_packets, passthrough, no_packets, match, parallel
+from pyretic.core.language import StaticPolicy, Filter, DerivedPolicy, identity, all_packets, passthrough, no_packets, match, union
 import pyretic.core.util as util
 from datetime import datetime
 
@@ -53,11 +53,11 @@ class breakpoint(DerivedPolicy):
 
 ### CONVENIENCE policies
 
-class _in(DerivedPolicy):
+class _in(DerivedPolicy,Filter):
     def __init__(self,field,group):
         self.group = group
         self.field = field
-        super(_in,self).__init__(parallel([match({field : i}) 
+        super(_in,self).__init__(union([match({field : i}) 
                                 for i in group]))
     def __repr__(self):
         return "_in: %s" % self.group

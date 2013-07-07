@@ -50,7 +50,7 @@ from pyretic.modules.mac_learner import learn
 drop_ingress = if_(ingress_network(),drop)
 
 def poke(W,P):
-    p = parallel([match(srcip=s,dstip=d) for (s,d) in W])
+    p = union([match(srcip=s,dstip=d) for (s,d) in W])
     return if_(p,passthrough,P)
 
 def static_fw(W):
@@ -60,10 +60,10 @@ def static_fw(W):
 def fw0(self,W):
     """A dynamic firewall that opens holes but doesn't close them"""
 
-    wp = parallel([match(srcip=s,dstip=d) for (s,d) in W])
+    wp = union([match(srcip=s,dstip=d) for (s,d) in W])
     def update_policy():
         """Update the policy based on current forward and query policies"""
-        self.policy = self.forward + (wp & self.query)
+        self.policy = self.forward + (wp >> self.query)
     self.update_policy = update_policy
 
     def allow_reverse(p):
@@ -94,7 +94,7 @@ def fw(self,W):
 
     def update_policy():
         """Update policy based on current inner and query policies"""
-        self.policy = self.inner + (parallel(rps) & self.query)
+        self.policy = self.inner + (union(rps) >> self.query)
     self.update_policy = update_policy
     
     def check_reverse(stats):

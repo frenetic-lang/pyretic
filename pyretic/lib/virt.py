@@ -106,32 +106,32 @@ class vmap(object):
         self.u2d = {}
 
     def ingress_policy(self):
-        non_ingress = ~parallel(parallel(match(switch=u.switch,
-                                               inport=u.port_no) 
-                                         for u in us) for (d, us) 
-                                in self.d2u.iteritems())
-        ingress = (parallel(parallel(match(switch=u.switch,
-                                                  inport=u.port_no)
-                                            for u in us) & 
-                                   push(vtag='ingress', 
-                                        vswitch=d.switch, 
-                                        vinport=d.port_no, 
-                                        voutport=-1)
-                                   for (d, us) in self.d2u.iteritems()))
-        return ingress | non_ingress
+        non_ingress = ~union(union(match(switch=u.switch,
+                                         inport=u.port_no) 
+                                   for u in us) for (d, us) 
+                             in self.d2u.iteritems())
+        ingress = (union(union(match(switch=u.switch,
+                                     inport=u.port_no)
+                               for u in us) >> 
+                         push(vtag='ingress', 
+                              vswitch=d.switch, 
+                              vinport=d.port_no, 
+                              voutport=-1)
+                         for (d, us) in self.d2u.iteritems()))
+        return ingress + non_ingress
 
     def egress_policy(self):
         matches_egress = []
         valid_match_egress = []
         for (d, us) in self.d2u.iteritems():
-            switch_pred = parallel(match(switch=u.switch, 
-                                         outport=u.port_no) 
-                                   for u in us)
+            switch_pred = union(match(switch=u.switch, 
+                                      outport=u.port_no) 
+                                for u in us)
             matches_egress.append(switch_pred)
             valid_match_egress.append(match(vswitch=d.switch, 
                                             voutport=d.port_no) & switch_pred)
-        return if_(parallel(matches_egress), 
-                   parallel(valid_match_egress) & pop_vheaders)
+        return if_(union(matches_egress), 
+                   union(valid_match_egress) >> pop_vheaders)
 
     def one_to_one_fabric_policy(self):
         fabric_policy = drop
@@ -144,7 +144,7 @@ class vmap(object):
                 # FORWARD OUT THE CORRECT PHYSICAL PORT
                 fabric_policy += (match(vswitch=d1.switch,
                                         vinport=d1.port_no,
-                                        voutport=d2.port_no) & 
+                                        voutport=d2.port_no) >>
                                   fwd(u2.port_no))
         return fabric_policy
 
@@ -162,7 +162,7 @@ class vmap(object):
                     fabric_policy += (match(vswitch=d1.switch,
                                             vinport=d1.port_no,
                                             voutport=d2.port_no,
-                                            switch=u2.switch) & 
+                                            switch=u2.switch) >> 
                                       fwd(u2.port_no))
                 # OTHERWISE, GET THE PATH BETWEEN EACH PHYSICAL PAIR OF SWITCHES CORRESPONDING TO THE VIRTUAL LOCATION PAIR
                 # THE FOR EACH PHYSICAL HOP ON THE PATH, CREATE THE APPROPRIATE FORWARDING RULE FOR THAT SWITCH
@@ -173,12 +173,12 @@ class vmap(object):
                             fabric_policy += (match(vswitch=d1.switch,
                                                     vinport=d1.port_no,
                                                     voutport=d2.port_no,
-                                                    switch=loc.switch) & 
+                                                    switch=loc.switch) >>
                                               fwd(loc.port_no))
                         fabric_policy += (match(vswitch=d1.switch,
                                                 vinport=d1.port_no,
                                                 voutport=d2.port_no,
-                                                switch=u2.switch) & 
+                                                switch=u2.switch) >>
                                           fwd(u2.port_no))
                     except KeyError:
                         pass

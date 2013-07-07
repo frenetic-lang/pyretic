@@ -41,33 +41,33 @@ class gateway_vdef(vdef):
         self.ingress_policy = if_(match(switch=1),
                push(vtag='ingress') >> (                                
                # At physical gateway, ethernet side. Pretend we are switch 1000.
-               (match(at=None, inport=1) & push_vloc(1000,1)) +
-               (match(at=None, inport=2) & push_vloc(1000,2)) +
+               (match(at=None, inport=1) >> push_vloc(1000,1)) +
+               (match(at=None, inport=2) >> push_vloc(1000,2)) +
                # At physical gateway, imaginary side close to ethernet.
-               (match(at="vswitch 1000, vinport 3") & push_vloc(1000,3) >> pop("at")) +
+               (match(at="vswitch 1000, vinport 3") >> push_vloc(1000,3) >> pop("at")) +
                # At physical gateway, imaginary gateway.
-               (match(at="vswitch 1001, vinport 1") & push_vloc(1001,1) >> pop("at")) +
-               (match(at="vswitch 1001, vinport 2") & push_vloc(1001,2) >> pop("at")) +
+               (match(at="vswitch 1001, vinport 1") >> push_vloc(1001,1) >> pop("at")) +
+               (match(at="vswitch 1001, vinport 2") >> push_vloc(1001,2) >> pop("at")) +
                # At physical gateway, imaginary side close to ip.
-               (match(at="vswitch 1002, vinport 3") & push_vloc(1002,3) >> pop("at")) +
+               (match(at="vswitch 1002, vinport 3") >> push_vloc(1002,3) >> pop("at")) +
                # At physical gateway, ip side. Pretend we are switch 1002.
-               (match(at=None, inport=3) & push_vloc(1002,1)) +
-               (match(at=None, inport=4) & push_vloc(1002,2))),
+               (match(at=None, inport=3) >> push_vloc(1002,1)) +
+               (match(at=None, inport=4) >> push_vloc(1002,2))),
                passthrough)
 
         self.fabric_policy = (
             # Destined to ethernet side
-            (match(vswitch=1000, voutport=1) & fwd(1)) +
-            (match(vswitch=1000, voutport=2) & fwd(2)) +
+            (match(vswitch=1000, voutport=1) >> fwd(1)) +
+            (match(vswitch=1000, voutport=2) >> fwd(2)) +
             # If we are destined to a fake switch, 
             # push another header that says which fake switch we are at.
-            (match(vswitch=1000, voutport=3) & push(at="vswitch 1001, vinport 1")) +
-            (match(vswitch=1001, voutport=1) & push(at="vswitch 1000, vinport 3")) +
-            (match(vswitch=1001, voutport=2) & push(at="vswitch 1002, vinport 3")) +
-            (match(vswitch=1002, voutport=3) & push(at="vswitch 1001, vinport 2")) +
+            (match(vswitch=1000, voutport=3) >> push(at="vswitch 1001, vinport 1")) +
+            (match(vswitch=1001, voutport=1) >> push(at="vswitch 1000, vinport 3")) +
+            (match(vswitch=1001, voutport=2) >> push(at="vswitch 1002, vinport 3")) +
+            (match(vswitch=1002, voutport=3) >> push(at="vswitch 1001, vinport 2")) +
             # Destined to ip side
-            (match(vswitch=1002, voutport=1) & fwd(3)) +
-            (match(vswitch=1002, voutport=2) & fwd(4)))
+            (match(vswitch=1002, voutport=1) >> fwd(3)) +
+            (match(vswitch=1002, voutport=2) >> fwd(4)))
             
         self.egress_policy = pop_vheaders >> \
             if_(match(at=None), passthrough, recurse(redo))
