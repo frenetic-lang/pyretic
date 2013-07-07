@@ -248,9 +248,9 @@ class Runtime(object):
             ### DON'T INSTALL RULES THAT CONTAIN QUERIES
             if eval_trace.contains_class(packets.BoolWrappedFwdBucket):
                 pass
-            elif eval_trace.contains_class(counts):
+            elif eval_trace.contains_class(count_packets):
                 pass
-            elif eval_trace.contains_class(sizes):
+            elif eval_trace.contains_class(count_bytes):
                 pass
             else:
                 rule = self.match_on_all_fields_rule(in_pkt,out_pkts)

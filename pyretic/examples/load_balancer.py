@@ -100,7 +100,7 @@ def lb(self,p,R,H):
         self.update_policy()
 
     self.H = H
-    self.query = counts(5,['srcip'])
+    self.query = count_packets(5,['srcip'])
     self.query.register_callback(rebalance)
     self.modify = static_lb(p,R,H) 
     self.update_policy()

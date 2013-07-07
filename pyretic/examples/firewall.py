@@ -110,7 +110,7 @@ def fw(self,W):
                 self.inner.refresh()
             self.H[p] = (cnt,missed)
 
-    self.query = counts(1,['srcip','dstip'])
+    self.query = count_packets(1,['srcip','dstip'])
     self.query.register_callback(check_reverse)
     rps = [match(srcip=d,dstip=s) for (s,d) in W]
     self.H = { rp : (0,0) for rp in rps }

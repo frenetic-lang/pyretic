@@ -873,13 +873,13 @@ class AggregateFwdBucket(FwdBucket):
             return (self.eval(pkt), EvalTrace(self))
 
 
-class counts(AggregateFwdBucket):
+class count_packets(AggregateFwdBucket):
     """AggregateFwdBucket that calls back with aggregate count of packets."""
     def aggregator(self,aggregate,pkt):
         return aggregate + 1
 
 
-class sizes(AggregateFwdBucket):
+class count_bytes(AggregateFwdBucket):
     """AggregateFwdBucket that calls back with aggregate bytesize of packets."""
     def aggregator(self,aggregate,pkt):
         return aggregate + pkt['header_len'] + pkt['payload_len']

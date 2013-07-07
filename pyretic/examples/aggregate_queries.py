@@ -38,22 +38,22 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 
-def count_printer(counts):
+def packet_count_printer(counts):
     print "----counts------"
     print counts
 
 def packet_counts():
-  q = counts(1,['srcip','dstip'])
-  q.register_callback(count_printer)
+  q = count_packets(1,['srcip','dstip'])
+  q.register_callback(packet_count_printer)
   return q
 
-def size_printer(sizes):
-    print "----sizes------"
-    print sizes
+def byte_count_printer(n):
+    print "----bytes------"
+    print n
 
-def packet_sizes():
-  q = sizes(1,['srcip','dstip'])
-  q.register_callback(size_printer)
+def byte_counts():
+  q = count_bytes(1,['srcip','dstip'])
+  q.register_callback(byte_count_printer)
   return q
 
 
@@ -61,5 +61,5 @@ def packet_sizes():
 
 def main():
     return (packet_counts() + 
-            packet_sizes() + 
+            byte_counts() + 
             mac_learner())
