@@ -492,6 +492,15 @@ class modify(DerivedPolicy):
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
 
+
+class match_modify(DerivedPolicy):
+    def __init__(self, field, match_val, mod_val):
+        self.field = field
+        self.match_val = match_val
+        self.mod_val = mod_val
+        super(match_modify,self).__init__(match(field=match_val) >>
+                                          modify(field=mod_val))
+
         
 class move(DerivedPolicy):
     """move(field1='field2') is equivalent to 
