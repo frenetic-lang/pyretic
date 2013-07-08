@@ -479,6 +479,29 @@ class negate(DerivedPolicy,Filter):
         return "negate:\n%s" % util.repr_plus([self.to_negate])
 
 
+class dropped_by(DerivedPolicy,Filter):
+    def __init__(self, dropper):
+        super(dropped_by,self).__init__(dropper)
+
+    def eval(self, pkt):
+        if self.policy.eval(pkt):
+            return set()
+        else:
+            return {pkt}
+
+    def track_eval(self, pkt, dry):
+        eval_trace = EvalTrace(self)
+        (results,trace) = self.policy.track_eval(pkt,dry)
+        eval_trace.add_trace(trace)
+        if results:
+            return (set(),eval_trace)
+        else:
+            return ({pkt},eval_trace)
+
+    def __repr__(self):
+        return "dropped:\n%s" % util.repr_plus([self])
+
+
 class modify(DerivedPolicy):
     """modify(field=value) is equivalent to
     pop('field') >> push(field=value)"""
