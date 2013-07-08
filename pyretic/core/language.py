@@ -461,8 +461,7 @@ class DerivedPolicy(Policy):
         self.policy.set_network(network) 
 
     def eval(self, pkt):
-        tmp = self.policy.eval(pkt)
-        return tmp
+        return self.policy.eval(pkt)
 
     def track_eval(self, pkt, dry):
         eval_trace = EvalTrace(self)
