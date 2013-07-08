@@ -40,11 +40,11 @@ from pyretic.core import util
 # Fixed width stuff
 ################################################################################
 
-class IP(object):
+class IPAddr(object):
     def __init__(self, ip):
 
         # already a IP object
-        if isinstance(ip, IP):
+        if isinstance(ip, IPAddr):
             self.bits = ip.bits
 
         # otherwise will be in byte or string encoding
@@ -84,12 +84,14 @@ class IP(object):
     def __eq__(self,other):
         return repr(self) == repr(other)
 
+class IP(IPAddr):
+    pass
             
-class MAC(object):
+class EthAddr(object):
     def __init__(self, mac):
 
         # already a MAC object
-        if isinstance(mac, MAC):
+        if isinstance(mac, EthAddr):
             self.bits = mac.bits
 
         # otherwise will be in byte or string encoding
@@ -139,6 +141,9 @@ class MAC(object):
 
     def __eq__(self,other):
         return repr(self) == repr(other)
+
+class MAC(EthAddr):
+    pass
 
         
 ################################################################################

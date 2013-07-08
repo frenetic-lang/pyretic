@@ -67,7 +67,7 @@ class PrefixMatch(object):
     """Pattern type for IP prefix match"""
     def __init__(self, pattern):
         self.masklen = 32
-        if isinstance(pattern, IP):     # IP OBJECT
+        if isinstance(pattern, IPAddr):     # IP Address
             self.pattern = pattern
         else:                           # STRING ENCODING
             parts = pattern.split("/")
