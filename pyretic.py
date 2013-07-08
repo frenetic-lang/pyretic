@@ -102,13 +102,14 @@ def main():
         sys.exit(1)
     try:
         module = import_module(module_name)
-    except ImportError:
+    except ImportError, e:
         print 'Must be a valid python module'
         print 'e.g, full module name,'
         print '     no .py suffix,'
         print '     located on the system PYTHONPATH'
         print ''
-        op.print_usage()
+        print 'Exception message for ImportError was:'
+        print e
         sys.exit(1)
 
     main = module.main
