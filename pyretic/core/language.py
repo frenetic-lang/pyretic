@@ -631,7 +631,7 @@ class DynamicPolicy(DerivedPolicy):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
 
 
-class DynamicFilter(DerivedPolicy,Filter):
+class DynamicFilter(DynamicPolicy,Filter):
     pass
 
         
