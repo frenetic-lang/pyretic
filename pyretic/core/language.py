@@ -229,7 +229,8 @@ class identity(PrimitivePolicy,Filter):
     def __repr__(self):
         return "identity"
 passthrough = identity   # Imperative alias
-all_packets = identity   # Logic alias
+true = identity          # Logic alias
+all_packets = identity   # Matching alias
 
         
 @singleton
@@ -241,7 +242,8 @@ class none(PrimitivePolicy,Filter):
     def __repr__(self):
         return "none"
 drop = none              # Imperative alias
-no_packets = none        # Logic alias
+false = none             # Logic alias
+no_packets = identity    # Matching alias
 
 
 class match(PrimitivePolicy,Filter):
