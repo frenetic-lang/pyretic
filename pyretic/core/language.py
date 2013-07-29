@@ -190,31 +190,40 @@ class Filter(Policy):
     def __invert__(self):
         return negate([self])
 
+    
+class Rule(object):
+    def __init__(self,match,acts):
+        self.match = match 
+        self.actions = acts
 
-class Classifer(object):
-    class rule(object):
-        def __init__(self,match,actions):
-            self.match = match 
-            self.actions = actions
+    def __str__(self):
+        return str(self.match) + 'actions:\t' + str(self.actions)
 
+
+class Classifier(object):
     def __init__(self):
         self.rules = []
 
-    def __plus__(self,c2):
+    def __str__(self):
+        return '\n'.join(map(str,self.rules))
+
+    def __add__(self,c2):
         c1 = self
         c = Classifier()
         # TODO (cole): make classifiers iterable
-        for m1, alist1 in c1:
-            for m2, alist2 in c2:
-                # TODO (cole): actions as sums?
-                # TODO (cole): matches + boolean conjunction?
-                if m1 and m2 is not None:
-                    c.rules.append(rule(m1 and m2, alist1 + alist2))
+        for r1 in c1.rules:
+            for r2 in c2.rules:
+                intersection = r1.match.intersect(r2.match)
+                if intersection != none:
+                    c.rules.append(Rule(intersection, r1.actions + r2.actions))
+        for r1 in c1.rules:
+            c.rules.append(r1)
+        for r2 in c2.rules:
+            c.rules.append(r2)
         # TODO (cole): simple shadow elimination
         return c
 
     def __rshift__(self,c2):
-
         # Helper function: commute the match from a right-hand-side rule to the
         # left.
         # Returns: a new match for r1 >> r2.
@@ -233,7 +242,7 @@ class Classifer(object):
             m = _specialize(r1, r2)
             if m is not None:
                 alist = _sequence_actions(r1.actions, r2.actions)
-                return rule(m, alist)
+                return Rule(m, alist)
             else:
                 return None
 
@@ -246,7 +255,7 @@ class Classifer(object):
         c = Classifier()
         for r1 in c1:
             c = c.rules.append(_compile_rule_classifier(r1, c2).rules)
-        c.rules.append(rule(match(), [drop]))
+        c.rules.append(Rule(match(), [drop]))
         # TODO (cole): optimize here.
         return c
 
@@ -273,8 +282,6 @@ class EvalTrace(object):
         else:
             return self.ne.name()
 
-
-
     
 class StaticPolicy(Policy):
     """Abstact class for static policies. 
@@ -285,7 +292,6 @@ class PrimitivePolicy(StaticPolicy):
     """Abstact class for primitive policies."""
     pass
 
-
 @singleton
 class identity(PrimitivePolicy,Filter):
     """The identity policy"""
@@ -293,9 +299,9 @@ class identity(PrimitivePolicy,Filter):
         return {pkt}
 
     def compile(self):
-        r = rule(match(),[identity])
-        self._classifer = Classifier()
-        self._classifer.rules.append(r)
+        r = Rule(match(),actions([modify()]))
+        self._classifier = Classifier()
+        self._classifier.rules.append(r)
         return self._classifier
 
     def __repr__(self):
@@ -312,9 +318,9 @@ class none(PrimitivePolicy,Filter):
         return set()
 
     def compile(self):
-        r = rule(match(),[drop])
-        self._classifer = Classifier()
-        self._classifer.rules.append(r)
+        r = Rule(match(),actions([drop]))
+        self._classifier = Classifier()
+        self._classifier.rules.append(r)
         return self._classifier
 
     def __repr__(self):
@@ -339,6 +345,18 @@ class match(PrimitivePolicy,Filter):
         self.map = util.frozendict(init_map)
         super(match,self).__init__()
 
+    def intersect(self, pol):
+        if not isinstance(pol,match):
+            raise TypeError
+        fs1 = set(self.map.keys())
+        fs2 = set(pol.map.keys())
+        shared = fs1 & fs2
+        for f in shared:
+            if self.map[f] != pol.map[f]:
+                return none
+        d = self.map.update(pol.map)
+        return match(**d)
+
     ### hash : unit -> int
     def __hash__(self):
         return hash(self.map)
@@ -362,11 +380,11 @@ class match(PrimitivePolicy,Filter):
         return {pkt}
 
     def compile(self):
-        r1 = rule(self,[identity])
-        r2 = rule(match(),[drop])
-        self._classifer = Classifier()
-        self._classifer.rules.append(r1)
-        self._classifer.rules.append(r2)
+        r1 = Rule(self,actions([modify()]))
+        r2 = Rule(match(),[drop])
+        self._classifier = Classifier()
+        self._classifier.rules.append(r1)
+        self._classifier.rules.append(r2)
         return self._classifier
 
     def __repr__(self):
@@ -385,9 +403,9 @@ class modify(PrimitivePolicy):
         return {pkt.modifymany(self.map)}
 
     def compile(self):
-        r = rule(match(),[self])
-        self._classifer = Classifier()
-        self._classifer.rules.append(r)
+        r = Rule(match(),actions([self]))
+        self._classifier = Classifier()
+        self._classifier.rules.append(r)
         return self._classifier
 
     def __repr__(self):
@@ -450,13 +468,13 @@ class negate(CombinatorPolicy,Filter):
         return (output,eval_trace)
 
     def compile(self):
-        inner_classifer = self.policies[0].compile()
-        self._classifer = Classifer()
-        for r in inner_classifer:
+        inner_classifier = self.policies[0].compile()
+        self._classifier = Classifier()
+        for r in inner_classifier:
             if r.actions[0] == identity:
-                self._classifier.rules.append(rule(r.match,[drop]))
+                self._classifier.rules.append(Rule(r.match,actions([drop])))
             elif r.actions[0] == drop:
-                self._classifier.rules.append(rule(r.match,[identity]))
+                self._classifier.rules.append(Rule(r.match,actions([modify()])))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return self._classifier 
@@ -487,15 +505,26 @@ class parallel(CombinatorPolicy):
         return (output,eval_trace)
 
     def compile(self):
-
         assert(len(self.policies) > 1)
-        return reduce(lambda acc, c: c.compile() + acc, self.policies)
+        classifiers = map(lambda p: p.compile(),self.policies)
+        return reduce(lambda acc, c: acc + c, classifiers)
 
 
 class union(parallel,Filter):
     pass
 
-    
+
+class actions(parallel):
+    def __init__(self, policies):
+        for p in policies:
+            if p == none:
+                continue
+            if isinstance(p,modify):
+                continue
+            raise TypeError
+        super(actions,self).__init__(policies)
+
+
 class sequential(CombinatorPolicy):
     """sequential(policies) evaluates the set union of each policy in policies 
     on each packet in the output of previous policy."""
@@ -544,7 +573,7 @@ class sequential(CombinatorPolicy):
 
     def compile(self):
         assert(len(self.policies) > 1)
-        return reduce(lambda acc, c: c.compile() >> acc, self.policies)
+        return reduce(lambda acc, p: p.compile() >> acc, self.policies)
   
 
 class intersection(sequential,Filter):
@@ -624,21 +653,7 @@ class match_modify(DerivedPolicy):
         self.mod_val = mod_val
         super(match_modify,self).__init__(match(field=match_val) >>
                                           modify(field=mod_val))
-
         
-class move(DerivedPolicy):
-    """move(field1='field2') is equivalent to 
-    copy(field1='field2') >> pop('field2')"""
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-        super(move,self).__init__(copy(**self.map) >>
-                                  pop(*[k for k in self.map.values()]))
-  
-    def __repr__(self):
-        return "move:\n%s" % util.repr_plus(self.map.items())
-
-
 class if_(DerivedPolicy):
     """if predicate holds, t_branch, otherwise f_branch."""
     ### init : Policy -> Policy -> Policy -> unit
