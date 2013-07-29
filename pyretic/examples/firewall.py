@@ -43,7 +43,7 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.modules.hub import hub
-from pyretic.modules.mac_learner import learn
+from pyretic.modules.mac_learner import mac_learner
 
 ### FIREWALLS ###
 
@@ -57,47 +57,54 @@ def static_fw(W):
     W_rev = [(d,s) for (s,d) in W]
     return poke(W_rev, poke(W, drop_ingress))
 
-def fw0(self,W):
+class fw0(DynamicPolicy):
     """A dynamic firewall that opens holes but doesn't close them"""
+    def __init__(self,W):
+        super(fw0,self).__init__()
+        self.wp = union([match(srcip=s,dstip=d) for (s,d) in W])
+        self.forward = poke(W,drop_ingress)
+        self.refresh()
 
-    wp = union([match(srcip=s,dstip=d) for (s,d) in W])
-    def update_policy():
+    def update_policy(self):
         """Update the policy based on current forward and query policies"""
-        self.policy = self.forward + (wp >> self.query)
-    self.update_policy = update_policy
+        self.policy = self.forward + (self.wp >> self.query)
 
-    def allow_reverse(p):
+    def allow_reverse(self,p):
         """Open reverse hole for ongoing traffic"""
         print "poking hole for %s,%s" % (p['dstip'],p['srcip'])
         self.forward = poke({(p['dstip'],p['srcip'])},self.forward)
         self.update_policy()
 
-    def refresh_query():
+    def refresh_query(self):
         """(Re)set the query checking for allowed traffic"""
         self.query = packets(1,['dstip','srcip'])
-        self.query.register_callback(allow_reverse)
+        self.query.register_callback(self.allow_reverse)
 
-    def refresh():
+    def refresh(self):
         """Refresh the policy"""
-        refresh_query()
-        update_policy()
-    self.refresh = refresh
-
-    self.forward = poke(W,drop_ingress) 
-    self.refresh()
+        self.refresh_query()
+        self.update_policy()
 
 def patch(p,P):
     return if_(p,drop_ingress,P)
 
-def fw(self,W):
+class fw(DynamicPolicy):
     """A dynamic firewall that closes holes that it opens"""
-
-    def update_policy():
-        """Update policy based on current inner and query policies"""
-        self.policy = self.inner + (union(rps) >> self.query)
-    self.update_policy = update_policy
+    def __init__(self,W):
+        super(fw,self).__init__()
+        self.query = count_packets(1,['srcip','dstip'])
+        self.query.register_callback(self.check_reverse)
+        self.rps = [match(srcip=d,dstip=s) for (s,d) in W]
+        self.H = { rp : (0,0) for rp in self.rps }
+        self.T = 3
+        self.inner = fw0(W)
+        self.update_policy()
     
-    def check_reverse(stats):
+    def update_policy(self):
+        """Update policy based on current inner and query policies"""
+        self.policy = self.inner + (union(self.rps) >> self.query)
+    
+    def check_reverse(self,stats):
         """Close unused holes"""
         for (p,cnt) in stats.items():
             (pcnt,missed) = self.H[p]
@@ -109,15 +116,6 @@ def fw(self,W):
                 self.inner.forward = patch(p,self.inner.forward)
                 self.inner.refresh()
             self.H[p] = (cnt,missed)
-
-    self.query = count_packets(1,['srcip','dstip'])
-    self.query.register_callback(check_reverse)
-    rps = [match(srcip=d,dstip=s) for (s,d) in W]
-    self.H = { rp : (0,0) for rp in rps }
-    self.T = 3
-    self.inner = dynamic(fw0)(W)
-    self.update_policy()
-    
 
 ### EXAMPLES ###
 
@@ -144,7 +142,7 @@ def authentication_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return dynamic(fw0)(whitelist) >> hub
+    return fw0(whitelist) >> hub
 
 
 
@@ -160,7 +158,7 @@ def statefull_firewall_example():
             whitelist.add((client_ip,client_ip2))
 
     print whitelist
-    return dynamic(fw)(whitelist) >> hub
+    return fw(whitelist) >> hub
 
 
 ### Main ###

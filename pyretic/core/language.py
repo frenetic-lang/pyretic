@@ -646,56 +646,6 @@ class DynamicFilter(DynamicPolicy,Filter):
     pass
 
         
-# dynamic : (DecoratedDynamicPolicy ->  unit) -> DecoratedDynamicPolicy
-def dynamic(fn):
-    """Decorator for dynamic policies.
-    Will initialize a dynamic policy based on the input function (fn)
-    and return a new dynamic policy class whose name is identical to that of fn.
-    Calling the constructor of the returned policy class creates an instance which
-    can then be used like any other policy."""
-    class DecoratedDynamicPolicy(DynamicPolicy):
-        def __init__(self, *args, **kwargs):
-            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
-            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
-            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
-            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
-            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
-            DynamicPolicy.__init__(self)
-            fn(self, *args, **kwargs)
-
-        def __repr__(self):
-            return "[dynamic(%s)]\n%s" % (self.name(), repr(self.policy))
-        
-    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
-    DecoratedDynamicPolicy.__name__ = fn.__name__
-    return DecoratedDynamicPolicy
-
-
-# dynamic_filter : (DecoratedDynamicFilter ->  unit) -> DecoratedDynamicFilter
-def dynamic_filter(fn):
-    """Decorator for dynamic policies.
-    Will initialize a dynamic policy based on the input function (fn)
-    and return a new dynamic policy class whose name is identical to that of fn.
-    Calling the constructor of the returned policy class creates an instance which
-    can then be used like any other policy."""
-    class DecoratedDynamicFilter(DynamicFilter):
-        def __init__(self, *args, **kwargs):
-            # THIS CALL WORKS BY SETTING THE BEHAVIOR OF MEMBERS OF SELF.
-            # IN PARICULAR, THE register_callback FUNCTION RETURNED BY self.query 
-            # (ITSELF A MEMBER OF A queries_base CREATED BY self.query)
-            # THIS ALLOWS FOR DECORATED POLICIES TO EVOLVE ACCORDING TO 
-            # FUNCTION REGISTERED FOR CALLBACK EACH TIME A NEW EVENT OCCURS
-            DynamicFilter.__init__(self)
-            fn(self, *args, **kwargs)
-
-        def __repr__(self):
-            return "[dynamic_filter(%s)]\n%s" % (self.name(), repr(self.policy))
-        
-    # SET THE NAME OF THE DECORATED POLICY RETURNED TO BE THAT OF THE INPUT FUNCTION
-    DecoratedDynamicFilter.__name__ = fn.__name__
-    return DecoratedDynamicFilter
-
-
 class flood(DynamicPolicy):
     """Policy that floods packets on a minimum spanning tree, recalculated 
     every time the network is updated (set_network)."""

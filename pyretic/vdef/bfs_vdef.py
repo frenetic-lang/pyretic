@@ -38,38 +38,30 @@ class BFS_vdef(vdef):
         self.kept_topology = None
         super(BFS_vdef,self).__init__()
 
-        @dynamic
-        def ingress_policy(self):
-            def set_network(network):
+        @singleton
+        class ingress_policy(DynamicPolicy):
+            def set_network(self,network):
                 if not self.vmap is None:
                     self.policy = self.vmap.ingress_policy()
                     DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
+        self.ingress_policy = ingress_policy
 
-        @dynamic
-        def fabric_policy(self):
-            def set_network(network):
+        @singleton
+        class fabric_policy(DynamicPolicy):
+            def set_network(self,network):
                 if not self.vmap is None:
                     self.policy = self.vmap.shortest_path_fabric_policy(network.topology)
                     DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
+        self.fabric_policy = fabric_policy
 
-        @dynamic
-        def egress_policy(self):
-            def set_network(network):
+        @singleton
+        class egress_policy(DynamicPolicy):
+            def set_network(self,network):
                 if not self.vmap is None:
                     self.policy = self.vmap.egress_policy()
                     DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
-
-        self.ingress_policy = ingress_policy()
-        self.fabric_policy = fabric_policy()
-        self.egress_policy = egress_policy()
-    
-
+        self.egress_policy = egress_policy
+   
     def make_vmap(self):
         mapping = vmap()
         port_no = 1

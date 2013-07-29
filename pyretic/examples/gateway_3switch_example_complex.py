@@ -89,8 +89,8 @@ def example_setup(num_clients=3, num_servers=3):
 
     ### POLICIES FOR THIS EXAMPLE
     eth_pol = mac_learner()
-    alb = dynamic(lb)(public_ip,R,H) >> fix_dstmac(ip_macs) 
-    afw = if_(ARP,passthrough,dynamic(fw)(W))
+    alb = lb(public_ip,R,H) >> fix_dstmac(ip_macs) 
+    afw = if_(ARP,passthrough,fw(W))
     ip_pol = if_(match(srcip=eth_cidr), 
                  afw >> alb, 
                  alb >> afw) >> mac_learner() 

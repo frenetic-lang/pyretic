@@ -34,35 +34,27 @@ class spanning_tree_vdef(vdef):
     def __init__(self):
         super(spanning_tree_vdef,self).__init__()
 
-        @dynamic
-        def ingress_policy(self):
-            def set_network(network):
+        @singleton
+        class ingress_policy(DynamicPolicy):
+            def set_network(self,network):
                 self.policy = self.vmap.ingress_policy()
                 DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
+        self.ingress_policy = ingress_policy
 
-        @dynamic
-        def fabric_policy(self):
-            def set_network(network):
+        @singleton
+        class fabric_policy(DynamicPolicy):
+            def set_network(self,network):
                 self.policy = self.vmap.one_to_one_fabric_policy() 
                 DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
+        self.fabric_policy = fabric_policy
 
-        @dynamic
-        def egress_policy(self):
-            def set_network(network):
+        @singleton
+        class egress_policy(DynamicPolicy):
+            def set_network(self,network):
                 self.policy = self.vmap.egress_policy()
                 DynamicPolicy.set_network(self,network)            
-            self.policy = drop
-            self.set_network = set_network
-
-        self.ingress_policy = ingress_policy()
-        self.fabric_policy = fabric_policy()
-        self.egress_policy = egress_policy()
+        self.egress_policy = egress_policy
     
-
     def make_vmap(self):
         mapping = vmap()
         for sw, attrs in self.derived.topology.nodes(data=True):

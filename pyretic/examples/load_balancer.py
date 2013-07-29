@@ -85,29 +85,31 @@ def update(H,stats):
 def static_lb(p,R,H):
     return rewrite(balance(R,H),p) 
 
-def lb(self,p,R,H):
-
-    def update_policy():
-        """Update the policy based on current modify and query policies"""
-        self.policy = self.modify + (match(dstip=p) >> self.query)
-    self.update_policy = update_policy
-
-    def rebalance(stats):
-        self.H = update(H,stats)
-        b = balance(R,self.H)
-        print "rebalance %s" % b
-        self.modify = rewrite(b,p)
+class lb(DynamicPolicy):
+    def __init__(self,p,R,H):
+        super(lb,self).__init__()
+        self.H = H
+        self.R = R
+        self.public_ip = p
+        self.query = count_packets(5,['srcip'])
+        self.query.register_callback(self.rebalance)
+        self.modify = static_lb(self.public_ip,self.R,self.H) 
         self.update_policy()
+        
+    def update_policy(self):
+        """Update the policy based on current modify and query policies"""
+        self.policy = self.modify + (match(dstip=self.public_ip) >> self.query)
 
-    self.H = H
-    self.query = count_packets(5,['srcip'])
-    self.query.register_callback(rebalance)
-    self.modify = static_lb(p,R,H) 
-    self.update_policy()
+    def rebalance(self,stats):
+        self.H = update(self.H,stats)
+        b = balance(self.R,self.H)
+        print "rebalance %s" % b
+        self.modify = rewrite(b,self.public_ip)
+        self.update_policy()
 
 
 def main(clients, servers):
-    from pyretic.modules.mac_learner import learn
+    from pyretic.modules.mac_learner import mac_learner
     
     num_clients = int(clients)
     num_servers = int(servers)
@@ -124,6 +126,6 @@ def main(clients, servers):
     H = {c : 0 for c in client_ips}
     R = [IP(ip_prefix + str(i)) for i in range(1+num_clients, 1+num_clients+num_servers)]
 
-    return static_lb(public_ip,R,H) >> dynamic(learn)()     ## TEST ABOVE WORKS
-#    return dynamic(lb)(public_ip,R,H) >> dynamic(learn)()  
+    return static_lb(public_ip,R,H) >> mac_learner()     ## TEST ABOVE WORKS
+#    return lb(public_ip,R,H) >> mac_learner()
 

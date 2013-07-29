@@ -42,39 +42,35 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
-def learn(self):
+class mac_learner(DynamicPolicy):
     """Standard MAC-learning logic"""
-    def update_policy():
+    def __init__(self):
+        super(mac_learner,self).__init__()
+        self.flood = flood()           # REUSE A SINGLE FLOOD INSTANCE
+        self.set_initial_state()
+
+    def set_initial_state(self):
+        self.query = packets(1,['srcmac','switch'])
+        self.query.register_callback(self.learn_new_MAC)
+        self.forward = self.flood  # REUSE A SINGLE FLOOD INSTANCE
+        self.update_policy()
+
+    def set_network(self,network):
+        Policy.set_network(self,network)  # AVOID UNECESSARY CALCULATIONS IN INTERNAL POLICY ABOUT TO BE REPLACED
+        self.set_initial_state()
+
+    def update_policy(self):
         """Update the policy based on current forward and query policies"""
         self.policy = self.forward + self.query
 
-    def learn_new_MAC(pkt):
+    def learn_new_MAC(self,pkt):
         """Update forward policy based on newly seen (mac,port)"""
         self.forward = if_(match(dstmac=pkt['srcmac'],
                                 switch=pkt['switch']),
                           fwd(pkt['inport']),
                           self.forward) 
-        update_policy()
-
-    def set_initial_state():
-        self.query = packets(1,['srcmac','switch'])
-        self.query.register_callback(learn_new_MAC)
-        self.forward = self.flood  # REUSE A SINGLE FLOOD INSTANCE
-        update_policy()
-
-    def set_network(network):
-        Policy.set_network(self,network)  # AVOID UNECESSARY CALCULATIONS IN INTERNAL POLICY ABOUT TO BE REPLACED
-        set_initial_state()
+        self.update_policy()
        
-    self.flood = flood()           # REUSE A SINGLE FLOOD INSTANCE
-    self.update_policy = update_policy
-    self.set_network = set_network
-    set_initial_state()
-
-
-def mac_learner():
-    """Create a dynamic policy object from learn()"""
-    return dynamic(learn)()
 
 def main():
     return mac_learner()

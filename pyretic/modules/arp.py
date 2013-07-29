@@ -81,14 +81,18 @@ def translate(mac_of={}):
     return known_ip + unknown_ip
 
 
-@dynamic
-def arp(self,mac_of={}):
+class arp(DynamicPolicy):
     """Respond to arp request for any known hosts,
        learn macs of unknown hosts, rewrite macs based on dstip"""
-    location_of = {}
-    outstanding_requests = collections.defaultdict(dict)
+    def __init__(self,mac_of={}):
+        self.mac_of = mac_of
+        self.location_of = {}
+        self.outstanding_requests = collections.defaultdict(dict)
+        self.query = packets()
+        self.query.register_callback(self.handle_arp)
+        super(arp,self).__init__(self.query)
 
-    def handle_arp(pkt):
+    def handle_arp(self,pkt):
         switch = pkt['switch']
         inport = pkt['inport']
         srcip  = pkt['srcip']
@@ -98,17 +102,17 @@ def arp(self,mac_of={}):
         opcode = pkt['protocol']
 
         # RECORD THE LOCATION AT WHICH THIS NODE IS ATTACHED TO THE NETWORK
-        if not srcip in location_of:
-            location_of[srcip] = Location(switch,inport)
+        if not srcip in self.location_of:
+            self.location_of[srcip] = Location(switch,inport)
 
         # IF THIS PACKET IS A REQUEST
         if opcode == 1:
-            if dstip in mac_of:
+            if dstip in self.mac_of:
                 if VERBOSE_LEVEL > 0:
                     print "RECEIVED REQUEST FOR %s FROM %s, KNOWN HOST" % (dstip,srcip)
                     if VERBOSE_LEVEL > 1:
                         print pkt
-                send_arp(RESPONSE,self.network,switch,inport,dstip,mac_of[dstip],srcip,srcmac)
+                send_arp(RESPONSE,self.network,switch,inport,dstip,self.mac_of[dstip],srcip,srcmac)
             else:
                 if VERBOSE_LEVEL > 0:
                     print "RECEIVED REQUEST FOR %s FROM %s, UNKNOWN HOST" % (dstip,srcip)
@@ -116,10 +120,10 @@ def arp(self,mac_of={}):
                         print pkt
 
                 # LEARN MAC
-                mac_of[srcip] = srcmac  
+                self.mac_of[srcip] = srcmac  
 
                 # FORWARD REQUEST OUT OF ALL EGRESS PORTS
-                outstanding_requests[srcip][dstip] = True
+                self.outstanding_requests[srcip][dstip] = True
                 for loc in self.network.topology.egress_locations() - {Location(switch,inport)}:
                     switch  = loc.switch
                     outport = loc.port_no
@@ -132,7 +136,7 @@ def arp(self,mac_of={}):
         # THIS IS A RESPONSE THAT WE WILL ALSO LEARN FROM
         elif opcode == 2:
             try:
-                del outstanding_requests[dstip][srcip]
+                del self.outstanding_requests[dstip][srcip]
 
                 if VERBOSE_LEVEL > 0:
                     print "OUTSTANDING RESPONSE FOR %s TO %s" % (srcip,dstip)
@@ -140,19 +144,15 @@ def arp(self,mac_of={}):
                         print pkt
 
                 # LEARN MAC
-                mac_of[srcip] = srcmac
-                loc = location_of[dstip]
-                send_arp(RESPONSE,self.network,loc.switch,loc.port_no,srcip,mac_of[srcip],dstip,mac_of[dstip])
+                self.mac_of[srcip] = srcmac
+                loc = self.location_of[dstip]
+                send_arp(RESPONSE,self.network,loc.switch,loc.port_no,srcip,self.mac_of[srcip],dstip,self.mac_of[dstip])
             except:
 
                 if VERBOSE_LEVEL > 1:
                     print "IGNORABLE RESPONSE FOR %s TO %s" % (srcip,dstip)
                     print pkt
-                pass
-
-    self.query = packets()
-    self.query.register_callback(handle_arp)
-    self.policy = self.query
+                pass    
 
 
 def arp_and_mac_learn():

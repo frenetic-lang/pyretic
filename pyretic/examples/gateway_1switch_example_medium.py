@@ -41,9 +41,9 @@ from pyretic.lib.virt import *
 from pyretic.examples.gateway_3switch_example_medium import example_setup
 from pyretic.vdef.gateway_vdef import gateway_vdef
 
-@dynamic
-def vgateway(self,pol):
-    self.policy = virtualize(pol, gateway_vdef(self))
+class vgateway(DynamicPolicy):
+    def __init__(self,pol):
+        super(vgateway,self).__init__(virtualize(pol, gateway_vdef(self)))
 
 def main():
     return vgateway(example_setup())
