@@ -41,7 +41,7 @@ from pyretic.lib.virt import *
 
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.modules.arp import arp, translate, ARP
-from pyretic.vdef.bfs_vdef import BFS_vdef
+from pyretic.vdef.merge import merge
 
 
 def main():
@@ -51,7 +51,7 @@ def main():
 #    pol = mac_learner()
     return virtualize(
         virtualize(pol,
-                   BFS_vdef(from_switches=[1,4])),
-        BFS_vdef(from_switches=[1,2,3]))
+                   merge(from_switches=[1,4])),
+        merge(from_switches=[1,2,3]))
 
 

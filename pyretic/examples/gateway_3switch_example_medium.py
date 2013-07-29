@@ -40,7 +40,7 @@ from pyretic.lib.virt import *
 
 from pyretic.modules.gateway_forwarder import gateway_forwarder
 from pyretic.modules.mac_learner import mac_learner
-from pyretic.vdef.bfs_vdef import BFS_vdef
+from pyretic.vdef.merge import merge
 
 def example_setup(num_clients=3, num_servers=3):
     ### EXAMPLE PARAMETERS
@@ -68,7 +68,7 @@ def example_setup(num_clients=3, num_servers=3):
 
     ### POLICIES FOR THIS EXAMPLE
     eth_pol = mac_learner() 
-    ip_pol = virtualize(mac_learner(),BFS_vdef(name=5,from_switches=ip_core))
+    ip_pol = virtualize(mac_learner(),merge(name=5,from_switches=ip_core))
     gw_pol = gateway_forwarder(eth_cidr,ip_cidr,host_macs)
 
     return ((switch_in(ethernet) >> eth_pol) + 

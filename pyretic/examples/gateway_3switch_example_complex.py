@@ -42,7 +42,7 @@ from pyretic.lib.virt import *
 from pyretic.modules.gateway_forwarder import gateway_forwarder
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.modules.arp import ARP
-from pyretic.vdef.bfs_vdef import BFS_vdef
+from pyretic.vdef.merge import merge
 from pyretic.examples.load_balancer import lb
 from pyretic.examples.firewall import fw
 
@@ -94,7 +94,7 @@ def example_setup(num_clients=3, num_servers=3):
     ip_pol = if_(match(srcip=eth_cidr), 
                  afw >> alb, 
                  alb >> afw) >> mac_learner() 
-    ip_pol = virtualize(ip_pol,BFS_vdef(name=5,from_switches=ip_core))
+    ip_pol = virtualize(ip_pol,merge(name=5,from_switches=ip_core))
     gw_pol = gateway_forwarder(eth_cidr,ip_cidr,host_macs)
 
     return ((switch_in(ethernet) >> eth_pol) + 

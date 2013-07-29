@@ -39,12 +39,12 @@ from pyretic.lib.std import *
 from pyretic.lib.virt import *
 
 from pyretic.examples.gateway_3switch_example_complex import example_setup
-from pyretic.vdef.gateway_vdef import gateway_vdef
+from pyretic.vdef.split_gateway import split_gateway
 
 
 class vgateway(DynamicPolicy):
     def __init__(self,pol):
-        super(vgateway,self).__init__(virtualize(pol, gateway_vdef(self)))
+        super(vgateway,self).__init__(virtualize(pol, split_gateway(self)))
 
 def main():
     return vgateway(example_setup())

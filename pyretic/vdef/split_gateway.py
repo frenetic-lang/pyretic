@@ -31,9 +31,9 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.virt import *
 
-class gateway_vdef(vdef):
+class split_gateway(vdef):
     def __init__(self, redo):
-        super(gateway_vdef,self).__init__()
+        super(split_gateway,self).__init__()
 
         def push_vloc(switch,inport):
             return push(vswitch=switch,vinport=inport,voutport=-1)
@@ -119,7 +119,7 @@ class gateway_vdef(vdef):
             self.derived.topology.add_link(Location(1001,2),Location(1002,3)) # internal  s1001[2] -- s1002[3] 
         except:
             self.derived.topology = Topology()
-        super(gateway_vdef,self).set_network(network)
+        super(split_gateway,self).set_network(network)
         print "--- Underlying Gateway Topology ------"
         print self.underlying.topology
         print "--- Derived Gateway Topology ------"
