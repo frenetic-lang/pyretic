@@ -118,6 +118,7 @@ class Policy(object):
     """
     def __init__(self):
         self._network = None
+        self._classifier = None
         
     @property
     def network(self):
@@ -150,6 +151,9 @@ class Policy(object):
 
     def track_eval(self, pkt, dry):
         return (self.eval(pkt), EvalTrace(self))
+
+    def compile(self):
+        return self._classifier
 
     def name(self):
         return self.__class__.__name__
@@ -184,7 +188,23 @@ class Filter(Policy):
     
     ### invert : unit -> Filter
     def __invert__(self):
-        return negate(self)
+        return negate([self])
+
+
+class Classifer(object):
+    class rule(object):
+        def __init__(self,match,actions):
+            self.match = match 
+            self.actions = actions
+
+    def __init__(self):
+        self.rules = []
+
+    def __plus__(self,c):
+        return None
+
+    def __rshift__(self,c):
+        return None
 
 
 class EvalTrace(object):
@@ -209,6 +229,8 @@ class EvalTrace(object):
         else:
             return self.ne.name()
 
+
+
     
 class StaticPolicy(Policy):
     """Abstact class for static policies. 
@@ -226,6 +248,12 @@ class identity(PrimitivePolicy,Filter):
     def eval(self, pkt):
         return {pkt}
 
+    def compile(self):
+        r = rule(match(),[identity])
+        self._classifer = Classifier()
+        self._classifer.rules.append(r)
+        return self._classifier
+
     def __repr__(self):
         return "identity"
 passthrough = identity   # Imperative alias
@@ -238,6 +266,12 @@ class none(PrimitivePolicy,Filter):
     """The policy that drops a pkt"""
     def eval(self, pkt):
         return set()
+
+    def compile(self):
+        r = rule(match(),[drop])
+        self._classifer = Classifier()
+        self._classifer.rules.append(r)
+        return self._classifier
 
     def __repr__(self):
         return "none"
@@ -283,6 +317,14 @@ class match(PrimitivePolicy,Filter):
                     return set()
         return {pkt}
 
+    def compile(self):
+        r1 = rule(self,[identity])
+        r2 = rule(match(),[drop])
+        self._classifer = Classifier()
+        self._classifer.rules.append(r1)
+        self._classifer.rules.append(r2)
+        return self._classifier
+
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
         
@@ -297,6 +339,12 @@ class modify(PrimitivePolicy):
 
     def eval(self, pkt):
         return {pkt.modifymany(self.map)}
+
+    def compile(self):
+        r = rule(match(),[self])
+        self._classifer = Classifier()
+        self._classifer.rules.append(r)
+        return self._classifier
 
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
@@ -342,17 +390,32 @@ class CombinatorPolicy(StaticPolicy):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
 
 
-class difference(CombinatorPolicy,Filter):
+class negate(CombinatorPolicy,Filter):
     def eval(self, pkt):
-        return self.policies[0].eval(pkt) - self.policies[1].eval(pkt)
+        if self.policies[0].eval(pkt):
+            return set()
+        else:
+            return {pkt}
 
     def track_eval(self, pkt, dry):
         eval_trace = EvalTrace(self)
-        (results1,trace1) = self.policies[0].track_eval(pkt,dry)
-        (results2,trace2) = self.policies[1].track_eval(pkt,dry)
-        eval_trace.add_trace(trace1)
-        eval_trace.add_trace(trace2)
-        return (results1 - results2, eval_trace)
+        output = set()
+        (results,trace) = self.policies[0].track_eval(pkt,dry)
+        output |= results
+        eval_trace.add_trace(trace)
+        return (output,eval_trace)
+
+    def compile(self):
+        inner_classifer = self.policies[0].compile()
+        self._classifer = Classifer()
+        for r in inner_classifer:
+            if r.actions[0] == identity:
+                self._classifier.rules.append(rule(r.match,[drop]))
+            elif r.actions[0] == drop:
+                self._classifier.rules.append(rule(r.match,[identity]))
+            else:
+                raise TypeError  # TODO MAKE A CompileError TYPE
+        return self._classifier 
 
 
 class parallel(CombinatorPolicy):
@@ -491,13 +554,14 @@ class DerivedPolicy(Policy):
         return (results,eval_trace)
 
 
-class negate(DerivedPolicy,Filter):
-    def __init__(self, to_negate):
-        self.to_negate = to_negate
-        super(negate,self).__init__(identity - to_negate)
+class difference(DerivedPolicy,Filter):
+    def __init__(self, f1, f2):
+       self.f1 = f1
+       self.f2 = f2
+       super(difference,self).__init__(~f2 & f1)
 
     def __repr__(self):
-        return "negate:\n%s" % util.repr_plus([self.to_negate])
+        return "difference:\n%s" % util.repr_plus([self.f1,self.f2])
 
 
 class match_modify(DerivedPolicy):
