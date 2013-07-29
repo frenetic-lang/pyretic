@@ -558,6 +558,23 @@ class if_(DerivedPolicy):
         super(if_,self).__init__((self.pred >> self.t_branch) + 
                                  ((~self.pred) >> self.f_branch))
 
+    def eval(self, pkt):
+        if self.pred.eval(pkt):
+            return self.t_branch.eval(pkt)
+        else:
+            return self.f_branch.eval(pkt)
+
+    def track_eval(self, pkt, dry):
+        eval_trace = EvalTrace(self)
+        (results,trace) = self.pred.track_eval(pkt,dry)
+        eval_trace.add_trace(trace)
+        if results:
+            (results,trace) = self.t_branch.track_eval(pkt,dry)
+        else:
+            (results,trace) = self.f_branch.track_eval(pkt,dry)
+        eval_trace.add_trace(trace)
+        return (results,eval_trace)
+
     def __repr__(self):
         return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
                                                util.repr_plus([self.t_branch]),
