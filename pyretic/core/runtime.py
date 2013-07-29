@@ -332,7 +332,7 @@ class Runtime(object):
             extended_values = util.frozendict()       
         pyretic_packet = Packet(extended_values)
         d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
-        return pyretic_packet.pushmany(d)
+        return pyretic_packet.modifymany(d)
 
     def send_packet(self,pyretic_packet):
         concrete_packet = self.pyretic2concrete(pyretic_packet)
@@ -380,15 +380,14 @@ basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstpor
 tagging_headers = ["vlan_id", "vlan_pcp"]
 native_headers = basic_headers + tagging_headers
 content_headers = [ "raw", "header_len", "payload_len"]
+location_headers = ["switch", "inport", "outport"]
 
 @util.cached
 def extended_values_from(packet):
     extended_values = {}
     for k, v in packet.header.items():
-        if k not in basic_headers + content_headers and v:
+        if k not in basic_headers + content_headers + location_headers and v:
             extended_values[k] = v
-        elif v and len(v) > 1:
-            extended_values[k] = v[1:]
     return util.frozendict(extended_values)
 
 

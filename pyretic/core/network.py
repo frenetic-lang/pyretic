@@ -158,57 +158,17 @@ class Packet(object):
         self.header = util.frozendict(state)
 
     def available_fields(self):
-        available = []
-        for field in self.header:
-            v = self.get_stack(field)
-            if v:
-                available.append(field)
-        return available
-                
-    def get_stack(self, field):
-        return self.header.get(field, ())
-    
-    def pushmany(self, d):
-        r = {}
-        for k, v in d.iteritems():
-            r[k] = (v,) + self.get_stack(k)
-        return Packet(self.header.update(r))
-
-    def push(self, **kwargs):
-        return self.pushmany(kwargs)
-    
-    def popmany(self, fields):
-        r = {}
-        for field in fields:
-            v = self.get_stack(field)
-            if len(v) > 0:
-                r[field] = v[1:]
-        return Packet(self.header.update(r))
-
-    def pop(self, *args):
-        return self.popmany(args)
-
-    def clear(self, *args):
-        return self.clearmany(args)
-        
-    def clearmany(self, fields):
-        hdr = {}
-        for field in fields:
-            hdr[field] = ()
-        return Packet(self.header.update(hdr))
-            
-    def modifymany(self, map):
-        return self.popmany(map).pushmany(map)
+        return self.header.keys()
+                            
+    def modifymany(self, d):
+        mod = { k : v for k, v in d.items() }
+        return Packet(self.header.update(mod))
 
     def modify(self, **kwargs):
         return self.modifymany(kwargs)
 
     def __getitem__(self, item):
-        v = self.get_stack(item)
-        if not v:
-            raise KeyError
-        # Return top of stack
-        return v[0]
+        return self.header[item]
 
     def __hash__(self):
         return hash(self.header)
@@ -244,7 +204,7 @@ class Packet(object):
         field = 'raw'
         outer.append("%s:%s%s" % ('md5',
                                     " " * (size - len(field)),
-                                    hashlib.md5(self.header[field][0]).hexdigest()))
+                                    hashlib.md5(self.header[field]).hexdigest()))
         all_fields.remove(field)
         ### ANY ADDITIONAL FIELDS
         for field in sorted(all_fields):

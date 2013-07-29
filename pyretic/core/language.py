@@ -274,11 +274,11 @@ class match(PrimitivePolicy,Filter):
 
     def eval(self, pkt):
         for field, pattern in self.map.iteritems():
-            v = pkt.get_stack(field)
-            if v:
-                if pattern is None or not pattern.match(v[0]):
+            try:
+                v = pkt[field]
+                if pattern is None or not pattern.match(v):
                     return set()
-            else:
+            except:
                 if pattern is not None:
                     return set()
         return {pkt}
@@ -287,50 +287,37 @@ class match(PrimitivePolicy,Filter):
         return "match:\n%s" % util.repr_plus(self.map.items())
         
 
-class push(PrimitivePolicy):
-    """push(field=value) pushes value onto header field stack."""
+class modify(PrimitivePolicy):
+    """modify(field=value)"""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
-        super(push,self).__init__()
-        
+        super(modify,self).__init__()
+
+
     def eval(self, pkt):
-        return {pkt.pushmany(self.map)}
+        return {pkt.modifymany(self.map)}
 
     def __repr__(self):
-        return "push:\n%s" % util.repr_plus(self.map.items())
-
-        
-class pop(PrimitivePolicy):
-    """pop('field') pops value off header field stack"""
-    ### init : List String -> unit
-    def __init__(self, *args):
-        self.fields = list(args)
-        super(pop,self).__init__()
-        
-    def eval(self, pkt):
-        return {pkt.popmany(self.fields)}
-
-    def __repr__(self):
-        return "pop:\n%s" % util.repr_plus(self.fields)
+        return "modify:\n%s" % util.repr_plus(self.map.items())
 
     
-class copy(PrimitivePolicy):
-    """copy(field1='field2') pushes the value stored at the top of 
-    the header field2 stack unto header field1 stack"""
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-        super(copy,self).__init__()
+# class copy(PrimitivePolicy):
+#     """copy(field1='field2') pushes the value stored at the top of 
+#     the header field2 stack unto header field1 stack"""
+#     ### init : List (String * FieldVal) -> List KeywordArg -> unit
+#     def __init__(self, *args, **kwargs):
+#         self.map = dict(*args, **kwargs)
+#         super(copy,self).__init__()
        
-    def eval(self, pkt):
-        pushes = {}
-        for (dstfield, srcfield) in self.map.iteritems():
-            pushes[dstfield] = pkt[srcfield]
-        return {pkt.pushmany(pushes)}
+#     def eval(self, pkt):
+#         pushes = {}
+#         for (dstfield, srcfield) in self.map.iteritems():
+#             pushes[dstfield] = pkt[srcfield]
+#         return {pkt.pushmany(pushes)}
         
-    def __repr__(self):
-        return "copy:\n%s" % util.repr_plus(self.map.items())
+#     def __repr__(self):
+#         return "copy:\n%s" % util.repr_plus(self.map.items())
 
 
 ################################################################################
@@ -513,19 +500,6 @@ class negate(DerivedPolicy,Filter):
         return "negate:\n%s" % util.repr_plus([self.to_negate])
 
 
-class modify(DerivedPolicy):
-    """modify(field=value) is equivalent to
-    pop('field') >> push(field=value)"""
-    ### init : List (String * FieldVal) -> List KeywordArg -> unit
-    def __init__(self, *args, **kwargs):
-        self.map = dict(*args, **kwargs)
-        super(modify,self).__init__(pop(*[k for k in self.map.keys()]) >>
-                                    push(**self.map))
-
-    def __repr__(self):
-        return "modify:\n%s" % util.repr_plus(self.map.items())
-
-
 class match_modify(DerivedPolicy):
     def __init__(self, field, match_val, mod_val):
         self.field = field
@@ -588,8 +562,7 @@ class fwd(DerivedPolicy):
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
-        super(fwd,self).__init__(if_(match(outport=-1),pop('outport')) 
-                                 >> push(outport=self.outport))
+        super(fwd,self).__init__(modify(outport=self.outport))
 
     def __repr__(self):
         return "fwd %s" % self.outport
