@@ -86,35 +86,38 @@ class _print(StaticPolicy):
         self.s = s
         super(_print,self).__init__()
 
+    def print_str(self,pkt):
+        raise NotImplementedError
+
+    def eval(self,pkt):
+        print self.print_str(pkt)
+        return {pkt}
+
     def __repr__(self):
         return "[%s %s]" % (self.name(),self.s)
 
-
 class str_print(_print):
-    def eval(self, pkt):
-        print str(datetime.now()),
-        print " | ",
-        print self.s
-        return set()
-
+    def print_str(self, pkt):
+        return str(datetime.now()) + " | " + self.s
 
 class pkt_print(_print):
-    def eval(self, pkt):
+    def print_str(self, pkt):
+        output_str = ""
         if self.s != '':
-            print "---- %s -------" % self.s
-        print str(datetime.now())
-        print pkt
+            output_str = "---- " + self.s + " -------\n" 
+        output_str += str(datetime.now()) + "\n"
+        output_str += str(pkt)
         if self.s != '':
-            print "-------------------------------"
-        return set()
-
+            output_str += "\n-------------------------------"
+        return output_str
 
 class topo_print(_print):
-    def print_fn(self, pkt):
+    def print_str(self, pkt):
+        output_str = ""
         if self.s != '':
-            print "---- %s -------" % self.s
-        print str(datetime.now())
-        print self.network.topology
+            output_str = "---- " + self.s + " -------\n" 
+        output_str += str(datetime.now()) + "\n"
+        output_str += str(self.network.topology)
         if self.s != '':
-            print "-------------------------------"
-        return set()
+            output_str += "\n-------------------------------"
+        return output_str

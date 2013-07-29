@@ -251,43 +251,14 @@ class vdef(object):
         self.egress_policy.set_network(network)
 
         ### THE INJECTION POLICY
-        if self.DEBUG == no_packets:
-            self.derived.injection_policy = (
-                lower_packet(self.vtag) >>
-                self.locate_in_underlying >>
-                if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
-                    self.fabric_policy) >>  # THEN WE NEED TO RUN THE FABRIC POLICY
-                self.egress_policy)
+        self.derived.injection_policy = (
+            lower_packet(self.vtag) >>
+            self.locate_in_underlying >>
+            if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
+                self.fabric_policy) >>  # THEN WE NEED TO RUN THE FABRIC POLICY
+            self.egress_policy)
 
-        ### THE INJECTION POLICY W/ DEBUGGING
-        else:
-            self.derived.injection_policy = (
-                (self.DEBUG &
-                 (str_print("-- " + str(self.vtag) + " injection_policy start ") +
-                  pkt_print(str(self.vtag) + " injected packet") +
-                  str_print("-- " + str(self.vtag) + " lower packet"))) +
-                lower_packet(self.vtag) >>
-                (self.DEBUG &
-                 (pkt_print(str(self.vtag) + " after lower:") +
-                  str_print("-- " + str(self.vtag) + " locate packet"))) +
-                self.locate_in_underlying >>
-                (self.DEBUG & 
-                 pkt_print(str(self.vtag) + " after locate:")) +
-                if_(match(outport=-1) | match(outport=None),   # IF NO OUTPORT 
-                    (self.DEBUG &
-                     str_print("-- " + str(self.vtag) + " apply fabric policy")) +
-                    self.fabric_policy >>  # THEN WE NEED TO RUN THE FABRIC POLICY
-                    (self.DEBUG & pkt_print(str(self.vtag) + " after fabric:")) +
-                    passthrough) >>        # OTHERWISE WE PASSTHROUGH TO EGRESS POLICY
-                (self.DEBUG & 
-                 str_print("-- " + str(self.vtag) + " apply egress policy")) +
-                self.egress_policy >>
-                (self.DEBUG & 
-                 (pkt_print(str(self.vtag) + " after egress:") +
-                  str_print("-- " + str(self.vtag) + " injection_policy end "))) +
-                passthrough)
-            
-
+    
 ################################################################################
 # Virtualize input policies based on virtualization definition                 #
 ################################################################################
@@ -307,8 +278,7 @@ class virtualize(DerivedPolicy):
         self.vdef.vtag = self.vtag
 
         ### THE VIRTUALIZED POLICY
-        if self.DEBUG == no_packets:
-            super(virtualize,self).__init__(
+        super(virtualize,self).__init__(
             if_(match(outport=None),push(outport=-1)) >>
             self.vdef.ingress_policy >> # set vlocation
             ### IF INGRESSING LIFT AND EVALUATE
@@ -318,55 +288,7 @@ class virtualize(DerivedPolicy):
             if_(match(vtag=self.vtag), 
                 self.vdef.fabric_policy >> self.vdef.egress_policy,
                 self.vpolicy))
-
-        ### THE VIRTUALIZED POLICY W/ DEBUGGING
-        else:
-            super(virtualize,self).__init__(
-                (self.DEBUG &
-                 pkt_print(repr(self))) +
-                if_(match(outport=None),push(outport=-1)) >>
-                (self.DEBUG & 
-                 str_print("-- " + str(self.vtag) + " apply ingress policy")) +
-                self.vdef.ingress_policy >> # set vlocation
-                (self.DEBUG &
-                 pkt_print(str(self.vtag) + " after ingress:")) +
-                ### IF INGRESSING LIFT AND EVALUATE
-                if_(match(vtag='ingress'), 
-                    (self.DEBUG &
-                     str_print("-- " + str(self.vtag) + " lift packet")) +
-                    lift_packet >>
-                    (self.DEBUG & 
-                     (pkt_print(str(self.vtag) + " after lift:") +
-                      str_print("-- " + str(self.vtag) + " run derived policy"))) +
-                    self.vpolicy >>
-                    (self.DEBUG & 
-                     (pkt_print(str(self.vtag) + " after derived policy:") +
-                      str_print("-- " + str(self.vtag) + " lower packet"))) +
-                    lower_packet(self.vtag) >>
-                    (self.DEBUG & 
-                     pkt_print(str(self.vtag) + " after lower:")) +
-                    passthrough,
-                    (self.DEBUG &
-                     str_print("-- " + str(self.vtag) + " non_ingress")) +
-                    passthrough) >>
-                ### IF IN INTERIOR NETWORK ROUTE ON FABRIC AND IF APPLICABLE EGRESS
-                if_(match(vtag=self.vtag), 
-                    (self.DEBUG & 
-                     str_print("-- " + str(self.vtag) + " run fabric policy")) +
-                    self.vdef.fabric_policy >>
-                    (self.DEBUG & 
-                     (pkt_print(str(self.vtag) + " after fabric:") +
-                      str_print("-- " + str(self.vtag) + " run egress policy"))) +
-                    self.vdef.egress_policy >>
-                    (self.DEBUG &
-                     pkt_print(str(self.vtag) + " after egress:")) +
-                    passthrough,
-                    (self.DEBUG &
-                     str_print("-- " + str(self.vtag) + " run derived policy on inherited nodes")) +
-                    self.vpolicy >>
-                    (self.DEBUG & 
-                     pkt_print(str(self.vtag) + " after derived policy on inherited nodes:")) +
-                    passthrough))
+        
             
     def set_network(self, network):
         Policy.set_network(self,network)            
