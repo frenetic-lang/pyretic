@@ -200,11 +200,55 @@ class Classifer(object):
     def __init__(self):
         self.rules = []
 
-    def __plus__(self,c):
-        return None
+    def __plus__(self,c2):
+        c1 = self
+        c = Classifier()
+        # TODO (cole): make classifiers iterable
+        for m1, alist1 in c1:
+            for m2, alist2 in c2:
+                # TODO (cole): actions as sums?
+                # TODO (cole): matches + boolean conjunction?
+                if m1 and m2 is not None:
+                    c.rules.append(rule(m1 and m2, alist1 + alist2))
+        # TODO (cole): simple shadow elimination
+        return c
 
-    def __rshift__(self,c):
-        return None
+    def __rshift__(self,c2):
+
+        # Helper function: commute the match from a right-hand-side rule to the
+        # left.
+        # Returns: a new match for r1 >> r2.
+        def _specialize(r1, r2):
+            # TODO (cole): implement.
+            pass
+
+        # Helper function: sequentially compose actions.
+        # Returns 
+        def _sequence_actions(as1, as2):
+            # TODO (cole): implement.
+            pass
+
+        def _compile_rule_rule(r1, r2):
+            assert(len(r1.actions == 1))
+            m = _specialize(r1, r2)
+            if m is not None:
+                alist = _sequence_actions(r1.actions, r2.actions)
+                return rule(m, alist)
+            else:
+                return None
+
+        def _compile_rule_classifier(r1, c2):
+            assert(len(r1.actions == 1))
+            cs = [_compile_rule_rule(r1, r2) for r2 in c2]
+            # TODO (cole): FIXME refactor classifier compilation.
+            return reduce(lambda acc, c: acc + c)
+
+        c = Classifier()
+        for r1 in c1:
+            c = c.rules.append(_compile_rule_classifier(r1, c2).rules)
+        c.rules.append(rule(match(), [drop]))
+        # TODO (cole): optimize here.
+        return c
 
 
 class EvalTrace(object):
@@ -442,6 +486,11 @@ class parallel(CombinatorPolicy):
             eval_trace.add_trace(trace)
         return (output,eval_trace)
 
+    def compile(self):
+
+        assert(len(self.policies) > 1)
+        return reduce(lambda acc, c: c.compile() + acc, self.policies)
+
 
 class union(parallel,Filter):
     pass
@@ -492,6 +541,10 @@ class sequential(CombinatorPolicy):
                 eval_trace.add_trace(trace)
             prev_output = output
         return (output,eval_trace)
+
+    def compile(self):
+        assert(len(self.policies) > 1)
+        return reduce(lambda acc, c: c.compile() >> acc, self.policies)
   
 
 class intersection(sequential,Filter):
