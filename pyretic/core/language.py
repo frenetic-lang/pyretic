@@ -224,12 +224,30 @@ class Classifier(object):
         return c
 
     def __rshift__(self,c2):
+
         # Helper function: commute the match from a right-hand-side rule to the
         # left.
         # Returns: a new match for r1 >> r2.
         def _specialize(r1, r2):
-            # TODO (cole): implement.
-            pass
+            assert(len(r1.actions) == 1)
+            a1 = r1.actions[0]
+            if a1 == identity:
+                return r1.intersect(r2)
+            elif a1 == none:
+                return none
+            elif instanceof(a1, match):
+                new_match = match()
+                for f, v in r2.match.map.iteritems():
+                    if f in a1.map and a1.map[f] == v:
+                        continue
+                    elif f in a1.map and a1.map[f] != v:
+                        return none
+                    else:
+                        new_match.map[f] = v
+                return new_match
+            else:
+                # TODO (cole) use compile error.
+                raise TypeError
 
         # Helper function: sequentially compose actions.
         # Returns 
@@ -238,7 +256,7 @@ class Classifier(object):
             pass
 
         def _compile_rule_rule(r1, r2):
-            assert(len(r1.actions == 1))
+            assert(len(r1.actions) == 1)
             m = _specialize(r1, r2)
             if m is not None:
                 alist = _sequence_actions(r1.actions, r2.actions)
@@ -247,7 +265,7 @@ class Classifier(object):
                 return None
 
         def _compile_rule_classifier(r1, c2):
-            assert(len(r1.actions == 1))
+            assert(len(r1.actions) == 1)
             cs = [_compile_rule_rule(r1, r2) for r2 in c2]
             # TODO (cole): FIXME refactor classifier compilation.
             return reduce(lambda acc, c: acc + c)
