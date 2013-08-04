@@ -174,8 +174,8 @@ class Classifier(object):
             a1 = a1.simplify()
             if a1 == identity:
                 return r1.match.intersect(r2.match)
-            elif a1 == none:
-                return none
+            elif a1 == none:  # if we drop, then later matches don't matter
+                return r1.match
             elif isinstance(a1, modify):
                 new_match_dict = {}
                 for f, v in r2.match.map.iteritems():
