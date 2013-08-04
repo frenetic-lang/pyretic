@@ -48,6 +48,16 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+        self.debug_packet_in = debug_packet_in
+        self.show_traces = show_traces
+        self.mode = mode
+        self.verbosity = verbosity
+        self.backend = backend
+        self.backend.runtime = self
+        self.vlan_to_extended_values_db = {}
+        self.extended_values_to_vlan_db = {}
+        self.extended_values_lock = threading.RLock()
+        self.threads = set()
         if mode == 'reactive0':
             self.active_dynamic_policies = set()
             def find_dynamic_sub_pols(policy,recursive_pols_seen):
@@ -76,16 +86,6 @@ class Runtime(object):
             dynamic_sub_pols = self.find_dynamic_sub_pols(self.policy,set())
             for p in dynamic_sub_pols:
                 p.attach(self.handle_policy_change)
-        self.debug_packet_in = debug_packet_in
-        self.show_traces = show_traces
-        self.mode = mode
-        self.verbosity = verbosity
-        self.backend = backend
-        self.backend.runtime = self
-        self.vlan_to_extended_values_db = {}
-        self.extended_values_to_vlan_db = {}
-        self.extended_values_lock = threading.RLock()
-        self.threads = set()
         self.in_update_network = False
 
     def update_network(self):
@@ -95,6 +95,10 @@ class Runtime(object):
             self.policy.set_network(self.prev_network)
             if self.mode == 'reactive0':
                 self.clear_all()
+            elif self.mode == 'proactive0':
+                self.clear_all()
+                classifier = self.policy.compile()
+                self.install_classifier(classifier)
             self.in_update_network = False
 
     def handle_policy_change(self, changed, old, new):
@@ -108,7 +112,11 @@ class Runtime(object):
             pass
         else:
             if self.mode == 'reactive0':
-                self.clear_all()  ## PLAY IT VERY CONSERVATIVE
+                self.clear_all() 
+            elif self.mode == 'proactive0':
+                self.clear_all()
+                classifier = self.policy.compile()
+                self.install_classifier(classifier)
             pass
 
     def handle_switch_join(self,switch_id):
@@ -338,6 +346,25 @@ class Runtime(object):
         concrete_packet = self.pyretic2concrete(pyretic_packet)
         self.backend.send_packet(concrete_packet)
 
+    def install_classifier(self, classifier):
+        if classifier is None:
+            return
+
+        switches = self.network.topology.nodes()
+        priority = len(classifier) + 32768  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
+        for rule in classifier.rules:
+            # massage actions into flow-table format
+            actions = filter(lambda a: a != drop,rule.actions)
+            actions = [ m.map for m in actions ]
+            if 'switch' in rule.match.map:
+                if not rule.match.map['switch'] in switches:
+                    continue
+                self.install_rule((rule.match,priority,actions))
+            else:
+                for s in switches:
+                    self.install_rule((rule.match & match(switch=s),priority,actions))
+            priority -= 1
+            
     def install_rule(self,(pred,priority,action_list)):
         concrete_pred = { k:v for (k,v) in pred.map.items() }
         self.backend.send_install(concrete_pred,priority,action_list)

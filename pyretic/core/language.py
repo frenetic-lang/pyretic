@@ -141,6 +141,9 @@ class Classifier(object):
     def __init__(self):
         self.rules = []
 
+    def __len__(self):
+        return len(self.rules)
+
     def __str__(self):
         return '\n'.join(map(str,self.rules))
 
@@ -154,6 +157,8 @@ class Classifier(object):
             for r2 in c2.rules:
                 intersection = r1.match.intersect(r2.match)
                 if intersection != none:
+                    # TODO (josh) logic for detecting when sets of actions can't be combined
+                    # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
                     actions = r1.actions + r2.actions
                     actions = filter(lambda a: a != none,actions)
                     if len(actions) == 0:
@@ -342,6 +347,12 @@ class match(PrimitivePolicy,Filter):
                 return none
         d = self.map.update(pol.map)
         return match(**d)
+
+    def __and__(self,pol):
+        if isinstance(pol,match):
+            return self.intersect(pol)
+        else:
+            return super(match,self).__and__(pol)
 
     ### hash : unit -> int
     def __hash__(self):

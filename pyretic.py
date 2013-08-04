@@ -74,7 +74,7 @@ def parseArgs():
     op.add_option( '--frontend-only', '-f', action="store_true", 
                      dest="frontend_only", help = 'only start the frontend'  )
     op.add_option( '--mode', '-m', type='choice',
-                     choices=['interpreted','i','reactive0','r0'], 
+                     choices=['interpreted','i','reactive0','r0','proactive0','p0'], 
                      help = '|'.join( ['interpreted/i','reactive0/r0'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
                      choices=['low','normal','high'], default = 'low',
@@ -93,6 +93,8 @@ def main():
         options.mode = 'interpreted'
     elif options.mode == 'r0':
         options.mode = 'reactive0'
+    elif options.mode == 'p0':
+        options.mode = 'proactive0'
     try:
         module_name = args[0]
     except IndexError:

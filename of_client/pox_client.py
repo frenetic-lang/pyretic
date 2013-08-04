@@ -372,15 +372,20 @@ class POXClient(revent.EventMixin):
 
 
     def install_flow(self,pred,priority,action_list):
-        switch = pred['switch']
-
         ### BUILD OF MATCH
-        inport = pred['inport']
         match = of.ofp_match()
-        match.in_port = pred['inport']
-        match.dl_src = pred['srcmac']
-        match.dl_dst = pred['dstmac']
-        match.dl_type = pred['ethtype']
+        switch = pred['switch']
+        if 'inport' in pred:        
+            inport = pred['inport']
+            match.in_port = inport
+        else:
+            inport = None
+        if 'srcmac' in pred:
+            match.dl_src = pred['srcmac']
+        if 'dstmac' in pred:
+            match.dl_dst = pred['dstmac']
+        if 'ethtype' in pred:
+            match.dl_type = pred['ethtype']
         if 'vlan_id' in pred:
             match.dl_vlan = pred['vlan_id']
         else:
@@ -389,7 +394,8 @@ class POXClient(revent.EventMixin):
             match.dl_vlan_pcp = pred['vlan_pcp']
         else:
             match.dl_vlan_pcp = 0
-        match.nw_proto = pred['protocol']
+        if 'protocol' in pred:
+            match.nw_proto = pred['protocol']
         if 'srcip' in pred:
             match.nw_src = pred['srcip']
         if 'dstip' in pred:
@@ -426,7 +432,7 @@ class POXClient(revent.EventMixin):
                     pass
                 else:
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
-            if outport == inport:
+            if (not inport is None) and (outport == inport):
                 of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
             else:
                 of_actions.append(of.ofp_action_output(port=outport))

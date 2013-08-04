@@ -141,4 +141,5 @@ class Backend(object):
     def send_to_OF_client(self,msg):
         serialized_msg = serialize(msg)
         with self.channel_lock:
-            self.backend_channel.push(serialized_msg)
+            if not self.backend_channel is None:
+                self.backend_channel.push(serialized_msg)
