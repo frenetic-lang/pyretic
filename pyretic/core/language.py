@@ -39,81 +39,6 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.util import frozendict, singleton
 
-
-################################################################################
-# Matching                                                                     #
-################################################################################
-
-class ExactMatch(object):
-    """Pattern type for exact match"""
-    def __init__(self, pattern):
-        self.pattern = pattern
-
-    def match(self, other):
-        return self.pattern == other
-
-    def __hash__(self):
-        return hash(self.pattern)
-
-    def __eq__(self, other):
-        """Match by checking for equality"""
-        if isinstance(other, ExactMatch):
-            return self.pattern == other.pattern 
-        else:
-            return False
-        
-    def __repr__(self):
-        return repr(self.pattern)
-
-
-class PrefixMatch(object):
-    """Pattern type for IP prefix match"""
-    def __init__(self, pattern):
-        self.masklen = 32
-        if isinstance(pattern, IPAddr):     # IP Address
-            self.pattern = pattern
-        else:                           # STRING ENCODING
-            parts = pattern.split("/")
-            self.pattern = IP(parts[0])
-            if len(parts) == 2:
-                self.masklen = int(parts[1])
-        self.prefix = self.pattern.to_bits()[:self.masklen]
-
-    def match(self, other):
-        """Match by checking prefix equality"""
-        return self.prefix == other.to_bits()[:self.masklen]
-
-    def __hash__(self):
-        return hash(self.pattern)
-
-    def __eq__(self, other):
-        if isinstance(other, PrefixMatch):
-            return self.pattern == other.pattern 
-        else:
-            return False
-        
-    def __repr__(self):
-        if self.masklen == 32:
-            return repr(self.pattern)
-        else:
-            return "%s/%d" % (repr(self.pattern),self.masklen)
-
-################################################################################
-# Determine how each field will be matched                                     #
-################################################################################
-        
-_field_to_patterntype = {}
-
-def register_field(field, patterntype):
-    _field_to_patterntype[field] = patterntype
-
-def field_patterntype(field):
-    return _field_to_patterntype.get(field, ExactMatch)
-
-register_field("srcip", PrefixMatch)
-register_field("dstip", PrefixMatch)
-
-
 ################################################################################
 # Policy Language                                                              #
 ################################################################################
@@ -394,12 +319,7 @@ class match(PrimitivePolicy,Filter):
     def __init__(self, *args, **kwargs):
         init_map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
-            if v is not None:
-                patterntype = field_patterntype(k)
-                pattern_to_match = patterntype(v)
-                init_map[k] = pattern_to_match
-            else: 
-                init_map[k] = None
+                init_map[k] = v
         self.map = util.frozendict(init_map)
         super(match,self).__init__()
 
@@ -430,7 +350,7 @@ class match(PrimitivePolicy,Filter):
         for field, pattern in self.map.iteritems():
             try:
                 v = pkt[field]
-                if pattern is None or not pattern.match(v):
+                if pattern is None or pattern != v:
                     return set()
             except:
                 if pattern is not None:

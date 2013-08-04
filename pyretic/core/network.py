@@ -40,6 +40,34 @@ from pyretic.core import util
 # Fixed width stuff
 ################################################################################
 
+class IPPrefix(object):
+    def __init__(self, pattern):
+        self.masklen = 32
+        parts = pattern.split("/")
+        self.pattern = IP(parts[0])
+        if len(parts) == 2:
+            self.masklen = int(parts[1])
+        else:
+            raise TypeError
+        self.prefix = self.pattern.to_bits()[:self.masklen]
+
+    def __eq__(self, other):
+        """Match by checking prefix equality"""
+        if isinstance(other,IPAddr):
+            return self.prefix == other.to_bits()[:self.masklen]
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash((self.pattern,self.masklen))
+
+    def __repr__(self):
+        return "%s/%d" % (repr(self.pattern),self.masklen)
+
+
 class IPAddr(object):
     def __init__(self, ip):
 
