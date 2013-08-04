@@ -152,7 +152,11 @@ class Classifier(object):
             for r2 in c2.rules:
                 intersection = r1.match.intersect(r2.match)
                 if intersection != none:
-                    c.rules.append(Rule(intersection, r1.actions + r2.actions))
+                    actions = r1.actions + r2.actions
+                    actions = filter(lambda a: a != none,actions)
+                    if len(actions) == 0:
+                        actions = [none]
+                    c.rules.append(Rule(intersection, actions))
         for r1 in c1.rules:
             c.rules.append(r1)
         for r2 in c2.rules:
