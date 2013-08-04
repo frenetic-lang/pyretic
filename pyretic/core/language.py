@@ -576,7 +576,7 @@ class sequential(CombinatorPolicy):
         classifiers = map(lambda p: p.compile(),self.policies)
         for c in classifiers:
             assert(c is not None)
-        return reduce(lambda acc, c: c >> acc, classifiers)
+        return reduce(lambda acc, c: acc >> c, classifiers)
   
 
 class intersection(sequential,Filter):
