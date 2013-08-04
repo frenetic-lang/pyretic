@@ -515,11 +515,12 @@ class parallel(CombinatorPolicy):
         return (output,eval_trace)
 
     def compile(self):
-        assert(len(self.policies) > 1)
+        if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
+            return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
         self._classifier = reduce(lambda acc, c: acc + c, classifiers)
         return self._classifier
-
+            
 
 class union(parallel,Filter):
     pass
