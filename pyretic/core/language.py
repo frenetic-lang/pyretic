@@ -146,6 +146,8 @@ class Classifier(object):
 
     def __add__(self,c2):
         c1 = self
+        if c2 is None:
+            return None
         c = Classifier()
         # TODO (cole): make classifiers iterable
         for r1 in c1.rules:
@@ -867,6 +869,9 @@ class FwdBucket(StaticPolicy):
             callback(pkt)
         return set()
 
+    def compile(self):
+        return None
+
     ### register_callback : (Packet -> X) -> unit 
     def register_callback(self, fn):
         self.callbacks.append(fn)
@@ -937,6 +942,9 @@ class packets(DynamicPolicy):
             else:
                 eval_trace.add_trace(EvalTrace(self.pwfb))
         return (set(),eval_trace)
+
+    def compile(self):
+        return None
 
     def __repr__(self):
         return "packets\n%s" % repr(self.policy)
