@@ -153,7 +153,7 @@ class Policy(object):
         return (self.eval(pkt), EvalTrace(self))
 
     def compile(self):
-        return self._classifier
+        raise NotImplementedError
 
     def name(self):
         return self.__class__.__name__
@@ -192,8 +192,11 @@ class Filter(Policy):
 
     
 class Rule(object):
-    def __init__(self,match,acts):
-        self.match = match 
+
+    # Matches m should be of the match class.  Actions acts should be a list of
+    # either modify, identity, or drop policies.
+    def __init__(self,m,acts):
+        self.match = m
         self.actions = acts
 
     def __str__(self):
@@ -232,50 +235,79 @@ class Classifier(object):
             assert(len(r1.actions) == 1)
             a1 = r1.actions[0]
             if a1 == identity:
-                return r1.intersect(r2)
+                return r1.match.intersect(r2.match)
             elif a1 == none:
                 return none
-            elif instanceof(a1, match):
-                new_match = match()
+            elif isinstance(a1, modify):
+                new_match_dict = {}
                 for f, v in r2.match.map.iteritems():
                     if f in a1.map and a1.map[f] == v:
                         continue
                     elif f in a1.map and a1.map[f] != v:
                         return none
                     else:
-                        new_match.map[f] = v
-                return new_match
+                        new_match_dict[f] = v
+                return match(**new_match_dict)
             else:
                 # TODO (cole) use compile error.
                 raise TypeError
 
-        # Helper function: sequentially compose actions.
-        # Returns 
+        # Helper function: sequentially compose actions.  a1 must be a single
+        # action.
         def _sequence_actions(as1, as2):
-            # TODO (cole): implement.
-            pass
+            assert(len(as1) == 1)
+            a1 = as1[0]
+            new_actions = []
+            if a1 == none:
+                return [none]
+            elif a1 == identity:
+                return as2
+            elif isinstance(a1, modify):
+                for a2 in as2:
+                    new_a1 = modify(**a1.map.copy())
+                    if a2 == none:
+                        new_actions.append(none)
+                    elif a2 == identity:
+                        new_actions.append(new_a1)
+                    elif isinstance(a2, modify):
+                        new_a1.map.update(a2.map)
+                        new_actions.append(new_a1)
+                    else:
+                        raise TypeError
+                return new_actions
+            else:
+                raise TypeError
 
         def _compile_rule_rule(r1, r2):
             assert(len(r1.actions) == 1)
             m = _specialize(r1, r2)
-            if m is not None:
-                alist = _sequence_actions(r1.actions, r2.actions)
-                return Rule(m, alist)
-            else:
-                return None
+            alist = _sequence_actions(r1.actions, r2.actions)
+            return Rule(m, alist)
+
+        def _compile_tinyrule_classifier(r1, c2):
+            assert(len(r1.actions) == 1)
+            rules = [_compile_rule_rule(r1, r2) for r2 in c2.rules]
+            c = Classifier()
+            c.rules = filter(lambda r: r.match != none, rules)
+            return c
 
         def _compile_rule_classifier(r1, c2):
-            assert(len(r1.actions) == 1)
-            cs = [_compile_rule_rule(r1, r2) for r2 in c2]
-            # TODO (cole): FIXME refactor classifier compilation.
-            return reduce(lambda acc, c: acc + c)
+            rules = [Rule(r1.match, [act]) for act in r1.actions]
+            cs = [_compile_tinyrule_classifier(r, c2) for r in rules]
+            return reduce(lambda acc, c: acc + c, cs)
 
         c = Classifier()
-        for r1 in c1:
-            c = c.rules.append(_compile_rule_classifier(r1, c2).rules)
+        for r1 in self.rules:
+            c.rules = c.rules + _compile_rule_classifier(r1, c2).rules
         c.rules.append(Rule(match(), [drop]))
-        # TODO (cole): optimize here.
         return c
+
+    def optimize(self):
+        # Strip 'none' from actions.
+        new_rules = []
+        for r in self.rules:
+            new_rules.append(Rule(r.match, filter(lambda act: act != none, r.actions)))
+        self.rules = new_rules
 
 
 class EvalTrace(object):
@@ -317,7 +349,7 @@ class identity(PrimitivePolicy,Filter):
         return {pkt}
 
     def compile(self):
-        r = Rule(match(),actions([modify()]))
+        r = Rule(match(),[modify()])
         self._classifier = Classifier()
         self._classifier.rules.append(r)
         return self._classifier
@@ -336,7 +368,7 @@ class none(PrimitivePolicy,Filter):
         return set()
 
     def compile(self):
-        r = Rule(match(),actions([drop]))
+        r = Rule(match(),[drop])
         self._classifier = Classifier()
         self._classifier.rules.append(r)
         return self._classifier
@@ -398,7 +430,7 @@ class match(PrimitivePolicy,Filter):
         return {pkt}
 
     def compile(self):
-        r1 = Rule(self,actions([modify()]))
+        r1 = Rule(self,[modify()])
         r2 = Rule(match(),[drop])
         self._classifier = Classifier()
         self._classifier.rules.append(r1)
@@ -421,7 +453,7 @@ class modify(PrimitivePolicy):
         return {pkt.modifymany(self.map)}
 
     def compile(self):
-        r = Rule(match(),actions([self]))
+        r = Rule(match(),[self])
         self._classifier = Classifier()
         self._classifier.rules.append(r)
         return self._classifier
@@ -490,9 +522,9 @@ class negate(CombinatorPolicy,Filter):
         self._classifier = Classifier()
         for r in inner_classifier:
             if r.actions[0] == identity:
-                self._classifier.rules.append(Rule(r.match,actions([drop])))
+                self._classifier.rules.append(Rule(r.match,[drop]))
             elif r.actions[0] == drop:
-                self._classifier.rules.append(Rule(r.match,actions([modify()])))
+                self._classifier.rules.append(Rule(r.match,[modify()]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return self._classifier 
@@ -525,22 +557,12 @@ class parallel(CombinatorPolicy):
     def compile(self):
         assert(len(self.policies) > 1)
         classifiers = map(lambda p: p.compile(),self.policies)
-        return reduce(lambda acc, c: acc + c, classifiers)
+        self._classifier = reduce(lambda acc, c: acc + c, classifiers)
+        return self._classifier
 
 
 class union(parallel,Filter):
     pass
-
-
-class actions(parallel):
-    def __init__(self, policies):
-        for p in policies:
-            if p == none:
-                continue
-            if isinstance(p,modify):
-                continue
-            raise TypeError
-        super(actions,self).__init__(policies)
 
 
 class sequential(CombinatorPolicy):
@@ -590,8 +612,12 @@ class sequential(CombinatorPolicy):
         return (output,eval_trace)
 
     def compile(self):
-        assert(len(self.policies) > 1)
-        return reduce(lambda acc, p: p.compile() >> acc, self.policies)
+        assert(len(self.policies) > 0)
+        classifiers = map(lambda p: p.compile(),self.policies)
+        for c in classifiers:
+            assert(c is not None)
+        print classifiers
+        return reduce(lambda acc, c: c >> acc, classifiers)
   
 
 class intersection(sequential,Filter):
@@ -652,6 +678,10 @@ class DerivedPolicy(Policy):
         (results,trace) = self.policy.track_eval(pkt,dry)
         eval_trace.add_trace(trace)
         return (results,eval_trace)
+
+    def compile(self):
+        self._classifier = self.policy.compile()
+        return self._classifier
 
 
 class difference(DerivedPolicy,Filter):
