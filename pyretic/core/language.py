@@ -57,7 +57,10 @@ class ExactMatch(object):
 
     def __eq__(self, other):
         """Match by checking for equality"""
-        return self.pattern == other.pattern 
+        if isinstance(other, ExactMatch):
+            return self.pattern == other.pattern 
+        else:
+            return False
         
     def __repr__(self):
         return repr(self.pattern)
@@ -84,7 +87,10 @@ class PrefixMatch(object):
         return hash(self.pattern)
 
     def __eq__(self, other):
-        return self.pattern == other.pattern 
+        if isinstance(other, PrefixMatch):
+            return self.pattern == other.pattern 
+        else:
+            return False
         
     def __repr__(self):
         if self.masklen == 32:
@@ -223,8 +229,7 @@ class Classifier(object):
             c.rules.append(r1)
         for r2 in c2.rules:
             c.rules.append(r2)
-        # TODO (cole): simple shadow elimination
-        return c
+        return c.optimize()
 
     def __rshift__(self,c2):
 
@@ -300,14 +305,17 @@ class Classifier(object):
         for r1 in self.rules:
             c.rules = c.rules + _compile_rule_classifier(r1, c2).rules
         c.rules.append(Rule(match(), [drop]))
-        return c
+        return c.optimize()
 
     def optimize(self):
-        # Strip 'none' from actions.
+
+        # Eliminate exactly shadowed rules.
         new_rules = []
         for r in self.rules:
-            new_rules.append(Rule(r.match, filter(lambda act: act != none, r.actions)))
+            if not reduce(lambda acc, new_r: acc or new_r.match == r.match, new_rules, False):
+                new_rules.append(r)
         self.rules = new_rules
+        return self
 
 
 class EvalTrace(object):
@@ -439,6 +447,12 @@ class match(PrimitivePolicy,Filter):
 
     def __repr__(self):
         return "match:\n%s" % util.repr_plus(self.map.items())
+
+    def __eq__(self, other):
+        if isinstance(other, match):
+            return self.map == other.map
+        else:
+            return False
         
 
 class modify(PrimitivePolicy):
@@ -460,6 +474,12 @@ class modify(PrimitivePolicy):
 
     def __repr__(self):
         return "modify:\n%s" % util.repr_plus(self.map.items())
+
+    def __eq__(self, other):
+        if isinstance(other, modify):
+            return self.map == other.map
+        else:
+            return False
 
     
 # class copy(PrimitivePolicy):
@@ -556,7 +576,7 @@ class parallel(CombinatorPolicy):
 
     def compile(self):
         assert(len(self.policies) > 1)
-        classifiers = map(lambda p: p.compile(),self.policies)
+        classifiers = map(lambda p: p.compile(), self.policies)
         self._classifier = reduce(lambda acc, c: acc + c, classifiers)
         return self._classifier
 
