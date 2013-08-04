@@ -171,6 +171,7 @@ class Classifier(object):
         def _specialize(r1, r2):
             assert(len(r1.actions) == 1)
             a1 = r1.actions[0]
+            a1 = a1.simplify()
             if a1 == identity:
                 return r1.match.intersect(r2.match)
             elif a1 == none:
@@ -280,7 +281,8 @@ class StaticPolicy(Policy):
 
 class PrimitivePolicy(StaticPolicy):
     """Abstact class for primitive policies."""
-    pass
+    def simplify(self):
+        return self
 
 @singleton
 class identity(PrimitivePolicy,Filter):
@@ -380,6 +382,12 @@ class match(PrimitivePolicy,Filter):
             return self.map == other.map
         else:
             return False
+
+    def simplify(self):
+        if len(self.map):
+            return self
+        else:
+            return identity
         
 
 class modify(PrimitivePolicy):
@@ -408,6 +416,11 @@ class modify(PrimitivePolicy):
         else:
             return False
 
+    def simplify(self):
+        if len(self.map):
+            return self
+        else:
+            return identity
     
 # class copy(PrimitivePolicy):
 #     """copy(field1='field2') pushes the value stored at the top of 
