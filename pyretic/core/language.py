@@ -131,7 +131,10 @@ class Rule(object):
         self.actions = acts
 
     def __str__(self):
-        return str(self.match) + 'actions:\t' + str(self.actions)
+        return str(self.match) + '\tactions:\t' + str(self.actions)
+
+    def __repr__(self):
+        return str(self)
 
 
 class Classifier(object):
@@ -366,7 +369,7 @@ class match(PrimitivePolicy,Filter):
         return self._classifier
 
     def __repr__(self):
-        return "match:\n%s" % util.repr_plus(self.map.items())
+        return "match: %s" % ' '.join(map(str,self.map.items()))
 
     def __eq__(self, other):
         if isinstance(other, match):
@@ -393,7 +396,7 @@ class modify(PrimitivePolicy):
         return self._classifier
 
     def __repr__(self):
-        return "modify:\n%s" % util.repr_plus(self.map.items())
+        return "modify: %s" % ' '.join(map(str,self.map.items()))
 
     def __eq__(self, other):
         if isinstance(other, modify):
