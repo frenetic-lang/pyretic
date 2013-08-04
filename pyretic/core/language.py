@@ -480,10 +480,11 @@ class negate(CombinatorPolicy,Filter):
     def compile(self):
         inner_classifier = self.policies[0].compile()
         self._classifier = Classifier()
-        for r in inner_classifier:
-            if r.actions[0] == identity:
+        for r in inner_classifier.rules:
+            action = r.actions[0].simplify()
+            if action == identity:
                 self._classifier.rules.append(Rule(r.match,[drop]))
-            elif r.actions[0] == drop:
+            elif action == drop:
                 self._classifier.rules.append(Rule(r.match,[modify()]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
