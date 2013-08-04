@@ -339,7 +339,7 @@ class Runtime(object):
         self.backend.send_packet(concrete_packet)
 
     def install_rule(self,(pred,action_list)):
-        concrete_pred = { k:v.pattern for (k,v) in pred.map.items() }
+        concrete_pred = { k:v for (k,v) in pred.map.items() }
         self.backend.send_install(concrete_pred,action_list)
 
     def clear_all(self):

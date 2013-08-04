@@ -328,10 +328,7 @@ class match(PrimitivePolicy,Filter):
     """A set of field matches on a packet (one per field)."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
-        init_map = {}
-        for (k, v) in dict(*args, **kwargs).iteritems():
-                init_map[k] = v
-        self.map = util.frozendict(init_map)
+        self.map = util.frozendict(dict(*args, **kwargs))
         super(match,self).__init__()
 
     def intersect(self, pol):
@@ -399,7 +396,6 @@ class modify(PrimitivePolicy):
         self.map = dict(*args, **kwargs)
         super(modify,self).__init__()
 
-
     def eval(self, pkt):
         return {pkt.modifymany(self.map)}
 
@@ -424,23 +420,6 @@ class modify(PrimitivePolicy):
         else:
             return identity
     
-# class copy(PrimitivePolicy):
-#     """copy(field1='field2') pushes the value stored at the top of 
-#     the header field2 stack unto header field1 stack"""
-#     ### init : List (String * FieldVal) -> List KeywordArg -> unit
-#     def __init__(self, *args, **kwargs):
-#         self.map = dict(*args, **kwargs)
-#         super(copy,self).__init__()
-       
-#     def eval(self, pkt):
-#         pushes = {}
-#         for (dstfield, srcfield) in self.map.iteritems():
-#             pushes[dstfield] = pkt[srcfield]
-#         return {pkt.pushmany(pushes)}
-        
-#     def __repr__(self):
-#         return "copy:\n%s" % util.repr_plus(self.map.items())
-
 
 ################################################################################
 # Combinator Policies                                                          #
@@ -473,11 +452,12 @@ class negate(CombinatorPolicy,Filter):
 
     def track_eval(self, pkt, dry):
         eval_trace = EvalTrace(self)
-        output = set()
         (results,trace) = self.policies[0].track_eval(pkt,dry)
-        output |= results
         eval_trace.add_trace(trace)
-        return (output,eval_trace)
+        if results:
+            return (set(),eval_trace)
+        else:
+            return ({pkt},eval_trace)
 
     def compile(self):
         inner_classifier = self.policies[0].compile()

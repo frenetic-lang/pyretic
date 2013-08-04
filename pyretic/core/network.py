@@ -112,8 +112,12 @@ class IPAddr(object):
     def __eq__(self,other):
         return repr(self) == repr(other)
 
+    def __ne__(self, other):
+        return not (self == other)
+
 class IP(IPAddr):
     pass
+
             
 class EthAddr(object):
     def __init__(self, mac):
@@ -169,6 +173,9 @@ class EthAddr(object):
 
     def __eq__(self,other):
         return repr(self) == repr(other)
+
+    def __ne__(self, other):
+        return not (self == other)
 
 class MAC(EthAddr):
     pass
