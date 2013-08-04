@@ -239,7 +239,7 @@ class Runtime(object):
                 if not out_val == in_val: 
                     actions[field] = out_val
             action_list.append(actions)
-        return (pred,action_list)
+        return (pred,0,action_list)
 
 
     def reactive0(self,in_pkt,out_pkts,eval_trace):
@@ -338,9 +338,9 @@ class Runtime(object):
         concrete_packet = self.pyretic2concrete(pyretic_packet)
         self.backend.send_packet(concrete_packet)
 
-    def install_rule(self,(pred,action_list)):
+    def install_rule(self,(pred,priority,action_list)):
         concrete_pred = { k:v for (k,v) in pred.map.items() }
-        self.backend.send_install(concrete_pred,action_list)
+        self.backend.send_install(concrete_pred,priority,action_list)
 
     def clear_all(self):
         self.backend.send_clear_all()

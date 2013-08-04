@@ -95,8 +95,9 @@ class BackendChannel(asynchat.async_chat):
             self.of_client.send_to_switch(packet)
         elif msg[0] == 'install':
             pred = self.dict2OF(msg[1])
-            actions = map(self.dict2OF,msg[2])
-            self.of_client.install_flow(pred,actions)
+            priority = int(msg[2])
+            actions = map(self.dict2OF,msg[3])
+            self.of_client.install_flow(pred,priority,actions)
         elif msg[0] == 'clear_all':
             self.of_client.clear_all()
         else:
@@ -370,7 +371,7 @@ class POXClient(revent.EventMixin):
             # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
 
-    def install_flow(self,pred,action_list):
+    def install_flow(self,pred,priority,action_list):
         switch = pred['switch']
 
         ### BUILD OF MATCH
@@ -431,6 +432,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
 
         msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
+                              priority=priority,
                               idle_timeout=of.OFP_FLOW_PERMANENT,
                               hard_timeout=of.OFP_FLOW_PERMANENT,
                               match=match,
