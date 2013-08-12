@@ -39,6 +39,16 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.util import frozendict, singleton
 
+import datetime
+import os
+from tools.logger import simpleLogger
+
+useTraceFile = True
+MATCHLOGLEVEL = 3
+MATCHPREFIXLOGLEVEL = 4
+
+traceMatch    = None
+traceMatchIP  = None
 
 ################################################################################
 # Matching                                                                     #
@@ -66,6 +76,8 @@ class ExactMatch(object):
 class PrefixMatch(object):
     """Pattern type for IP prefix match"""
     def __init__(self, pattern):
+        #self.trace = simpleLogger.geTracePyretic()
+                
         self.masklen = 32
         if isinstance(pattern, IP):     # IP OBJECT
             self.pattern = pattern
@@ -75,7 +87,8 @@ class PrefixMatch(object):
             if len(parts) == 2:
                 self.masklen = int(parts[1])
         self.prefix = self.pattern.to_bits()[:self.masklen]
-
+        #self.trace("pattern=%s prefix=%s" % (self.pattern, self.prefix))
+       
     def match(self, other):
         """Match by checking prefix equality"""
         return self.prefix == other.to_bits()[:self.masklen]
@@ -92,6 +105,7 @@ class PrefixMatch(object):
         else:
             return "%s/%d" % (repr(self.pattern),self.masklen)
 
+
 ################################################################################
 # Determine how each field will be matched                                     #
 ################################################################################
@@ -106,7 +120,6 @@ def field_patterntype(field):
 
 register_field("srcip", PrefixMatch)
 register_field("dstip", PrefixMatch)
-
 
 ################################################################################
 # Policy Language                                                              #
@@ -234,8 +247,11 @@ no_packets = none        # Logic alias
 
 class match(PrimitivePolicy):
     """A set of field matches on a packet (one per field)."""
+    
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
+        #self.trace = simpleLogger.geTracePyretic()
+                
         init_map = {}
         for (k, v) in dict(*args, **kwargs).iteritems():
             if v is not None:
@@ -245,6 +261,7 @@ class match(PrimitivePolicy):
             else: 
                 init_map[k] = None
         self.map = util.frozendict(init_map)
+        #self.trace("patterns to match: %s\n" % self.map, True)                 # hph
         super(match,self).__init__()
 
     ### hash : unit -> int
@@ -259,14 +276,19 @@ class match(PrimitivePolicy):
             return False
 
     def eval(self, pkt):
+        #self.trace("match eval pkt:\n%s\n" % {pkt}, True)                        # hph
+
         for field, pattern in self.map.iteritems():
             v = pkt.get_stack(field)
+            #self.trace("match eval: pattern=%s field=%s v=%s" % (pattern, field, v))     
+
             if v:
                 if pattern is None or not pattern.match(v[0]):
                     return set()
             else:
                 if pattern is not None:
                     return set()
+        #self.trace("\nmatch eval return pkt\n")                             # hph
         return {pkt}
 
     def __repr__(self):

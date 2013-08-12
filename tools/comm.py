@@ -32,17 +32,20 @@ import asyncore
 import socket
 
 import json
+from tools.logger import simpleLogger
 
 BACKEND_PORT=41414
 TERM_CHAR='\n'
 
 def serialize(msg):
+    # simpleLogger.geTracePyretic()("comm.serialize", timeStamped=True)
     jsonable_msg = to_jsonable_format(msg)
     jsoned_msg = json.dumps(jsonable_msg)
     serialized_msg = jsoned_msg + TERM_CHAR
     return serialized_msg
 
 def deserialize(serialized_msgs):
+    # simpleLogger.geTracePyretic()("comm.deserialize", timeStamped=True)
     def json2python(item):
         if isinstance(item, unicode):
             return item.encode('ascii')

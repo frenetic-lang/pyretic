@@ -31,6 +31,7 @@
 import pyretic.core.util as util
 from pyretic.core.language import *
 from pyretic.core.network import *
+from tools.logger import simpleLogger
 
 import threading
 try:
@@ -44,7 +45,10 @@ except:
 
 class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
-                 show_traces=False, debug_packet_in=False):
+                 show_traces=False, debug_packet_in=False):   
+        
+        self.debug = True
+        #self.trace = simpleLogger.geTracePyretic()
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
@@ -87,6 +91,12 @@ class Runtime(object):
         self.extended_values_lock = threading.RLock()
         self.threads = set()
         self.in_update_network = False
+
+    def trace(self, logLine, timeStamped=False):
+      if not self.debug:
+        return
+        
+      simpleLogger.geTracePyretic()(logLine, timeStamped)
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -256,13 +266,13 @@ class Runtime(object):
                 rule = self.match_on_all_fields_rule(in_pkt,out_pkts)
                 if rule:
                     self.install_rule(rule)
-                    if self.verbosity == 'high':
+                    if self.verbosity == 'high' or True:
                         from datetime import datetime
-                        print str(datetime.now()),
-                        print " | install rule"
-                        print rule[0]
-                        print rule[1]
-
+                        self.trace(str(datetime.now()))
+                        self.trace(" | install rule")
+                        self.trace(rule[0])
+                        self.trace(rule[1])
+                        self.trace("")
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
@@ -286,13 +296,13 @@ class Runtime(object):
                 type, value, tb = sys.exc_info()
                 traceback.print_exc()
                 debugger.post_mortem(tb)
-        if self.show_traces:
-            print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
-            print util.repr_plus([pyretic_pkt], sep="\n\n")
-            print
-            print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
-            print util.repr_plus(output, sep="\n\n")
-            print
+        if self.show_traces or True:
+            self.trace("<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<", timeStamped=True)
+            self.trace(util.repr_plus([pyretic_pkt], sep="\n\n"))
+            self.trace("")
+            self.trace(">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>", timeStamped=True)
+            self.trace(util.repr_plus(output, sep="\n\n"))
+            self.trace("")
         map(self.send_packet,output)
   
     def pyretic2concrete(self,packet):
@@ -344,11 +354,12 @@ class Runtime(object):
 
     def clear_all(self):
         self.backend.send_clear_all()
-        if self.verbosity == 'high':
+        if self.verbosity == 'high' or True:
             from datetime import datetime
-            print str(datetime.now()),
-            print " | clear_all"
-
+            self.trace(str(datetime.now()))
+            self.trace(" | clear_all")
+            self.trace("")
+            
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
 
@@ -399,9 +410,10 @@ def extended_values_from(packet):
 class ConcretePacket(dict):
     pass
 
-DEBUG_TOPO_DISCOVERY = False
+DEBUG_TOPO_DISCOVERY = True
 class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
+        self.trace = simpleLogger.geTracePyretic()
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
 
@@ -419,11 +431,11 @@ class ConcreteNetwork(Network):
         self.runtime.inject_discovery_packet(dpid, port_no)
         
     def handle_switch_join(self, switch):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_joins"
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_switch_joins\n", timeStamped=True)
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
         self.topology.add_switch(switch)
-        print "OpenFlow switch %s connected" % switch
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        print("OpenFlow switch %s connected" % switch)
+        if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
         self.update_network()
 
     def remove_associated_link(self,location):
@@ -443,41 +455,41 @@ class ConcreteNetwork(Network):
             self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def handle_switch_part(self, switch):
-        print "OpenFlow switch %s disconnected" % switch
-        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_parts"
+        print("OpenFlow switch %s disconnected" % switch)
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_switch_parts\n", timeStamped=True)
         # REMOVE ALL ASSOCIATED LINKS
         for port_no in self.topology.node[switch]["ports"].keys():
             self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
         self.update_network()
         
     def handle_port_join(self, switch, port_no, config, status):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_port_joins %s:%s:%s:%s\n" % (switch, port_no, config, status), timeStamped=True)
         self.topology.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
             self.update_network()
 
     def handle_port_part(self, switch, port_no):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_parts"
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_port_parts\n", timeStamped=True)
         try:
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
             self.update_network()
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
     def handle_port_mod(self, switch, port_no, config, status):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_port_mods %s:%s:%s:%s\n" % (switch, port_no, config, status), timeStamped=True)
         # GET PREV VALUES
         try:
             prev_config = self.topology.node[switch]["ports"][port_no].config
             prev_status = self.topology.node[switch]["ports"][port_no].status
         except KeyError:
-            print "KeyError CASE!!!!!!!!"
+            print("KeyError CASE!!!!!!!!")
             self.port_down(switch, port_no)
             return
 
@@ -495,28 +507,28 @@ class ConcreteNetwork(Network):
             self.port_up(switch, port_no)
 
     def port_up(self, switch, port_no):
-        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s" % (switch,port_no)
+        if DEBUG_TOPO_DISCOVERY:  self.trace("port_up %s:%s\n" % (switch,port_no), timeStamped=True)
         self.inject_discovery_packet(switch,port_no)
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
         self.update_network()
 
     def port_down(self, switch, port_no, double_check=False):
-        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s" % (switch,port_no,double_check)
+        if DEBUG_TOPO_DISCOVERY: self.trace("port_down %s:%s:double_check=%s\n" % (switch,port_no,double_check), timeStamped=True)
         try:
             self.remove_associated_link(Location(switch,port_no))
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
             self.update_network()
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_link_updates"
+        if DEBUG_TOPO_DISCOVERY:  self.trace("handle_link_updates\n", timeStamped=True)
         try:
             p1 = self.topology.node[s1]["ports"][p_no1]
             p2 = self.topology.node[s2]["ports"][p_no2]
         except KeyError:
-            if DEBUG_TOPO_DISCOVERY: print "node doesn't yet exist"
+            if DEBUG_TOPO_DISCOVERY: self.trace("node doesn't yet exist\n", timeStamped=True)
             return  # at least one of these ports isn't (yet) in the topology
 
         # LINK ALREADY EXISTS
@@ -526,7 +538,7 @@ class ConcreteNetwork(Network):
             # LINK ON SAME PORT PAIR
             if link[s1] == p_no1 and link[s2] == p_no2:         
                 if p1.possibly_up() and p2.possibly_up():   
-                    if DEBUG_TOPO_DISCOVERY: print "nothing to do"
+                    if DEBUG_TOPO_DISCOVERY: self.trace("nothing to do\n", timeStamped=True)
                     return                                      #   NOTHING TO DO
                 else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
                     raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
@@ -549,6 +561,6 @@ class ConcreteNetwork(Network):
             self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        if DEBUG_TOPO_DISCOVERY:  self.trace("\n%s\n" % self.topology, timeStamped=True)
         self.update_network()
 

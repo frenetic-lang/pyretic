@@ -30,6 +30,8 @@
 
 from pyretic.core.runtime import Runtime
 from pyretic.backend.backend import Backend
+from pyretic.backend.comm import BACKEND_PORT
+
 import sys
 import threading
 import signal
@@ -38,6 +40,7 @@ from importlib import import_module
 from optparse import OptionParser
 import re
 import os
+import datetime
 
 of_client = None
 
@@ -79,16 +82,105 @@ def parseArgs():
     op.add_option( '--verbosity', '-v', type='choice',
                      choices=['low','normal','high'], default = 'low',
                      help = '|'.join( ['quiet','high'] )  )
+    op.add_option('--port', '-p', action = 'store', type   = 'int',
+                   dest   = "listenPort", default= 6633,
+                   help   = 'set listenPort')
+    op.add_option('--backendPort', '-P', action = 'store', type   = 'int',
+                   dest   = "backendPort", default= BACKEND_PORT,
+                   help   = 'set backendPort')
+                   
+    localHost = '127.0.0.1'
+    
+    op.add_option('--listenIP', '-i', action = 'store', type   = 'string',
+                   dest   = "listenIP", default= '0.0.0.0',
+                   help   = 'set listenIP')
+    op.add_option('--backendIP', '-I', action = 'store', type   = 'string',
+                   dest   = "backendIP", default= localHost,
+                   help   = 'set backendIP')
+
+    op.add_option('--client', '-c', action = 'store', type   = 'string',
+                   dest   = "client", default= 'pox_client',
+                   help   = 'use this OF client')
+
+    op.add_option('--logDirName', '-d', action = 'store', type   = 'string',
+                   dest   = "logDirName", default= 'pyretic',
+                   help   = 'set log dir name')
+
+    op.add_option('--logLevel', '-l', action = 'store', type   = 'int',
+                   dest   = "logLevel", default= 100,
+                   help   = 'set log level')
 
     op.set_defaults(frontend_only=False,mode='reactive0')
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
 
+def getPaths():
+  try:
+    output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
+    
+  except:
+    print 'Error: Unable to obtain PYTHONPATH'
+    sys.exit(1)
+
+  poxpath = None
+  pyreticpath = None
+  mininetpath = None
+  
+  for p in output.split(':'):
+     if re.match('.*pox/?$',p):
+       poxpath = os.path.abspath(p)
+       
+     elif re.match('.*pyretic/?$',p):
+       pyreticpath = os.path.abspath(p)
+
+     elif re.match('.*mininet/?$',p):
+       mininetpath = os.path.abspath(p)
+
+  # print("poxpath=%s pyreticpath=%s mininetpath=%s" %(poxpath, pyreticpath, mininetpath))
+  
+  return (poxpath, pyreticpath, mininetpath)
+  
+def emptyLogDir(logDir):  
+  for the_file in os.listdir(logDir):
+    file_path = os.path.join(logDir, the_file)
+    
+    try:
+      if os.path.isfile(file_path):
+        os.unlink(file_path)
+            
+    except Exception, e:
+      print e
+
+def setLogDirPathName(pyreticpath, logDirName, logLevel):
+
+  datetimeNow = datetime.datetime.now()
+  dateNow     = datetimeNow.strftime("%Y-%m-%d")
+  timeNow     = datetimeNow.strftime("%H:%M:%S.%f")
+  
+  pyreticLogsDir = "%s/%s" % (pyreticpath, "logs")
+  logDirPathName = "%s/%s/%s" % (pyreticLogsDir, dateNow, logDirName)
+      
+  # print("logDirPathName=%s logLevel=%s" % (logDirPathName, logLevel))
+  
+  if not os.path.isdir(logDirPathName):
+    os.makedirs(logDirPathName)
+
+  else:
+    emptyLogDir(logDirPathName)  
+    
+  os.environ["PYRETICLOGDIR"]   = logDirPathName
+  os.environ["PYRETICLOGLEVEL"] = str(logLevel)
+
 
 def main():
     global of_client
     (op, options, args, kwargs_to_pass) = parseArgs()
+    
+    (poxpath, pyreticpath, mininetpath) = getPaths()
+    
+    setLogDirPathName(pyreticpath, options.logDirName, options.logLevel)
+
     if options.mode == 'i':
         options.mode = 'interpreted'
     elif options.mode == 'r0':
@@ -116,28 +208,38 @@ def main():
 
     sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
     
-    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity,False,False)
+    runtime = Runtime(Backend(ip=options.backendIP, port=options.backendPort),main,kwargs,options.mode,options.verbosity,False,False)
+    
     if not options.frontend_only:
-        try:
-            output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
-        except:
-            print 'Error: Unable to obtain PYTHONPATH'
-            sys.exit(1)
-        poxpath = None
-        for p in output.split(':'):
-             if re.match('.*pox/?$',p):
-                 poxpath = os.path.abspath(p)
-                 break
+        #try:
+        #    output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
+        #except:
+        #    print 'Error: Unable to obtain PYTHONPATH'
+        #    sys.exit(1)
+        #poxpath = None
+        #for p in output.split(':'):
+        #     if re.match('.*pox/?$',p):
+        #         poxpath = os.path.abspath(p)
+        #         break
+        
         if poxpath is None:
             print 'Error: pox not found in PYTHONPATH'
             sys.exit(1)
         pox_exec = os.path.join(poxpath,'pox.py')
         python=sys.executable
-        of_client = subprocess.Popen([python, 
-                                      pox_exec,
-                                      'of_client.pox_client' ],
-                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    
+        
+        poxClient   = 'of_client.%s' % options.client
+        backendIP   = '--ip=%s'   % options.backendIP 
+        backendPort = '--port=%d' % options.backendPort
+        
+        OF          = 'openflow.of_01'
+        listenIP    = '--address=%s' % options.listenIP 
+        listenPort  = '--port=%d'    % options.listenPort 
+      
+        procCmd = [python, pox_exec, poxClient, backendIP, backendPort, OF, listenIP, listenPort]
+
+        of_client = subprocess.Popen(procCmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
 

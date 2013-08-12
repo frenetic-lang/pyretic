@@ -40,6 +40,10 @@ from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
 
+import datetime
+from pyretic.core.logger import simpleLogger
+
+OFCLIENTLOGLEVEL = 5
 
 def inport_value_hack(outport):
     if outport > 1:
@@ -53,6 +57,7 @@ class BackendChannel(asynchat.async_chat):
     """
     def __init__(self, host, port, of_client):
         self.of_client = of_client
+        self.trace = of_client.trace   
         self.received_data = []
         asynchat.async_chat.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -106,6 +111,11 @@ class BackendChannel(asynchat.async_chat):
 class POXClient(revent.EventMixin):
     # NOT **kwargs
     def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT):
+    
+        logFileName = "%s.log" % __name__.split('.')[1]
+        logger = simpleLogger(baseName=logFileName, logLevel=OFCLIENTLOGLEVEL)    
+        self.trace = logger.write  
+          
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
@@ -353,11 +363,15 @@ class POXClient(revent.EventMixin):
         msg.data = self.packet_to_network(packet)
         msg.actions.append(of.ofp_action_output(port = outport))
  
-        if self.show_traces:
-            print "========= POX/OF SEND ================"
-            print msg
-            print packetlib.ethernet(msg._get_data())
-            print
+        #if self.show_traces:
+        if self.trace != None:
+            self.trace("========= POX/OF SEND ================")
+            self.trace(msg)
+            # If the following line is un-commented, 'pingall' fails
+            # Tested with BADIP2IP and BADIP3IP
+            
+            # self.trace(packetlib.ethernet(msg._get_data()))
+            self.trace("")
 
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
         try:
@@ -618,27 +632,29 @@ class POXClient(revent.EventMixin):
         elif packet.type == 0x86dd:  # IGNORE IPV6
             return 
 
-        if self.show_traces:
+        # if self.show_traces:
+        if self.trace != None:
             self.packetno += 1
-            print "-------- POX/OF RECV %d ---------------" % self.packetno
-            print event.connection
-            print event.ofp
-            print "port\t%s" % event.port
-            print "data\t%s" % packetlib.ethernet(event.data)
-            print "dpid\t%s" % event.dpid
-            print
+            self.trace("-------- POX/OF RECV %d ---------------" % self.packetno)
+            self.trace(event.connection)
+            self.trace(event.ofp)
+            self.trace("port\t%s" % event.port)
+            self.trace("data\t%s" % packetlib.ethernet(event.data))
+            self.trace("dpid\t%s" % event.dpid)
+            self.trace("")
 
         received = self.packet_from_network(event.dpid, event.ofp.in_port, event.data)
         self.send_to_pyretic(['packet',received])
         
        
-def launch():
+def launch(ip='127.0.0.1', port=BACKEND_PORT):
 
     class asyncore_loop(threading.Thread):
         def run(self):
             asyncore.loop()
-
-    POXClient()
+            
+    POXClient(ip=ip, port=int(port))
+    
     al = asyncore_loop()
     al.start()
 
