@@ -254,6 +254,7 @@ class Runtime(object):
         if self.mode == 'reactive0':
             rule = None
             ### DON'T INSTALL RULES THAT CONTAIN QUERIES
+            from pyretic.lib.query import packets, count_packets, count_bytes
             if eval_trace.contains_class(packets.FilterWrappedFwdBucket):
                 pass
             elif eval_trace.contains_class(count_packets):

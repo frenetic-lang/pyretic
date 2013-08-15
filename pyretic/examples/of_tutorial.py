@@ -36,7 +36,7 @@
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
-
+from pyretic.lib.query import *
 
 def act_like_hub():
     """Implement hub-like behavior --- send all packets to all ports on a network

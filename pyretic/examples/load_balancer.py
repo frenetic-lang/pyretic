@@ -49,6 +49,7 @@
 import math
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
+from pyretic.lib.query import *
 
 def subs(c,r,p):
     """from client, substitute replica address for the public address 
