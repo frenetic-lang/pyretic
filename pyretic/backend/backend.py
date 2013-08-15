@@ -135,6 +135,9 @@ class Backend(object):
     def send_clear_all(self):
         self.send_to_OF_client(['clear_all'])
 
+    def send_barrier(self,switch):
+        self.send_to_OF_client(['barrier',switch])
+
     def inject_discovery_packet(self,dpid, port):
         self.send_to_OF_client(['inject_discovery_packet',dpid,port])
 

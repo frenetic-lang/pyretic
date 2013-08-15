@@ -99,7 +99,10 @@ class BackendChannel(asynchat.async_chat):
             actions = map(self.dict2OF,msg[3])
             self.of_client.install_flow(pred,priority,actions)
         elif msg[0] == 'clear_all':
-            self.of_client.clear_all()
+            self.of_client.clear()
+        elif msg[0] == 'barrier':
+            switch = msg[1]
+            self.of_client.barrier(switch)
         else:
             print "ERROR: Unknown msg from frontend %s" % msg
 
@@ -456,15 +459,18 @@ class POXClient(revent.EventMixin):
         msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
         self.switches[switch]['connection'].send(msg) 
 
-
-    def clear_switch(self,switch):
-        d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
-        self.switches[switch]['connection'].send(d) 
+    def barrier(self,switch):
+        b = of.ofp_barrier_request()
+        self.switches[switch]['connection'].send(b) 
     
-
-    def clear_all(self):
-        for switch in self.switches.keys():
-            self.clear_switch(switch)
+    def clear(self,switch=None):
+        if switch is None:
+            for switch in self.switches.keys():
+                self.clear(switch)
+        else:
+            d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
+            self.switches[switch]['connection'].send(d) 
+            self.barrier(switch)
             self.send_all_flows_to_controller(switch)
 
 
