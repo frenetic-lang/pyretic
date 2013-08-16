@@ -98,7 +98,6 @@ class Runtime(object):
                 self.in_update_network = True
                 self.prev_network = self.network.copy()
                 self.policy.set_network(self.prev_network)
-                print self.policy
                 if self.mode == 'reactive0':
                     self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0':

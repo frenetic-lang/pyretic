@@ -91,7 +91,6 @@ class packets(DynamicPolicy):
                 (results,trace) = self.pwfb.track_eval(pkt,dry)
                 eval_trace.add_trace(trace)
                 if not results:
-                    print '------CHANGE-----------'
                     val = {h : pkt[h] for h in self.group_by}
                     self.policy = ~match(val) & self.policy
             else:
