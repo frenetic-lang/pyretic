@@ -58,7 +58,7 @@ class Runtime(object):
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
-        if mode == 'reactive0':
+        if mode != 'interpreted':
             self.active_dynamic_policies = set()
             def find_dynamic_sub_pols(policy,recursive_pols_seen):
                 dynamic_sub_pols = set()
