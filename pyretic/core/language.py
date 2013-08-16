@@ -664,6 +664,9 @@ class DerivedPolicy(Policy):
         self._classifier = self.policy.compile()
         return self._classifier
 
+    def __repr__(self):
+        return "[DerivedPolicy]\n%s" % repr(self.policy)
+
 
 class difference(DerivedPolicy,Filter):
     def __init__(self, f1, f2):
