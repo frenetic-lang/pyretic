@@ -98,8 +98,9 @@ class BackendChannel(asynchat.async_chat):
             priority = int(msg[2])
             actions = map(self.dict2OF,msg[3])
             self.of_client.install_flow(pred,priority,actions)
-        elif msg[0] == 'clear_all':
-            self.of_client.clear()
+        elif msg[0] == 'clear':
+            switch = int(msg[1])
+            self.of_client.clear(switch)
         elif msg[0] == 'barrier':
             switch = msg[1]
             self.of_client.barrier(switch)
@@ -456,12 +457,6 @@ class POXClient(revent.EventMixin):
         except KeyError, e:
             print "ERROR:install_flow: No connection to switch %d available" % switch
 
-
-    def send_all_flows_to_controller(self,switch):
-        msg = of.ofp_flow_mod(match = of.ofp_match())
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        self.switches[switch]['connection'].send(msg) 
-
     def barrier(self,switch):
         b = of.ofp_barrier_request()
         self.switches[switch]['connection'].send(b) 
@@ -473,9 +468,6 @@ class POXClient(revent.EventMixin):
         else:
             d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
             self.switches[switch]['connection'].send(d) 
-            self.barrier(switch)
-            self.send_all_flows_to_controller(switch)
-
 
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switches
@@ -484,7 +476,9 @@ class POXClient(revent.EventMixin):
         self.switches[event.dpid]['connection'] = event.connection
         self.switches[event.dpid]['ports'] = {}
 
-        self.send_all_flows_to_controller(event.dpid)
+        msg = of.ofp_flow_mod(match = of.ofp_match())
+        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+        self.switches[event.dpid]['connection'].send(msg) 
 
         self.send_to_pyretic(['switch','join',event.dpid,'BEGIN'])
 

@@ -132,8 +132,8 @@ class Backend(object):
     def send_install(self,pred,priority,action_list):
         self.send_to_OF_client(['install',pred,priority,action_list])
         
-    def send_clear_all(self):
-        self.send_to_OF_client(['clear_all'])
+    def send_clear(self,switch):
+        self.send_to_OF_client(['clear',switch])
 
     def send_barrier(self,switch):
         self.send_to_OF_client(['barrier',switch])

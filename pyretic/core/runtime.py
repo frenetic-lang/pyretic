@@ -102,7 +102,6 @@ class Runtime(object):
                 if self.mode == 'reactive0':
                     self.clear_all()
                 elif self.mode == 'proactive0':
-                    self.clear_all()
                     classifier = self.policy.compile()
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
                 self.in_update_network = False
@@ -120,7 +119,6 @@ class Runtime(object):
             if self.mode == 'reactive0':
                 self.clear_all() 
             elif self.mode == 'proactive0':
-                self.clear_all()
                 classifier = self.policy.compile()
                 self.install_classifier(classifier)
 
@@ -363,7 +361,9 @@ class Runtime(object):
             switches = self.network.topology.nodes()
             for s in switches:
                 self.send_barrier(s)
-            #        priority = len(classifier) + 32768  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
+                self.send_clear(s)
+                self.send_barrier(s)
+                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
             for rule in classifier.rules:
                 # massage actions into flow-table format
@@ -396,12 +396,15 @@ class Runtime(object):
     def send_barrier(self,switch):
         self.backend.send_barrier(switch)
 
-    def clear_all(self):
-        self.backend.send_clear_all()
-        if self.verbosity == 'high':
-            from datetime import datetime
-            print str(datetime.now()),
-            print " | clear_all"
+    def send_clear(self,switch):
+        self.backend.send_clear(switch)
+
+    # def clear_all(self):
+    #     self.backend.send_clear_all()
+    #     if self.verbosity == 'high':
+    #         from datetime import datetime
+    #         print str(datetime.now()),
+    #         print " | clear_all"
 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
