@@ -360,11 +360,9 @@ class Runtime(object):
                 time.sleep(0.1)
                 if this_update_no != current_update_no.value:
                     return
-            print 'install_classifer: go'
             switches = self.network.topology.nodes()
             for s in switches:
                 self.send_barrier(s)
-            print '----barrier-----'
             #        priority = len(classifier) + 32768  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
             for rule in classifier.rules:
