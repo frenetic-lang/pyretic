@@ -615,36 +615,30 @@ class intersection(sequential,Filter):
     pass
 
 
-class UnaryCombinatorPolicy(CombinatorPolicy):
-    """Abstract class for unary policy combinators."""
-    ### init : List Policy -> unit
-    def __init__(self, policy):
-        self.policy = policy
-        super(CombinatorPolicy,self).__init__([policy])
-
-
-class dropped_by(UnaryCombinatorPolicy,Filter):
+class dropped_by(CombinatorPolicy,Filter):
     def __init__(self, dropper):
-        super(dropped_by,self).__init__(dropper)
+        super(dropped_by,self).__init__([dropper])
 
     def eval(self, pkt):
-        if self.policy.eval(pkt):
+        if self.policies[0].eval(pkt):
             return set()
         else:
             return {pkt}
 
     def track_eval(self, pkt, dry):
         eval_trace = EvalTrace(self)
-        (results,trace) = self.policy.track_eval(pkt,dry)
+        (results,trace) = self.policies[0].track_eval(pkt,dry)
         eval_trace.add_trace(trace)
         if results:
             return (set(),eval_trace)
         else:
             return ({pkt},eval_trace)
 
-    def __repr__(self):
-        return "dropped:\n%s" % util.repr_plus([self])
-
+    def compile(self):
+        r = Rule(match(),[Controller])
+        self._classifier = Classifier()
+        self._classifier.rules.append(r)
+        return self._classifier
 
 
 ################################################################################
