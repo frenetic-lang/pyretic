@@ -368,7 +368,7 @@ class Runtime(object):
             for rule in classifier.rules:
                 # massage actions into flow-table format
                 actions = filter(lambda a: a != drop,rule.actions)
-                actions = [ m.map for m in actions ]
+                actions = [ m.map for m in actions if len(m.map) > 0 ]
                 if 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
