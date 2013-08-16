@@ -360,15 +360,17 @@ class Runtime(object):
                 time.sleep(0.1)
                 if this_update_no != current_update_no.value:
                     return
+            print 'install_classifer: go'
             switches = self.network.topology.nodes()
             for s in switches:
                 self.send_barrier(s)
+            print '----barrier-----'
             #        priority = len(classifier) + 32768  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
             for rule in classifier.rules:
                 # massage actions into flow-table format
                 actions = filter(lambda a: a != drop,rule.actions)
-                if reduce(lambda acc, a: acc | isinstance(a,FwdBucket),rule.actions,False):
+                if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
                    actions = [{'send_to_controller' : 0}]
                 else:
                     actions = [ m.map for m in actions if len(m.map) > 0 ]

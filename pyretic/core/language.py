@@ -183,6 +183,8 @@ class Classifier(object):
                 return r1.match.intersect(r2.match)
             elif a1 == none:  # if we drop, then later matches don't matter
                 return r1.match
+            elif a1 == Controller:
+                return r1.match
             elif isinstance(a1, modify):
                 new_match_dict = {}
                 for f, v in r2.match.map.iteritems():
@@ -207,12 +209,14 @@ class Classifier(object):
                 return [none]
             elif a1 == identity:
                 return as2
+            elif a1 == Controller:
+                return as1 + as2
             elif isinstance(a1, modify):
                 for a2 in as2:
                     new_a1 = modify(**a1.map.copy())
                     if a2 == none:
                         new_actions.append(none)
-                    elif isinstance(a2,FwdBucket):
+                    elif a2 == Controller:
                         new_actions.append(a2)
                     elif a2 == identity:
                         new_actions.append(new_a1)
@@ -400,7 +404,13 @@ class match(PrimitivePolicy,Filter):
             return self
         else:
             return identity
+
         
+@singleton
+class Controller(PrimitivePolicy):
+    def __repr__(self):
+        return "Controller"
+
 
 class modify(PrimitivePolicy):
     """modify(field=value)"""
@@ -449,7 +459,7 @@ class FwdBucket(PrimitivePolicy):
         return set()
 
     def compile(self):
-        r = Rule(match(),[self])
+        r = Rule(match(),[Controller])
         self._classifier = Classifier()
         self._classifier.rules.append(r)
         return self._classifier
