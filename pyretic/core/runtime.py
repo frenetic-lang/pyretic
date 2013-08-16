@@ -100,7 +100,7 @@ class Runtime(object):
                 self.policy.set_network(self.prev_network)
                 print self.policy
                 if self.mode == 'reactive0':
-                    self.clear_all()
+                    self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0':
                     classifier = self.policy.compile()
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
@@ -399,12 +399,21 @@ class Runtime(object):
     def send_clear(self,switch):
         self.backend.send_clear(switch)
 
-    # def clear_all(self):
-    #     self.backend.send_clear_all()
-    #     if self.verbosity == 'high':
-    #         from datetime import datetime
-    #         print str(datetime.now()),
-    #         print " | clear_all"
+    def clear_all(self,this_update_no=None,current_update_no=None):
+        def f(this_update_no, current_update_no):
+            if not this_update_no is None:
+                time.sleep(0.1)
+                if this_update_no != current_update_no.value:
+                    return
+            switches = self.network.topology.nodes()
+            for s in switches:
+                self.send_barrier(s)
+                self.send_clear(s)
+                self.send_barrier(s)
+                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
+        p = Process(target=f,args=(this_update_no,current_update_no))
+        p.daemon = True
+        p.start()
 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
