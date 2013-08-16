@@ -212,6 +212,8 @@ class Classifier(object):
                     new_a1 = modify(**a1.map.copy())
                     if a2 == none:
                         new_actions.append(none)
+                    elif isinstance(a2,FwdBucket):
+                        new_actions.append(a2)
                     elif a2 == identity:
                         new_actions.append(new_a1)
                     elif isinstance(a2, modify):
@@ -447,7 +449,10 @@ class FwdBucket(PrimitivePolicy):
         return set()
 
     def compile(self):
-        return None
+        r = Rule(match(),[self])
+        self._classifier = Classifier()
+        self._classifier.rules.append(r)
+        return self._classifier
 
     ### register_callback : (Packet -> X) -> unit 
     def register_callback(self, fn):
