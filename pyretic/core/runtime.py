@@ -368,7 +368,11 @@ class Runtime(object):
             for rule in classifier.rules:
                 # massage actions into flow-table format
                 actions = filter(lambda a: a != drop,rule.actions)
-                actions = [ m.map for m in actions if len(m.map) > 0 ]
+                if reduce(lambda acc, a: acc | isinstance(a,FwdBucket),rule.actions,False):
+                   actions = [{'send_to_controller' : 0}]
+                else:
+                    actions = [ m.map for m in actions if len(m.map) > 0 ]
+                # TODO (josh) put logic in here to figure out when 'inport' forward location should be used
                 if 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
