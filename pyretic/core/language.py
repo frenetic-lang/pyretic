@@ -262,14 +262,29 @@ class Classifier(object):
         return c.optimize()
 
     def optimize(self):
+        return self.remove_shadowed_cover_single()
 
-        # Eliminate exactly shadowed rules.
-        new_rules = []
+    def remove_shadowed_exact_single(self):
+        # Eliminate every rule exactly matched by some higher priority rule
+        opt_c = Classifier()
         for r in self.rules:
-            if not reduce(lambda acc, new_r: acc or new_r.match == r.match, new_rules, False):
-                new_rules.append(r)
-        self.rules = new_rules
-        return self
+            if not reduce(lambda acc, new_r: acc or 
+                          new_r.match == r.match, 
+                          opt_c.rules, 
+                          False):
+                opt_c.rules.append(r)
+        return opt_c
+
+    def remove_shadowed_cover_single(self):
+        # Eliminate every rule completely covered by some higher priority rule
+        opt_c = Classifier()
+        for r in self.rules:
+            if not reduce(lambda acc, new_r: acc or 
+                          new_r.match.covers(r.match), 
+                          opt_c.rules, 
+                          False):
+                opt_c.rules.append(r)
+        return opt_c
 
 
 class EvalTrace(object):
@@ -378,6 +393,15 @@ class match(PrimitivePolicy,Filter):
             return self.map == other.map
         except:
             return False
+
+    def covers(self,other):
+        # if self is specific on any field that other lacks
+        if set(self.map.keys()) - set(other.map.keys()):
+            return False
+        for (f,v) in self.map.items():
+            if v != other.map[f]:
+                return False
+        return True
 
     def eval(self, pkt):
         for field, pattern in self.map.iteritems():
