@@ -431,13 +431,6 @@ class Runtime(object):
 # Extended Values
 ################################################################################
 
-basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
-                 "ethtype", "protocol"]
-tagging_headers = ["vlan_id", "vlan_pcp"]
-native_headers = basic_headers + tagging_headers
-content_headers = [ "raw", "header_len", "payload_len"]
-location_headers = ["switch", "inport", "outport"]
-
 @util.cached
 def extended_values_from(packet):
     extended_values = {}

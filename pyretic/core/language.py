@@ -39,6 +39,14 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.util import frozendict, singleton
 
+basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
+                 "ethtype", "protocol"]
+tagging_headers = ["vlan_id", "vlan_pcp"]
+native_headers = basic_headers + tagging_headers
+location_headers = ["switch", "inport", "outport"]
+compilable_headers = native_headers + location_headers
+content_headers = [ "raw", "header_len", "payload_len"]
+
 ################################################################################
 # Policy Language                                                              #
 ################################################################################
@@ -417,13 +425,21 @@ class modify(PrimitivePolicy):
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
+        self.has_virtual_headers = not \
+            reduce(lambda acc, f: 
+                   acc and (f in compilable_headers),
+                   self.map.keys(),
+                   True)
         super(modify,self).__init__()
 
     def eval(self, pkt):
         return {pkt.modifymany(self.map)}
 
     def compile(self):
-        r = Rule(match(),[self])
+        if self.has_virtual_headers:
+            r = Rule(match(),[Controller])
+        else:
+            r = Rule(match(),[self])
         self._classifier = Classifier()
         self._classifier.rules.append(r)
         return self._classifier

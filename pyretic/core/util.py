@@ -65,7 +65,7 @@ class frozendict(object):
         
         return self.__class__(d)
 
-    def remove(self, *ks):
+    def remove(self, ks):
         d = self._dict.copy()
         for k in ks:
             del d[k]

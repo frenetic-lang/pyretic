@@ -196,11 +196,14 @@ class Packet(object):
         return self.header.keys()
                             
     def modifymany(self, d):
-        mod = { k : v for k, v in d.items() }
-        return Packet(self.header.update(mod))
-
-    def modify(self, **kwargs):
-        return self.modifymany(kwargs)
+        add = {}
+        delete = []
+        for k, v in d.items():
+            if v is None:
+                delete.append(k)
+            else:
+                add[k] = v
+        return Packet(self.header.update(add).remove(delete))
 
     def __getitem__(self, item):
         return self.header[item]
