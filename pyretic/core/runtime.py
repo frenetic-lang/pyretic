@@ -381,6 +381,7 @@ class Runtime(object):
                 self.send_barrier(s)
 
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
+        p.daemon = True
         p.start()
 
             
