@@ -202,6 +202,7 @@ class Classifier(object):
                         return none
                     else:
                         new_match_dict[f] = v
+                new_match_dict.update(r1.match.map)
                 return match(**new_match_dict)
             else:
                 # TODO (cole) use compile error.
