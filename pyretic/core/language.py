@@ -202,8 +202,7 @@ class Classifier(object):
                         return none
                     else:
                         new_match_dict[f] = v
-                new_match_dict.update(r1.match.map)
-                return match(**new_match_dict)
+                return match(**new_match_dict).intersect(r1.match)
             else:
                 # TODO (cole) use compile error.
                 raise TypeError
