@@ -144,10 +144,13 @@ class Rule(object):
     def __repr__(self):
         return str(self)
 
+    def __eq__(self, other):
+        return self.match == other.match and self.actions == other.actions
+
 
 class Classifier(object):
-    def __init__(self):
-        self.rules = []
+    def __init__(self, new_rules=[]):
+        self.rules = new_rules
 
     def __len__(self):
         return len(self.rules)
@@ -159,7 +162,7 @@ class Classifier(object):
         c1 = self
         if c2 is None:
             return None
-        c = Classifier()
+        c = Classifier([])
         # TODO (cole): make classifiers iterable
         for r1 in c1.rules:
             for r2 in c2.rules:
@@ -178,95 +181,167 @@ class Classifier(object):
             c.rules.append(r2)
         return c.optimize()
 
-    def __rshift__(self,c2):
-
-        # Helper function: commute the match from a right-hand-side rule to the
-        # left.
-        # Returns: a new match for r1 >> r2.
-        def _specialize(r1, r2):
-            assert(len(r1.actions) == 1)
-            a1 = r1.actions[0]
-            a1 = a1.simplify()
-            if a1 == identity:
-                return r1.match.intersect(r2.match)
-            elif a1 == none:  # if we drop, then later matches don't matter
-                return r1.match
-            elif a1 == Controller:
-                return r1.match
-            elif isinstance(a1, modify):
-                new_match_dict = {}
-                for f, v in r2.match.map.iteritems():
-                    if f in a1.map and a1.map[f] == v:
-                        continue
-                    elif f in a1.map and a1.map[f] != v:
-                        return none
-                    else:
-                        new_match_dict[f] = v
-                return match(**new_match_dict).intersect(r1.match)
+    # Helper function for rshift: given a set of packets pkts (denoted by a match)
+    # and an action act, return the set of packets pkts' such that
+    # sym_eval(act, pkts') == pkts.
+    def _invert_action(self, act, pkts):
+        if act == identity:
+            return pkts
+        elif act == none or act == Controller:
+            return false
+        elif isinstance(act, modify):
+            new_match_dict = {}
+            for f, v in pkts.map.iteritems():
+                if f in act.map and act.map[f] == v:
+                    continue
+                elif f in act.map and act.map[f] != v:
+                    return false
+                else:
+                    new_match_dict[f] = v
+            return match(**new_match_dict).simplify()
+        elif isinstance(act, fwd):
+            if 'outport' in pkts.map and pkts.map['outport'] == act.outport:
+                return true
+            elif 'outport' in pkts.map and pkts.map['outport'] != act.outport:
+                return false
             else:
-                # TODO (cole) use compile error.
-                raise TypeError
+                return pkts
+        else:
+            # TODO (cole) use compile error.
+            # TODO (cole) what actions are allowable?
+            raise TypeError
 
-        # Helper function: sequentially compose actions.  a1 must be a single
-        # action.
-        def _sequence_actions(as1, as2):
-            assert(len(as1) == 1)
-            a1 = as1[0]
-            new_actions = []
-            if a1 == none:
-                return [none]
-            elif a1 == identity:
-                return as2
-            elif a1 == Controller:
-                return as1 + as2
-            elif isinstance(a1, modify):
-                for a2 in as2:
+    # Helper function for rshift: sequentially compose actions.  a1 must be a
+    # single action.  Returns a list of actions.
+    def _sequence_actions(self, a1, as2):
+        # TODO: be uniform about returning copied or modified objects.
+        new_actions = []
+        if a1 == none:
+            return [none]
+        elif a1 == identity:
+            return as2
+        elif a1 == Controller:
+            return [a1] + as2
+        elif isinstance(a1, modify):
+            for a2 in as2:
+                new_a1 = modify(**a1.map.copy())
+                if a2 == none:
+                    new_actions.append(none)
+                elif a2 == Controller:
+                    new_actions.append(a2)
+                elif a2 == identity:
+                    new_actions.append(new_a1)
+                elif isinstance(a2, modify):
+                    new_a1.map.update(a2.map)
+                    new_actions.append(new_a1)
+                else:
+                    raise TypeError
+            return new_actions
+        elif isinstance(a1, fwd):
+            for a2 in as2:
+                if a2 == none or a2 == Controller or isinstance(a2, fwd):
+                    new_actions.append(a2)
+                elif a2 == identity:
                     new_a1 = modify(**a1.map.copy())
-                    if a2 == none:
-                        new_actions.append(none)
-                    elif a2 == Controller:
+                    new_actions.append(new_a1)
+                elif isinstance(a2, modify):
+                    if 'outport' in a2.map:
                         new_actions.append(a2)
-                    elif a2 == identity:
-                        new_actions.append(new_a1)
-                    elif isinstance(a2, modify):
-                        new_a1.map.update(a2.map)
-                        new_actions.append(new_a1)
                     else:
-                        raise TypeError
-                return new_actions
-            else:
-                raise TypeError
+                        new_a2 = modify(**a2.map.copy())
+                        new_a2['outport'] = a1.outport
+                        new_actions.append(new_a2)
+                else:
+                    raise TypeError
+            return new_actions
+        else:
+            raise TypeError
 
-        def _compile_rule_rule(r1, r2):
-            assert(len(r1.actions) == 1)
-            m = _specialize(r1, r2)
-            alist = _sequence_actions(r1.actions, r2.actions)
-            return Rule(m, alist)
+    # Returns a classifier.
+    def _sequence_action_classifier(self, act, c):
+        # TODO (cole): make classifiers easier to use w.r.t. adding/removing
+        # rules.
+        # TODO (cole): remove recursion?
+        if len(c.rules) == 0:
+            return Classifier([Rule(match(), [drop])])
+        pkts = c.rules[0].match
+        pkts2 = self._invert_action(act, pkts)
+        if pkts2 == true:
+            acts = self._sequence_actions(act, c.rules[0].actions)
+            return Classifier([Rule(match(), acts)])
+        elif pkts2 == false:
+            c2 = Classifier(c.rules[1:])
+            return self._sequence_action_classifier(act, c2)
+        else:
+            acts = self._sequence_actions(act, c.rules[0].actions)
+            c2 = Classifier(c.rules[1:])
+            c3 = self._sequence_action_classifier(act, c2)
+            c3.rules = [Rule(pkts2, acts)] + c3.rules
+            return c3
 
-        def _compile_tinyrule_classifier(r1, c2):
-            assert(len(r1.actions) == 1)
-            rules = [_compile_rule_rule(r1, r2) for r2 in c2.rules]
-            c = Classifier()
-            c.rules = filter(lambda r: r.match != none, rules)
-            return c
+    def _sequence_actions_classifier(self, acts, c):
+        empty_classifier = Classifier([Rule(match(), [drop])])
+        if acts == []:
+            # Treat the empty list of actions as drop.
+            return empty_classifier
+        acc = empty_classifier
+        for act in acts:
+            acc = acc + self._sequence_action_classifier(act, c)
+        return acc
 
-        def _compile_rule_classifier(r1, c2):
-            rules = [Rule(r1.match, [act]) for act in r1.actions]
-            cs = [_compile_tinyrule_classifier(r, c2) for r in rules]
-            return reduce(lambda acc, c: acc + c, cs)
+    def _sequence_rule_classifier(self, r, c):
+        c2 = self._sequence_actions_classifier(r.actions, c)
+        for rule in c2.rules:
+            rule.match = rule.match.intersect(r.match)
+        c2.rules = [r2 for r2 in c2.rules if r2 != drop]
+        return c2.optimize()
 
-        c = Classifier()
-        for r1 in self.rules:
-            c.rules = c.rules + _compile_rule_classifier(r1, c2).rules
-        c.rules.append(Rule(match(), [drop]))
-        return c.optimize()
+    def __rshift__(self, c2):
+        new_rules = []
+        for rule in self.rules:
+            c3 = self._sequence_rule_classifier(rule, c2)
+            new_rules = new_rules + c3.rules
+        rv = Classifier(new_rules)
+        return rv.optimize()
+
+#     # Helper function for rshift.
+#     def _compile_rule_rule(self, r1, r2):
+#         assert(len(r1.actions) == 1)
+#         act = r1.actions[0]
+#         act = act.simplify()
+#         pkts = r2.match
+#         m = _invert_action(act, pkts)
+#         # TODO: this is broken atm.
+#         alist = _sequence_actions(r1.actions, r2.actions)
+#         return Rule(m, alist)
+# 
+#     # Helper function for rshift.
+#     def _compile_tinyrule_classifier(self, r1, c2):
+#         assert(len(r1.actions) == 1)
+#         rules = [_compile_rule_rule(r1, r2) for r2 in c2.rules]
+#         c = Classifier()
+#         c.rules = filter(lambda r: r.match != none, rules)
+#         return c
+# 
+#     # Helper function for rshift.
+#     def _compile_rule_classifier(self, r1, c2):
+#         rules = [Rule(r1.match, [act]) for act in r1.actions]
+#         cs = [_compile_tinyrule_classifier(r, c2) for r in rules]
+#         return reduce(lambda acc, c: acc + c, cs)
+# 
+#     def __rshift__(self,c2):
+#         c = Classifier()
+#         for r1 in self.rules:
+#             c.rules = c.rules + _compile_rule_classifier(r1, c2).rules
+#         c.rules.append(Rule(match(), [drop]))
+#         return c.optimize()
 
     def optimize(self):
         return self.remove_shadowed_cover_single()
 
     def remove_shadowed_exact_single(self):
         # Eliminate every rule exactly matched by some higher priority rule
-        opt_c = Classifier()
+        opt_c = Classifier([])
         for r in self.rules:
             if not reduce(lambda acc, new_r: acc or 
                           new_r.match == r.match, 
@@ -277,7 +352,7 @@ class Classifier(object):
 
     def remove_shadowed_cover_single(self):
         # Eliminate every rule completely covered by some higher priority rule
-        opt_c = Classifier()
+        opt_c = Classifier([])
         for r in self.rules:
             if not reduce(lambda acc, new_r: acc or 
                           new_r.match.covers(r.match), 
@@ -328,8 +403,7 @@ class identity(PrimitivePolicy,Filter):
 
     def compile(self):
         r = Rule(match(),[modify()])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r)
+        self._classifier = Classifier([r])
         return self._classifier
 
     def __repr__(self):
@@ -347,15 +421,14 @@ class none(PrimitivePolicy,Filter):
 
     def compile(self):
         r = Rule(match(),[drop])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r)
+        self._classifier = Classifier([r])
         return self._classifier
 
     def __repr__(self):
         return "none"
 drop = none              # Imperative alias
 false = none             # Logic alias
-no_packets = identity    # Matching alias
+no_packets = none        # Matching alias
 
 
 class match(PrimitivePolicy,Filter):
@@ -417,9 +490,7 @@ class match(PrimitivePolicy,Filter):
     def compile(self):
         r1 = Rule(self,[modify()])
         r2 = Rule(match(),[drop])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r1)
-        self._classifier.rules.append(r2)
+        self._classifier = Classifier([r1, r2])
         return self._classifier
 
     def __repr__(self):
@@ -464,8 +535,7 @@ class modify(PrimitivePolicy):
             r = Rule(match(),[Controller])
         else:
             r = Rule(match(),[self])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r)
+        self._classifier = Classifier([r])
         return self._classifier
 
     def __repr__(self):
@@ -500,8 +570,7 @@ class FwdBucket(PrimitivePolicy):
 
     def compile(self):
         r = Rule(match(),[Controller])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r)
+        self._classifier = Classifier([r])
         return self._classifier
 
     ### register_callback : (Packet -> X) -> unit 
@@ -549,7 +618,7 @@ class negate(CombinatorPolicy,Filter):
 
     def compile(self):
         inner_classifier = self.policies[0].compile()
-        self._classifier = Classifier()
+        self._classifier = Classifier([])
         for r in inner_classifier.rules:
             action = r.actions[0].simplify()
             if action == identity:
@@ -676,8 +745,7 @@ class dropped_by(CombinatorPolicy,Filter):
 
     def compile(self):
         r = Rule(match(),[Controller])
-        self._classifier = Classifier()
-        self._classifier.rules.append(r)
+        self._classifier = Classifier([r])
         return self._classifier
 
 

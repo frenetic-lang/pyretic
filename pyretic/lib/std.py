@@ -33,6 +33,7 @@ from datetime import datetime
 
 ### DEFINITIONS
 ARP_TYPE = 2054
+IP_TYPE  = 0x800
 
 
 ### BREAKPOINT policy
