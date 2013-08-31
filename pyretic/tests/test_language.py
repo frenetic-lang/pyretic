@@ -106,6 +106,27 @@ def test_sequencing_fwd_fwd():
     print c3
     assert c3.rules == [Rule(match(), [fwd(2)])]
 
+def test_sequencing_fwd_fwd_shadow():
+    c1 = Classifier([Rule(match(), [fwd(1)])])
+    c2 = Classifier([Rule(match(), [fwd(2)]), Rule(match(), [fwd(3)])])
+    c3 = c1 >> c2
+    print c3
+    assert c3.rules == [Rule(match(), [fwd(2)])]
+
+def test_sequencing_fwd_fwd_fwd_1():
+    c1 = Classifier([Rule(match(), [fwd(1)])])
+    c2 = Classifier([Rule(match(), [fwd(2), fwd(3)])])
+    c3 = c1 >> c2
+    print c3
+    assert c3.rules == [Rule(match(), [fwd(2), fwd(3)])]
+
+def test_sequencing_fwd_fwd_fwd_2():
+    c1 = Classifier([Rule(match(), [fwd(1), fwd(2)])])
+    c2 = Classifier([Rule(match(), [fwd(3)])])
+    c3 = c1 >> c2
+    print c3
+    assert c3.rules == [Rule(match(), [fwd(3), fwd(3)])]
+
 
 
 # Optimization
