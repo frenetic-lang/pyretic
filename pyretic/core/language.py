@@ -4,6 +4,7 @@
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
 # author: Christopher Monsanto (chris@monsan.to)                               #
+# author: Cole Schlesinger (cschlesi@cs.princeton.edu)                         #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -145,7 +146,8 @@ class Rule(object):
         return str(self)
 
     def __eq__(self, other):
-        return self.match == other.match and self.actions == other.actions
+        return (id(self) == id(other) or 
+                self.match == other.match and self.actions == other.actions)
 
 
 class Classifier(object):
@@ -304,38 +306,6 @@ class Classifier(object):
         rv = Classifier(new_rules)
         return rv.optimize()
 
-#     # Helper function for rshift.
-#     def _compile_rule_rule(self, r1, r2):
-#         assert(len(r1.actions) == 1)
-#         act = r1.actions[0]
-#         act = act.simplify()
-#         pkts = r2.match
-#         m = _invert_action(act, pkts)
-#         # TODO: this is broken atm.
-#         alist = _sequence_actions(r1.actions, r2.actions)
-#         return Rule(m, alist)
-# 
-#     # Helper function for rshift.
-#     def _compile_tinyrule_classifier(self, r1, c2):
-#         assert(len(r1.actions) == 1)
-#         rules = [_compile_rule_rule(r1, r2) for r2 in c2.rules]
-#         c = Classifier()
-#         c.rules = filter(lambda r: r.match != none, rules)
-#         return c
-# 
-#     # Helper function for rshift.
-#     def _compile_rule_classifier(self, r1, c2):
-#         rules = [Rule(r1.match, [act]) for act in r1.actions]
-#         cs = [_compile_tinyrule_classifier(r, c2) for r in rules]
-#         return reduce(lambda acc, c: acc + c, cs)
-# 
-#     def __rshift__(self,c2):
-#         c = Classifier()
-#         for r1 in self.rules:
-#             c.rules = c.rules + _compile_rule_classifier(r1, c2).rules
-#         c.rules.append(Rule(match(), [drop]))
-#         return c.optimize()
-
     def optimize(self):
         return self.remove_shadowed_cover_single()
 
@@ -464,7 +434,7 @@ class match(PrimitivePolicy,Filter):
     def __eq__(self, other):
         try:
             return self.map == other.map
-        except:
+        except AttributeError:
             return False
 
     def covers(self,other):
@@ -598,6 +568,12 @@ class CombinatorPolicy(StaticPolicy):
 
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
+
+    def __eq__(self, other):
+        try:
+            return id(self) == id(other) or self.policies == other.policies
+        except AttributeError:
+            return False
 
 
 class negate(CombinatorPolicy,Filter):
@@ -789,6 +765,12 @@ class difference(DerivedPolicy,Filter):
     def __repr__(self):
         return "difference:\n%s" % util.repr_plus([self.f1,self.f2])
 
+    def __eq__(self, other):
+        try:
+            return id(self) == id(other) or self.f1 == other.f1 and self.f2 == other.f2
+        except AttributeError:
+            return False
+
 
 class match_modify(DerivedPolicy):
     def __init__(self, field, match_val, mod_val):
@@ -830,6 +812,15 @@ class if_(DerivedPolicy):
                                                util.repr_plus([self.t_branch]),
                                                util.repr_plus([self.f_branch]))
 
+    def __eq__(self, other):
+        try:
+            return id(self) == id(other) or (
+              self.pred == other.pred and
+              self.t_branch == other.t_branch and
+              self.f_branch == other.f_branch)
+        except AttributeError:
+            return False
+
 
 class fwd(DerivedPolicy):
     """fwd(port) is equivalent to pushing port onto the top of the outport
@@ -842,6 +833,12 @@ class fwd(DerivedPolicy):
 
     def __repr__(self):
         return "fwd %s" % self.outport
+
+    def __eq__(self, other):
+        try:
+            return self.outport == other.outport
+        except AttributeError:
+            return False
 
 
 class xfwd(DerivedPolicy):

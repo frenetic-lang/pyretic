@@ -99,6 +99,14 @@ def test_sequencing_fwd_drop():
     print c3
     assert c3.rules == [Rule(match(), [drop])]
 
+def test_sequencing_fwd_fwd():
+    c1 = Classifier([Rule(match(), [fwd(1)])])
+    c2 = Classifier([Rule(match(), [fwd(2)])])
+    c3 = c1 >> c2
+    print c3
+    assert c3.rules == [Rule(match(), [fwd(2)])]
+
+
 
 # Optimization
 
