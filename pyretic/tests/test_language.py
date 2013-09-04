@@ -32,6 +32,8 @@
 from pyretic.core.language import *
 from pyretic.lib.std import *
 
+import pytest
+
 ### Equality tests ###
 
 def test_list_equality_1():
@@ -57,10 +59,10 @@ def test_parallel_equality_2():
 
 ### Match tests ###
 
-def test_covers_self_1():
+def test_covers_1():
     assert identity.covers(identity)
 
-def test_covers_self_2():
+def test_covers_2():
     assert match(dstip='10.0.0.1').covers(match(dstip='10.0.0.1'))
 
 
@@ -185,26 +187,124 @@ def test_empty_parallel_composition():
 
 # Compilation
 
-def test_bug_1():
-    mac1 = EthAddr('00:00:00:00:00:01')
-    mac2 = EthAddr('00:00:00:00:00:02')
-    macB = EthAddr('FF:FF:FF:FF:FF:FF')
-    ip1 = IPAddr('10.0.0.1')
-    ip2 = IPAddr('10.0.0.2')
-    p = IPAddr('10.0.0.11')
+# Bug 1
 
-    mod = if_(match(srcip=ip1),
-              modify(srcip=p),
-              if_(match(dstip=p),
-                  modify(dstip=ip1)))
-    route = ( ((match(dstmac=mac1) | match(dstmac=macB)) >> fwd(1)) +
-              ((match(dstmac=mac2) | match(dstmac=macB)) >> fwd(2)) )
+class TestBug1:
 
-    policy = mod >> route
-    classifier = policy.compile()
-    pkt = Packet({'srcmac':mac1, 'dstmac':macB, 'srcip':ip1, 'ethtype':ARP_TYPE})
+    class TestEnv:
+        def __init__(self):
+            self.mac1 = EthAddr('00:00:00:00:00:01')
+            self.mac2 = EthAddr('00:00:00:00:00:02')
+            self.macB = EthAddr('FF:FF:FF:FF:FF:FF')
+            self.ip1 = IPAddr('10.0.0.1')
+            self.ip2 = IPAddr('10.0.0.2')
+            self.p = IPAddr('10.0.0.11')
 
-    assert policy.eval(pkt) == classifier.eval(pkt)
+            self.mod = if_(match(srcip=self.ip1),
+                      modify(srcip=self.p),
+                      if_(match(dstip=self.p),
+                          modify(dstip=self.ip1)))
+            self.route = (
+              ((match(dstmac=self.mac1) | match(dstmac=self.macB)) >> fwd(1)) +
+              ((match(dstmac=self.mac2) | match(dstmac=self.macB)) >> fwd(2)) )
+
+            self.policy = self.mod >> self.route
+            self.classifier = self.policy.compile()
+
+    @pytest.fixture
+    def e(self):
+        return self.TestEnv()
+
+    # ARP request from h1.
+    def test_bug_1(self, e):
+        pkt = Packet({'srcmac':e.mac1,
+                      'dstmac':e.macB,
+                      'srcip':e.ip1,
+                      'ethtype':ARP_TYPE})
+
+        assert_out_pkts = set([
+          Packet({'srcmac':e.mac1,
+                  'dstmac':e.macB,
+                  'srcip':e.p,
+                  'ethtype':ARP_TYPE,
+                  'outport':1}),
+          Packet({'srcmac':e.mac1,
+                  'dstmac':e.macB,
+                  'srcip':e.p,
+                  'ethtype':ARP_TYPE,
+                  'outport':2})
+          ])
+        pol_out = e.policy.eval(pkt)
+        class_out = e.classifier.eval(pkt)
+
+        assert pol_out == class_out
+        assert pol_out == assert_out_pkts
+
+    # ARP response from h2 to h1.
+    def test_bug_2(self, e):
+        pkt = Packet({'srcmac':e.mac2,
+                      'dstmac':e.mac1,
+                      'srcip':e.ip2,
+                      'dstip':e.p,
+                      'ethtype':ARP_TYPE})
+
+        assert_out_pkts = set([
+          Packet({'srcmac':e.mac2,
+                  'dstmac':e.mac1,
+                  'srcip':e.ip2,
+                  'dstip':e.ip1,
+                  'ethtype':ARP_TYPE,
+                  'outport':1})
+          ])
+        pol_out = e.policy.eval(pkt)
+        class_out = e.classifier.eval(pkt)
+
+        assert pol_out == class_out
+        assert pol_out == assert_out_pkts
+
+    # Ping from h1 to h2.
+    def test_bug_3(self, e):
+        pkt = Packet({'srcmac':e.mac1,
+                      'dstmac':e.mac2,
+                      'srcip':e.ip1,
+                      'dstip':e.ip2,
+                      'ethtype':IP_TYPE})
+
+        assert_out_pkts = set([
+          Packet({'srcmac':e.mac1,
+                  'dstmac':e.mac2,
+                  'srcip':e.p,
+                  'dstip':e.ip2,
+                  'ethtype':IP_TYPE,
+                  'outport':2})
+          ])
+        pol_out = e.policy.eval(pkt)
+        class_out = e.classifier.eval(pkt)
+
+        assert pol_out == class_out
+        assert pol_out == assert_out_pkts
+
+    # Ping from h2 to h1.
+    def test_bug_4(self, e):
+        pkt = Packet({'srcmac':e.mac2,
+                      'dstmac':e.mac1,
+                      'srcip':e.ip2,
+                      'dstip':e.p,
+                      'ethtype':IP_TYPE})
+
+        assert_out_pkts = set([
+          Packet({'srcmac':e.mac2,
+                  'dstmac':e.mac1,
+                  'srcip':e.ip2,
+                  'dstip':e.ip1,
+                  'ethtype':IP_TYPE,
+                  'outport':1})
+          ])
+        pol_out = e.policy.eval(pkt)
+        class_out = e.classifier.eval(pkt)
+
+        assert pol_out == class_out
+        assert pol_out == assert_out_pkts
 
 
 # Optimization

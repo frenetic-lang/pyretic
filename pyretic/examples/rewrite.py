@@ -60,7 +60,7 @@ l3route = ((match(dstip=ip1) >> fwd(1)) +
            (match(dstip=ip2) >> fwd(2)) +
            (match(dstip=ip3) >> fwd(3)) )
 
-policy = modify >> l2route
+policy = modify >> (l2route + l3route)
 
 def main():
     return policy

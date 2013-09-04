@@ -223,6 +223,9 @@ class identity(Filter):
     def covers(self, other):
         return True
 
+    def eval(self, pkt):
+        return {pkt}
+
 passthrough = identity   # Imperative alias
 true = identity          # Logic alias
 all_packets = identity   # Matching alias
@@ -241,6 +244,9 @@ class drop(Filter):
 
     def covers(self, other):
         return False
+
+    def eval(self, pkt):
+        return set()
 
 none = drop
 false = drop             # Logic alias
