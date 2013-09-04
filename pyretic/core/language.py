@@ -59,11 +59,11 @@ class Policy(object):
     def __init__(self):
         self._network = None
         self._classifier = None
-        
+
     @property
     def network(self):
         return self._network
-        
+
     def set_network(self, network):
         self._network = network
 
@@ -73,7 +73,7 @@ class Policy(object):
             return parallel([self] + pol.policies)
         else:
             return parallel([self, pol])
-        
+
     ### rshift : Policy -> Policy
     def __rshift__(self, other):
         if isinstance(other,sequential):
@@ -85,8 +85,8 @@ class Policy(object):
     def __eq__(self, other):
         '''Structural equality.'''
         return (
-          id(self) == id(other) 
-          or (isinstance(other, self.__class__) 
+          id(self) == id(other)
+          or (isinstance(other, self.__class__)
              and self.__dict__ == other.__dict__))
 
     ### ne : Policy -> bool
@@ -134,7 +134,7 @@ class Filter(Policy):
             return difference([self, pol])
         else:
             raise TypeError
-    
+
     ### invert : unit -> Filter
     def __invert__(self):
         return negate([self])
@@ -212,7 +212,7 @@ class modify(Policy):
     def __init__(self, *args, **kwargs):
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
-            reduce(lambda acc, f: 
+            reduce(lambda acc, f:
                    acc and (f in compilable_headers),
                    self.map.keys(),
                    True)
@@ -247,11 +247,11 @@ class Query(Policy):
 @singleton
 class Controller(Query):
     def __repr__(self):
-        return "Controller"    
+        return "Controller"
 
 
 class FwdBucket(Query):
-    """Abstract class representing a data structure 
+    """Abstract class representing a data structure
     into which packets (conceptually) go and with which callbacks can register.
     """
     ### init : unit -> unit
@@ -269,7 +269,7 @@ class FwdBucket(Query):
         self._classifier = Classifier([r])
         return self._classifier
 
-    ### register_callback : (Packet -> X) -> unit 
+    ### register_callback : (Packet -> X) -> unit
     def register_callback(self, fn):
         self.callbacks.append(fn)
 
@@ -280,7 +280,7 @@ class FwdBucket(Query):
 
 class CombinatorPolicy(Policy):
     """Abstract class for policy combinators.
-    A policy combinator takes one or more policies and produces a new 
+    A policy combinator takes one or more policies and produces a new
     policy with the specified semantics."""
     ### init : List Policy -> unit
     def __init__(self, policies=[]):
@@ -290,7 +290,7 @@ class CombinatorPolicy(Policy):
     def set_network(self, network):
         super(CombinatorPolicy,self).set_network(network)
         for policy in self.policies:
-            policy.set_network(network) 
+            policy.set_network(network)
 
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
@@ -323,7 +323,7 @@ class negate(CombinatorPolicy,Filter):
                 self._classifier.rules.append(Rule(r.match,[modify()]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
-        return self._classifier 
+        return self._classifier
 
 
 class parallel(CombinatorPolicy):
@@ -356,19 +356,19 @@ class parallel(CombinatorPolicy):
         classifiers = map(lambda p: p.compile(), self.policies)
         self._classifier = reduce(lambda acc, c: acc + c, classifiers)
         return self._classifier
-  
+
 none = parallel([])
 drop = none              # Imperative alias
 false = none             # Logic alias
 no_packets = none        # Matching alias
-          
+
 
 class union(parallel,Filter):
     pass
 
 
 class sequential(CombinatorPolicy):
-    """sequential(policies) evaluates the set union of each policy in policies 
+    """sequential(policies) evaluates the set union of each policy in policies
     on each packet in the output of previous policy."""
     def __rshift__(self, pol):
         if isinstance(pol,sequential):
@@ -458,7 +458,7 @@ class dropped_by(CombinatorPolicy,Filter):
 ################################################################################
 # Derived Policies                                                             #
 ################################################################################
-        
+
 class DerivedPolicy(Policy):
     """Abstract class for policies derived from other policies."""
     def __init__(self, policy=passthrough):
@@ -466,8 +466,8 @@ class DerivedPolicy(Policy):
         super(DerivedPolicy,self).__init__()
 
     def set_network(self, network):
-        super(DerivedPolicy,self).set_network(network)            
-        self.policy.set_network(network) 
+        super(DerivedPolicy,self).set_network(network)
+        self.policy.set_network(network)
 
     def eval(self, pkt):
         return self.policy.eval(pkt)
@@ -503,7 +503,7 @@ class match_modify(DerivedPolicy):
         self.mod_val = mod_val
         super(match_modify,self).__init__(match(field=match_val) >>
                                           modify(field=mod_val))
-        
+
 class if_(DerivedPolicy):
     """if predicate holds, t_branch, otherwise f_branch."""
     ### init : Policy -> Policy -> Policy -> unit
@@ -511,7 +511,7 @@ class if_(DerivedPolicy):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
-        super(if_,self).__init__((self.pred >> self.t_branch) + 
+        super(if_,self).__init__((self.pred >> self.t_branch) +
                                  ((~self.pred) >> self.f_branch))
 
     def eval(self, pkt):
@@ -539,8 +539,8 @@ class if_(DerivedPolicy):
 
 class fwd(DerivedPolicy):
     """fwd(port) is equivalent to pushing port onto the top of the outport
-    stack, unless the topmost outport stack value is placeholder -1 
-    (in which case we first pop, then push).""" 
+    stack, unless the topmost outport stack value is placeholder -1
+    (in which case we first pop, then push)."""
     ### init : int -> unit
     def __init__(self, outport):
         self.outport = outport
@@ -554,7 +554,7 @@ class xfwd(DerivedPolicy):
     """xfwd(outport) is equivalent to fwd(outport), except when inport=outport.
     (The same semantics as OpenFlow's fwd action)"""
     def __init__(self, outport):
-        self.outport = outport    
+        self.outport = outport
         super(xfwd,self).__init__((~match(inport=outport)) >> fwd(outport))
 
     def __repr__(self):
@@ -599,13 +599,13 @@ class DynamicPolicy(DerivedPolicy):
     @property
     def policy(self):
         return self._policy
-        
+
     @policy.setter
     def policy(self, policy):
         prev_policy = self._policy
         self._policy = policy
         if self.network:
-            if (not self._policy.network or 
+            if (not self._policy.network or
                 (self.network.topology != self._policy.network.topology)):
                 self._policy.set_network(self.network)
         self.changed(self,prev_policy,policy)
@@ -617,17 +617,17 @@ class DynamicPolicy(DerivedPolicy):
 class DynamicFilter(DynamicPolicy,Filter):
     pass
 
-        
+
 class flood(DynamicPolicy):
-    """Policy that floods packets on a minimum spanning tree, recalculated 
+    """Policy that floods packets on a minimum spanning tree, recalculated
     every time the network is updated (set_network)."""
     def __init__(self):
         self.mst = None
         super(flood,self).__init__()
-        
+
     def set_network(self, network):
         changed = False
-        super(flood,self).set_network(network) 
+        super(flood,self).set_network(network)
         if not network is None:
             updated_mst = Topology.minimum_spanning_tree(network.topology)
             if not self.mst is None:
@@ -644,7 +644,7 @@ class flood(DynamicPolicy):
                     for switch,attrs in self.mst.nodes(data=True)])
 
     def __repr__(self):
-        try: 
+        try:
             return "flood on:\n%s" % self.mst
         except:
             return "flood"
@@ -663,27 +663,27 @@ class ingress_network(DynamicFilter):
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
             self.policy = parallel([match(switch=l.switch,
-                                       inport=l.port_no) 
+                                       inport=l.port_no)
                                  for l in self.egresses])
 
     def __repr__(self):
         return "ingress_network"
 
-        
+
 class egress_network(DynamicFilter):
     """Returns True if a packet is located at a (switch,outport) pair leaving
     the network, False otherwise."""
     def __init__(self):
         self.egresses = None
         super(egress_network,self).__init__()
-    
+
     def set_network(self, network):
         super(egress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
             self.policy = parallel([match(switch=l.switch,
-                                       outport=l.port_no) 
+                                       outport=l.port_no)
                                  for l in self.egresses])
 
     def __repr__(self):
@@ -693,7 +693,7 @@ class egress_network(DynamicFilter):
 ###############################################################################
 # Classifiers
 # an intermediate representation for proactive compilation.
-    
+
 class Rule(object):
     '''A rule contains a filter and the parallel composition of zero or more
     Pyretic actions.'''
@@ -886,9 +886,9 @@ class Classifier(object):
         # Eliminate every rule exactly matched by some higher priority rule
         opt_c = Classifier([])
         for r in self.rules:
-            if not reduce(lambda acc, new_r: acc or 
-                          new_r.match == r.match, 
-                          opt_c.rules, 
+            if not reduce(lambda acc, new_r: acc or
+                          new_r.match == r.match,
+                          opt_c.rules,
                           False):
                 opt_c.rules.append(r)
         return opt_c
@@ -897,9 +897,9 @@ class Classifier(object):
         # Eliminate every rule completely covered by some higher priority rule
         opt_c = Classifier([])
         for r in self.rules:
-            if not reduce(lambda acc, new_r: acc or 
-                          new_r.match.covers(r.match), 
-                          opt_c.rules, 
+            if not reduce(lambda acc, new_r: acc or
+                          new_r.match.covers(r.match),
+                          opt_c.rules,
                           False):
                 opt_c.rules.append(r)
         return opt_c
@@ -924,7 +924,7 @@ class EvalTrace(object):
             if trace.contains_class(cls):
                 return True
         return False
-            
+
     def __repr__(self):
         if self.traces:
             return self.ne.name() + '[' + ']['.join(map(repr,self.traces))+']'
