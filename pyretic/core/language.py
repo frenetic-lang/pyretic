@@ -281,19 +281,13 @@ class modify(Policy):
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
 
-
-# FIXME: Srinivas =).
-class Query(Policy):
-    pass
-
-
 @singleton
-class Controller(Query):
+class Controller(Policy):
     def __repr__(self):
         return "Controller"
 
-
-class FwdBucket(Query):
+# FIXME: Srinivas =).
+class Query(Policy):
     """Abstract class representing a data structure
     into which packets (conceptually) go and with which callbacks can register.
     """
@@ -308,14 +302,32 @@ class FwdBucket(Query):
         return set()
 
     def compile(self):
-        r = Rule(identity,[Controller])
-        self._classifier = Classifier([r])
-        return self._classifier
+        raise NotImplementedError
 
     ### register_callback : (Packet -> X) -> unit
     def register_callback(self, fn):
         self.callbacks.append(fn)
 
+
+class FwdBucket(Query):
+    """Class for registering callbacks on individual packets sent to
+    the controller.
+    """
+    def compile(self):
+        r = Rule(identity,[Controller])
+        self._classifier = Classifier([r])
+        return self._classifier
+
+
+class CountBucket(Query):
+    """Class for registering callbacks on counts of packets sent to
+    the controller.
+    """
+    def compile(self):
+        r = Rule(identity,[self])
+        self._classifier = Classifier([r])
+        return self._classifier
+        
 
 ################################################################################
 # Combinator Policies                                                          #
