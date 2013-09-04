@@ -357,6 +357,16 @@ class Runtime(object):
                                    filter(lambda a: a != drop,rule.actions))
                               for rule in classifier.rules)
 
+        def send_drops_to_controller(classifier):
+            def replace_empty_with_controller(actions):
+                if len(actions) == 0:
+                    return [Controller]
+                else:
+                    return actions
+            return Classifier(Rule(rule.match,
+                                   replace_empty_with_controller(rule.actions))
+                              for rule in classifier.rules)
+                
         def controllerify(classifier):
             def controllerify_rule(rule):
                 if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
@@ -391,6 +401,7 @@ class Runtime(object):
                 self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
 
             classifier = remove_drop(classifier)
+            #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
             classifier = layer_3_specialize(classifier)
 
