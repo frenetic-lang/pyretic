@@ -194,6 +194,14 @@ class Packet(object):
 
     def available_fields(self):
         return self.header.keys()
+
+    def __eq__(self, other):
+        return ( id(self) == id(other)
+                 or ( isinstance(other, self.__class__)
+                      and self.header == other.header ) )
+
+    def __ne__(self, other):
+        return not (self == other)
                             
     def modifymany(self, d):
         add = {}

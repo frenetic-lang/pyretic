@@ -185,26 +185,26 @@ def test_empty_parallel_composition():
 
 # Compilation
 
-# def test_bug_1():
-#     mac1 = EthAddr('00:00:00:00:00:01')
-#     mac2 = EthAddr('00:00:00:00:00:02')
-#     macB = EthAddr('FF:FF:FF:FF:FF:FF')
-#     ip1 = IPAddr('10.0.0.1')
-#     ip2 = IPAddr('10.0.0.2')
-#     p = IPAddr('10.0.0.11')
-# 
-#     mod = if_(match(srcip=ip1),
-#               modify(srcip=p),
-#               if_(match(dstip=p),
-#                   modify(dstip=ip1)))
-#     route = ( ((match(dstmac=mac1) | match(dstmac=macB)) >> fwd(1)) +
-#               ((match(dstmac=mac2) | match(dstmac=macB)) >> fwd(2)) )
-# 
-#     policy = mod >> route
-#     classifier = policy.compile()
-#     pkt = Packet(srcmac=mac1, dstmac=macB, srcip=ip1, ethtype=ARP_TYPE)
-# 
-#     assert policy.eval(pkt) == classifier.eval(pkt)
+def test_bug_1():
+    mac1 = EthAddr('00:00:00:00:00:01')
+    mac2 = EthAddr('00:00:00:00:00:02')
+    macB = EthAddr('FF:FF:FF:FF:FF:FF')
+    ip1 = IPAddr('10.0.0.1')
+    ip2 = IPAddr('10.0.0.2')
+    p = IPAddr('10.0.0.11')
+
+    mod = if_(match(srcip=ip1),
+              modify(srcip=p),
+              if_(match(dstip=p),
+                  modify(dstip=ip1)))
+    route = ( ((match(dstmac=mac1) | match(dstmac=macB)) >> fwd(1)) +
+              ((match(dstmac=mac2) | match(dstmac=macB)) >> fwd(2)) )
+
+    policy = mod >> route
+    classifier = policy.compile()
+    pkt = Packet({'srcmac':mac1, 'dstmac':macB, 'srcip':ip1, 'ethtype':ARP_TYPE})
+
+    assert policy.eval(pkt) == classifier.eval(pkt)
 
 
 # Optimization
