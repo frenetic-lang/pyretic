@@ -32,6 +32,14 @@
 from pyretic.core.language import *
 from pyretic.lib.std import (ARP_TYPE, IP_TYPE)
 
+### Equality tests ###
+def test_list_equality_1():
+    assert [match(switch=1),match(dstip='10.0.0.1')] == [match(switch=1),match(dstip='10.0.0.1')]
+
+def test_list_equality_2():
+    assert [match(switch=1),match(dstip='10.0.0.1')] != [match(dstip='10.0.0.1'),match(switch=1)]
+
+
 ### Match tests ###
 
 def test_covers_self_1():
