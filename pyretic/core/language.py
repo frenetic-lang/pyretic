@@ -145,11 +145,17 @@ class match(Filter):
     """A set of field matches on a packet (one per field)."""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
+        if len(args) == 0 and len(kwargs) == 0:
+            raise TypeError
         self.map = util.frozendict(dict(*args, **kwargs))
         super(match,self).__init__()
 
     def intersect(self, pol):
-        if not isinstance(pol,match):
+        if pol == true:
+            return self
+        elif pol == false:
+            return false
+        elif not isinstance(pol,match):
             raise TypeError
         fs1 = set(self.map.keys())
         fs2 = set(pol.map.keys())
@@ -172,6 +178,10 @@ class match(Filter):
 
     def covers(self,other):
         # if self is specific on any field that other lacks
+        if other == true:
+            return True
+        elif other == false:
+            return False
         if set(self.map.keys()) - set(other.map.keys()):
             return False
         for (f,v) in self.map.items():
@@ -191,25 +201,58 @@ class match(Filter):
         return {pkt}
 
     def compile(self):
-        r1 = Rule(self,[modify()])
-        r2 = Rule(match(),[drop])
+        r1 = Rule(self,[identity])
+        r2 = Rule(true,[drop])
         self._classifier = Classifier([r1, r2])
         return self._classifier
 
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
 
-    def simplify(self):
-        if len(self.map):
-            return self
-        else:
-            return identity
+@singleton
+class identity(Filter):
+    def __repr__(self):
+        return "identity"
+
+    def compile(self):
+        return Classifier([Rule(identity, [identity])])
+
+    def intersect(self, other):
+        return other
+
+    def covers(self, other):
+        return True
+
+passthrough = identity   # Imperative alias
+true = identity          # Logic alias
+all_packets = identity   # Matching alias
+
+
+@singleton
+class drop(Filter):
+    def __repr__(self):
+        return "drop"
+
+    def compile(self):
+        return Classifier([Rule(identity, [drop])])
+
+    def intersect(self, other):
+        return self
+
+    def covers(self, other):
+        return False
+
+none = drop
+false = drop             # Logic alias
+no_packets = drop        # Matching alias
 
 
 class modify(Policy):
     """modify(field=value)"""
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
+        if len(args) == 0 and len(kwargs) == 0:
+            raise TypeError
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
             reduce(lambda acc, f:
@@ -223,20 +266,14 @@ class modify(Policy):
 
     def compile(self):
         if self.has_virtual_headers:
-            r = Rule(match(),[Controller])
+            r = Rule(identity,[Controller])
         else:
-            r = Rule(match(),[self])
+            r = Rule(identity,[self])
         self._classifier = Classifier([r])
         return self._classifier
 
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
-
-    def simplify(self):
-        if len(self.map):
-            return self
-        else:
-            return identity
 
 
 # FIXME: Srinivas =).
@@ -265,7 +302,7 @@ class FwdBucket(Query):
         return set()
 
     def compile(self):
-        r = Rule(match(),[Controller])
+        r = Rule(identity,[Controller])
         self._classifier = Classifier([r])
         return self._classifier
 
@@ -316,11 +353,11 @@ class negate(CombinatorPolicy,Filter):
         inner_classifier = self.policies[0].compile()
         self._classifier = Classifier([])
         for r in inner_classifier.rules:
-            action = r.actions[0].simplify()
+            action = r.actions[0]
             if action == identity:
                 self._classifier.rules.append(Rule(r.match,[drop]))
             elif action == drop:
-                self._classifier.rules.append(Rule(r.match,[modify()]))
+                self._classifier.rules.append(Rule(r.match,[identity]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return self._classifier
@@ -329,6 +366,11 @@ class negate(CombinatorPolicy,Filter):
 class parallel(CombinatorPolicy):
     """parallel(policies) evaluates to the set union of the evaluation
     of each policy in policies."""
+    def __init__(self, policies):
+        if len(policies) == 0:
+            raise TypeError
+        super(parallel, self).__init__(policies)
+
     def __add__(self, pol):
         if isinstance(pol,parallel):
             return parallel(self.policies + pol.policies)
@@ -357,11 +399,6 @@ class parallel(CombinatorPolicy):
         self._classifier = reduce(lambda acc, c: acc + c, classifiers)
         return self._classifier
 
-none = parallel([])
-drop = none              # Imperative alias
-false = none             # Logic alias
-no_packets = none        # Matching alias
-
 
 class union(parallel,Filter):
     pass
@@ -370,6 +407,11 @@ class union(parallel,Filter):
 class sequential(CombinatorPolicy):
     """sequential(policies) evaluates the set union of each policy in policies
     on each packet in the output of previous policy."""
+    def __init__(self, policies):
+        if len(policies) == 0:
+            raise TypeError
+        super(sequential, self).__init__(policies)
+
     def __rshift__(self, pol):
         if isinstance(pol,sequential):
             return sequential(self.policies + pol.policies)
@@ -420,11 +462,6 @@ class sequential(CombinatorPolicy):
             assert(c is not None)
         return reduce(lambda acc, c: acc >> c, classifiers)
 
-identity = sequential([])
-passthrough = identity   # Imperative alias
-true = identity          # Logic alias
-all_packets = identity   # Matching alias
-
 
 class intersection(sequential,Filter):
     pass
@@ -450,7 +487,7 @@ class dropped_by(CombinatorPolicy,Filter):
             return ({pkt},eval_trace)
 
     def compile(self):
-        r = Rule(match(),[Controller])
+        r = Rule(identity,[Controller])
         self._classifier = Classifier([r])
         return self._classifier
 
@@ -721,6 +758,18 @@ class Rule(object):
         '''Structural inequality.'''
         return not (self == other)
 
+    def eval(self, in_pkt):
+        '''If this rule matches the packet, then return the union of the sets
+        of packets produced by the actions.  Otherwise, return None.'''
+        filtered_pkt = self.match.eval(in_pkt)
+        if len(filtered_pkt) == 0:
+            return None
+        rv = set()
+        for pkt in filtered_pkt:
+            for act in self.actions:
+                rv |= act.eval(pkt)
+        return rv
+
 
 class Classifier(object):
     '''A classifier contains a list of rules, where the order of the list implies
@@ -774,6 +823,8 @@ class Classifier(object):
     # Helper function for rshift: given a set of packets pkts (denoted by a match)
     # and an action act, return the set of packets pkts' such that
     # sym_eval(act, pkts') == pkts.
+    # TODO (cole): not quite true, since there does not exist a pkts' such that
+    # sym_eval(modify(outport=1), pkts') == true
     def _invert_action(self, act, pkts):
         while isinstance(act, DerivedPolicy):
             act = act.policy
@@ -783,6 +834,10 @@ class Classifier(object):
             return false
         elif isinstance(act, modify):
             new_match_dict = {}
+            if pkts == true:
+                return true
+            elif pkts == false:
+                return false
             for f, v in pkts.map.iteritems():
                 if f in act.map and act.map[f] == v:
                     continue
@@ -790,7 +845,9 @@ class Classifier(object):
                     return false
                 else:
                     new_match_dict[f] = v
-            return match(**new_match_dict).simplify()
+            if len(new_match_dict) == 0:
+                return true
+            return match(**new_match_dict)
         else:
             # TODO (cole) use compile error.
             # TODO (cole) what actions are allowable?
@@ -838,12 +895,12 @@ class Classifier(object):
         # rules.
         # TODO (cole): remove recursion?
         if len(c.rules) == 0:
-            return Classifier([Rule(match(), [drop])])
+            return Classifier([Rule(identity, [drop])])
         pkts = c.rules[0].match
         pkts2 = self._invert_action(act, pkts)
         if pkts2 == true:
             acts = self._sequence_actions(act, c.rules[0].actions)
-            return Classifier([Rule(match(), acts)])
+            return Classifier([Rule(identity, acts)])
         elif pkts2 == false:
             c2 = Classifier(c.rules[1:])
             return self._sequence_action_classifier(act, c2)
@@ -855,7 +912,7 @@ class Classifier(object):
             return c3
 
     def _sequence_actions_classifier(self, acts, c):
-        empty_classifier = Classifier([Rule(match(), [drop])])
+        empty_classifier = Classifier([Rule(identity, [drop])])
         if acts == []:
             # Treat the empty list of actions as drop.
             return empty_classifier
@@ -903,6 +960,16 @@ class Classifier(object):
                           False):
                 opt_c.rules.append(r)
         return opt_c
+
+    def eval(self, in_pkt):
+        '''Evaluate against each rule in the classifier, starting with the
+        highest priority.  Return the set of packets resulting from applying
+        the actions of the first rule that matches.'''
+        for rule in self.rules:
+            pkts = rule.eval(in_pkt)
+            if pkts is not None:
+                return pkts
+        raise TypeError('Classifier is not total.')
 
 
 ###############################################################################

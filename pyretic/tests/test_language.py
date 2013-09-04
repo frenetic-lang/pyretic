@@ -30,7 +30,7 @@
 ################################################################################
 
 from pyretic.core.language import *
-from pyretic.lib.std import (ARP_TYPE, IP_TYPE)
+from pyretic.lib.std import *
 
 ### Equality tests ###
 
@@ -40,20 +40,11 @@ def test_list_equality_1():
 def test_list_equality_2():
     assert [match(switch=1),match(dstip='10.0.0.1')] != [match(dstip='10.0.0.1'),match(switch=1)]
 
-def test_drop_equality():
-    assert drop == parallel()
-
-def test_identity_equality():
-    assert identity == sequential()
-
 def test_modify_equality_1():
     assert modify(outport=1) == modify(outport=1)
 
 def test_modify_equality_2():
     assert modify(outport=1, srcip='10.0.0.1') == modify(outport=1, srcip='10.0.0.1')
-
-def test_parallel_equality_0():
-    assert parallel() == parallel()
 
 def test_parallel_equality_1():
     assert parallel([modify(outport=1)]) == parallel([modify(outport=1)])
@@ -67,7 +58,7 @@ def test_parallel_equality_2():
 ### Match tests ###
 
 def test_covers_self_1():
-    assert match().covers(match())
+    assert identity.covers(identity)
 
 def test_covers_self_2():
     assert match(dstip='10.0.0.1').covers(match(dstip='10.0.0.1'))
@@ -82,16 +73,23 @@ def test_empty_initialization():
     assert c.rules == []
 
 def test_single_initialization():
-    c = Classifier([Rule(match(), [drop])])
-    assert c.rules == [Rule(match(), [drop])]
+    c = Classifier([Rule(identity, [drop])])
+    assert c.rules == [Rule(identity, [drop])]
 
 def test_repeat_initialization():
-    c1 = Classifier([Rule(match(), [drop])])
-    c2 = Classifier([Rule(match(), [drop])])
-    assert c2.rules == [Rule(match(), [drop])]
+    c1 = Classifier([Rule(identity, [drop])])
+    c2 = Classifier([Rule(identity, [drop])])
+    assert c2.rules == [Rule(identity, [drop])]
 
 
 # Sequencing
+
+def test_empty_sequential_composition():
+    try:
+        sequential()
+        assert False
+    except TypeError:
+        pass
 
 def test_invert_action_true():
     act = modify(srcip='10.0.0.1')
@@ -118,71 +116,102 @@ def test_invert_action_incomparable():
     assert m3 == match(dstip='10.0.0.2')
 
 def test_sequencing_drop_fwd():
-    c1 = Classifier([Rule(match(), [drop])])
-    c2 = Classifier([Rule(match(), [modify(outport=1)])])
+    c1 = Classifier([Rule(identity, [drop])])
+    c2 = Classifier([Rule(identity, [modify(outport=1)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [drop])]
+    assert c3.rules == [Rule(identity, [drop])]
 
 def test_sequencing_fwd_drop():
-    c1 = Classifier([Rule(match(), [drop])])
-    c2 = Classifier([Rule(match(), [modify(outport=1)])])
+    c1 = Classifier([Rule(identity, [drop])])
+    c2 = Classifier([Rule(identity, [modify(outport=1)])])
     c3 = c2 >> c1
     print c3
-    assert c3.rules == [Rule(match(), [drop])]
+    assert c3.rules == [Rule(identity, [drop])]
 
 def test_sequencing_fwd_fwd():
-    c1 = Classifier([Rule(match(), [modify(outport=1)])])
-    c2 = Classifier([Rule(match(), [modify(outport=2)])])
+    c1 = Classifier([Rule(identity, [modify(outport=1)])])
+    c2 = Classifier([Rule(identity, [modify(outport=2)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [modify(outport=2)])]
+    assert c3.rules == [Rule(identity, [modify(outport=2)])]
 
 def test_sequencing_fwd_fwd_shadow():
-    c1 = Classifier([Rule(match(), [modify(outport=1)])])
-    c2 = Classifier([Rule(match(), [modify(outport=2)]), Rule(match(), [modify(outport=3)])])
+    c1 = Classifier([Rule(identity, [modify(outport=1)])])
+    c2 = Classifier([Rule(identity, [modify(outport=2)]), Rule(identity, [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [modify(outport=2)])]
+    assert c3.rules == [Rule(identity, [modify(outport=2)])]
 
 def test_sequencing_fwd_fwd_fwd_1():
-    c1 = Classifier([Rule(match(), [modify(outport=1)])])
-    c2 = Classifier([Rule(match(), [modify(outport=2), modify(outport=3)])])
+    c1 = Classifier([Rule(identity, [modify(outport=1)])])
+    c2 = Classifier([Rule(identity, [modify(outport=2), modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [modify(outport=2), modify(outport=3)])]
+    assert c3.rules == [Rule(identity, [modify(outport=2), modify(outport=3)])]
 
 def test_sequencing_fwd_fwd_fwd_2():
-    c1 = Classifier([Rule(match(), [modify(outport=1), modify(outport=2)])])
-    c2 = Classifier([Rule(match(), [modify(outport=3)])])
+    c1 = Classifier([Rule(identity, [modify(outport=1), modify(outport=2)])])
+    c2 = Classifier([Rule(identity, [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [modify(outport=3), modify(outport=3)])]
+    assert c3.rules == [Rule(identity, [modify(outport=3), modify(outport=3)])]
 
 def test_sequencing_mod_fwd():
-    c1 = Classifier([Rule(match(), [modify(dstip='10.0.0.1', dstport=22)])])
+    c1 = Classifier([Rule(identity, [modify(dstip='10.0.0.1', dstport=22)])])
     c2 = Classifier([Rule(match(dstip='10.0.0.1'), [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [modify(dstip='10.0.0.1', dstport=22, outport=3)])]
+    assert c3.rules == [Rule(identity, [modify(dstip='10.0.0.1', dstport=22, outport=3)])]
 
 def test_sequencing_fwd_mod():
-    c1 = Classifier([Rule(match(), [modify(outport=3)])])
+    c1 = Classifier([Rule(identity, [modify(outport=3)])])
     c2 = Classifier([Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1)])])
     c3 = c1 >> c2
     print c3
     assert c3.rules == [
-        Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1, outport=3)]),
-        Rule(match(), [drop])]
+        Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1, outport=3)])]
+
+# Parallel
+
+def test_empty_parallel_composition():
+    try:
+        parallel()
+        assert False
+    except TypeError:
+        pass
 
 
+
+# Compilation
+
+# def test_bug_1():
+#     mac1 = EthAddr('00:00:00:00:00:01')
+#     mac2 = EthAddr('00:00:00:00:00:02')
+#     macB = EthAddr('FF:FF:FF:FF:FF:FF')
+#     ip1 = IPAddr('10.0.0.1')
+#     ip2 = IPAddr('10.0.0.2')
+#     p = IPAddr('10.0.0.11')
+# 
+#     mod = if_(match(srcip=ip1),
+#               modify(srcip=p),
+#               if_(match(dstip=p),
+#                   modify(dstip=ip1)))
+#     route = ( ((match(dstmac=mac1) | match(dstmac=macB)) >> fwd(1)) +
+#               ((match(dstmac=mac2) | match(dstmac=macB)) >> fwd(2)) )
+# 
+#     policy = mod >> route
+#     classifier = policy.compile()
+#     pkt = Packet(srcmac=mac1, dstmac=macB, srcip=ip1, ethtype=ARP_TYPE)
+# 
+#     assert policy.eval(pkt) == classifier.eval(pkt)
 
 
 # Optimization
 
 def test_remove_shadow_cover_single():
-    c = Classifier([Rule(match(), [drop]), Rule(match(), [drop])])
+    c = Classifier([Rule(identity, [drop]), Rule(identity, [drop])])
     c = c.remove_shadowed_cover_single()
     print c
-    assert c.rules == [Rule(match(), [drop])]
+    assert c.rules == [Rule(identity, [drop])]
 
