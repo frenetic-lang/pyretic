@@ -33,11 +33,35 @@ from pyretic.core.language import *
 from pyretic.lib.std import (ARP_TYPE, IP_TYPE)
 
 ### Equality tests ###
+
 def test_list_equality_1():
     assert [match(switch=1),match(dstip='10.0.0.1')] == [match(switch=1),match(dstip='10.0.0.1')]
 
 def test_list_equality_2():
     assert [match(switch=1),match(dstip='10.0.0.1')] != [match(dstip='10.0.0.1'),match(switch=1)]
+
+def test_drop_equality():
+    assert drop == parallel()
+
+def test_identity_equality():
+    assert identity == sequential()
+
+def test_modify_equality_1():
+    assert modify(outport=1) == modify(outport=1)
+
+def test_modify_equality_2():
+    assert modify(outport=1, srcip='10.0.0.1') == modify(outport=1, srcip='10.0.0.1')
+
+def test_parallel_equality_0():
+    assert parallel() == parallel()
+
+def test_parallel_equality_1():
+    assert parallel([modify(outport=1)]) == parallel([modify(outport=1)])
+
+def test_parallel_equality_2():
+    p1 = parallel([modify(srcip='10.0.0.1'), modify(outport=1)]) 
+    p2 = parallel([modify(srcip='10.0.0.1'), modify(outport=1)])
+    assert p1 == p2
 
 
 ### Match tests ###
@@ -95,55 +119,55 @@ def test_invert_action_incomparable():
 
 def test_sequencing_drop_fwd():
     c1 = Classifier([Rule(match(), [drop])])
-    c2 = Classifier([Rule(match(), [fwd(1)])])
+    c2 = Classifier([Rule(match(), [modify(outport=1)])])
     c3 = c1 >> c2
     print c3
     assert c3.rules == [Rule(match(), [drop])]
 
 def test_sequencing_fwd_drop():
     c1 = Classifier([Rule(match(), [drop])])
-    c2 = Classifier([Rule(match(), [fwd(1)])])
+    c2 = Classifier([Rule(match(), [modify(outport=1)])])
     c3 = c2 >> c1
     print c3
     assert c3.rules == [Rule(match(), [drop])]
 
 def test_sequencing_fwd_fwd():
-    c1 = Classifier([Rule(match(), [fwd(1)])])
-    c2 = Classifier([Rule(match(), [fwd(2)])])
+    c1 = Classifier([Rule(match(), [modify(outport=1)])])
+    c2 = Classifier([Rule(match(), [modify(outport=2)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [fwd(2)])]
+    assert c3.rules == [Rule(match(), [modify(outport=2)])]
 
 def test_sequencing_fwd_fwd_shadow():
-    c1 = Classifier([Rule(match(), [fwd(1)])])
-    c2 = Classifier([Rule(match(), [fwd(2)]), Rule(match(), [fwd(3)])])
+    c1 = Classifier([Rule(match(), [modify(outport=1)])])
+    c2 = Classifier([Rule(match(), [modify(outport=2)]), Rule(match(), [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [fwd(2)])]
+    assert c3.rules == [Rule(match(), [modify(outport=2)])]
 
 def test_sequencing_fwd_fwd_fwd_1():
-    c1 = Classifier([Rule(match(), [fwd(1)])])
-    c2 = Classifier([Rule(match(), [fwd(2), fwd(3)])])
+    c1 = Classifier([Rule(match(), [modify(outport=1)])])
+    c2 = Classifier([Rule(match(), [modify(outport=2), modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [fwd(2), fwd(3)])]
+    assert c3.rules == [Rule(match(), [modify(outport=2), modify(outport=3)])]
 
 def test_sequencing_fwd_fwd_fwd_2():
-    c1 = Classifier([Rule(match(), [fwd(1), fwd(2)])])
-    c2 = Classifier([Rule(match(), [fwd(3)])])
+    c1 = Classifier([Rule(match(), [modify(outport=1), modify(outport=2)])])
+    c2 = Classifier([Rule(match(), [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
-    assert c3.rules == [Rule(match(), [fwd(3), fwd(3)])]
+    assert c3.rules == [Rule(match(), [modify(outport=3), modify(outport=3)])]
 
 def test_sequencing_mod_fwd():
     c1 = Classifier([Rule(match(), [modify(dstip='10.0.0.1', dstport=22)])])
-    c2 = Classifier([Rule(match(dstip='10.0.0.1'), [fwd(3)])])
+    c2 = Classifier([Rule(match(dstip='10.0.0.1'), [modify(outport=3)])])
     c3 = c1 >> c2
     print c3
     assert c3.rules == [Rule(match(), [modify(dstip='10.0.0.1', dstport=22, outport=3)])]
 
 def test_sequencing_fwd_mod():
-    c1 = Classifier([Rule(match(), [fwd(3)])])
+    c1 = Classifier([Rule(match(), [modify(outport=3)])])
     c2 = Classifier([Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1)])])
     c3 = c1 >> c2
     print c3

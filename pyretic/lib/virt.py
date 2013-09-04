@@ -205,7 +205,7 @@ class vdef(object):
                 output = self.injection_policy.eval(pkt)
                 map(self.underlying.inject_packet,output)
 
-    class locate_packet_in_underlying(StaticPolicy):
+    class locate_packet_in_underlying(Policy):
         def __init__(self):
             self.vmap = None
             super(vdef.locate_packet_in_underlying,self).__init__()

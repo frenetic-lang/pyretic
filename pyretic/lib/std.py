@@ -27,7 +27,7 @@
 ################################################################################
 
 """Pyretic Standard Library"""
-from pyretic.core.language import StaticPolicy, Filter, DerivedPolicy, identity, all_packets, passthrough, no_packets, match, union
+from pyretic.core.language import Policy, Filter, DerivedPolicy, identity, all_packets, passthrough, no_packets, match, union
 import pyretic.core.util as util
 from datetime import datetime
 
@@ -82,7 +82,7 @@ class dstip_in(_in):
 
 ### PRINTING policies
 
-class _print(StaticPolicy):
+class _print(Policy):
     def __init__(self,s=''):
         self.s = s
         super(_print,self).__init__()
