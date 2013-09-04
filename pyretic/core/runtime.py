@@ -352,6 +352,32 @@ class Runtime(object):
         if classifier is None:
             return
 
+        def remove_drop(classifier):
+            return Classifier(Rule(rule.match,
+                                   filter(lambda a: a != drop,rule.actions))
+                              for rule in classifier.rules)
+
+        def controllerify(classifier):
+            def controllerify_rule(rule):
+                if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
+                    return Rule(rule.match,[{'send_to_controller' : 0}])
+                else:
+                    return Rule(rule.match,[ m.map for m in rule.actions if len(m.map) > 0 ])
+            return Classifier(controllerify_rule(rule) 
+                              for rule in classifier.rules)
+
+        def layer_3_specialize(classifier):
+            specialized_rules = []
+            for rule in classifier.rules:
+                if (('srcip' in rule.match.map or 
+                     'dstip' in rule.match.map) and 
+                    not 'ethtype' in rule.match.map):
+                    specialized_rules.append(Rule(rule.match & match(ethtype=0x800),rule.actions))
+                    specialized_rules.append(Rule(rule.match & match(ethtype=0x806),rule.actions))
+                else:
+                    specialized_rules.append(rule)
+            return Classifier(specialized_rules)
+
         def f(classifier, this_update_no, current_update_no):
             if not this_update_no is None:
                 time.sleep(0.1)
@@ -363,22 +389,22 @@ class Runtime(object):
                 self.send_clear(s)
                 self.send_barrier(s)
                 self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
+
+            classifier = remove_drop(classifier)
+            classifier = controllerify(classifier)
+            classifier = layer_3_specialize(classifier)
+
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
+
             for rule in classifier.rules:
-                # massage actions into flow-table format
-                actions = filter(lambda a: a != drop,rule.actions)
-                if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
-                   actions = [{'send_to_controller' : 0}]
-                else:
-                    actions = [ m.map for m in actions if len(m.map) > 0 ]
                 # TODO (josh) put logic in here to figure out when 'inport' forward location should be used
                 if 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
-                    self.install_rule((rule.match,priority,actions))
+                    self.install_rule((rule.match,priority,rule.actions))
                 else:
                     for s in switches:
-                        self.install_rule((rule.match & match(switch=s),priority,actions))
+                        self.install_rule((rule.match & match(switch=s),priority,rule.actions))
                 priority -= 1
             for s in switches:
                 self.send_barrier(s)
