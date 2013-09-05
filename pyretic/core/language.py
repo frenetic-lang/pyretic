@@ -848,8 +848,10 @@ class Classifier(object):
             act = act.policy
         if act == identity:
             return pkts
-        elif act == none or act == Controller:
+        elif act == none:
             return false
+        elif act == Controller or isinstance(act, CountBucket):
+            return true
         elif isinstance(act, modify):
             new_match_dict = {}
             if pkts == true:
@@ -882,8 +884,8 @@ class Classifier(object):
             return [none]
         elif a1 == identity:
             return as2
-        elif a1 == Controller:
-            return [a1] + as2
+        elif a1 == Controller or isinstance(a1, CountBucket):
+            return a1
         elif isinstance(a1, modify):
             for a2 in as2:
                 while isinstance(a2, DerivedPolicy):
@@ -891,7 +893,7 @@ class Classifier(object):
                 new_a1 = modify(**a1.map.copy())
                 if a2 == none:
                     new_actions.append(none)
-                elif a2 == Controller:
+                elif a2 == Controller or isinstance(a2, CountBucket): 
                     new_actions.append(a2)
                 elif a2 == identity:
                     new_actions.append(new_a1)

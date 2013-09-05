@@ -102,6 +102,11 @@ class Runtime(object):
                     self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0':
                     classifier = self.policy.compile()
+                    if self.verbosity == 'high':
+                        print '-----------------------'
+                        print self.policy
+                        print '-------------------------'
+                        print classifier
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
                 self.in_update_network = False
 
@@ -119,6 +124,11 @@ class Runtime(object):
                 self.clear_all() 
             elif self.mode == 'proactive0':
                 classifier = self.policy.compile()
+                if self.verbosity == 'high':
+                    print '-----------------------'
+                    print self.policy
+                    print '-------------------------'
+                    print classifier
                 self.install_classifier(classifier)
 
     def handle_switch_join(self,switch_id):
