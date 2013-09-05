@@ -370,18 +370,26 @@ class Runtime(object):
         def controllerify(classifier):
             def controllerify_rule(rule):
                 if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
+                    # FIXME (cole): should other actions be taken at the switch
+                    # before sending to the controller?  i.e. a policy like:
+                    # modify(srcip=1) >> ToController.
                     return Rule(rule.match,[{'send_to_controller' : 0}])
                 else:
-                    return Rule(rule.match,[ m.map for m in rule.actions if len(m.map) > 0 ])
+                    # TODO (cole): convert identity to inport rather than drop?
+                    return Rule(
+                      rule.match,
+                      [ m.map for m in rule.actions 
+                              if isinstance(m, match) and len(m.map) > 0 ])
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
 
         def layer_3_specialize(classifier):
             specialized_rules = []
             for rule in classifier.rules:
-                if (('srcip' in rule.match.map or 
-                     'dstip' in rule.match.map) and 
-                    not 'ethtype' in rule.match.map):
+                if ( isinstance(rule.match, match) and
+                     ( 'srcip' in rule.match.map or 
+                       'dstip' in rule.match.map ) and 
+                     not 'ethtype' in rule.match.map ):
                     specialized_rules.append(Rule(rule.match & match(ethtype=0x800),rule.actions))
                     specialized_rules.append(Rule(rule.match & match(ethtype=0x806),rule.actions))
                 else:
@@ -408,14 +416,19 @@ class Runtime(object):
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
 
             for rule in classifier.rules:
-                # TODO (josh) put logic in here to figure out when 'inport' forward location should be used
-                if 'switch' in rule.match.map:
+                # TODO (josh) put logic in here to figure out when 'inport'
+                # forward location should be used
+
+                if isinstance(rule.match, match) and 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
                     self.install_rule((rule.match,priority,rule.actions))
                 else:
                     for s in switches:
-                        self.install_rule((rule.match & match(switch=s),priority,rule.actions))
+                        self.install_rule((
+                            rule.match.intersect(match(switch=s)),
+                            priority,
+                            rule.actions))
                 priority -= 1
             for s in switches:
                 self.send_barrier(s)
@@ -426,7 +439,14 @@ class Runtime(object):
 
             
     def install_rule(self,(pred,priority,action_list)):
-        concrete_pred = { k:v for (k,v) in pred.map.items() }
+        if pred == false:
+            return
+        elif pred == true:
+            concrete_pred = {}
+        elif isinstance(pred, match):
+            concrete_pred = { k:v for (k,v) in pred.map.items() }
+        else:
+            raise TypeError
         self.backend.send_install(concrete_pred,priority,action_list)
 
     def send_barrier(self,switch):
