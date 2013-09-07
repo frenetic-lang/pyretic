@@ -390,12 +390,25 @@ class Runtime(object):
                     # modify(srcip=1) >> ToController.
                     return Rule(rule.match,[{'send_to_controller' : 0}])
                 else:
-                    # TODO (cole): convert identity to inport rather than drop?
-                    return Rule(
-                      rule.match,
-                      [ m.map for m in rule.actions 
-                              if isinstance(m, match) and len(m.map) > 0 ])
+                    # TODO (cole): convert identity to inport rather
+                    # than drop?
+                    return rule
             return Classifier(controllerify_rule(rule) 
+                              for rule in classifier.rules)
+
+        def conflate_modify(classifier):
+            """Conflates all the modify maps in the actions list to
+            one list of maps from all the modify actions.
+            Pre-condition: all actions in the actions_list of the rule
+            at this point must be modify actions.
+            """
+            def conflate_modify_maps(rule):
+                # TODO(ngsrinivas): remove isinstance 
+                return Rule(
+                    rule.match,
+                    [ m.map for m in rule.actions
+                      if isinstance(m, modify) and len(m.map) > 0 ])
+            return Classifier(conflate_modify_maps(rule) 
                               for rule in classifier.rules)
 
         def layer_3_specialize(classifier):
@@ -426,6 +439,7 @@ class Runtime(object):
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
+            classifier = conflate_modify(classifier)
             classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
@@ -433,7 +447,6 @@ class Runtime(object):
             for rule in classifier.rules:
                 # TODO (josh) put logic in here to figure out when 'inport'
                 # forward location should be used
-
                 if isinstance(rule.match, match) and 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
