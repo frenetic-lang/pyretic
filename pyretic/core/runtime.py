@@ -286,18 +286,23 @@ class Runtime(object):
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+        if self.verbosity == 'high':
+            print "-----------------"
+            print "Got packet in. The packet looks like:"
+            print pyretic_pkt
+            print "-----------------"
         if self.debug_packet_in:
             debugger.set_trace()
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
-                 if self.mode == 'interpreted':
+                 if self.mode == 'interpreted' or self.mode == 'proactive0':
                      output = self.policy.eval(pyretic_pkt)
                  else:
                      (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
                      self.reactive0(pyretic_pkt,output,eval_trace)
         else:
             try:
-                if self.mode == 'interpreted':
+                if self.mode == 'interpreted' or self.mode == 'proactive0':
                     output = self.policy.eval(pyretic_pkt)
                 else:
                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)

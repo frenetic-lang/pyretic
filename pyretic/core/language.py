@@ -285,6 +285,14 @@ class modify(Policy):
 class Controller(Policy):
     def __repr__(self):
         return "Controller"
+    
+    def eval(self, pkt):
+        return set()
+    
+    def compile(self):
+        r = Rule(identity, [Controller])
+        self._classifier = Classifier([r])
+        return self._classifier
 
 # FIXME: Srinivas =).
 class Query(Policy):
