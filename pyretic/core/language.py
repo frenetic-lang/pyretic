@@ -339,11 +339,11 @@ class CountBucket(Query):
     """
     def __init__(self):
         super(CountBucket, self).__init__()
-        self.matches = []
+        self.matches = set([])
         
     def __repr__(self):
         return "CountBucket"
-    
+
     def compile(self):
         r = Rule(identity,[self])
         self._classifier = Classifier([r])
@@ -353,7 +353,8 @@ class CountBucket(Query):
         """Add a match m to list of classifier rules to be queried for
         counts."""
         assert(isinstance(m, match))
-        self.matches.append(m)
+        if not m in self.matches:
+            self.matches.add(m)
 
 ################################################################################
 # Combinator Policies                                                          #

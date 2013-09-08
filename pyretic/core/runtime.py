@@ -396,22 +396,12 @@ class Runtime(object):
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
         
-        def bookkeep_buckets(classifier):
-            """Whenever rules are associated with counting buckets,
-            add a reference to the classifier rule into the respective
-            bucket for querying later. Count bucket actions operate at
-            the pyretic level and are removed before installing rules.
-            """
-            def bookkeep_buckets_rule(rule):
-                cleaned_acts = filter(lambda a: 
-                                      not isinstance(a, CountBucket), 
-                                      rule.actions)
-                buckets = filter(lambda a: isinstance(a, CountBucket),
-                                 rule.actions)
-                for bucket in buckets:
-                    bucket.add_match(rule.match)
-                return Rule(rule.match, cleaned_acts)
-            return Classifier(bookkeep_buckets_rule(rule) 
+
+        def remove_buckets(classifier):
+            return Classifier(Rule(rule.match,
+                                   filter(lambda a: 
+                                          not isinstance(a, CountBucket),
+                                          rule.actions))
                               for rule in classifier.rules)
 
         def conflate_modify(classifier):
@@ -459,7 +449,7 @@ class Runtime(object):
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
-            classifier = bookkeep_buckets(classifier)
+            classifier = remove_buckets(classifier)
             classifier = conflate_modify(classifier)
             classifier = layer_3_specialize(classifier)
 
@@ -482,10 +472,24 @@ class Runtime(object):
             for s in switches:
                 self.send_barrier(s)
 
+        def bookkeep_buckets(classifier):
+            """Whenever rules are associated with counting buckets,
+            add a reference to the classifier rule into the respective
+            bucket for querying later. Count bucket actions operate at
+            the pyretic level and are removed before installing rules.
+            """
+            def hook_buckets_to_rule(rule):
+                for act in rule.actions:
+                    if isinstance(act, CountBucket):
+                        act.add_match(rule.match)
+                return rule
+            for rule in classifier.rules:
+                hook_buckets_to_rule(rule)
+
+        bookkeep_buckets(classifier)
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
         p.start()
-
             
     def install_rule(self,(pred,priority,action_list)):
         if pred == false:
