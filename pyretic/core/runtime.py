@@ -395,6 +395,24 @@ class Runtime(object):
                     return rule
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
+        
+        def bookkeep_buckets(classifier):
+            """Whenever rules are associated with counting buckets,
+            add a reference to the classifier rule into the respective
+            bucket for querying later. Count bucket actions operate at
+            the pyretic level and are removed before installing rules.
+            """
+            def bookkeep_buckets_rule(rule):
+                cleaned_acts = filter(lambda a: 
+                                      not isinstance(a, CountBucket), 
+                                      rule.actions)
+                buckets = filter(lambda a: isinstance(a, CountBucket),
+                                 rule.actions)
+                for bucket in buckets:
+                    bucket.add_match(rule.match)
+                return Rule(rule.match, cleaned_acts)
+            return Classifier(bookkeep_buckets_rule(rule) 
+                              for rule in classifier.rules)
 
         def conflate_modify(classifier):
             """Conflates all the modify maps in the actions list to
@@ -403,7 +421,9 @@ class Runtime(object):
             at this point must be modify actions.
             """
             def conflate_modify_maps(rule):
-                # TODO(ngsrinivas): remove isinstance 
+                # TODO(ngsrinivas): remove isinstance conservative
+                # check after handling all other classifier actions
+                # for rule installation
                 return Rule(
                     rule.match,
                     [ m.map for m in rule.actions
@@ -439,6 +459,7 @@ class Runtime(object):
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
+            classifier = bookkeep_buckets(classifier)
             classifier = conflate_modify(classifier)
             classifier = layer_3_specialize(classifier)
 

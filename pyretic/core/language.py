@@ -302,7 +302,10 @@ class Query(Policy):
     ### init : unit -> unit
     def __init__(self):
         self.callbacks = []
-        super(FwdBucket,self).__init__()
+        super(Query,self).__init__()
+        
+    def __repr__(self):
+        return "Query"
 
     def eval(self, pkt):
         for callback in self.callbacks:
@@ -325,17 +328,32 @@ class FwdBucket(Query):
         r = Rule(identity,[Controller])
         self._classifier = Classifier([r])
         return self._classifier
+    
+    def __repr__(self):
+        return "FwdBucket"
 
 
 class CountBucket(Query):
     """Class for registering callbacks on counts of packets sent to
     the controller.
     """
+    def __init__(self):
+        super(CountBucket, self).__init__()
+        self.matches = []
+        
+    def __repr__(self):
+        return "CountBucket"
+    
     def compile(self):
         r = Rule(identity,[self])
         self._classifier = Classifier([r])
         return self._classifier
-        
+    
+    def add_match(self, m):
+        """Add a match m to list of classifier rules to be queried for
+        counts."""
+        assert(isinstance(m, match))
+        self.matches.append(m)
 
 ################################################################################
 # Combinator Policies                                                          #
@@ -893,7 +911,7 @@ class Classifier(object):
         elif a1 == identity:
             return as2
         elif a1 == Controller or isinstance(a1, CountBucket):
-            return a1
+            return [a1]
         elif isinstance(a1, modify):
             for a2 in as2:
                 while isinstance(a2, DerivedPolicy):
