@@ -34,6 +34,7 @@ import functools
 import itertools
 import struct
 import time
+from ipaddr import IPv4Network
 from bitarray import bitarray
 
 from pyretic.core import util
@@ -136,6 +137,14 @@ class Filter(Policy):
         return negate([self])
 
 
+def _intersect_ip(ipfx, opfx):
+    most_specific = None
+    if (IPv4Network(ipfx) in IPv4Network(opfx)):
+        most_specific = ipfx
+    elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
+        most_specific = opfx
+    return most_specific
+
 
 class match(Filter):
     """A set of field matches on a packet (one per field)."""
@@ -160,10 +169,28 @@ class match(Filter):
         fs1 = set(self.map.keys())
         fs2 = set(pol.map.keys())
         shared = fs1 & fs2
+        most_specific_src = None
+        most_specific_dst = None
+
         for f in shared:
-            if self.map[f] != pol.map[f]:
+            if (f=='srcip'):
+                most_specific_src = _intersect_ip(self.map[f], pol.map[f])
+                if most_specific_src is None:
+                    return None
+            elif (f=='dstip'):
+                most_specific_dst = _intersect_ip(self.map[f], pol.map[f])
+                if most_specific_dst is None:
+                    return None
+            elif (self.map[f] != pol.map[f]):
                 return none
+
         d = self.map.update(pol.map)
+
+        if most_specific_src is not None:
+            d = d.update({'srcip' : most_specific_src})
+        if most_specific_dst is not None:
+            d = d.update({'dstip' : most_specific_dst})
+
         return match(**d)
 
     def __and__(self,pol):
@@ -188,7 +215,11 @@ class match(Filter):
         if set(self.map.keys()) - set(other.map.keys()):
             return False
         for (f,v) in self.map.items():
-            if v != other.map[f]:
+            if (f=='srcip' or f=='dstip'):
+                if(IPv4Network(v) != IPv4Network(other.map[f])):
+                    if(not IPv4Network(other.map[f]) in IPv4Network(v)):
+                        return False
+            elif v != other.map[f]:
                 return False
         return True
 
