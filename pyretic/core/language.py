@@ -410,6 +410,13 @@ class negate(CombinatorPolicy,Filter):
 class parallel(CombinatorPolicy):
     """parallel(policies) evaluates to the set union of the evaluation
     of each policy in policies."""
+    def __new__(self, policies):
+        # Hackety hack.
+        if len(policies) == 0:
+            return drop
+        else:
+            return super(parallel, self).__new__(parallel, policies)
+
     def __init__(self, policies):
         if len(policies) == 0:
             raise TypeError
@@ -451,6 +458,13 @@ class union(parallel,Filter):
 class sequential(CombinatorPolicy):
     """sequential(policies) evaluates the set union of each policy in policies
     on each packet in the output of previous policy."""
+    def __new__(self, policies):
+        # Hackety hack.
+        if len(policies) == 0:
+            return identity
+        else:
+            return super(sequential, self).__new__(sequential, policies)
+
     def __init__(self, policies):
         if len(policies) == 0:
             raise TypeError
