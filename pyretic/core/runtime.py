@@ -30,7 +30,8 @@
 
 import pyretic.core.util as util
 from pyretic.core.language import *
-from multiprocessing import Process, RLock, Lock, Value, Queue
+from pyretic.core.network import *
+from multiprocessing import Process, Manager, RLock, Lock, Value, Queue
 import time
 from datetime import datetime
 
@@ -89,6 +90,7 @@ class Runtime(object):
             for p in dynamic_sub_pols:
                 p.attach(self.handle_policy_change)
         self.in_update_network = False
+        self.old_rules = list()
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
         self.global_outstanding_queries = {}
@@ -529,20 +531,84 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
+        def find_same_rule(target, rule_list):
+            if rule_list is None:
+                return None
+            for rule in rule_list:
+                if target[0] == rule[0] and target[1] == rule[1]:
+                    return rule
+            return None
+
+        def install_diff_rules(classifier):
+            old_rules = self.old_rules
+            new_rules = list()
+
+            # get new rules
+            priority = len(classifier) + 40000
+            switches = self.network.topology.nodes()
+            for rule in classifier.rules:
+                if isinstance(rule.match, match) and 'switch' in rule.match.map:
+                    if not rule.match.map['switch'] in switches:
+                        continue
+                    new_rules.append((rule.match, priority, rule.actions))
+                else:
+                    for s in switches:
+                        new_rules.append((
+                            rule.match.intersect(match(switch=s)),
+                            priority,
+                            rule.actions))
+                priority -= 1
+
+            # calculate diff
+            to_add = list()
+            to_delete = list()
+            to_modify = list()
+            for old in old_rules:
+                new = find_same_rule(old, new_rules)
+                if new is None:
+                    to_delete.append(old)
+                else:
+                    if old[2] != new[2]:
+                        to_modify.append(new)
+
+            for new in new_rules:
+                old = find_same_rule(new, old_rules)
+                if old is None:
+                    to_add.append(new)
+
+            # install diff
+            if not to_add is None:
+                for rule in to_add:
+                    self.install_rule(rule)
+            #for rule in to_delete:
+            #    self.delete_rule(rule)
+            #for rule in to_modify:
+            #    self.modify_rule(rule)
+
+            # update old_rule
+            self.old_rules = new_rules
+
+            for s in switches:
+                self.send_barrier(s)
+
         def f(classifier, this_update_no, current_update_no):
             if not this_update_no is None:
                 time.sleep(0.1)
                 if this_update_no != current_update_no.value:
                     return
-            switches = self.network.topology.nodes()
 
-            priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
+            switches = self.network.topology.nodes()
 
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
                 self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'send_to_controller' : 0}]))
+
+            install_diff_rules(classifier)
+            return
+
+            priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
 
             for rule in classifier.rules:
                 # TODO (josh) put logic in here to figure out when 'inport'
@@ -573,6 +639,9 @@ class Runtime(object):
         classifier = layer_3_specialize(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
+
+        f(classifier, this_update_no, current_update_no)
+        return
 
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
