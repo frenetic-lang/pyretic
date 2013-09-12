@@ -98,6 +98,10 @@ class BackendChannel(asynchat.async_chat):
             priority = int(msg[2])
             actions = map(self.dict2OF,msg[3])
             self.of_client.install_flow(pred,priority,actions)
+        elif msg[0] == 'delete':
+            pred = self.dict2OF(msg[1])
+            priority = int(msg[2])
+            self.of_client.delete_flow(pred,priority)
         elif msg[0] == 'clear':
             switch = int(msg[1])
             self.of_client.clear(switch)
@@ -461,6 +465,23 @@ class POXClient(revent.EventMixin):
             print "ERROR:install_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
             print "ERROR:install_flow: No connection to switch %d available" % switch
+
+    def delete_flow(self,pred,priority):
+        switch = pred['switch']
+        if 'inport' in pred:        
+            inport = pred['inport']
+        else:
+            inport = None
+        match = self.build_of_match(switch,inport,pred)
+        msg = of.ofp_flow_mod(command=of.OFPFC_DELETE_STRICT,
+                              priority=priority,
+                              match=match)
+        try:
+            self.switches[switch]['connection'].send(msg)
+        except RuntimeError, e:
+            print "ERROR:delete_flow: %s to switch %d" % (str(e),switch)
+        except KeyError, e:
+            print "ERROR:delete_flow: No connection to switch %d available" % switch
 
     def barrier(self,switch):
         b = of.ofp_barrier_request()

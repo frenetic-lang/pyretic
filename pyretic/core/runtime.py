@@ -470,6 +470,7 @@ class Runtime(object):
                             rule.actions))
                 priority -= 1
             for s in switches:
+                self.delete_rule((match(switch=s),32768))
                 self.send_barrier(s)
 
         def bookkeep_buckets(classifier):
@@ -501,6 +502,10 @@ class Runtime(object):
         else:
             raise TypeError
         self.backend.send_install(concrete_pred,priority,action_list)
+
+    def delete_rule(self,(pred,priority)):
+        concrete_pred = { k:v for (k,v) in pred.map.items() }
+        self.backend.send_delete(concrete_pred,priority)
 
     def send_barrier(self,switch):
         self.backend.send_barrier(switch)
