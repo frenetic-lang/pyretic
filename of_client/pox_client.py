@@ -374,16 +374,10 @@ class POXClient(revent.EventMixin):
             print "ERROR:send_to_switch: No connection to switch %d available" % switch
             # TODO - IF SOCKET RECONNECTION, THEN WAIT AND RETRY
 
-
-    def install_flow(self,pred,priority,action_list):
+    def build_of_match(self,switch,inport,pred):
         ### BUILD OF MATCH
         match = of.ofp_match()
-        switch = pred['switch']
-        if 'inport' in pred:        
-            inport = pred['inport']
-            match.in_port = inport
-        else:
-            inport = None
+        match.in_port = inport
         if 'srcmac' in pred:
             match.dl_src = pred['srcmac']
         if 'dstmac' in pred:
@@ -410,7 +404,9 @@ class POXClient(revent.EventMixin):
             match.tp_src = pred['srcport']
         if 'dstport' in pred:
             match.tp_dst = pred['dstport']
+        return match
 
+    def build_of_actions(self,inport,action_list):
         ### BUILD OF ACTIONS
         of_actions = []
         if action_list == [{'send_to_controller' : 0}]:
@@ -443,7 +439,16 @@ class POXClient(revent.EventMixin):
                     of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
                 else:
                     of_actions.append(of.ofp_action_output(port=outport))
+        return of_actions
 
+    def install_flow(self,pred,priority,action_list):
+        switch = pred['switch']
+        if 'inport' in pred:        
+            inport = pred['inport']
+        else:
+            inport = None
+        match = self.build_of_match(switch,inport,pred)
+        of_actions = self.build_of_actions(inport,action_list)
         msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
                               priority=priority,
                               idle_timeout=of.OFP_FLOW_PERMANENT,
