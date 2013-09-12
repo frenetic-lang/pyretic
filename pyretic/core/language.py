@@ -117,14 +117,14 @@ class Filter(Policy):
     ### or : Filter -> Filter
     def __or__(self, pol):
         if isinstance(pol,Filter):
-            return union((self + pol).policies)
+            return union([self, pol])
         else:
             raise TypeError
 
     ### and : Filter -> Filter
     def __and__(self, pol):
         if isinstance(pol,Filter):
-            return intersection((self >> pol).policies)
+            return intersection([self, pol])
         else:
             raise TypeError
 
@@ -410,14 +410,16 @@ class negate(CombinatorPolicy,Filter):
 class parallel(CombinatorPolicy):
     """parallel(policies) evaluates to the set union of the evaluation
     of each policy in policies."""
-    def __new__(self, policies):
+    def __new__(self, policies=[]):
         # Hackety hack.
         if len(policies) == 0:
             return drop
         else:
-            return super(parallel, self).__new__(parallel, policies)
+            rv = super(parallel, self).__new__(parallel, policies)
+            rv.__init__(policies)
+            return rv
 
-    def __init__(self, policies):
+    def __init__(self, policies=[]):
         if len(policies) == 0:
             raise TypeError
         super(parallel, self).__init__(policies)
@@ -458,14 +460,16 @@ class union(parallel,Filter):
 class sequential(CombinatorPolicy):
     """sequential(policies) evaluates the set union of each policy in policies
     on each packet in the output of previous policy."""
-    def __new__(self, policies):
+    def __new__(self, policies=[]):
         # Hackety hack.
         if len(policies) == 0:
             return identity
         else:
-            return super(sequential, self).__new__(sequential, policies)
+            rv = super(sequential, self).__new__(sequential, policies)
+            rv.__init__(policies)
+            return rv
 
-    def __init__(self, policies):
+    def __init__(self, policies=[]):
         if len(policies) == 0:
             raise TypeError
         super(sequential, self).__init__(policies)
