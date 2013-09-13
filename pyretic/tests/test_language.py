@@ -73,6 +73,9 @@ def test_covers_1():
 def test_covers_2():
     assert match(dstip='10.0.0.1').covers(match(dstip='10.0.0.1'))
 
+def test_covers_3():
+    assert not match(inport=1).covers(identity)
+
 
 ### Classifier tests ###
 
@@ -97,29 +100,35 @@ def test_repeat_initialization():
 def test_empty_sequential_composition():
     assert sequential() == identity
 
-def test_invert_action_true():
+def test_commute_test_true():
     act = modify(srcip='10.0.0.1')
     pkts = match(srcip='10.0.0.1')
-    m3 = Classifier()._invert_action(act, pkts)
+    m3 = Classifier()._commute_test(act, pkts)
     assert m3 == true
 
-def test_invert_action_false_1():
+def test_commute_test_false_1():
     act = drop
     pkts = match(srcip='10.0.0.1')
-    m3 = Classifier()._invert_action(act, pkts)
+    m3 = Classifier()._commute_test(act, pkts)
     assert m3 == false
 
-def test_invert_action_false_2():
+def test_commute_test_false_2():
     act = modify(srcip='0')
     pkts = match(srcip='10.0.0.1')
-    m3 = Classifier()._invert_action(act, pkts)
+    m3 = Classifier()._commute_test(act, pkts)
     assert m3 == false
 
-def test_invert_action_incomparable():
+def test_commute_test_incomparable():
     act = modify(srcip='10.0.0.1')
     pkts = match(dstip='10.0.0.2')
-    m3 = Classifier()._invert_action(act, pkts)
+    m3 = Classifier()._commute_test(act, pkts)
     assert m3 == match(dstip='10.0.0.2')
+
+def test_commute_id():
+    act = identity
+    pkts = match(outport=2)
+    m3 = Classifier()._commute_test(act, pkts)
+    assert m3 == pkts
 
 def test_sequencing_drop_fwd():
     c1 = Classifier([Rule(identity, [drop])])
@@ -176,7 +185,19 @@ def test_sequencing_fwd_mod():
     c3 = c1 >> c2
     print c3
     assert c3.rules == [
-        Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1, outport=3)])]
+        Rule(match(srcip='192.168.1.1'), [modify(srcip='10.0.0.1', srcport=1, outport=3)]),
+        Rule(identity, [drop]) ]
+
+def test_sequencing_match_match():
+    c1 = Classifier([Rule(match(inport=1), [identity]), Rule(true, [drop])])
+    c2 = Classifier([Rule(match(outport=2), [identity]), Rule(true, [drop])])
+    c3 = c1 >> c2
+    print c3
+    assert c3.rules == [
+        Rule(match(inport=1, outport=2), [identity]),
+        Rule(match(inport=1), [drop]),
+        Rule(true, [drop]) ]
+
 
 # Parallel
 
@@ -184,7 +205,80 @@ def test_empty_parallel_composition():
     assert parallel() == drop
 
 
+# Intersection
+
+def test_intersect_1():
+    assert match(inport=1).intersect(match(outport=2)) == match(inport=1, outport=2)
+
+
 # Compilation
+
+def test_nested_1():
+    pol = match(inport=1) >> match(outport=2) >> modify(outport=3)
+    classifier = pol.compile()
+    print classifier
+    assert classifier.rules == [
+        Rule(match(inport=1, outport=2), [modify(outport=3)]),
+        Rule(match(inport=1), [drop]),
+        Rule(true, [drop]) ]
+
+def test_if_compilation_1():
+    pol = if_(true, modify(outport=1), modify(outport=2))
+    classifier = pol.compile()
+    assert classifier.rules == [
+        Rule(true, [modify(outport=1)]) ]
+
+def test_if_compilation_2():
+    pol = if_(false, modify(outport=1), modify(outport=2))
+    classifier = pol.compile()
+    assert classifier.rules == [
+        Rule(true, [modify(outport=2)]) ]
+
+def test_if_compilation_3():
+    pol = if_(match(inport=2), modify(outport=1), modify(outport=2))
+    classifier = pol.compile()
+    assert classifier.rules == [
+        Rule(match(inport=2), [modify(outport=1)]),
+        Rule(true, [modify(outport=2)]) ]
+
+def test_if_compilation_4():
+    pol = if_(match(inport=2), modify(outport=1), match(inport=4) >> modify(outport=2))
+    classifier = pol.compile()
+    print classifier
+    assert classifier.rules == [
+        Rule(match(inport=2), [modify(outport=1)]),
+        Rule(match(inport=4), [modify(outport=2)]),
+        Rule(true, [drop]) ]
+
+def test_if_compilation_5():
+    pol = if_(match(inport=2), modify(outport=1), modify(outport=3) + modify(outport=2))
+    classifier = pol.compile()
+    print classifier
+    assert classifier.rules == [
+        Rule(match(inport=2), [modify(outport=1)]),
+        Rule(true, [modify(outport=3), modify(outport=2)]) ]
+
+def test_if_compilation_x():
+    mac1 = EthAddr('00:00:00:00:00:01')
+    mac2 = EthAddr('00:00:00:00:00:02')
+    macB = EthAddr('FF:FF:FF:FF:FF:FF')
+    ip1 = IPAddr('10.0.0.1')
+    ip2 = IPAddr('10.0.0.2')
+    p = IPAddr('10.0.0.11')
+    pol = if_(
+            match(srcip=ip1),
+            modify(srcip=p),
+            if_(
+              match(dstip=p),
+              modify(dstip=ip1)))
+    classifier = pol.compile()
+    print pol.policy
+    print classifier
+    assert classifier.rules == [
+        Rule(match(srcip=ip1), [modify(srcip=p)]),
+        Rule(match(dstip=p), [modify(dstip=ip1)]),
+        Rule(true, [identity]) ]
+
 
 # Bug 1
 
@@ -199,10 +293,12 @@ class TestBug1:
             self.ip2 = IPAddr('10.0.0.2')
             self.p = IPAddr('10.0.0.11')
 
-            self.mod = if_(match(srcip=self.ip1),
-                      modify(srcip=self.p),
-                      if_(match(dstip=self.p),
-                          modify(dstip=self.ip1)))
+            self.mod = if_(
+                         match(srcip=self.ip1),
+                         modify(srcip=self.p),
+                         if_(
+                           match(dstip=self.p),
+                           modify(dstip=self.ip1)))
             self.route = (
               ((match(dstmac=self.mac1) | match(dstmac=self.macB)) >> fwd(1)) +
               ((match(dstmac=self.mac2) | match(dstmac=self.macB)) >> fwd(2)) )
@@ -305,44 +401,61 @@ class TestBug1:
         assert pol_out == class_out
         assert pol_out == assert_out_pkts
 
+def test_match_compilation():
+    pol = match(inport=1)
+    classifier = pol.compile()
+    assert classifier.rules == [
+        Rule(match(inport=1), [identity]),
+        Rule(identity, [drop]) ]
+
 def test_negation_compilation():
     pol = ~match(inport=1)
     classifier = pol.compile()
-    print classifier.rules[0].match.__class__
-    print match(inport=1).__class__
-    print classifier.rules[0].match.__dict__
-    print match(inport=1).__dict__
-    assert classifier.rules[0].match == match(inport=1)
-    assert classifier.rules[0].actions == [drop]
     assert classifier.rules == [
         Rule(match(inport=1), [drop]),
         Rule(identity, [identity]) ]
 
-# def test_xfwd_compilation():
-#     pol = xfwd(1)
-#     classifier = pol.compile()
-#     print classifier.rules
-#     assert classifier.rules == [
-#         Rule(match(inport=1), [drop]),
-#         Rule(identity, [fwd(1)]) ]
-# 
-# class FakeNetwork(Network):
-#     pass
-# 
-# def test_flood_compilation():
-#     pol = flood()
-#     topo = Topology()
-#     topo.add_switch('s1')
-#     topo.add_port('s1', 1, True, True)
-#     topo.add_port('s1', 2, True, True)
-#     pol.set_network(FakeNetwork(topo))
-#     
-#     classifier = pol.compile()
-#     print classifier.rules
-#     assert classifier.rules == [
-#         Rule(match(inport=1), [fwd(2)]),
-#         Rule(match(inport=2), [fwd(1)]),
-#         Rule(identity, [drop]) ]
+def test_fwd_compilation():
+    pol = fwd(1)
+    classifier = pol.compile()
+    assert classifier.rules == [Rule(identity, [modify(outport=1)])]
+
+def test_match_fwd():
+    pol = match(inport=1) >> fwd(2)
+    classifier = pol.compile()
+    print classifier
+    assert classifier.rules == [
+        Rule(match(inport=1), [modify(outport=2)]),
+        Rule(identity, [drop]) ]
+
+def test_xfwd_compilation():
+    pol = xfwd(1)
+    print pol.policy
+    classifier = pol.compile()
+    print classifier.rules
+    assert classifier.rules == [
+        Rule(match(inport=1), [drop]),
+        Rule(identity, [modify(outport=1)]) ]
+
+class FakeNetwork(Network):
+    pass
+
+def test_flood_compilation():
+    pol = flood()
+    topo = Topology()
+    topo.add_switch('s1')
+    topo.add_port('s1', 1, True, True)
+    topo.add_port('s1', 2, True, True)
+    pol.set_network(FakeNetwork(topo))
+    
+    classifier = pol.compile()
+    print pol.policy
+    print classifier
+    assert classifier.rules == [
+        Rule(match(switch='s1', inport=1), [modify(outport=2)]),
+        Rule(match(switch='s1', inport=2), [modify(outport=1)]),
+        Rule(match(switch='s1'), [modify(outport=1), modify(outport=2)]),
+        Rule(identity, [drop]) ]
 
 # Optimization
 
@@ -352,3 +465,12 @@ def test_remove_shadow_cover_single():
     print c
     assert c.rules == [Rule(identity, [drop])]
 
+def test_optimize_bug_1():
+    classifier = Classifier([
+        Rule(match(inport=1), [modify(outport=1)]),
+        Rule(identity, [drop]) ])
+    print 'classifier:'
+    print classifier
+    print 'classifier.optimize():'
+    print classifier.optimize()
+    assert classifier == classifier.optimize()

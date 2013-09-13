@@ -82,15 +82,12 @@ class Policy(object):
 
     ### eq : Policy -> bool
     def __eq__(self, other):
-        '''Structural equality.'''
-        return (
-          id(self) == id(other)
-          or (isinstance(other, self.__class__)
-             and self.__dict__ == other.__dict__))
+        '''Syntactic equality.'''
+        raise NotImplementedError
 
     ### ne : Policy -> bool
     def __ne__(self,other):
-        '''Structural inequality.'''
+        '''Syntactic inequality.'''
         return not (self == other)
 
     ### eval : Packet -> Set Packet
@@ -149,6 +146,10 @@ class match(Filter):
         self.map = util.frozendict(dict(*args, **kwargs))
         super(match,self).__init__()
 
+    def __eq__(self, other):
+        return ( (isinstance(other, match) and self.map == other.map)
+            or (other == true and len(self.map) == 0) )
+
     def intersect(self, pol):
         if pol == true:
             return self
@@ -176,11 +177,14 @@ class match(Filter):
         return hash(self.map)
 
     def covers(self,other):
-        # if self is specific on any field that other lacks
-        if other == true:
+        # Return true if self matches every packet that other matches (and maybe more).
+        # eg. if other is specific on any field that self lacks.
+        if other == true and len(self.map.keys()) > 0:
+            return False
+        elif other == true:
             return True
         elif other == false:
-            return False
+            return True
         if set(self.map.keys()) - set(other.map.keys()):
             return False
         for (f,v) in self.map.items():
@@ -224,6 +228,10 @@ class identity(Filter):
     def eval(self, pkt):
         return {pkt}
 
+    def __eq__(self, other):
+        return ( id(self) == id(other)
+            or ( isinstance(other, match) and len(other.map) == 0) )
+
 passthrough = identity   # Imperative alias
 true = identity          # Logic alias
 all_packets = identity   # Matching alias
@@ -245,6 +253,9 @@ class drop(Filter):
 
     def eval(self, pkt):
         return set()
+
+    def __eq__(self, other):
+        return id(self) == id(other)
 
 none = drop
 false = drop             # Logic alias
@@ -278,6 +289,10 @@ class modify(Policy):
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
 
+    def __eq__(self, other):
+        return ( isinstance(other, modify)
+           and (self.map == other.map) )
+
 @singleton
 class Controller(Policy):
     def __repr__(self):
@@ -290,6 +305,9 @@ class Controller(Policy):
         r = Rule(identity, [Controller])
         self._classifier = Classifier([r])
         return self._classifier
+
+    def __eq__(self, other):
+        return id(self) == id(other)
 
 # FIXME: Srinivas =).
 class Query(Policy):
@@ -328,6 +346,11 @@ class FwdBucket(Query):
     def __repr__(self):
         return "FwdBucket"
 
+    def __eq__(self, other):
+        # TODO: if buckets eventually have names, equality should
+        # be on names.
+        return isinstance(other, FwdBucket)
+
 
 class CountBucket(Query):
     """Class for registering callbacks on counts of packets sent to
@@ -351,6 +374,11 @@ class CountBucket(Query):
         if not m in self.matches:
             self.matches.add(m)
 
+    def __eq__(self, other):
+        # TODO: if buckets eventually have names, equality should
+        # be on names.
+        return isinstance(other, CountBucket)
+
 ################################################################################
 # Combinator Policies                                                          #
 ################################################################################
@@ -371,6 +399,10 @@ class CombinatorPolicy(Policy):
 
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
+
+    def __eq__(self, other):
+        return ( self.__class__ == other.__class__
+           and   self.policies == other.policies )
 
 
 class negate(CombinatorPolicy,Filter):
@@ -576,6 +608,10 @@ class DerivedPolicy(Policy):
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)
+
+    def __eq__(self, other):
+        return ( self.__class__ == other.__class__
+           and ( self.policy == other.policy ) )
 
 
 class difference(DerivedPolicy,Filter):
@@ -803,14 +839,13 @@ class Rule(object):
         return str(self)
 
     def __eq__(self, other):
-        '''Structural equality.'''
-        return (
-          id(self) == id(other)
-          or (isinstance(other, self.__class__)
-              and self.__dict__ == other.__dict__))
+        '''Based on syntactic equality of policies.'''
+        return ( id(self) == id(other)
+            or ( self.match == other.match
+                 and self.actions == other.actions ) )
 
     def __ne__(self, other):
-        '''Structural inequality.'''
+        '''Based on syntactic equality of policies.'''
         return not (self == other)
 
     def eval(self, in_pkt):
@@ -841,15 +876,16 @@ class Classifier(object):
     def __str__(self):
         return '\n'.join(map(str,self.rules))
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, other):
-        '''Structural equality.'''
-        return (
-          id(self) == id(other)
-          or (isinstance(other, self.__class__)
-              and self.__dict__ == other.__dict__))
+        '''Based on syntactic equality of policies.'''
+        return ( id(self) == id(other)
+            or ( self.rules == other.rules ) )
 
     def __ne__(self, other):
-        '''Structural inequality.'''
+        '''Based on syntactic equality of policies.'''
         return not (self == other)
 
     def __add__(self,c2):
@@ -875,12 +911,9 @@ class Classifier(object):
             c.rules.append(r2)
         return c.optimize()
 
-    # Helper function for rshift: given a set of packets pkts (denoted by a match)
-    # and an action act, return the set of packets pkts' such that
-    # sym_eval(act, pkts') == pkts.
-    # TODO (cole): not quite true, since there does not exist a pkts' such that
-    # sym_eval(modify(outport=1), pkts') == true
-    def _invert_action(self, act, pkts):
+    # Helper function for rshift: given a test b and an action p, return a test
+    # b' such that p >> b == b' >> p.
+    def _commute_test(self, act, pkts):
         while isinstance(act, DerivedPolicy):
             act = act.policy
         if act == identity:
@@ -950,24 +983,25 @@ class Classifier(object):
     def _sequence_action_classifier(self, act, c):
         # TODO (cole): make classifiers easier to use w.r.t. adding/removing
         # rules.
-        # TODO (cole): remove recursion?
         if len(c.rules) == 0:
             return Classifier([Rule(identity, [drop])])
-        pkts = c.rules[0].match
-        pkts2 = self._invert_action(act, pkts)
-        if pkts2 == true:
-            acts = self._sequence_actions(act, c.rules[0].actions)
-            return Classifier([Rule(identity, acts)])
-        elif pkts2 == false:
-            c2 = Classifier(c.rules[1:])
-            return self._sequence_action_classifier(act, c2)
+        new_rules = []
+        for rule in c.rules:
+            pkts = self._commute_test(act, rule.match)
+            if pkts == true:
+                acts = self._sequence_actions(act, rule.actions)
+                new_rules += [Rule(identity, acts)]
+                break
+            elif pkts == false:
+                continue
+            else:
+                acts = self._sequence_actions(act, rule.actions)
+                new_rules += [Rule(pkts, acts)]
+        if new_rules == []:
+            return Classifier([Rule(identity, [drop])])
         else:
-            acts = self._sequence_actions(act, c.rules[0].actions)
-            c2 = Classifier(c.rules[1:])
-            c3 = self._sequence_action_classifier(act, c2)
-            c3.rules = [Rule(pkts2, acts)] + c3.rules
-            return c3
-
+            return Classifier(new_rules)
+                
     def _sequence_actions_classifier(self, acts, c):
         empty_classifier = Classifier([Rule(identity, [drop])])
         if acts == []:
@@ -982,7 +1016,7 @@ class Classifier(object):
         c2 = self._sequence_actions_classifier(r.actions, c)
         for rule in c2.rules:
             rule.match = rule.match.intersect(r.match)
-        c2.rules = [r2 for r2 in c2.rules if r2 != drop]
+        c2.rules = [r2 for r2 in c2.rules if r2.match != drop]
         return c2.optimize()
 
     def __rshift__(self, c2):
