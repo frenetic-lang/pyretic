@@ -58,7 +58,6 @@ class Policy(object):
     """
     def __init__(self):
         self._network = None
-        self._classifier = None
 
     @property
     def network(self):
@@ -203,8 +202,7 @@ class match(Filter):
     def compile(self):
         r1 = Rule(self,[identity])
         r2 = Rule(true,[drop])
-        self._classifier = Classifier([r1, r2])
-        return self._classifier
+        return Classifier([r1, r2])
 
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
@@ -275,8 +273,7 @@ class modify(Policy):
             r = Rule(identity,[Controller])
         else:
             r = Rule(identity,[self])
-        self._classifier = Classifier([r])
-        return self._classifier
+        return Classifier([r])
 
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
@@ -315,8 +312,7 @@ class FwdBucket(Query):
     """
     def compile(self):
         r = Rule(identity,[Controller])
-        self._classifier = Classifier([r])
-        return self._classifier
+        return Classifier([r])
 
 
 class CountBucket(Query):
@@ -325,8 +321,7 @@ class CountBucket(Query):
     """
     def compile(self):
         r = Rule(identity,[self])
-        self._classifier = Classifier([r])
-        return self._classifier
+        return Classifier([r])
         
 
 ################################################################################
@@ -369,16 +364,16 @@ class negate(CombinatorPolicy,Filter):
 
     def compile(self):
         inner_classifier = self.policies[0].compile()
-        self._classifier = Classifier([])
+        classifier = Classifier([])
         for r in inner_classifier.rules:
             action = r.actions[0]
             if action == identity:
-                self._classifier.rules.append(Rule(r.match,[drop]))
+                classifier.rules.append(Rule(r.match,[drop]))
             elif action == drop:
-                self._classifier.rules.append(Rule(r.match,[identity]))
+                classifier.rules.append(Rule(r.match,[identity]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
-        return self._classifier
+        return classifier
 
 
 class parallel(CombinatorPolicy):
@@ -414,8 +409,7 @@ class parallel(CombinatorPolicy):
         if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
             return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
-        self._classifier = reduce(lambda acc, c: acc + c, classifiers)
-        return self._classifier
+        return reduce(lambda acc, c: acc + c, classifiers)
 
 
 class union(parallel,Filter):
@@ -506,8 +500,7 @@ class dropped_by(CombinatorPolicy,Filter):
 
     def compile(self):
         r = Rule(identity,[Controller])
-        self._classifier = Classifier([r])
-        return self._classifier
+        return Classifier([r])
 
 
 ################################################################################
@@ -534,8 +527,7 @@ class DerivedPolicy(Policy):
         return (results,eval_trace)
 
     def compile(self):
-        self._classifier = self.policy.compile()
-        return self._classifier
+        return self.policy.compile()
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)

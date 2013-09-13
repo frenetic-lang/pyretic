@@ -56,6 +56,14 @@ def test_parallel_equality_2():
     p2 = parallel([modify(srcip='10.0.0.1'), modify(outport=1)])
     assert p1 == p2
 
+def test_rule_equality():
+    assert Rule(match(inport=1), [drop]) == Rule(match(inport=1), [drop])
+
+def test_rule_list_equality():
+    l1 = [ Rule(match(inport=1), [drop]), Rule(identity, [identity]) ]
+    l2 = [ Rule(match(inport=1), [drop]), Rule(identity, [identity]) ]
+    assert l1 == l2
+
 
 ### Match tests ###
 
@@ -306,6 +314,44 @@ class TestBug1:
         assert pol_out == class_out
         assert pol_out == assert_out_pkts
 
+def test_negation_compilation():
+    pol = ~match(inport=1)
+    classifier = pol.compile()
+    print classifier.rules[0].match.__class__
+    print match(inport=1).__class__
+    print classifier.rules[0].match.__dict__
+    print match(inport=1).__dict__
+    assert classifier.rules[0].match == match(inport=1)
+    assert classifier.rules[0].actions == [drop]
+    assert classifier.rules == [
+        Rule(match(inport=1), [drop]),
+        Rule(identity, [identity]) ]
+
+# def test_xfwd_compilation():
+#     pol = xfwd(1)
+#     classifier = pol.compile()
+#     print classifier.rules
+#     assert classifier.rules == [
+#         Rule(match(inport=1), [drop]),
+#         Rule(identity, [fwd(1)]) ]
+# 
+# class FakeNetwork(Network):
+#     pass
+# 
+# def test_flood_compilation():
+#     pol = flood()
+#     topo = Topology()
+#     topo.add_switch('s1')
+#     topo.add_port('s1', 1, True, True)
+#     topo.add_port('s1', 2, True, True)
+#     pol.set_network(FakeNetwork(topo))
+#     
+#     classifier = pol.compile()
+#     print classifier.rules
+#     assert classifier.rules == [
+#         Rule(match(inport=1), [fwd(2)]),
+#         Rule(match(inport=2), [fwd(1)]),
+#         Rule(identity, [drop]) ]
 
 # Optimization
 
