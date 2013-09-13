@@ -95,11 +95,7 @@ def test_repeat_initialization():
 # Sequencing
 
 def test_empty_sequential_composition():
-    try:
-        sequential()
-        assert False
-    except TypeError:
-        pass
+    assert sequential() == identity
 
 def test_invert_action_true():
     act = modify(srcip='10.0.0.1')
@@ -185,12 +181,7 @@ def test_sequencing_fwd_mod():
 # Parallel
 
 def test_empty_parallel_composition():
-    try:
-        parallel()
-        assert False
-    except TypeError:
-        pass
-
+    assert parallel() == drop
 
 
 # Compilation

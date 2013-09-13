@@ -286,18 +286,23 @@ class Runtime(object):
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+        if self.verbosity == 'high':
+            print "-----------------"
+            print "Got packet in. The packet looks like:"
+            print pyretic_pkt
+            print "-----------------"
         if self.debug_packet_in:
             debugger.set_trace()
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
-                 if self.mode == 'interpreted':
+                 if self.mode == 'interpreted' or self.mode == 'proactive0':
                      output = self.policy.eval(pyretic_pkt)
                  else:
                      (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
                      self.reactive0(pyretic_pkt,output,eval_trace)
         else:
             try:
-                if self.mode == 'interpreted':
+                if self.mode == 'interpreted' or self.mode == 'proactive0':
                     output = self.policy.eval(pyretic_pkt)
                 else:
                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
@@ -385,12 +390,35 @@ class Runtime(object):
                     # modify(srcip=1) >> ToController.
                     return Rule(rule.match,[{'send_to_controller' : 0}])
                 else:
-                    # TODO (cole): convert identity to inport rather than drop?
-                    return Rule(
-                      rule.match,
-                      [ m.map for m in rule.actions 
-                              if isinstance(m, match) and len(m.map) > 0 ])
+                    # TODO (cole): convert identity to inport rather
+                    # than drop?
+                    return rule
             return Classifier(controllerify_rule(rule) 
+                              for rule in classifier.rules)
+        
+
+        def remove_buckets(classifier):
+            return Classifier(Rule(rule.match,
+                                   filter(lambda a: 
+                                          not isinstance(a, CountBucket),
+                                          rule.actions))
+                              for rule in classifier.rules)
+
+        def conflate_modify(classifier):
+            """Conflates all the modify maps in the actions list to
+            one list of maps from all the modify actions.
+            Pre-condition: all actions in the actions_list of the rule
+            at this point must be modify actions.
+            """
+            def conflate_modify_maps(rule):
+                # TODO(ngsrinivas): remove isinstance conservative
+                # check after handling all other classifier actions
+                # for rule installation
+                return Rule(
+                    rule.match,
+                    [ m.map for m in rule.actions
+                      if isinstance(m, modify) and len(m.map) > 0 ])
+            return Classifier(conflate_modify_maps(rule) 
                               for rule in classifier.rules)
 
         def layer_3_specialize(classifier):
@@ -421,6 +449,8 @@ class Runtime(object):
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
+            classifier = remove_buckets(classifier)
+            classifier = conflate_modify(classifier)
             classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
@@ -428,7 +458,6 @@ class Runtime(object):
             for rule in classifier.rules:
                 # TODO (josh) put logic in here to figure out when 'inport'
                 # forward location should be used
-
                 if isinstance(rule.match, match) and 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
@@ -443,10 +472,24 @@ class Runtime(object):
             for s in switches:
                 self.send_barrier(s)
 
+        def bookkeep_buckets(classifier):
+            """Whenever rules are associated with counting buckets,
+            add a reference to the classifier rule into the respective
+            bucket for querying later. Count bucket actions operate at
+            the pyretic level and are removed before installing rules.
+            """
+            def hook_buckets_to_rule(rule):
+                for act in rule.actions:
+                    if isinstance(act, CountBucket):
+                        act.add_match(rule.match)
+                return rule
+            for rule in classifier.rules:
+                hook_buckets_to_rule(rule)
+
+        bookkeep_buckets(classifier)
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
         p.start()
-
             
     def install_rule(self,(pred,priority,action_list)):
         if pred == false:

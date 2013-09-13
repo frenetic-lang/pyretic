@@ -136,10 +136,13 @@ def main():
             sys.exit(1)
         pox_exec = os.path.join(poxpath,'pox.py')
         python=sys.executable
+        # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
+        # other log file descriptor if necessary
         of_client = subprocess.Popen([python, 
                                       pox_exec,
                                       'of_client.pox_client' ],
-                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                     stdout=sys.stdout,
+                                     stderr=subprocess.STDOUT)
     
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
