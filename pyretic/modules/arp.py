@@ -155,14 +155,16 @@ class arp(DynamicPolicy):
                     print pkt
                 pass    
 
+def arp_and_flood():
+    """Handle ARPs and do MAC learning"""
+    return if_(ARP,arp(),flood())
 
 def arp_and_mac_learn():
     """Handle ARPs and do MAC learning"""
     return if_(ARP,arp(),mac_learner())
 
-
 def main():
-    return arp_and_mac_learn()
+    return arp_and_flood()
 
 
 
