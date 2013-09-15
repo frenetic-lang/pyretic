@@ -495,6 +495,14 @@ class union(parallel,Filter):
             raise TypeError
         super(union, self).__init__(policies)
 
+    ### or : Filter -> Filter
+    def __or__(self, pol):
+        if isinstance(pol,union):
+            return union(self.policies + pol.policies)
+        elif isinstance(pol,Filter):
+            return union(self.policies + [pol])
+        else:
+            raise TypeError
 
 
 class sequential(CombinatorPolicy):
@@ -580,6 +588,14 @@ class intersection(sequential,Filter):
             raise TypeError
         super(intersection, self).__init__(policies)
 
+    ### and : Filter -> Filter
+    def __and__(self, pol):
+        if isinstance(pol,intersection):
+            return intersection(self.policies + pol.policies)
+        elif isinstance(pol,Filter):
+            return intersection(self.policies + [pol])
+        else:
+            raise TypeError
 
 
 class dropped_by(CombinatorPolicy,Filter):
