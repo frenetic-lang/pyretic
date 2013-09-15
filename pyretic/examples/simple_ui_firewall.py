@@ -80,4 +80,4 @@ class firewall(DynamicPolicy):
 
 
 def main ():
-    return firewall() >> mac_learner()
+    return firewall() >> flood()
