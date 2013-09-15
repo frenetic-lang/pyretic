@@ -580,10 +580,11 @@ class Runtime(object):
             if not to_add is None:
                 for rule in to_add:
                     self.install_rule(rule)
-            #for rule in to_delete:
-            #    self.delete_rule(rule)
-            #for rule in to_modify:
-            #    self.modify_rule(rule)
+            for rule in to_delete:
+                self.delete_rule((rule[0], rule[1]))
+            for rule in to_modify:
+                self.delete_rule((rule[0], rule[1]))
+                self.install_rule(rule)
 
             # update old_rule
             self.old_rules = new_rules
