@@ -202,7 +202,10 @@ class Packet(object):
 
     def __ne__(self, other):
         return not (self == other)
-                            
+              
+    def modify(self, **kwargs):
+        return self.modifymany(kwargs)
+              
     def modifymany(self, d):
         add = {}
         delete = []

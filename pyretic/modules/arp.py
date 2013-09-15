@@ -52,16 +52,16 @@ RESPONSE=2
 def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     """Construct an arp packet from scratch and send"""
     rp = Packet()
-    rp = rp.push(protocol=msg_type)
-    rp = rp.push(ethtype=ARP_TYPE)
-    rp = rp.push(switch=switch)
-    rp = rp.push(inport=-1)
-    rp = rp.push(outport=outport)
-    rp = rp.push(srcip=srcip)
-    rp = rp.push(srcmac=srcmac)
-    rp = rp.push(dstip=dstip)
-    rp = rp.push(dstmac=dstmac)
-    rp = rp.push(raw='')
+    rp = rp.modify(protocol=msg_type)
+    rp = rp.modify(ethtype=ARP_TYPE)
+    rp = rp.modify(switch=switch)
+    rp = rp.modify(inport=-1)
+    rp = rp.modify(outport=outport)
+    rp = rp.modify(srcip=srcip)
+    rp = rp.modify(srcmac=srcmac)
+    rp = rp.modify(dstip=dstip)
+    rp = rp.modify(dstmac=dstmac)
+    rp = rp.modify(raw='')
 
     if VERBOSE_LEVEL > 0:
         if msg_type == RESPONSE:
