@@ -481,7 +481,20 @@ class parallel(CombinatorPolicy):
 
 
 class union(parallel,Filter):
-    pass
+    def __new__(self, policies=[]):
+        # Hackety hack.
+        if len(policies) == 0:
+            return drop
+        else:
+            rv = super(parallel, self).__new__(union, policies)
+            rv.__init__(policies)
+            return rv
+
+    def __init__(self, policies=[]):
+        if len(policies) == 0:
+            raise TypeError
+        super(union, self).__init__(policies)
+
 
 
 class sequential(CombinatorPolicy):
@@ -553,7 +566,20 @@ class sequential(CombinatorPolicy):
 
 
 class intersection(sequential,Filter):
-    pass
+    def __new__(self, policies=[]):
+        # Hackety hack.
+        if len(policies) == 0:
+            return identity
+        else:
+            rv = super(sequential, self).__new__(intersection, policies)
+            rv.__init__(policies)
+            return rv
+
+    def __init__(self, policies=[]):
+        if len(policies) == 0:
+            raise TypeError
+        super(intersection, self).__init__(policies)
+
 
 
 class dropped_by(CombinatorPolicy,Filter):
