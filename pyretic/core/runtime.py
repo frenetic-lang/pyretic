@@ -239,7 +239,7 @@ class Runtime(object):
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (pred,action_list)
+            return (pred,0,action_list)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
