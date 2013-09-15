@@ -76,6 +76,7 @@ def test_covers_2():
 def test_covers_3():
     assert not match(inport=1).covers(identity)
 
+# TODO check this test
 def test_most_specific_prefix_matching():
     c1 = if_(
             match(srcip='10.0.0.1'), modify(outport=2), 
@@ -88,7 +89,7 @@ def test_most_specific_prefix_matching():
     assert c1.rules != [
         Rule(match(srcip='10.0.0.1'), [modify(outport=2)]),
         Rule(match(srcip='10.0.0.0/16'), [modify(outport=3)]),
-        Rule(match(), [drop])]
+        Rule(identity, [drop])]
 
 
 ### Classifier tests ###
