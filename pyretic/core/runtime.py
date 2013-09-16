@@ -90,7 +90,6 @@ class Runtime(object):
             for p in dynamic_sub_pols:
                 p.attach(self.handle_policy_change)
         self.in_update_network = False
-        self.old_rules = list()
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
         self.global_outstanding_queries = {}
@@ -112,6 +111,10 @@ class Runtime(object):
         self.log_process = Process(target=log,args=(self.log,))
         self.log_process.daemon = True
         self.log_process.start()
+        self.manager = Manager()
+        self.old_rules_lock = Lock()
+        self.old_rules = self.manager.list()
+        self.update_rules_lock = Lock()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -540,57 +543,58 @@ class Runtime(object):
             return None
 
         def install_diff_rules(classifier):
-            old_rules = self.old_rules
-            new_rules = list()
+            with self.old_rules_lock:
+                old_rules = self.old_rules
+                new_rules = list()
 
-            # get new rules
-            priority = len(classifier) + 40000
-            switches = self.network.topology.nodes()
-            for rule in classifier.rules:
-                if isinstance(rule.match, match) and 'switch' in rule.match.map:
-                    if not rule.match.map['switch'] in switches:
-                        continue
-                    new_rules.append((rule.match, priority, rule.actions))
-                else:
-                    for s in switches:
-                        new_rules.append((
-                            rule.match.intersect(match(switch=s)),
-                            priority,
-                            rule.actions))
-                priority -= 1
-
-            # calculate diff
-            to_add = list()
-            to_delete = list()
-            to_modify = list()
-            for old in old_rules:
-                new = find_same_rule(old, new_rules)
-                if new is None:
-                    to_delete.append(old)
-                else:
-                    if old[2] != new[2]:
-                        to_modify.append(new)
-
-            for new in new_rules:
-                old = find_same_rule(new, old_rules)
-                if old is None:
-                    to_add.append(new)
-
-            # install diff
-            if not to_add is None:
-                for rule in to_add:
+                # get new rules
+                priority = len(classifier) + 40000
+                switches = self.network.topology.nodes()
+                for rule in classifier.rules:
+                    if isinstance(rule.match, match) and 'switch' in rule.match.map:
+                        if not rule.match.map['switch'] in switches:
+                            continue
+                        new_rules.append((rule.match, priority, rule.actions))
+                    else:
+                        for s in switches:
+                            new_rules.append((
+                                rule.match.intersect(match(switch=s)),
+                                priority,
+                                rule.actions))
+                    priority -= 1
+    
+                # calculate diff
+                to_add = list()
+                to_delete = list()
+                to_modify = list()
+                for old in old_rules:
+                    new = find_same_rule(old, new_rules)
+                    if new is None:
+                        to_delete.append(old)
+                    else:
+                        if old[2] != new[2]:
+                            to_modify.append(new)
+    
+                for new in new_rules:
+                    old = find_same_rule(new, old_rules)
+                    if old is None:
+                        to_add.append(new)
+    
+                # install diff
+                if not to_add is None:
+                    for rule in to_add:
+                        self.install_rule(rule)
+                for rule in to_delete:
+                    self.delete_rule((rule[0], rule[1]))
+                for rule in to_modify:
+                    self.delete_rule((rule[0], rule[1]))
                     self.install_rule(rule)
-            for rule in to_delete:
-                self.delete_rule((rule[0], rule[1]))
-            for rule in to_modify:
-                self.delete_rule((rule[0], rule[1]))
-                self.install_rule(rule)
-
-            # update old_rule
-            self.old_rules = new_rules
-
-            for s in switches:
-                self.send_barrier(s)
+    
+                # update old_rule
+                self.old_rules = new_rules
+    
+                for s in switches:
+                    self.send_barrier(s)
 
         def f(classifier, this_update_no, current_update_no):
             if not this_update_no is None:
@@ -598,37 +602,8 @@ class Runtime(object):
                 if this_update_no != current_update_no.value:
                     return
 
-            switches = self.network.topology.nodes()
-
-            for s in switches:
-                self.send_barrier(s)
-                self.send_clear(s)
-                self.send_barrier(s)
-                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'send_to_controller' : 0}]))
-
             install_diff_rules(classifier)
             return
-
-            priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
-
-            for rule in classifier.rules:
-                # TODO (josh) put logic in here to figure out when 'inport'
-                # forward location should be used
-                if isinstance(rule.match, match) and 'switch' in rule.match.map:
-                    if not rule.match.map['switch'] in switches:
-                        continue
-                    self.install_rule((rule.match,priority,rule.actions))
-                else:
-                    for s in switches:
-                        self.install_rule((
-                            rule.match.intersect(match(switch=s)),
-                            priority,
-                            rule.actions))
-                priority -= 1
-            for s in switches:
-                self.send_barrier(s)
-                if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
-                    self.request_flow_stats(s)
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
@@ -640,9 +615,6 @@ class Runtime(object):
         classifier = layer_3_specialize(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
-
-        f(classifier, this_update_no, current_update_no)
-        return
 
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
