@@ -941,7 +941,13 @@ class Classifier(object):
     tables.'''
 
     def __init__(self, new_rules=[]):
-        self.rules = new_rules
+        import types
+        if isinstance(new_rules, types.GeneratorType):
+            self.rules = [r for r in new_rules]
+        elif isinstance(new_rules,list):
+            self.rules = new_rules
+        else:
+            raise TypeError
 
     def __len__(self):
         return len(self.rules)
