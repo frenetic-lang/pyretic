@@ -110,6 +110,9 @@ class BackendChannel(asynchat.async_chat):
         elif msg[0] == 'barrier':
             switch = msg[1]
             self.of_client.barrier(switch)
+        elif msg[0] == 'flow_stats_request':
+            switch = msg[1]
+            self.of_client.flow_stats_request(switch)
         else:
             print "ERROR: Unknown msg from frontend %s" % msg
 
@@ -170,7 +173,6 @@ class POXClient(revent.EventMixin):
 
         h["raw"] = raw 
         return h
-
 
     def make_arp(self, packet):
         p = packetlib.ethernet()
@@ -488,6 +490,15 @@ class POXClient(revent.EventMixin):
     def barrier(self,switch):
         b = of.ofp_barrier_request()
         self.switches[switch]['connection'].send(b) 
+
+    def flow_stats_request(self,switch):
+        sr = of.ofp_stats_request()
+        sr.body = of.ofp_flow_stats_request()
+        match = of.ofp_match()
+        sr.body.match = match
+        sr.body.table_id = 0xff
+        sr.body.out_port = of.OFPP_NONE
+        self.switches[switch]['connection'].send(sr) 
     
     def clear(self,switch=None):
         if switch is None:
@@ -527,7 +538,91 @@ class POXClient(revent.EventMixin):
         del self.switches[event.dpid]
         self.send_to_pyretic(['switch','part',event.dpid])
 
-        
+
+    def of_match_to_dict(self, m):
+        h = {}
+        if not m.in_port is None:
+            h["inport"] = m.in_port
+        if not m.dl_src is None:
+            h["srcmac"] = m.dl_src.toRaw()
+        if not m.dl_dst is None:
+            h["dstmac"] = m.dl_dst.toRaw()
+        if not m.dl_type is None:
+            h["ethtype"] = m.dl_type
+        if not m.dl_vlan is None:
+            h["vlan_id"] = m.dl_vlan
+        if not m.dl_vlan_pcp is None:
+            h["vlan_pcp"] = m.dl_vlan_pcp
+        if not m.nw_src is None:
+            h["srcip"] = m.nw_src.toRaw()
+        if not m.nw_dst is None:
+            h["dstip"] = m.nw_dst.toRaw()
+        if not m.nw_proto is None:
+            h["protocol"] = m.nw_proto
+        if not m.nw_tos is None:
+            h["tos"] = m.nw_tos
+        if not m.tp_src is None:
+            h["srcport"] = m.tp_src
+        if not m.tp_dst is None:
+            h["dstport"] = m.tp_dst
+        return h
+
+    def of_actions_to_dicts(self, actions):
+        action_dicts = []
+        for a in actions:
+            d = {}
+            if a.type == of.OFPAT_OUTPUT:
+                d['output'] = a.port
+            elif a.type == of.OFPAT_ENQUEUE:
+                d['enqueue'] = a.port
+            elif a.type == of.OFPAT_STRIP_VLAN:
+                d['strip_vlan_id'] = 0
+            elif a.type == of.OFPAT_SET_VLAN_VID:
+                d['vlan_id'] = a.vlan_vid
+            elif a.type == of.OFPAT_SET_VLAN_PCP:
+                d['vlan_pcp'] = a.vlan_pcp
+            elif a.type == of.OFPAT_SET_DL_SRC:
+                d['srcmac'] = a.dl_addr.toRaw()
+            elif a.type == of.OFPAT_SET_DL_DST:
+                d['dstmac'] = a.dl_addr.toRaw()
+            elif a.type == of.OFPAT_SET_NW_SRC:
+                d['srcip'] = a.nw_addr.toRaw()
+            elif a.type == of.OFPAT_SET_NW_DST:
+                d['dstip'] = a.nw_addr.toRaw()
+            elif a.type == of.OFPAT_SET_NW_TOS:
+                d['tos'] = a.nw_tos
+            elif a.type == of.OFPAT_SET_TP_SRC:
+                d['srcport'] = a.tp_port
+            elif a.type == of.OFPAT_SET_TP_DST:
+                d['dstport'] = a.tp_port
+            action_dicts.append(d)
+        return action_dicts
+
+    def _handle_FlowStatsReceived (self, event):
+        dpid = event.connection.dpid
+        def handle_ofp_flow_stat(flow_stat):
+            flow_stat_dict = {}
+            flow_stat_dict['table_id'] = flow_stat.table_id 
+            #flow_stat.match
+            flow_stat_dict['duration_sec'] = flow_stat.duration_sec
+            flow_stat_dict['duration_nsec'] = flow_stat.duration_nsec
+            flow_stat_dict['priority'] = flow_stat.priority
+            flow_stat_dict['idle_timeout'] = flow_stat.idle_timeout
+            flow_stat_dict['hard_timeout'] = flow_stat.hard_timeout
+            flow_stat_dict['cookie'] = flow_stat.cookie    
+            flow_stat_dict['packet_count'] = flow_stat.packet_count
+            flow_stat_dict['byte_count'] = flow_stat.byte_count
+            match = self.of_match_to_dict(flow_stat.match)
+            flow_stat_dict['match'] = match
+            actions = self.of_actions_to_dicts(flow_stat.actions)
+            flow_stat_dict['actions'] = actions
+            print actions
+            return flow_stat_dict
+        flow_stats = [handle_ofp_flow_stat(s) for s in event.stats]
+        print flow_stats
+        self.send_to_pyretic(['flow_stats_reply',dpid,flow_stats])
+        print '--- sent to pyretic ----'
+
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
         if event.port <= of.OFPP_MAX:

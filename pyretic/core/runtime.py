@@ -341,6 +341,33 @@ class Runtime(object):
             concrete_packet['vlan_pcp'] = vlan_pcp
         return concrete_packet
 
+    def handle_flow_stats_reply(self, switch, flow_stats):
+        def convert(f,val):
+            if f == 'match':
+                import ast
+                val = ast.literal_eval(val)
+                return { g : convert(g,v) for g,v in val.items() }
+            if f == 'actions':
+                import ast
+                vals = ast.literal_eval(val)
+                return [ { g : convert(g,v) for g,v in val.items() }
+                         for val in vals ]
+            if f in ['srcmac','dstmac']:
+                return MAC(val)
+            elif f in ['srcip','dstip']:
+                return IP(val)
+            else:
+                return val
+        flow_stats = [ { f : convert(f,v) 
+                         for (f,v) in flow_stat.items() }
+                       for flow_stat in flow_stats       ]
+        flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
+        def flow_stat_str(flow_stat):
+            output = str(flow_stat['priority']) + ':\t' 
+            output += str(flow_stat['match']) + '\n\t'
+            output += str(flow_stat['actions'])
+            return output
+
     def concrete2pyretic(self,packet):
         def convert(h,val):
             if h in ['srcmac','dstmac']:
@@ -547,6 +574,9 @@ class Runtime(object):
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
+
+    def request_flow_stats(self,switch):
+        self.backend.send_flow_stats_request(switch)
 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)

@@ -105,6 +105,8 @@ class BackendChannel(asynchat.async_chat):
         elif msg[0] == 'packet':
             packet = ConcretePacket(msg[1])
             self.backend.runtime.handle_packet_in(packet)
+        elif msg[0] == 'flow_stats_reply':
+            self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])
         else:
             print 'ERROR: Unknown msg from backend %s' % msg
         return
@@ -139,6 +141,9 @@ class Backend(object):
         
     def send_clear(self,switch):
         self.send_to_OF_client(['clear',switch])
+
+    def send_flow_stats_request(self,switch):
+        self.send_to_OF_client(['flow_stats_request',switch])
 
     def send_barrier(self,switch):
         self.send_to_OF_client(['barrier',switch])
