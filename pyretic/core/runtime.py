@@ -456,11 +456,6 @@ class Runtime(object):
                 if this_update_no != current_update_no.value:
                     return
             switches = self.network.topology.nodes()
-            for s in switches:
-                self.send_barrier(s)
-                self.send_clear(s)
-                self.send_barrier(s)
-                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
 
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
@@ -472,6 +467,12 @@ class Runtime(object):
             classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
+
+            for s in switches:
+                self.send_barrier(s)
+                self.send_clear(s)
+                self.send_barrier(s)
+                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
 
             for rule in classifier.rules:
                 # TODO (josh) put logic in here to figure out when 'inport'
