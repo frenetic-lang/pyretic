@@ -372,6 +372,13 @@ class Runtime(object):
                                    filter(lambda a: a != drop,rule.actions))
                               for rule in classifier.rules)
 
+        def remove_identity(classifier):
+            # DISCUSS (cole): convert identity to inport rather
+            # than drop?
+            return Classifier(Rule(rule.match,
+                                   filter(lambda a: a != identity,rule.actions))
+                              for rule in classifier.rules)
+
         def send_drops_to_controller(classifier):
             def replace_empty_with_controller(actions):
                 if len(actions) == 0:
@@ -385,18 +392,15 @@ class Runtime(object):
         def controllerify(classifier):
             def controllerify_rule(rule):
                 if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
-                    # FIXME (cole): should other actions be taken at the switch
+                    # DISCUSS (cole): should other actions be taken at the switch
                     # before sending to the controller?  i.e. a policy like:
                     # modify(srcip=1) >> ToController.
-                    return Rule(rule.match,[{'send_to_controller' : 0}])
+                    return Rule(rule.match,[Controller])
                 else:
-                    # TODO (cole): convert identity to inport rather
-                    # than drop?
                     return rule
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
         
-
         def remove_buckets(classifier):
             return Classifier(Rule(rule.match,
                                    filter(lambda a: 
@@ -420,6 +424,18 @@ class Runtime(object):
                       if isinstance(m, modify) and len(m.map) > 0 ])
             return Classifier(conflate_modify_maps(rule) 
                               for rule in classifier.rules)
+
+        def concretize_classifier_actions(classifier):
+            def concretize_rule_actions(rule):
+                def concretize_action(action):
+                    if action == Controller:
+                        return {'send_to_controller' : 0}
+                    elif isinstance(action,modify):
+                        return { k:v for (k,v) in action.map.items() }
+                return Rule(rule.match,[concretize_action(a) 
+                                        for a in rule.actions])
+            return Classifier(concretize_rule_actions(r) 
+                              for r in classifier.rules)
 
         def layer_3_specialize(classifier):
             specialized_rules = []
@@ -448,9 +464,11 @@ class Runtime(object):
 
             classifier = remove_drop(classifier)
             #classifier = send_drops_to_controller(classifier)
+            classifier = remove_identity(classifier)
             classifier = controllerify(classifier)
             classifier = remove_buckets(classifier)
 #            classifier = conflate_modify(classifier)
+            classifier = concretize_classifier_actions(classifier)
             classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
