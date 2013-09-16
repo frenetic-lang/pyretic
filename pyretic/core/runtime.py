@@ -450,7 +450,7 @@ class Runtime(object):
             #classifier = send_drops_to_controller(classifier)
             classifier = controllerify(classifier)
             classifier = remove_buckets(classifier)
-            classifier = conflate_modify(classifier)
+#            classifier = conflate_modify(classifier)
             classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
@@ -487,7 +487,7 @@ class Runtime(object):
             for rule in classifier.rules:
                 hook_buckets_to_rule(rule)
 
-        bookkeep_buckets(classifier)
+#        bookkeep_buckets(classifier)
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
         p.start()
