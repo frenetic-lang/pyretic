@@ -57,6 +57,8 @@ class BackendChannel(asynchat.async_chat):
         asynchat.async_chat.__init__(self)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((host, port))
+        self.ac_in_buffer_size = 4096 * 3
+        self.ac_out_buffer_size = 4096 * 3
         self.set_terminator(TERM_CHAR)
         return
 
