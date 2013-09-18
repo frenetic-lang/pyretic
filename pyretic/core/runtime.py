@@ -372,6 +372,9 @@ class Runtime(object):
             output += str(flow_stat['match']) + '\n\t->'
             output += str(flow_stat['actions'])
             return output
+        if self.verbosity == 'high':
+            self.log.put([str(datetime.now()),'flow table for switch='+repr(switch)] + 
+                         [flow_stat_str(f) for f in flow_stats])
 
     def concrete2pyretic(self,packet):
         def convert(h,val):
@@ -523,6 +526,8 @@ class Runtime(object):
             for s in switches:
                 self.delete_rule((match(switch=s),32768))
                 self.send_barrier(s)
+                if self.verbosity == 'high':
+                    self.request_flow_stats(s)
 
         def bookkeep_buckets(classifier):
             """Whenever rules are associated with counting buckets,
