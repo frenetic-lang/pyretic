@@ -31,8 +31,9 @@
 import pyretic.core.util as util
 from pyretic.core.language import *
 from pyretic.core.network import *
-from multiprocessing import Process, RLock, Lock, Value
+from multiprocessing import Process, RLock, Lock, Value, Queue
 import time
+from datetime import datetime
 
 try:
     import ipdb as debugger
@@ -89,6 +90,19 @@ class Runtime(object):
         self.in_update_network = False
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
+        self.log = Queue()
+        def log(queue):
+            while(True):
+                to_log = queue.get()
+                def to_repr(o):
+                    if isinstance(o,str):
+                        return o
+                    else:
+                        return repr(o)
+                print ('|' + to_log[0] + '| ') + '\n'.join(to_repr(l) for l in to_log[1:])
+        self.log_process = Process(target=log,args=(self.log,))
+        self.log_process.daemon = True
+        self.log_process.start()
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -103,10 +117,10 @@ class Runtime(object):
                 elif self.mode == 'proactive0':
                     classifier = self.policy.compile()
                     if self.verbosity == 'high':
-                        print '-----------------------'
-                        print self.policy
-                        print '-------------------------'
-                        print classifier
+                        self.log.put([str(datetime.now()),
+                                      "generate classifier",
+                                      "policy="+repr(self.policy),
+                                      "classifier="+repr(classifier)])
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
                 self.in_update_network = False
 
@@ -125,10 +139,10 @@ class Runtime(object):
             elif self.mode == 'proactive0':
                 classifier = self.policy.compile()
                 if self.verbosity == 'high':
-                    print '-----------------------'
-                    print self.policy
-                    print '-------------------------'
-                    print classifier
+                        self.log.put([str(datetime.now()),
+                                      "generate classifier",
+                                      "policy="+repr(self.policy),
+                                      "classifier="+repr(classifier)])
                 self.install_classifier(classifier)
 
     def handle_switch_join(self,switch_id):
@@ -278,19 +292,10 @@ class Runtime(object):
                 if rule:
                     self.install_rule(rule)
                     if self.verbosity == 'high':
-                        from datetime import datetime
-                        print str(datetime.now()),
-                        print " | install rule"
-                        print rule[0]
-                        print rule[1]
+                        self.log.put([str(datetime.now())," | install rule",rule[0],'actions='+repr(rule[2])])
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        if self.verbosity == 'high':
-            print "-----------------"
-            print "Got packet in. The packet looks like:"
-            print pyretic_pkt
-            print "-----------------"
         if self.debug_packet_in:
             debugger.set_trace()
         if USE_IPDB:
@@ -364,7 +369,7 @@ class Runtime(object):
         flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
         def flow_stat_str(flow_stat):
             output = str(flow_stat['priority']) + ':\t' 
-            output += str(flow_stat['match']) + '\n\t'
+            output += str(flow_stat['match']) + '\n\t->'
             output += str(flow_stat['actions'])
             return output
 

@@ -906,7 +906,7 @@ class Rule(object):
         self.actions = acts
 
     def __str__(self):
-        return str(self.match) + '\tactions:\t' + str(self.actions)
+        return str(self.match) + '\n  -> ' + str(self.actions)
 
     def __repr__(self):
         return str(self)
@@ -953,7 +953,7 @@ class Classifier(object):
         return len(self.rules)
 
     def __str__(self):
-        return '\n'.join(map(str,self.rules))
+        return '\n '.join(map(str,self.rules))
 
     def __repr__(self):
         return str(self)
