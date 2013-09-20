@@ -33,7 +33,8 @@
 # mininet: mininet.sh --topo=single,3                                          #
 # pyretic: pyretic.py pyretic.examples.bucket -m p0                            #
 # test:    `h_i ping h_j` produce increasing (packet/byte) counts every        #
-#           10 seconds in buckets b_i.                                         #
+#          10 seconds in buckets b_i.                                          #
+#          In i/r0 modes, reported counts from switches are always 0.          #
 ################################################################################
 
 from pyretic.lib.corelib import *
