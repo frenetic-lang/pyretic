@@ -392,7 +392,6 @@ class CountBucket(Query):
         self.matches = set([])
         self.runtime_stats_query_fun = None
         self.outstanding_switches = []
-        self.user_callback_funs = []
         
     def __repr__(self):
         return "CountBucket"
@@ -415,9 +414,6 @@ class CountBucket(Query):
         """
         if not self.runtime_stats_query_fun:
             self.runtime_stats_query_fun = fun
-
-    def register_callback(self, callback_fun):
-            self.user_callback_funs.append(callback_fun)
 
     def pull_stats(self):
         """Issue stats queries from the runtime"""
@@ -458,7 +454,7 @@ class CountBucket(Query):
             self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
         if not self.outstanding_switches:
-            for f in self.user_callback_funs:
+            for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
 
     def __eq__(self, other):
