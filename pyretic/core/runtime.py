@@ -94,7 +94,12 @@ class Runtime(object):
         self.log = Queue()
         def log(queue):
             while(True):
-                to_log = queue.get()
+                try:
+                    to_log = queue.get()
+                except KeyboardInterrupt, e:
+                    print "\nkilling log"
+                    import sys
+                    sys.exit(0)
                 def to_repr(o):
                     if isinstance(o,str):
                         return o
