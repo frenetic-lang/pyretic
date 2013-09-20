@@ -77,8 +77,9 @@ def parseArgs():
                      choices=['interpreted','i','reactive0','r0','proactive0','p0'], 
                      help = '|'.join( ['interpreted/i','reactive0/r0'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
-                     choices=['low','normal','high'], default = 'low',
-                     help = '|'.join( ['quiet','high'] )  )
+                   choices=['low','normal','high','please-make-it-stop'],
+                   default = 'low',
+                   help = '|'.join( ['low','normal','high','please-make-it-stop'] )  )
 
     op.set_defaults(frontend_only=False,mode='reactive0')
     options, args = op.parse_args()

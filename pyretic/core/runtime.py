@@ -52,7 +52,7 @@ class Runtime(object):
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.mode = mode
-        self.verbosity = verbosity
+        self.verbosity = self.verbosity_numeric(verbosity)
         self.backend = backend
         self.backend.runtime = self
         self.vlan_to_extended_values_db = {}
@@ -89,6 +89,14 @@ class Runtime(object):
         self.in_update_network = False
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
+        self.global_outstanding_queries = {}
+
+    def verbosity_numeric(self,verbosity_option):
+        numeric_map = { 'low': 1,
+                        'normal': 2,
+                        'high': 3,
+                        'please-make-it-stop': 4}
+        return numeric_map.get(verbosity_option, 0)
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -102,7 +110,7 @@ class Runtime(object):
                     self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0':
                     classifier = self.policy.compile()
-                    if self.verbosity == 'high':
+                    if self.verbosity >= self.verbosity_numeric('high'):
                         print '-----------------------'
                         print self.policy
                         print '-------------------------'
@@ -124,7 +132,7 @@ class Runtime(object):
                 self.clear_all() 
             elif self.mode == 'proactive0':
                 classifier = self.policy.compile()
-                if self.verbosity == 'high':
+                if self.verbosity >= self.verbosity_numeric('high'):
                     print '-----------------------'
                     print self.policy
                     print '-------------------------'
@@ -277,7 +285,7 @@ class Runtime(object):
                 rule = self.match_on_all_fields_rule(in_pkt,out_pkts)
                 if rule:
                     self.install_rule(rule)
-                    if self.verbosity == 'high':
+                    if self.verbosity >= self.verbosity_numeric('high'):
                         from datetime import datetime
                         print str(datetime.now()),
                         print " | install rule"
@@ -286,7 +294,7 @@ class Runtime(object):
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        if self.verbosity == 'high':
+        if self.verbosity >= self.verbosity_numeric('high'):
             print "-----------------"
             print "Got packet in. The packet looks like:"
             print pyretic_pkt
@@ -368,6 +376,19 @@ class Runtime(object):
             output += str(flow_stat['actions'])
             return output
 
+        if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
+            print "\n-------------------"
+            print "Statistics for switch", switch
+            for f in flow_stats:
+                print flow_stat_str(f)
+                print f
+            print "-------------------\n"
+
+        if switch in self.global_outstanding_queries:
+            for bucket in self.global_outstanding_queries[switch]:
+                bucket.handle_flow_stats_reply(switch, flow_stats)
+            del self.global_outstanding_queries[switch]
+
     def concrete2pyretic(self,packet):
         def convert(h,val):
             if h in ['srcmac','dstmac']:
@@ -427,29 +448,31 @@ class Runtime(object):
                     return rule
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
+
+        def bookkeep_buckets(classifier):
+            """Whenever rules are associated with counting buckets,
+            add a reference to the classifier rule into the respective
+            bucket for querying later. Count bucket actions operate at
+            the pyretic level and are removed before installing rules.
+            """
+            def hook_buckets_to_rule(rule):
+                for act in rule.actions:
+                    if isinstance(act, CountBucket):
+                        act.add_match(rule.match)
+
+            def hook_buckets_to_pull_stats(rule):
+                for act in rule.actions:
+                    if isinstance(act, CountBucket):
+                        act.add_pull_stats(self.pull_stats_for_bucket(act))
+
+            map(hook_buckets_to_rule, classifier.rules)
+            map(hook_buckets_to_pull_stats, classifier.rules)
         
         def remove_buckets(classifier):
             return Classifier(Rule(rule.match,
                                    filter(lambda a: 
                                           not isinstance(a, CountBucket),
                                           rule.actions))
-                              for rule in classifier.rules)
-
-        def conflate_modify(classifier):
-            """Conflates all the modify maps in the actions list to
-            one list of maps from all the modify actions.
-            Pre-condition: all actions in the actions_list of the rule
-            at this point must be modify actions.
-            """
-            def conflate_modify_maps(rule):
-                # TODO(ngsrinivas): remove isinstance conservative
-                # check after handling all other classifier actions
-                # for rule installation
-                return Rule(
-                    rule.match,
-                    [ m.map for m in rule.actions
-                      if isinstance(m, modify) and len(m.map) > 0 ])
-            return Classifier(conflate_modify_maps(rule) 
                               for rule in classifier.rules)
 
         def concretize_classifier_actions(classifier):
@@ -459,6 +482,8 @@ class Runtime(object):
                         return {'send_to_controller' : 0}
                     elif isinstance(action,modify):
                         return { k:v for (k,v) in action.map.items() }
+                    else: # default
+                        return action
                 return Rule(rule.match,[concretize_action(a) 
                                         for a in rule.actions])
             return Classifier(concretize_rule_actions(r) 
@@ -483,15 +508,6 @@ class Runtime(object):
                 if this_update_no != current_update_no.value:
                     return
             switches = self.network.topology.nodes()
-
-            classifier = remove_drop(classifier)
-            #classifier = send_drops_to_controller(classifier)
-            classifier = remove_identity(classifier)
-            classifier = controllerify(classifier)
-            classifier = remove_buckets(classifier)
-#            classifier = conflate_modify(classifier)
-            classifier = concretize_classifier_actions(classifier)
-            classifier = layer_3_specialize(classifier)
 
             priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)
 
@@ -519,21 +535,17 @@ class Runtime(object):
                 self.delete_rule((match(switch=s),32768))
                 self.send_barrier(s)
 
-        def bookkeep_buckets(classifier):
-            """Whenever rules are associated with counting buckets,
-            add a reference to the classifier rule into the respective
-            bucket for querying later. Count bucket actions operate at
-            the pyretic level and are removed before installing rules.
-            """
-            def hook_buckets_to_rule(rule):
-                for act in rule.actions:
-                    if isinstance(act, CountBucket):
-                        act.add_match(rule.match)
-                return rule
-            for rule in classifier.rules:
-                hook_buckets_to_rule(rule)
+        # Process classifier to an openflow-compatible format before
+        # sending out rule installs
+        classifier = remove_drop(classifier)
+        #classifier = send_drops_to_controller(classifier)
+        classifier = remove_identity(classifier)
+        classifier = controllerify(classifier)
+        classifier = concretize_classifier_actions(classifier)
+        classifier = layer_3_specialize(classifier)
+        bookkeep_buckets(classifier)
+        classifier = remove_buckets(classifier)
 
-#        bookkeep_buckets(classifier)
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
         p.start()
@@ -574,6 +586,30 @@ class Runtime(object):
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
+
+    def pull_stats_for_bucket(self,bucket):
+        """Returns a function that can be used by counting buckets to
+        issue queries from the runtime."""
+        def pull_bucket_stats():
+            switch_list = []
+            for match in bucket.matches:
+                concrete_pred = { k:v for (k,v) in match.map.items() }
+                if 'switch' in concrete_pred:
+                    switch_list.append(switch)
+                else:
+                    switch_list = self.network.topology.nodes()
+                    break
+            for s in switch_list:
+                bucket.add_outstanding_switch_query(s)
+                self.add_global_outstanding_query(s, bucket)
+                self.request_flow_stats(s)
+        return pull_bucket_stats
+
+    def add_global_outstanding_query(self, s, bucket):
+        if not s in self.global_outstanding_queries:
+            self.global_outstanding_queries[s] = [bucket]
+        else:
+            self.global_outstanding_queries[s].append(bucket)
 
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)

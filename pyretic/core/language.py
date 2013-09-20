@@ -176,11 +176,11 @@ class match(Filter):
             if (f=='srcip'):
                 most_specific_src = _intersect_ip(self.map[f], pol.map[f])
                 if most_specific_src is None:
-                    return None
+                    return none
             elif (f=='dstip'):
                 most_specific_dst = _intersect_ip(self.map[f], pol.map[f])
                 if most_specific_dst is None:
-                    return None
+                    return none
             elif (self.map[f] != pol.map[f]):
                 return none
 
@@ -390,6 +390,9 @@ class CountBucket(Query):
     def __init__(self):
         super(CountBucket, self).__init__()
         self.matches = set([])
+        self.runtime_stats_query_fun = None
+        self.outstanding_switches = []
+        self.user_callback_funs = []
         
     def __repr__(self):
         return "CountBucket"
@@ -400,10 +403,63 @@ class CountBucket(Query):
         
     def add_match(self, m):
         """Add a match m to list of classifier rules to be queried for
-        counts."""
+        counts.
+        """
         assert(isinstance(m, match))
         if not m in self.matches:
             self.matches.add(m)
+
+    def add_pull_stats(self, fun):
+        """Point to function that issues stats queries in the
+        runtime.
+        """
+        if not self.runtime_stats_query_fun:
+            self.runtime_stats_query_fun = fun
+
+    def register_callback(self, callback_fun):
+            self.user_callback_funs.append(callback_fun)
+
+    def pull_stats(self):
+        """Issue stats queries from the runtime"""
+        if not self.runtime_stats_query_fun is None:
+            self.outstanding_switches = []
+            self.packet_count = 0
+            self.byte_count = 0
+            self.runtime_stats_query_fun()
+        else:
+            raise NotImplementedError
+
+    def add_outstanding_switch_query(self,switch):
+        self.outstanding_switches.append(switch)
+
+    def handle_flow_stats_reply(self,switch,flow_stats):
+        """Given a flow_stats_reply from switch, collect only those
+        counts which are relevant to this bucket.
+
+        Very simple processing for now: just collect all packet and
+        byte counts from rules that have a match that is in the set of
+        matches this bucket is interested in.
+        """
+        def stat_in_bucket(flow_stat):
+            table_match = match(f['match'])
+            if table_match in self.matches:
+                return True
+            for m in self.matches:
+                if m.intersect(table_match) == table_match:
+                    return True
+            return False
+
+        if switch in self.outstanding_switches:
+            for f in flow_stats:
+                if 'match' in f:
+                    if stat_in_bucket(f):
+                        self.packet_count += f['packet_count']
+                        self.byte_count   += f['byte_count']
+            self.outstanding_switches.remove(switch)
+        # If have all necessary data, call user-land registered callbacks
+        if not self.outstanding_switches:
+            for f in self.user_callback_funs:
+                f([self.packet_count, self.byte_count])
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should

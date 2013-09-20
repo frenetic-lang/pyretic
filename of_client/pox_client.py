@@ -616,12 +616,9 @@ class POXClient(revent.EventMixin):
             flow_stat_dict['match'] = match
             actions = self.of_actions_to_dicts(flow_stat.actions)
             flow_stat_dict['actions'] = actions
-            print actions
             return flow_stat_dict
         flow_stats = [handle_ofp_flow_stat(s) for s in event.stats]
-        print flow_stats
         self.send_to_pyretic(['flow_stats_reply',dpid,flow_stats])
-        print '--- sent to pyretic ----'
 
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
