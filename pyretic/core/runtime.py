@@ -565,6 +565,11 @@ class Runtime(object):
             concrete_pred = { k:v for (k,v) in pred.map.items() }
         else:
             raise TypeError
+        if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
+            self.log.put([str(datetime.now()),
+                          "sending openflow rule:",
+                          (str(priority) + " " + repr(concrete_pred) +
+                           " "+ repr(action_list))])
         self.backend.send_install(concrete_pred,priority,action_list)
 
     def delete_rule(self,(pred,priority)):

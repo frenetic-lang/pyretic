@@ -30,10 +30,10 @@
 ################################################################################
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
-# mininet: mininet.sh --topo=clique,3,3 (or other single subnet network)       #
+# mininet: mininet.sh --topo=single,3                                          #
 # pyretic: pyretic.py pyretic.examples.bucket -m p0                            #
-# test:    `h1 ping h2` or `h2 ping h1` produce increasing                     #
-#          (packet/byte) counts every 10 seconds in the respective buckets.    #
+# test:    `h_i ping h_j` produce increasing (packet/byte) counts every        #
+#           10 seconds in buckets b_i.                                         #
 ################################################################################
 
 from pyretic.lib.corelib import *
@@ -58,7 +58,8 @@ class QueryTest(CountBucket):
         while True:
             print "---------"
             print "Printing matches for bucket", str(id(self)), "at time:", t
-            print self.matches
+            for m in self.matches:
+                print m
             print "---------"
             self.pull_stats()
             print "Issued query, sleeping for 10 seconds"
@@ -68,16 +69,42 @@ class QueryTest(CountBucket):
     def query_callback(self, counts):
         print "*** In user callback for bucket", id(self)
         print "(packet, byte) counts:", counts
-        
-def main():
-    b1 = QueryTest()
-    b2 = QueryTest()
-    pol1 = match(srcip=IPAddr('10.0.0.1')) >> b1
-    pol2 = match(srcip=IPAddr('10.0.0.2')) >> b2
+
+def asymmetric_main():
+    """Just another candidate policy; the default policy is in main() below."""
+    b = [] # counting buckets
+    for i in range(0,2):
+        b.append(QueryTest())
+        time.sleep(0.2)
+
+    pol1 = match(srcip=IPAddr('10.0.0.1')) >> b[0]
+    pol2 = match(srcip=IPAddr('10.0.0.2')) >> b[1]
     pol3 = (match(srcip=IPAddr('10.0.0.2')) >>
             modify(srcip=IPAddr('10.0.0.1')) >> fwd(2))
-    pol4 = match(srcip=IPAddr('10.0.0.3')) >> b1
+    pol4 = match(srcip=IPAddr('10.0.0.3')) >> b[0]
     pol5 = (match(srcip=IPAddr('10.0.0.1')) >> 
             modify(srcip=IPAddr('10.0.0.2')) >> fwd(1))
+
     return pol1 + pol2 + pol3 + pol4 + pol5
+
+def main():
+    ip1 = IPAddr('10.0.0.1')
+    ip2 = IPAddr('10.0.0.2')
+    ip3 = IPAddr('10.0.0.3')
+
+    fwding = ( (match(dstip=ip1) >> fwd(1)) +
+               (match(dstip=ip2) >> fwd(2)) +
+               (match(dstip=ip3) >> fwd(3)) )
+
+    b = [] # counting buckets
+    for i in range(0,4):
+        b.append(QueryTest())
+        time.sleep(0.2)
+
+    query1 = match(srcip=ip1) >> b[0]
+    query2 = match(srcip=ip2) >> b[1]
+    query3 = match(srcip=ip3) >> b[2]
+    query4 = match(srcip=ip1) >> match(dstip=ip2) >> b[3]
+
+    return fwding + query1 + query2 + query3 + query4
 

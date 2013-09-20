@@ -392,6 +392,8 @@ class CountBucket(Query):
         self.matches = set([])
         self.runtime_stats_query_fun = None
         self.outstanding_switches = []
+        self.packet_count = 0
+        self.byte_count = 0
         
     def __repr__(self):
         return "CountBucket"
@@ -423,7 +425,8 @@ class CountBucket(Query):
             self.byte_count = 0
             self.runtime_stats_query_fun()
         else:
-            raise NotImplementedError
+            for f in self.callbacks:
+                f([self.packet_count, self.byte_count])
 
     def add_outstanding_switch_query(self,switch):
         self.outstanding_switches.append(switch)
