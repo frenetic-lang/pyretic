@@ -74,6 +74,9 @@ class firewall(DynamicPolicy):
                 except:
                     print "Invalid Format"
             elif nb == 'q':
+                print "Quitting"
+                import os, signal
+                os.kill(os.getpid(), signal.SIGINT)
                 return
             else:
                 print "Invalid option"    
