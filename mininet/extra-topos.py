@@ -3,7 +3,7 @@ from mininet.topo import Topo
 
 class ChainTopo(Topo):
  
-    def __init__(self, numSwitches, numClients, numServers=0):
+    def __init__(self, numSwitches, numClients, numServers=0, noIP=False):
 
         # Add default members to class.
         super(ChainTopo, self ).__init__()
@@ -15,16 +15,19 @@ class ChainTopo(Topo):
         client_ids = ['h'+str(i) for i in range(1,numClients+1)]
         server_ids = ['hs'+str(i) for i in range(1,numServers+1)]
 
-        self.add_hosts(client_ids + server_ids)
+        self.add_hosts(client_ids + server_ids,noIP)
         self.connect_hosts(switch_inds,client_ids,server_ids)
 
     def add_switches(self,switch_inds):
         for i in switch_inds:
             self.addSwitch('s'+str(i))
 
-    def add_hosts(self,host_ids):
+    def add_hosts(self,host_ids,noIP):
         for i in host_ids:
-            self.addHost(i)
+            if not noIP:
+                self.addHost(i)
+            else:
+                self.addHost(i,ip=None)
 
     def connect_switches(self,switch_ids):
 
