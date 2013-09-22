@@ -30,7 +30,6 @@
 
 import pyretic.core.util as util
 from pyretic.core.language import *
-from pyretic.core.network import *
 from multiprocessing import Process, RLock, Lock, Value, Queue
 import time
 from datetime import datetime
@@ -286,6 +285,13 @@ class Runtime(object):
                 if not out_val == in_val: 
                     actions[field] = out_val
             action_list.append(actions)
+
+        # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
+        if pkt_in['ethtype'] == ARP_TYPE: 
+            for action_set in action_list:
+                if len(action_set) > 1:
+                    return None
+
         return (pred,0,action_list)
 
 
@@ -500,8 +506,18 @@ class Runtime(object):
                      ( 'srcip' in rule.match.map or 
                        'dstip' in rule.match.map ) and 
                      not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & match(ethtype=0x800),rule.actions))
-                    specialized_rules.append(Rule(rule.match & match(ethtype=0x806),rule.actions))
+                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
+
+                    # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
+                    arp_bug = False
+                    for action_set in rule.actions:
+                        if len(action_set) > 1:
+                            arp_bug = True
+                            break
+                    if arp_bug:
+                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[{'send_to_controller' : 0}]))
+                    else:
+                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)

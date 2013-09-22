@@ -31,11 +31,6 @@ from pyretic.core.language import Policy, Filter, DerivedPolicy, identity, all_p
 import pyretic.core.util as util
 from datetime import datetime
 
-### DEFINITIONS
-ARP_TYPE = 0x806
-IP_TYPE  = 0x800
-
-
 ### BREAKPOINT policy
 class breakpoint(DerivedPolicy):
     def eval(self, pkt):

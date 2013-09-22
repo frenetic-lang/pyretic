@@ -43,7 +43,7 @@ from pyretic.lib.query import *
 def printer(pkt):
     print "------packet--------"
     print pkt
-    if pkt['ethtype'] == 0x800:
+    if pkt['ethtype'] == IP_TYPE:
         print "Ethernet packet, try to decode"
         raw_bytes = [ord(c) for c in pkt['raw']]
         print "ethernet payload is %d" % pkt['payload_len']    
