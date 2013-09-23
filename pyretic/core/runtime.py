@@ -34,6 +34,8 @@ from multiprocessing import Process, RLock, Lock, Value, Queue
 import time
 from datetime import datetime
 
+TABLE_MISS_PRIORITY = 0
+
 try:
     import ipdb as debugger
     USE_IPDB=True
@@ -540,7 +542,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
+                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'send_to_controller' : 0}]))
 
             for rule in classifier.rules:
                 # TODO (josh) put logic in here to figure out when 'inport'
@@ -557,7 +559,6 @@ class Runtime(object):
                             rule.actions))
                 priority -= 1
             for s in switches:
-                self.delete_rule((match(switch=s),32768))
                 self.send_barrier(s)
                 if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
                     self.request_flow_stats(s)
@@ -614,7 +615,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule((match(switch=s),32768,[{'send_to_controller' : 0}]))
+                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'send_to_controller' : 0}]))
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
