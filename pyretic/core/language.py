@@ -157,13 +157,13 @@ class match(Filter):
 
     def __eq__(self, other):
         return ( (isinstance(other, match) and self.map == other.map)
-            or (other == true and len(self.map) == 0) )
+            or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
-        if pol == true:
+        if pol == identity:
             return self
-        elif pol == false:
-            return false
+        elif pol == drop:
+            return drop
         elif not isinstance(pol,match):
             raise TypeError
         fs1 = set(self.map.keys())
@@ -176,13 +176,13 @@ class match(Filter):
             if (f=='srcip'):
                 most_specific_src = _intersect_ip(self.map[f], pol.map[f])
                 if most_specific_src is None:
-                    return none
+                    return drop
             elif (f=='dstip'):
                 most_specific_dst = _intersect_ip(self.map[f], pol.map[f])
                 if most_specific_dst is None:
-                    return none
+                    return drop
             elif (self.map[f] != pol.map[f]):
-                return none
+                return drop
 
         d = self.map.update(pol.map)
 
@@ -204,13 +204,13 @@ class match(Filter):
         return hash(self.map)
 
     def covers(self,other):
-        # Return true if self matches every packet that other matches (and maybe more).
+        # Return identity if self matches every packet that other matches (and maybe more).
         # eg. if other is specific on any field that self lacks.
-        if other == true and len(self.map.keys()) > 0:
+        if other == identity and len(self.map.keys()) > 0:
             return False
-        elif other == true:
+        elif other == identity:
             return True
-        elif other == false:
+        elif other == drop:
             return True
         if set(self.map.keys()) - set(other.map.keys()):
             return False
@@ -236,7 +236,7 @@ class match(Filter):
 
     def compile(self):
         r1 = Rule(self,[identity])
-        r2 = Rule(true,[drop])
+        r2 = Rule(identity,[drop])
         return Classifier([r1, r2])
 
     def __repr__(self):
@@ -622,7 +622,7 @@ class sequential(CombinatorPolicy):
                 return set()
             if policy == identity:
                 continue
-            if policy == none:
+            if policy == drop:
                 return set()
             output = set()
             for p in prev_output:
@@ -640,7 +640,7 @@ class sequential(CombinatorPolicy):
             if policy == identity:
                 eval_trace.add_trace(EvalTrace(policy))
                 continue
-            if policy == none:
+            if policy == drop:
                 eval_trace.add_trace(EvalTrace(policy))
                 return (set(),eval_trace)
             output = set()
@@ -714,7 +714,7 @@ class dropped_by(CombinatorPolicy,Filter):
 
 class DerivedPolicy(Policy):
     """Abstract class for policies derived from other policies."""
-    def __init__(self, policy=passthrough):
+    def __init__(self, policy=identity):
         self.policy = policy
         super(DerivedPolicy,self).__init__()
 
@@ -763,7 +763,7 @@ class match_modify(DerivedPolicy):
 class if_(DerivedPolicy):
     """if predicate holds, t_branch, otherwise f_branch."""
     ### init : Policy -> Policy -> Policy -> unit
-    def __init__(self, pred, t_branch, f_branch=passthrough):
+    def __init__(self, pred, t_branch, f_branch=identity):
         self.pred = pred
         self.t_branch = t_branch
         self.f_branch = f_branch
@@ -1031,13 +1031,13 @@ class Classifier(object):
         for r1 in c1.rules:
             for r2 in c2.rules:
                 intersection = r1.match.intersect(r2.match)
-                if intersection != none:
+                if intersection != drop:
                     # TODO (josh) logic for detecting when sets of actions can't be combined
                     # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
                     actions = r1.actions + r2.actions
-                    actions = filter(lambda a: a != none,actions)
+                    actions = filter(lambda a: a != drop,actions)
                     if len(actions) == 0:
-                        actions = [none]
+                        actions = [drop]
                     c.rules.append(Rule(intersection, actions))
         for r1 in c1.rules:
             c.rules.append(r1)
@@ -1052,25 +1052,25 @@ class Classifier(object):
             act = act.policy
         if act == identity:
             return pkts
-        elif act == none:
-            return false
+        elif act == drop:
+            return drop
         elif act == Controller or isinstance(act, CountBucket):
-            return true
+            return identity
         elif isinstance(act, modify):
             new_match_dict = {}
-            if pkts == true:
-                return true
-            elif pkts == false:
-                return false
+            if pkts == identity:
+                return identity
+            elif pkts == drop:
+                return drop
             for f, v in pkts.map.iteritems():
                 if f in act.map and act.map[f] == v:
                     continue
                 elif f in act.map and act.map[f] != v:
-                    return false
+                    return drop
                 else:
                     new_match_dict[f] = v
             if len(new_match_dict) == 0:
-                return true
+                return identity
             return match(**new_match_dict)
         else:
             # TODO (cole) use compile error.
@@ -1084,8 +1084,8 @@ class Classifier(object):
             a1 = a1.policy
         # TODO: be uniform about returning copied or modified objects.
         new_actions = []
-        if a1 == none:
-            return [none]
+        if a1 == drop:
+            return [drop]
         elif a1 == identity:
             return as2
         elif a1 == Controller or isinstance(a1, CountBucket):
@@ -1095,8 +1095,8 @@ class Classifier(object):
                 while isinstance(a2, DerivedPolicy):
                     a2 = a2.policy
                 new_a1 = modify(**a1.map.copy())
-                if a2 == none:
-                    new_actions.append(none)
+                if a2 == drop:
+                    new_actions.append(drop)
                 elif a2 == Controller or isinstance(a2, CountBucket): 
                     new_actions.append(a2)
                 elif a2 == identity:
@@ -1122,11 +1122,11 @@ class Classifier(object):
         new_rules = []
         for rule in c.rules:
             pkts = self._commute_test(act, rule.match)
-            if pkts == true:
+            if pkts == identity:
                 acts = self._sequence_actions(act, rule.actions)
                 new_rules += [Rule(identity, acts)]
                 break
-            elif pkts == false:
+            elif pkts == drop:
                 continue
             else:
                 acts = self._sequence_actions(act, rule.actions)
