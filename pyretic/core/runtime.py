@@ -389,7 +389,9 @@ class Runtime(object):
         def flow_stat_str(flow_stat):
             output = str(flow_stat['priority']) + ':\t' 
             output += str(flow_stat['match']) + '\n\t->'
-            output += str(flow_stat['actions'])
+            output += str(flow_stat['actions']) + '\n\t'
+            output += 'packet_count=' + str(flow_stat['packet_count']) 
+            output += '\tbyte_count=' + str(flow_stat['byte_count'])
             return output
         if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
             self.log.put([str(datetime.now()),'flow table for switch='+repr(switch)] + 
