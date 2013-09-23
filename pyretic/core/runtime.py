@@ -511,9 +511,12 @@ class Runtime(object):
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
                     for action_set in rule.actions:
-                        if len(action_set) > 1:
-                            arp_bug = True
-                            break
+                        try:
+                            if len(action_set) > 1:
+                                arp_bug = True
+                                break
+                        except:
+                            pass
                     if arp_bug:
                         specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[{'send_to_controller' : 0}]))
                     else:
