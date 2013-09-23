@@ -57,15 +57,17 @@ def deserialize(serialized_msgs):
             return item
     serialized_msg = serialized_msgs.pop(0)
     jsoned_msg = serialized_msg.rstrip(TERM_CHAR)
-    try:
-        msg = json.loads(jsoned_msg)  
-    except:
-        p2 = serialized_msgs.pop(0).rstrip(TERM_CHAR)
+    msg = None
+    while True:
         try:
-            msg = json.loads(jsoned_msg+p2)
+            msg = json.loads(jsoned_msg)  
+            msg = json2python(msg)
+            break
         except:
-            raise RuntimeError("BAD MSG IN!!!!")
-    msg = json2python(msg)
+            if len(serialized_msgs) == 0:
+                break
+            next_part = serialized_msgs.pop(0).rstrip(TERM_CHAR)
+            jsoned_msg += next_part
     return msg
 
 

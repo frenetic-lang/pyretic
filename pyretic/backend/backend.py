@@ -83,7 +83,9 @@ class BackendChannel(asynchat.async_chat):
             msg = deserialize(self.received_data)
 
         # USE DESERIALIZED MSG
-        if msg[0] == 'switch':
+        if msg is None or len(msg) == 0:
+            print "ERROR: empty message"
+        elif msg[0] == 'switch':
             if msg[1] == 'join':
                 if msg[3] == 'BEGIN':
                     self.backend.runtime.handle_switch_join(msg[2])
