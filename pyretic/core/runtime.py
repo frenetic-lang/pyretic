@@ -628,7 +628,7 @@ class Runtime(object):
             for match in bucket.matches:
                 concrete_pred = { k:v for (k,v) in match.map.items() }
                 if 'switch' in concrete_pred:
-                    switch_list.append(switch)
+                    switch_list.append(concrete_pred['switch'])
                 else:
                     switch_list = self.network.topology.nodes()
                     break
