@@ -133,7 +133,7 @@ class Runtime(object):
                 self.policy.set_network(self.prev_network)
                 if self.mode == 'reactive0':
                     self.clear_all(this_update_network_no,self.update_network_no)
-                elif self.mode == 'proactive0':
+                elif self.mode == 'proactive0' or self.mode == 'proactive1':
                     classifier = self.policy.compile()
                     if self.verbosity >= self.verbosity_numeric('high'):
                         self.log.put([str(datetime.now()),
@@ -155,7 +155,7 @@ class Runtime(object):
         else:
             if self.mode == 'reactive0':
                 self.clear_all() 
-            elif self.mode == 'proactive0':
+            elif self.mode == 'proactive0' or self.mode == 'proactive1':
                 classifier = self.policy.compile()
                 if self.verbosity >= self.verbosity_numeric('high'):
                         self.log.put([str(datetime.now()),
@@ -326,14 +326,16 @@ class Runtime(object):
             debugger.set_trace()
         if USE_IPDB:
              with debugger.launch_ipdb_on_exception():
-                 if self.mode == 'interpreted' or self.mode == 'proactive0':
+                 if (self.mode == 'interpreted' or 
+                     self.mode == 'proactive0' or self.mode == 'proactive1'):
                      output = self.policy.eval(pyretic_pkt)
                  else:
                      (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
                      self.reactive0(pyretic_pkt,output,eval_trace)
         else:
             try:
-                if self.mode == 'interpreted' or self.mode == 'proactive0':
+                if (self.mode == 'interpreted' or 
+                    self.mode == 'proactive0' or self.mode == 'proactive1'):
                     output = self.policy.eval(pyretic_pkt)
                 else:
                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
@@ -533,6 +535,36 @@ class Runtime(object):
                                           rule.actions))
                               for rule in classifier.rules)
 
+        ### UPDATE LOGIC
+
+        def nuclear_install(classifier):
+            switches = self.network.topology.nodes()
+            priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)  
+            for s in switches:
+                self.send_barrier(s)
+                self.send_clear(s)
+                self.send_barrier(s)
+                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+
+            for rule in classifier.rules:
+                # TODO (josh) put logic in here to figure out when 'inport'
+                # forward location should be used
+                if isinstance(rule.match, match) and 'switch' in rule.match.map:
+                    if not rule.match.map['switch'] in switches:
+                        continue
+                    self.install_rule((rule.match,priority,rule.actions))
+                else:
+                    for s in switches:
+                        self.install_rule((
+                            rule.match.intersect(match(switch=s)),
+                            priority,
+                            rule.actions))
+                priority -= 1
+            for s in switches:
+                self.send_barrier(s)
+                if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
+                    self.request_flow_stats(s)
+
 
         ### INCREMENTAL UPDATE LOGIC
 
@@ -604,8 +636,10 @@ class Runtime(object):
                 if this_update_no != current_update_no.value:
                     return
 
-            install_diff_rules(classifier)
-            return
+            if self.mode == 'proactive0':
+                nuclear_install(classifier)
+            elif self.mode == 'proactive1':
+                install_diff_rules(classifier)
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
