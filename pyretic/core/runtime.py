@@ -182,97 +182,21 @@ class Runtime(object):
     def handle_link_update(self, s1, p_no1, s2, p_no2):
         self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
-    def match_on_all_fields_pred(self, pkt):
-        try:
-            return match(
-                switch=pkt['switch'],
-                inport=pkt['inport'],
-                srcmac=pkt['srcmac'],
-                dstmac=pkt['dstmac'],
-                ethtype=pkt['ethtype'],
-                srcip=pkt['srcip'],
-                dstip=pkt['dstip'],
-                protocol=pkt['protocol'],
-                tos=pkt['tos'],
-                srcport=pkt['srcport'],
-                dstport=pkt['dstport'],
-                vlan_id=pkt['vlan_id'],
-                vlan_pcp=pkt['vlan_pcp'])
-        except:
-            try:
-                return match(
-                    switch=pkt['switch'],
-                    inport=pkt['inport'],
-                    srcmac=pkt['srcmac'],
-                    dstmac=pkt['dstmac'],
-                    ethtype=pkt['ethtype'],
-                    srcip=pkt['srcip'],
-                    dstip=pkt['dstip'],
-                    protocol=pkt['protocol'],
-                    tos=pkt['tos'],
-                    srcport=pkt['srcport'],
-                    dstport=pkt['dstport'])
-            except:
-                try:
-                    return match(
-                        switch=pkt['switch'],
-                        inport=pkt['inport'],
-                        srcmac=pkt['srcmac'],
-                        dstmac=pkt['dstmac'],
-                        ethtype=pkt['ethtype'],
-                        srcip=pkt['srcip'],
-                        dstip=pkt['dstip'],
-                        protocol=pkt['protocol'],
-                        vlan_id=pkt['vlan_id'],
-                        vlan_pcp=pkt['vlan_pcp'])
-                except:
-                    try:
-                        return match(
-                            switch=pkt['switch'],
-                            inport=pkt['inport'],
-                            srcmac=pkt['srcmac'],
-                            dstmac=pkt['dstmac'],
-                            ethtype=pkt['ethtype'],
-                            srcip=pkt['srcip'],
-                            dstip=pkt['dstip'],
-                            protocol=pkt['protocol'])
-                    except:
-                        try:
-                            return match(
-                                switch=pkt['switch'],
-                                inport=pkt['inport'],
-                                srcmac=pkt['srcmac'],
-                                dstmac=pkt['dstmac'],
-                                ethtype=pkt['ethtype'],
-                                protocol=pkt['protocol'],
-                                vlan_id=pkt['vlan_id'],
-                                vlan_pcp=pkt['vlan_pcp'])
-                        except:
-                            try:
-                                return match(
-                                    switch=pkt['switch'],
-                                    inport=pkt['inport'],
-                                    srcmac=pkt['srcmac'],
-                                    dstmac=pkt['dstmac'],
-                                    ethtype=pkt['ethtype'],
-                                    protocol=pkt['protocol'])
-                            except:
-                                try:
-                                    return match(
-                                        vlan_id=pkt['vlan_id'],
-                                        vlan_pcp=pkt['vlan_pcp'])
-                                except:
-                                    return no_packets
+    def match_on_all_fields(self, pkt):
+        pred = pkt.copy()
+        del pred['header_len']
+        del pred['payload_len']
+        del pred['raw']
+        return pred
 
-
-    def match_on_all_fields_rule(self, pkt_in, pkts_out):
+    def match_on_all_fields_rule_tuple(self, pkt_in, pkts_out):
         concrete_pkt_in = self.pyretic2concrete(pkt_in)
-        pred = self.match_on_all_fields_pred(concrete_pkt_in)
+        concrete_pred = self.match_on_all_fields(concrete_pkt_in)
         action_list = []
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (pred,0,action_list)
+            return (concrete_pred,0,action_list)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -299,7 +223,7 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (pred,0,action_list)
+        return (concrete_pred,0,action_list)
 
 
     def reactive0(self,in_pkt,out_pkts,eval_trace):
@@ -314,11 +238,11 @@ class Runtime(object):
             elif eval_trace.contains_class(count_bytes):
                 pass
             else:
-                rule = self.match_on_all_fields_rule(in_pkt,out_pkts)
-                if rule:
-                    self.install_rule(rule)
+                rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
+                if rule_tuple:
+                    self.install_rule(rule_tuple)
                     if self.verbosity >= self.verbosity_numeric('high'):
-                        self.log.put([str(datetime.now())," | install rule",rule[0],'actions='+repr(rule[2])])
+                        self.log.put([str(datetime.now())," | install rule",rule_tuple[0],'actions='+repr(rule_tuple[2])])
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
@@ -495,20 +419,6 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def concretize_classifier_actions(classifier):
-            def concretize_rule_actions(rule):
-                def concretize_action(action):
-                    if action == Controller:
-                        return {'outport' : OFPP_CONTROLLER}
-                    elif isinstance(action,modify):
-                        return { k:v for (k,v) in action.map.items() }
-                    else: # default
-                        return action
-                return Rule(rule.match,[concretize_action(a) 
-                                        for a in rule.actions])
-            return Classifier(concretize_rule_actions(r) 
-                              for r in classifier.rules)
-
         def bookkeep_buckets(classifier):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
@@ -549,13 +459,39 @@ class Runtime(object):
                                 rule.actions))
             return Classifier(new_rules)
 
+        def concretize(classifier):
+            def concretize_rule_actions(rule):
+                def concretize_match(pred):
+                    if pred == false:
+                        return None
+                    elif pred == true:
+                        return {}
+                    elif isinstance(pred, match):
+                        return { k:v for (k,v) in pred.map.items() }
+                def concretize_action(a):
+                    if a == Controller:
+                        return {'outport' : OFPP_CONTROLLER}
+                    elif isinstance(a,modify):
+                        return { k:v for (k,v) in a.map.items() }
+                    else: # default
+                        return a
+                m = concretize_match(rule.match)
+                acts = [concretize_action(a) for a in rule.actions]
+                if m is None:
+                    return None
+                else:
+                    return Rule(m,acts)
+            crs = [concretize_rule_actions(r) for r in classifier.rules]
+            crs = filter(lambda cr: not cr is None,crs)
+            return Classifier(crs)
+
         def prioritize(classifier,switches):
             priority = {}
             for s in switches:
                 priority[s] = 60000
             tuple_rules = list()
             for rule in classifier.rules:
-                s = rule.match.map['switch']
+                s = rule.match['switch']
                 tuple_rules.append((rule.match,priority[s],rule.actions))
                 priority[s] -= 1
             return tuple_rules
@@ -565,13 +501,14 @@ class Runtime(object):
         def nuclear_install(classifier):
             switches = self.network.topology.nodes()
             classifier = switchify(classifier,switches)
+            classifier = concretize(classifier)
             new_rules = prioritize(classifier,switches)
 
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
 
             for rule in new_rules:
                 self.install_rule(rule)
@@ -597,6 +534,7 @@ class Runtime(object):
                 old_rules = self.old_rules
                 switches = self.network.topology.nodes()
                 classifier = switchify(classifier,switches)
+                classifier = concretize(classifier)
                 new_rules = prioritize(classifier,switches)
 
                 # calculate diff
@@ -632,6 +570,8 @@ class Runtime(object):
                 for s in switches:
                     self.send_barrier(s)
 
+        ### PROCESS THAT DOES INSTALL
+
         def f(classifier, this_update_no, current_update_no):
             if not this_update_no is None:
                 time.sleep(0.1)
@@ -650,7 +590,6 @@ class Runtime(object):
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
-        classifier = concretize_classifier_actions(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
@@ -658,15 +597,7 @@ class Runtime(object):
         p.daemon = True
         p.start()
             
-    def install_rule(self,(pred,priority,action_list)):
-        if pred == false:
-            return
-        elif pred == true:
-            concrete_pred = {}
-        elif isinstance(pred, match):
-            concrete_pred = { k:v for (k,v) in pred.map.items() }
-        else:
-            raise TypeError
+    def install_rule(self,(concrete_pred,priority,action_list)):
         if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
             self.log.put([str(datetime.now()),
                           "sending openflow rule:",
@@ -674,8 +605,7 @@ class Runtime(object):
                            " "+ repr(action_list))])
         self.backend.send_install(concrete_pred,priority,action_list)
 
-    def delete_rule(self,(pred,priority)):
-        concrete_pred = { k:v for (k,v) in pred.map.items() }
+    def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
 
     def send_barrier(self,switch):
@@ -695,7 +625,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
