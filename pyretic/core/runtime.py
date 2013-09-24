@@ -537,27 +537,36 @@ class Runtime(object):
 
         def switchify(classifier,switches):
             new_rules = list()
-            priority = len(classifier) + 40000
             for rule in classifier.rules:
                 if isinstance(rule.match, match) and 'switch' in rule.match.map:
                     if not rule.match.map['switch'] in switches:
                         continue
-                    new_rules.append((rule.match, priority, rule.actions))
+                    new_rules.append(rule)
                 else:
                     for s in switches:
-                        new_rules.append((
+                        new_rules.append(Rule(
                                 rule.match.intersect(match(switch=s)),
-                                priority,
                                 rule.actions))
-                priority -= 1
-            return new_rules
+            return Classifier(new_rules)
+
+        def prioritize(classifier,switches):
+            priority = {}
+            for s in switches:
+                priority[s] = 60000
+            tuple_rules = list()
+            for rule in classifier.rules:
+                s = rule.match.map['switch']
+                tuple_rules.append((rule.match,priority[s],rule.actions))
+                priority[s] -= 1
+            return tuple_rules
 
         ### UPDATE LOGIC
 
         def nuclear_install(classifier):
             switches = self.network.topology.nodes()
-            new_rules = switchify(classifier,switches)
-            
+            classifier = switchify(classifier,switches)
+            new_rules = prioritize(classifier,switches)
+
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
@@ -587,7 +596,8 @@ class Runtime(object):
             with self.old_rules_lock:
                 old_rules = self.old_rules
                 switches = self.network.topology.nodes()
-                new_rules = switchify(classifier,switches)
+                classifier = switchify(classifier,switches)
+                new_rules = prioritize(classifier,switches)
 
                 # calculate diff
                 to_add = list()
