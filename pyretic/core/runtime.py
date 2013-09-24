@@ -535,31 +535,38 @@ class Runtime(object):
                                           rule.actions))
                               for rule in classifier.rules)
 
+        def switchify(classifier,switches):
+            new_rules = list()
+            priority = len(classifier) + 40000
+            for rule in classifier.rules:
+                if isinstance(rule.match, match) and 'switch' in rule.match.map:
+                    if not rule.match.map['switch'] in switches:
+                        continue
+                    new_rules.append((rule.match, priority, rule.actions))
+                else:
+                    for s in switches:
+                        new_rules.append((
+                                rule.match.intersect(match(switch=s)),
+                                priority,
+                                rule.actions))
+                priority -= 1
+            return new_rules
+
         ### UPDATE LOGIC
 
         def nuclear_install(classifier):
             switches = self.network.topology.nodes()
-            priority = len(classifier) + 40000  # (SEND PACKETS TO CONTROLLER IS AT THIS PRIORITY)  
+            new_rules = switchify(classifier,switches)
+            
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
                 self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
 
-            for rule in classifier.rules:
-                # TODO (josh) put logic in here to figure out when 'inport'
-                # forward location should be used
-                if isinstance(rule.match, match) and 'switch' in rule.match.map:
-                    if not rule.match.map['switch'] in switches:
-                        continue
-                    self.install_rule((rule.match,priority,rule.actions))
-                else:
-                    for s in switches:
-                        self.install_rule((
-                            rule.match.intersect(match(switch=s)),
-                            priority,
-                            rule.actions))
-                priority -= 1
+            for rule in new_rules:
+                self.install_rule(rule)
+                
             for s in switches:
                 self.send_barrier(s)
                 if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
@@ -579,24 +586,9 @@ class Runtime(object):
         def install_diff_rules(classifier):
             with self.old_rules_lock:
                 old_rules = self.old_rules
-                new_rules = list()
-
-                # get new rules
-                priority = len(classifier) + 40000
                 switches = self.network.topology.nodes()
-                for rule in classifier.rules:
-                    if isinstance(rule.match, match) and 'switch' in rule.match.map:
-                        if not rule.match.map['switch'] in switches:
-                            continue
-                        new_rules.append((rule.match, priority, rule.actions))
-                    else:
-                        for s in switches:
-                            new_rules.append((
-                                rule.match.intersect(match(switch=s)),
-                                priority,
-                                rule.actions))
-                    priority -= 1
-    
+                new_rules = switchify(classifier,switches)
+
                 # calculate diff
                 to_add = list()
                 to_delete = list()
