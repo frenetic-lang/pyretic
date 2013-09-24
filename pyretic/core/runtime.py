@@ -434,6 +434,8 @@ class Runtime(object):
         if classifier is None:
             return
 
+        ### CLASSIFIER TRANSFORMS 
+
         def remove_drop(classifier):
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != drop,rule.actions))
@@ -468,6 +470,43 @@ class Runtime(object):
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
 
+        def layer_3_specialize(classifier):
+            specialized_rules = []
+            for rule in classifier.rules:
+                if ( isinstance(rule.match, match) and
+                     ( 'srcip' in rule.match.map or 
+                       'dstip' in rule.match.map ) and 
+                     not 'ethtype' in rule.match.map ):
+                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
+
+                    # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
+                    arp_bug = False
+                    for action in rule.actions:
+                        if len(action.map) > 1:
+                            arp_bug = True
+                            break
+                    if arp_bug:
+                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[Controller]))
+                    else:
+                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
+                else:
+                    specialized_rules.append(rule)
+            return Classifier(specialized_rules)
+
+        def concretize_classifier_actions(classifier):
+            def concretize_rule_actions(rule):
+                def concretize_action(action):
+                    if action == Controller:
+                        return {'send_to_controller' : 0}
+                    elif isinstance(action,modify):
+                        return { k:v for (k,v) in action.map.items() }
+                    else: # default
+                        return action
+                return Rule(rule.match,[concretize_action(a) 
+                                        for a in rule.actions])
+            return Classifier(concretize_rule_actions(r) 
+                              for r in classifier.rules)
+
         def bookkeep_buckets(classifier):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
@@ -494,45 +533,8 @@ class Runtime(object):
                                           rule.actions))
                               for rule in classifier.rules)
 
-        def concretize_classifier_actions(classifier):
-            def concretize_rule_actions(rule):
-                def concretize_action(action):
-                    if action == Controller:
-                        return {'send_to_controller' : 0}
-                    elif isinstance(action,modify):
-                        return { k:v for (k,v) in action.map.items() }
-                    else: # default
-                        return action
-                return Rule(rule.match,[concretize_action(a) 
-                                        for a in rule.actions])
-            return Classifier(concretize_rule_actions(r) 
-                              for r in classifier.rules)
 
-        def layer_3_specialize(classifier):
-            specialized_rules = []
-            for rule in classifier.rules:
-                if ( isinstance(rule.match, match) and
-                     ( 'srcip' in rule.match.map or 
-                       'dstip' in rule.match.map ) and 
-                     not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
-
-                    # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
-                    arp_bug = False
-                    for action_set in rule.actions:
-                        try:
-                            if len(action_set) > 1:
-                                arp_bug = True
-                                break
-                        except:
-                            pass
-                    if arp_bug:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[{'send_to_controller' : 0}]))
-                    else:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
-                else:
-                    specialized_rules.append(rule)
-            return Classifier(specialized_rules)
+        ### INCREMENTAL UPDATE LOGIC
 
         def find_same_rule(target, rule_list):
             if rule_list is None:
@@ -611,8 +613,8 @@ class Runtime(object):
         #classifier = send_drops_to_controller(classifier)
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
-        classifier = concretize_classifier_actions(classifier)
         classifier = layer_3_specialize(classifier)
+        classifier = concretize_classifier_actions(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
