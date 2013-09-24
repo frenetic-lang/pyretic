@@ -41,6 +41,7 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 
 import time
+from datetime import datetime
 
 class QueryTest(CountBucket):
     
@@ -54,18 +55,15 @@ class QueryTest(CountBucket):
 
     def query_thread(self):
         """Thread that issues stats queries every 10 seconds."""
-        time.sleep(10)
-        t = 10
+        interval = 2.5
         while True:
-            print "---------"
-            print "Printing matches for bucket", str(id(self)), "at time:", t
+            output = str(datetime.now()) + "| bucket " + str(id(self)) + ": print matches\n"
             for m in self.matches:
-                print m
-            print "---------"
+                output += str(m) + '\n'
             self.pull_stats()
-            print "Issued query, sleeping for 10 seconds"
-            time.sleep(10)
-            t += 10
+            output += 'issued query, going to sleep for %f' % interval
+            print output
+            time.sleep(interval)
 
     def query_callback(self, counts):
         print "*** In user callback for bucket", id(self)
@@ -88,7 +86,7 @@ def asymmetric_main():
 
     return pol1 + pol2 + pol3 + pol4 + pol5
 
-def main():
+def symmetric_main():
     ip1 = IPAddr('10.0.0.1')
     ip2 = IPAddr('10.0.0.2')
     ip3 = IPAddr('10.0.0.3')
@@ -108,4 +106,9 @@ def main():
     query4 = match(srcip=ip1) >> match(dstip=ip2) >> b[3]
 
     return fwding + query1 + query2 + query3 + query4
+
+def main():
+    ip1 = IPAddr('10.0.0.1')
+    test_bucket = QueryTest()
+    return ((~match(srcip=ip1)) >> test_bucket) + flood()
 
