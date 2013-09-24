@@ -625,8 +625,12 @@ class Runtime(object):
         issue queries from the runtime."""
         def pull_bucket_stats():
             switch_list = []
-            for match in bucket.matches:
-                concrete_pred = { k:v for (k,v) in match.map.items() }
+            for m in bucket.matches:
+                if m == identity:
+                    concrete_pred = {}
+                else:
+                    assert(isinstance(m, match))
+                    concrete_pred = { k:v for (k,v) in m.map.items() }
                 if 'switch' in concrete_pred:
                     switch_list.append(concrete_pred['switch'])
                 else:

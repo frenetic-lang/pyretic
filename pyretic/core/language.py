@@ -406,7 +406,6 @@ class CountBucket(Query):
         """Add a match m to list of classifier rules to be queried for
         counts.
         """
-        assert(isinstance(m, match))
         if not m in self.matches:
             self.matches.add(m)
 
