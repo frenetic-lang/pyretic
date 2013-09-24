@@ -36,6 +36,8 @@ import networkx as nx
 from pyretic.core import util
 
 ### DEFINITIONS
+OFPP_CONTROLLER = 0xfffd
+
 ARP_TYPE = 0x806
 IP_TYPE  = 0x800
 

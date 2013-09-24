@@ -417,36 +417,33 @@ class POXClient(revent.EventMixin):
     def build_of_actions(self,inport,action_list):
         ### BUILD OF ACTIONS
         of_actions = []
-        if action_list == [{'send_to_controller' : 0}]:
-            of_actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        else:
-            for actions in action_list:
-                outport = actions['outport']
-                del actions['outport']
-                if 'srcmac' in actions:
-                    of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
-                if 'dstmac' in actions:
-                    of_actions.append(of.ofp_action_dl_addr.set_dst(actions['dstmac']))
-                if 'srcip' in actions:
-                    of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
-                if 'dstip' in actions:
-                    of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
-                if 'vlan_id' in actions:
-                    if actions['vlan_id'] is None:
-                        of_actions.append(of.ofp_action_strip_vlan())
-                    else:
-                        of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
-                if 'vlan_pcp' in actions:
-                    if actions['vlan_pcp'] is None:
-                        if not actions['vlan_id'] is None:
-                            raise RuntimeError("vlan_id and vlan_pcp must be set together!")
-                        pass
-                    else:
-                        of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
-                if (not inport is None) and (outport == inport):
-                    of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+        for actions in action_list:
+            outport = actions['outport']
+            del actions['outport']
+            if 'srcmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
+            if 'dstmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_dst(actions['dstmac']))
+            if 'srcip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
+            if 'dstip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
+            if 'vlan_id' in actions:
+                if actions['vlan_id'] is None:
+                    of_actions.append(of.ofp_action_strip_vlan())
                 else:
-                    of_actions.append(of.ofp_action_output(port=outport))
+                    of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
+            if 'vlan_pcp' in actions:
+                if actions['vlan_pcp'] is None:
+                    if not actions['vlan_id'] is None:
+                        raise RuntimeError("vlan_id and vlan_pcp must be set together!")
+                    pass
+                else:
+                    of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
+            if (not inport is None) and (outport == inport):
+                of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+            else:
+                of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
     def install_flow(self,pred,priority,action_list):

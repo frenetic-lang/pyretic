@@ -497,7 +497,7 @@ class Runtime(object):
             def concretize_rule_actions(rule):
                 def concretize_action(action):
                     if action == Controller:
-                        return {'send_to_controller' : 0}
+                        return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(action,modify):
                         return { k:v for (k,v) in action.map.items() }
                     else: # default
@@ -659,7 +659,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'send_to_controller' : 0}]))
+                self.install_rule((match(switch=s),TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
