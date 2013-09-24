@@ -559,14 +559,17 @@ class Runtime(object):
                     for rule in to_add:
                         self.install_rule(rule)
                 for rule in to_delete:
-                    self.delete_rule((rule[0], rule[1]))
+                    if rule[0]['switch'] in switches:
+                        self.delete_rule((rule[0], rule[1]))
                 for rule in to_modify:
                     self.delete_rule((rule[0], rule[1]))
                     self.install_rule(rule)
     
                 # update old_rule
-                self.old_rules = new_rules
-    
+                del old_rules[0:len(old_rules)]
+                for rule in new_rules:
+                    old_rules.append(rule)
+
                 for s in switches:
                     self.send_barrier(s)
 
