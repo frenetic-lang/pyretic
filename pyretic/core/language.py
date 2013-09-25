@@ -394,9 +394,16 @@ class CountBucket(Query):
         self.outstanding_switches = []
         self.packet_count = 0
         self.byte_count = 0
+        self.packet_count_persistent = 0
+        self.byte_count_persistent = 0
         
     def __repr__(self):
         return "CountBucket"
+
+    def eval(self, pkt):
+        self.packet_count_persistent += 1
+        self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
+        return set()
 
     def compile(self):
         r = Rule(identity,[self])
@@ -420,10 +427,10 @@ class CountBucket(Query):
         """Issue stats queries from the runtime"""
         if not self.runtime_stats_query_fun is None:
             self.outstanding_switches = []
-            self.packet_count = 0
-            self.byte_count = 0
             self.runtime_stats_query_fun()
         else:
+            self.packet_count = self.packet_count_persistent
+            self.byte_count = self.byte_count_persistent
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
 
@@ -446,6 +453,9 @@ class CountBucket(Query):
                 if m.intersect(table_match) == table_match:
                     return True
             return False
+
+        self.packet_count = self.packet_count_persistent
+        self.byte_count = self.byte_count_persistent
 
         if switch in self.outstanding_switches:
             for f in flow_stats:
