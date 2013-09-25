@@ -408,7 +408,9 @@ class Runtime(object):
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
                     for action in rule.actions:
-                        if len(action.map) > 1:
+                        if action == Controller:
+                            pass
+                        elif len(action.map) > 1:
                             arp_bug = True
                             break
                     if arp_bug:
