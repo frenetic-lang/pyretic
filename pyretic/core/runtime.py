@@ -92,6 +92,7 @@ class Runtime(object):
         self.in_update_network = False
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
+        self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
         self.log = Queue()
         def log(queue):
@@ -329,10 +330,11 @@ class Runtime(object):
         if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
             self.log.put([str(datetime.now()),'flow table for switch='+repr(switch)] + 
                          [flow_stat_str(f) for f in flow_stats])
-        if switch in self.global_outstanding_queries:
-            for bucket in self.global_outstanding_queries[switch]:
-                bucket.handle_flow_stats_reply(switch, flow_stats)
-            del self.global_outstanding_queries[switch]
+        with self.global_outstanding_queries_lock:
+            if switch in self.global_outstanding_queries:
+                for bucket in self.global_outstanding_queries[switch]:
+                    bucket.handle_flow_stats_reply(switch, flow_stats)
+                del self.global_outstanding_queries[switch]
 
     def concrete2pyretic(self,packet):
         def convert(h,val):
@@ -653,15 +655,20 @@ class Runtime(object):
                     break
             for s in switch_list:
                 bucket.add_outstanding_switch_query(s)
-                self.add_global_outstanding_query(s, bucket)
-                self.request_flow_stats(s)
+                already_queried = self.add_global_outstanding_query(s, bucket)
+                if not already_queried:
+                    self.request_flow_stats(s)
         return pull_bucket_stats
 
     def add_global_outstanding_query(self, s, bucket):
-        if not s in self.global_outstanding_queries:
-            self.global_outstanding_queries[s] = [bucket]
-        else:
-            self.global_outstanding_queries[s].append(bucket)
+        already_queried = False
+        with self.global_outstanding_queries_lock:
+            if not s in self.global_outstanding_queries:
+                self.global_outstanding_queries[s] = [bucket]
+            else:
+                self.global_outstanding_queries[s].append(bucket)
+                already_queried = True
+        return already_queried
 
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
