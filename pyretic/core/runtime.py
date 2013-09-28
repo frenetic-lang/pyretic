@@ -410,7 +410,7 @@ class Runtime(object):
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
                     for action in rule.actions:
-                        if action == Controller:
+                        if action == Controller or isinstance(action, CountBucket):
                             pass
                         elif len(action.map) > 1:
                             arp_bug = True
