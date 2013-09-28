@@ -41,6 +41,8 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.util import frozendict, singleton
 
+from multiprocessing import Condition
+
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
 tagging_headers = ["vlan_id", "vlan_pcp"]
@@ -396,6 +398,8 @@ class CountBucket(Query):
         self.byte_count = 0
         self.packet_count_persistent = 0
         self.byte_count_persistent = 0
+        self.in_update_cv = Condition()
+        self.in_update = False
         
     def __repr__(self):
         return "CountBucket"
@@ -408,6 +412,18 @@ class CountBucket(Query):
     def compile(self):
         r = Rule(identity,[self])
         return Classifier([r])
+
+    def start_update(self):
+        with self.in_update_cv:
+            self.in_update = True
+            self.matches = set([])
+            self.runtime_stats_query_fun = None
+            self.outstanding_switches = []
+
+    def finish_update(self):
+        with self.in_update_cv:
+            self.in_update = False
+            self.in_update_cv.notify_all()
         
     def add_match(self, m):
         """Add a match m to list of classifier rules to be queried for
@@ -425,10 +441,17 @@ class CountBucket(Query):
 
     def pull_stats(self):
         """Issue stats queries from the runtime"""
-        if not self.runtime_stats_query_fun is None:
-            self.outstanding_switches = []
-            self.runtime_stats_query_fun()
-        else:
+        queries_issued = False
+        with self.in_update_cv:
+            while self.in_update: # ensure buckets not updated concurrently
+                self.in_update_cv.wait()
+            if not self.runtime_stats_query_fun is None:
+                self.outstanding_switches = []
+                queries_issued = True
+                self.runtime_stats_query_fun()
+        # If no queries were issued, then no matches, so just call userland
+        # registered callback routines
+        if not queries_issued:
             self.packet_count = self.packet_count_persistent
             self.byte_count = self.byte_count_persistent
             for f in self.callbacks:
@@ -454,16 +477,18 @@ class CountBucket(Query):
             #         return True
             return False
 
-        self.packet_count = self.packet_count_persistent
-        self.byte_count = self.byte_count_persistent
-
-        if switch in self.outstanding_switches:
-            for f in flow_stats:
-                if 'match' in f:
-                    if stat_in_bucket(f, switch):
-                        self.packet_count += f['packet_count']
-                        self.byte_count   += f['byte_count']
-            self.outstanding_switches.remove(switch)
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            self.packet_count = self.packet_count_persistent
+            self.byte_count = self.byte_count_persistent
+            if switch in self.outstanding_switches:
+                for f in flow_stats:
+                    if 'match' in f:
+                        if stat_in_bucket(f, switch):
+                            self.packet_count += f['packet_count']
+                            self.byte_count   += f['byte_count']
+                self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
         if not self.outstanding_switches:
             for f in self.callbacks:

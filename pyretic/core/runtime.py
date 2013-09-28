@@ -31,7 +31,7 @@
 import pyretic.core.util as util
 from pyretic.core.language import *
 from pyretic.core.network import *
-from multiprocessing import Process, Manager, RLock, Lock, Value, Queue
+from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import time
 from datetime import datetime
 
@@ -116,6 +116,7 @@ class Runtime(object):
         self.old_rules_lock = Lock()
         self.old_rules = self.manager.list()
         self.update_rules_lock = Lock()
+        self.update_buckets_lock = Lock()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -429,18 +430,41 @@ class Runtime(object):
             bucket for querying later. Count bucket actions operate at
             the pyretic level and are removed before installing rules.
             """
+            def collect_buckets(rules):
+                """Scan classifier rules and collect distinct buckets into a
+                dictionary.
+                """
+                bucket_list = {}
+                for rule in rules:
+                    for act in rule.actions:
+                        if isinstance(act, CountBucket):
+                            if not id(act) in bucket_list:
+                                bucket_list[id(act)] = act
+                return bucket_list
+
+            def start_update(bucket_list):
+                for b in bucket_list.values():
+                    b.start_update()
+
             def hook_buckets_to_rule(rule):
                 for act in rule.actions:
                     if isinstance(act, CountBucket):
                         act.add_match(rule.match)
 
-            def hook_buckets_to_pull_stats(rule):
-                for act in rule.actions:
-                    if isinstance(act, CountBucket):
-                        act.add_pull_stats(self.pull_stats_for_bucket(act))
+            def hook_buckets_to_pull_stats(bucket_list):
+                for b in bucket_list.values():
+                    b.add_pull_stats(self.pull_stats_for_bucket(b))
 
-            map(hook_buckets_to_rule, classifier.rules)
-            map(hook_buckets_to_pull_stats, classifier.rules)
+            def finish_update(bucket_list):
+                for b in bucket_list.values():
+                    b.finish_update()
+
+            with self.update_buckets_lock:
+                bucket_list = collect_buckets(classifier.rules)
+                start_update(bucket_list)
+                map(hook_buckets_to_rule, classifier.rules)
+                hook_buckets_to_pull_stats(bucket_list)
+                finish_update(bucket_list)
         
         def remove_buckets(classifier):
             return Classifier(Rule(rule.match,
