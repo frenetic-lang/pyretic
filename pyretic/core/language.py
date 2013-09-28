@@ -438,20 +438,20 @@ class CountBucket(Query):
         self.outstanding_switches.append(switch)
 
     def handle_flow_stats_reply(self,switch,flow_stats):
-        """Given a flow_stats_reply from switch, collect only those
+        """Given a flow_stats_reply from switch s, collect only those
         counts which are relevant to this bucket.
 
         Very simple processing for now: just collect all packet and
         byte counts from rules that have a match that is in the set of
         matches this bucket is interested in.
         """
-        def stat_in_bucket(flow_stat):
-            table_match = match(f['match'])
+        def stat_in_bucket(flow_stat, s):
+            table_match = match(f['match']).intersect(match(switch=s))
             if table_match in self.matches:
                 return True
-            for m in self.matches:
-                if m.intersect(table_match) == table_match:
-                    return True
+            # for m in self.matches:
+            #     if m.intersect(table_match) == table_match:
+            #         return True
             return False
 
         self.packet_count = self.packet_count_persistent
@@ -460,7 +460,7 @@ class CountBucket(Query):
         if switch in self.outstanding_switches:
             for f in flow_stats:
                 if 'match' in f:
-                    if stat_in_bucket(f):
+                    if stat_in_bucket(f, switch):
                         self.packet_count += f['packet_count']
                         self.byte_count   += f['byte_count']
             self.outstanding_switches.remove(switch)
