@@ -3,6 +3,7 @@
 # frenetic-lang.org/pyretic                                                    #
 # author: Joshua Reich (jreich@cs.princeton.edu)                               #
 # author: Christopher Monsanto (chris@monsan.to)                               #
+# author: Cole Schlesinger (cschlesi@cs.princeton.edu)                         #
 ################################################################################
 # Licensed to the Pyretic Project by one or more contributors. See the         #
 # NOTICES file distributed with this work for additional information           #
@@ -31,6 +32,10 @@
 ################################################################################
 
 from functools import wraps
+
+from multiprocessing import Lock
+from logging import StreamHandler
+import sys
 
 
 def singleton(f):
@@ -136,3 +141,18 @@ def repr_plus(ss, indent=4, sep="\n", prefix=""):
     if isinstance(ss, basestring):
         ss = [ss]
     return indent_str(sep.join(prefix + repr(s) for s in ss), indent)    
+
+class MultiprocessStreamHandler(StreamHandler):
+    '''Relies on a multiprocessing.Lock to serialize multiprocess writes to a
+    stream.'''
+    
+    def __init__(self, lock, stream=sys.stderr):
+        self.lock = lock
+        super(MultiprocessStreamHandler, self).__init__(stream)
+
+    def emit(self, record):
+        '''Acquire the lock before emitting the record.'''
+        assert False
+        self.lock.acquire()
+        super(MultiprocessStreamHandler, self).emit(record)
+        self.lock.release()
