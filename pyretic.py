@@ -38,6 +38,9 @@ from importlib import import_module
 from optparse import OptionParser
 import re
 import os
+import logging
+from multiprocessing import Queue, Process
+import pyretic.core.util as util
 
 of_client = None
 
@@ -121,6 +124,41 @@ def main():
     kwargs = { k : v for [k,v] in [ i.lstrip('--').split('=') for i in kwargs_to_pass ]}
 
     sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
+
+    # Set up multiprocess logging.
+    verbosity_map = { 'low' : logging.WARNING,
+                      'normal' : logging.INFO,
+                      'high' : logging.DEBUG,
+                      'please-make-it-stop' : logging.DEBUG }
+    logging_queue = Queue()
+
+    # Make a logging process.
+    def log_writer(queue, log_level):
+        formatter = logging.Formatter('%(levelname)s:%(name)s: %(message)s')
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        handler.setLevel(log_level)
+        logger = logging.getLogger()
+        logger.addHandler(handler)
+        logger.setLevel(log_level)
+        while(True):
+            try:
+                to_log = queue.get()
+            except KeyboardInterrupt, e:
+                print "\nkilling log"
+                import sys
+                sys.exit(0)
+            logger.handle(to_log)
+    log_level = verbosity_map.get(options.verbosity, logging.DEBUG)
+    log_process = Process(target=log_writer,args=(logging_queue, log_level,))
+    log_process.daemon = True
+    log_process.start()
+
+    # Set default handler.
+    logger = logging.getLogger()
+    handler = util.QueueStreamHandler(logging_queue)
+    logger.addHandler(handler)
+    logger.setLevel(log_level)
     
     runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity,False,False)
     if not options.frontend_only:

@@ -142,7 +142,7 @@ def repr_plus(ss, indent=4, sep="\n", prefix=""):
         ss = [ss]
     return indent_str(sep.join(prefix + repr(s) for s in ss), indent)    
 
-class MultiprocessStreamHandler(StreamHandler):
+class LockStreamHandler(StreamHandler):
     '''Relies on a multiprocessing.Lock to serialize multiprocess writes to a
     stream.'''
     
@@ -152,7 +152,18 @@ class MultiprocessStreamHandler(StreamHandler):
 
     def emit(self, record):
         '''Acquire the lock before emitting the record.'''
-        assert False
         self.lock.acquire()
-        super(MultiprocessStreamHandler, self).emit(record)
+        super(LockStreamHandler, self).emit(record)
         self.lock.release()
+
+class QueueStreamHandler(StreamHandler):
+    '''Relies on a multiprocessing.Lock to serialize multiprocess writes to a
+    stream.'''
+    
+    def __init__(self, queue, stream=sys.stderr):
+        self.queue = queue
+        super(QueueStreamHandler, self).__init__(stream)
+
+    def emit(self, record):
+        '''Acquire the lock before emitting the record.'''
+        self.queue.put(record)
