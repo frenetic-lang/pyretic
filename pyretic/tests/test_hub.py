@@ -25,6 +25,15 @@ def run_mininet():
     # cmd = '%s --topo clique,4,4' % mn
     # subprocess.call(shlex.split(cmd))
 
+def filter_mininet(line):
+    return line
+
+def filter_controller(line):
+    if line.find('TEST') >= 0:
+        return line
+    else:
+        return ''
+
 if __name__ == "__main__":
     # Run the common main function from utils.py.
     main(run_mininet)
