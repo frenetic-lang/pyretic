@@ -32,7 +32,7 @@ import pyretic.core.util as util
 from pyretic.core.language import *
 from pyretic.core.network import *
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
-import time
+import logging, sys, time
 from datetime import datetime
 
 TABLE_MISS_PRIORITY = 0
@@ -49,13 +49,14 @@ except:
 class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
                  show_traces=False, debug_packet_in=False):
+        self.verbosity = self.verbosity_numeric(verbosity)
+        self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         self.debug_packet_in = debug_packet_in
         self.show_traces = show_traces
         self.mode = mode
-        self.verbosity = self.verbosity_numeric(verbosity)
         self.backend = backend
         self.backend.runtime = self
         self.vlan_to_extended_values_db = {}
@@ -94,24 +95,6 @@ class Runtime(object):
         self.update_network_no = Value('i', 0)
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
-        self.log = Queue()
-        def log(queue):
-            while(True):
-                try:
-                    to_log = queue.get()
-                except KeyboardInterrupt, e:
-                    print "\nkilling log"
-                    import sys
-                    sys.exit(0)
-                def to_repr(o):
-                    if isinstance(o,str):
-                        return o
-                    else:
-                        return repr(o)
-                print ('|' + to_log[0] + '| ') + '\n'.join(to_repr(l) for l in to_log[1:])
-        self.log_process = Process(target=log,args=(self.log,))
-        self.log_process.daemon = True
-        self.log_process.start()
         self.manager = Manager()
         self.old_rules_lock = Lock()
         self.old_rules = self.manager.list()
@@ -137,11 +120,11 @@ class Runtime(object):
                     self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0' or self.mode == 'proactive1':
                     classifier = self.policy.compile()
-                    if self.verbosity >= self.verbosity_numeric('high'):
-                        self.log.put([str(datetime.now()),
-                                      "generate classifier",
-                                      "policy="+repr(self.policy),
-                                      "classifier="+repr(classifier)])
+                    self.log.debug(
+                        '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                            "generate classifier",
+                            "policy="+repr(self.policy),
+                            "classifier="+repr(classifier)))
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
                 self.in_update_network = False
 
@@ -159,11 +142,11 @@ class Runtime(object):
                 self.clear_all() 
             elif self.mode == 'proactive0' or self.mode == 'proactive1':
                 classifier = self.policy.compile()
-                if self.verbosity >= self.verbosity_numeric('high'):
-                        self.log.put([str(datetime.now()),
-                                      "generate classifier",
-                                      "policy="+repr(self.policy),
-                                      "classifier="+repr(classifier)])
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                        "generate classifier",
+                        "policy="+repr(self.policy),
+                        "classifier="+repr(classifier)))
                 self.install_classifier(classifier)
 
     def handle_switch_join(self,switch_id):
@@ -243,8 +226,11 @@ class Runtime(object):
                 rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
                 if rule_tuple:
                     self.install_rule(rule_tuple)
-                    if self.verbosity >= self.verbosity_numeric('high'):
-                        self.log.put([str(datetime.now())," | install rule",rule_tuple[0],'actions='+repr(rule_tuple[2])])
+                    self.log.debug(
+                        '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                            " | install rule",
+                            rule_tuple[0],
+                            'actions='+repr(rule_tuple[2])))
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
@@ -271,12 +257,12 @@ class Runtime(object):
                 traceback.print_exc()
                 debugger.post_mortem(tb)
         if self.show_traces:
-            print "<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<"
-            print util.repr_plus([pyretic_pkt], sep="\n\n")
-            print
-            print ">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>"
-            print util.repr_plus(output, sep="\n\n")
-            print
+            self.log.info("<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<")
+            self.log.info(str(util.repr_plus([pyretic_pkt], sep="\n\n")))
+            self.log.info("")
+            self.log.info(">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>")
+            self.log.info(str(util.repr_plus(output, sep="\n\n")))
+            self.log.info("")
         map(self.send_packet,output)
   
     def pyretic2concrete(self,packet):
@@ -328,9 +314,10 @@ class Runtime(object):
             output += 'packet_count=' + str(flow_stat['packet_count']) 
             output += '\tbyte_count=' + str(flow_stat['byte_count'])
             return output
-        if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
-            self.log.put([str(datetime.now()),'flow table for switch='+repr(switch)] + 
-                         [flow_stat_str(f) for f in flow_stats])
+        self.log.debug(
+            '|%s|\n\t%s\n' % (str(datetime.now()),
+                '\n'.join(['flow table for switch='+repr(switch)] + 
+                    [flow_stat_str(f) for f in flow_stats])))
         with self.global_outstanding_queries_lock:
             if switch in self.global_outstanding_queries:
                 for bucket in self.global_outstanding_queries[switch]:
@@ -417,6 +404,8 @@ class Runtime(object):
 
         def layer_3_specialize(classifier):
             specialized_rules = []
+            #Add a rule that routes the LLDP messages to the controller for topology maintenance.
+            specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
             for rule in classifier.rules:
                 if ( isinstance(rule.match, match) and
                      ( 'srcip' in rule.match.map or 
@@ -646,11 +635,10 @@ class Runtime(object):
         p.start()
             
     def install_rule(self,(concrete_pred,priority,action_list)):
-        if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
-            self.log.put([str(datetime.now()),
-                          "sending openflow rule:",
-                          (str(priority) + " " + repr(concrete_pred) +
-                           " "+ repr(action_list))])
+        self.log.debug(
+            '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
+                "sending openflow rule:",
+                (str(priority) + " " + repr(concrete_pred) + " "+ repr(action_list))))
         self.backend.send_install(concrete_pred,priority,action_list)
 
     def delete_rule(self,(concrete_pred,priority)):
@@ -756,11 +744,13 @@ def extended_values_from(packet):
 class ConcretePacket(dict):
     pass
 
-DEBUG_TOPO_DISCOVERY = False
 class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
+        self.log = logging.getLogger('%s.ConcreteNetwork' % __name__)
+        self.debug_log = logging.getLogger('%s.DEBUG_TOPO_DISCOVERY' % __name__)
+        self.debug_log.setLevel(logging.WARNING)
 
     def inject_packet(self, pkt):
         self.runtime.send_packet(pkt)
@@ -776,11 +766,11 @@ class ConcreteNetwork(Network):
         self.runtime.inject_discovery_packet(dpid, port_no)
         
     def handle_switch_join(self, switch):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_joins"
+        self.debug_log.debug("handle_switch_joins")
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
         self.topology.add_switch(switch)
-        print "OpenFlow switch %s connected" % switch
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self.log.info("OpenFlow switch %s connected" % switch)
+        self.debug_log.debug(str(self.topology))
         self.update_network()
 
     def remove_associated_link(self,location):
@@ -800,41 +790,41 @@ class ConcreteNetwork(Network):
             self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def handle_switch_part(self, switch):
-        print "OpenFlow switch %s disconnected" % switch
-        if DEBUG_TOPO_DISCOVERY:  print "handle_switch_parts"
+        self.log.info("OpenFlow switch %s disconnected" % switch)
+        self.debug_log.debug("handle_switch_parts")
         # REMOVE ALL ASSOCIATED LINKS
         for port_no in self.topology.node[switch]["ports"].keys():
             self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self.debug_log.debug(str(self.topology))
         self.update_network()
         
     def handle_port_join(self, switch, port_no, config, status):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status)
+        self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         self.topology.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self.debug_log.debug(str(self.topology))
             self.update_network()
 
     def handle_port_part(self, switch, port_no):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_parts"
+        self.debug_log.debug("handle_port_parts")
         try:
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self.debug_log.debug(str(self.topology))
             self.update_network()
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
     def handle_port_mod(self, switch, port_no, config, status):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status)
+        self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
         # GET PREV VALUES
         try:
             prev_config = self.topology.node[switch]["ports"][port_no].config
             prev_status = self.topology.node[switch]["ports"][port_no].status
         except KeyError:
-            print "KeyError CASE!!!!!!!!"
+            self.log.warning("KeyError CASE!!!!!!!!")
             self.port_down(switch, port_no)
             return
 
@@ -852,28 +842,28 @@ class ConcreteNetwork(Network):
             self.port_up(switch, port_no)
 
     def port_up(self, switch, port_no):
-        if DEBUG_TOPO_DISCOVERY:  print "port_up %s:%s" % (switch,port_no)
+        self.debug_log.debug("port_up %s:%s" % (switch,port_no))
         self.inject_discovery_packet(switch,port_no)
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self.debug_log.debug(str(self.topology))
         self.update_network()
 
     def port_down(self, switch, port_no, double_check=False):
-        if DEBUG_TOPO_DISCOVERY: print "port_down %s:%s:double_check=%s" % (switch,port_no,double_check)
+        self.debug_log.debug("port_down %s:%s:double_check=%s" % (switch,port_no,double_check))
         try:
             self.remove_associated_link(Location(switch,port_no))
-            if DEBUG_TOPO_DISCOVERY:  print self.topology
+            self.debug_log.debug(str(self.topology))
             self.update_network()
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
-        if DEBUG_TOPO_DISCOVERY:  print "handle_link_updates"
+        self.debug_log.debug("handle_link_updates")
         try:
             p1 = self.topology.node[s1]["ports"][p_no1]
             p2 = self.topology.node[s2]["ports"][p_no2]
         except KeyError:
-            if DEBUG_TOPO_DISCOVERY: print "node doesn't yet exist"
+            self.log.warning("node doesn't yet exist")
             return  # at least one of these ports isn't (yet) in the topology
 
         # LINK ALREADY EXISTS
@@ -883,7 +873,7 @@ class ConcreteNetwork(Network):
             # LINK ON SAME PORT PAIR
             if link[s1] == p_no1 and link[s2] == p_no2:         
                 if p1.possibly_up() and p2.possibly_up():   
-                    if DEBUG_TOPO_DISCOVERY: print "nothing to do"
+                    self.debug_log.debug("nothing to do")
                     return                                      #   NOTHING TO DO
                 else:                                           # ELSE RAISE AN ERROR - SOMETHING WEIRD IS HAPPENING
                     raise RuntimeError('Link update w/ bad port status %s,%s' % (p1,p2))
@@ -906,6 +896,6 @@ class ConcreteNetwork(Network):
             self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
-        if DEBUG_TOPO_DISCOVERY:  print self.topology
+        self.debug_log.debug(self.topology)
         self.update_network()
 
