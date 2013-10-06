@@ -465,6 +465,11 @@ class Runtime(object):
                     b.finish_update()
 
             with self.update_buckets_lock:
+                """The start_update and finish_update functions per bucket guard
+                against inconsistent state in a single bucket, and the global
+                "update buckets" lock guards against inconsistent classifier
+                match state *across* buckets.
+                """
                 bucket_list = collect_buckets(classifier.rules)
                 start_update(bucket_list)
                 map(hook_buckets_to_rule, classifier.rules)

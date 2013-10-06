@@ -414,6 +414,26 @@ class CountBucket(Query):
         return Classifier([r])
 
     def start_update(self):
+        """Use a condition variable to mediate access to bucket state as it is
+        being updated.
+
+        Why condition variables and not locks? The main reason is that the state
+        update doesn't happen in just a single function call here, since the
+        runtime processes the classifier rule by rule and buckets may be touched
+        in arbitrary order depending on the policy. They're not all updated in a
+        single function call. In that case,
+
+        (1) Holding locks *across* function calls seems dangerous and
+        non-modular (in my opinion), since we need to be aware of this across a
+        large function, and acquiring locks in different orders at different
+        points in the code can result in tricky deadlocks (there is another lock
+        involved in protecting bucket updates in runtime).
+
+        (2) The "with" semantics in python is clean, and splitting that into
+        lock.acquire() and lock.release() calls results in possibly replicated
+        failure handling code that is boilerplate.
+
+        """
         with self.in_update_cv:
             self.in_update = True
             self.matches = set([])
