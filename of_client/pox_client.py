@@ -394,12 +394,8 @@ class POXClient(revent.EventMixin):
             match.dl_type = pred['ethtype']
         if 'vlan_id' in pred:
             match.dl_vlan = pred['vlan_id']
-        # else:
-        #     match.dl_vlan = 0xffff
         if 'vlan_pcp' in pred:
             match.dl_vlan_pcp = pred['vlan_pcp']
-        # else:
-        #     match.dl_vlan_pcp = 0
         if 'protocol' in pred:
             match.nw_proto = pred['protocol']
         if 'srcip' in pred:

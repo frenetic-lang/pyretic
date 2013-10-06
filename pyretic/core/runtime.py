@@ -399,6 +399,22 @@ class Runtime(object):
             return Classifier(controllerify_rule(rule) 
                               for rule in classifier.rules)
 
+        def vlan_specialize(classifier):
+            """Add Openflow's "default" VLAN match to identify packets which
+            don't have any VLAN tags on them.
+            """
+            specialized_rules = []
+            default_vlan_match = match(vlan_id=0xFFFF, vlan_pcp=0)
+            for rule in classifier.rules:
+                if ( ( isinstance(rule.match, match) and
+                       not 'vlan_id' in rule.match.map ) or
+                     rule.match == identity ):
+                    specialized_rules.append(Rule(rule.match.intersect(default_vlan_match),
+                                                  rule.actions))
+                else:
+                    specialized_rules.append(rule)
+            return Classifier(specialized_rules)
+
         def layer_3_specialize(classifier):
             specialized_rules = []
             for rule in classifier.rules:
@@ -621,6 +637,7 @@ class Runtime(object):
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
+        classifier = vlan_specialize(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 

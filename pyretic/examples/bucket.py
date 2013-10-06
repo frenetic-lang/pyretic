@@ -43,6 +43,15 @@ from pyretic.lib.std import *
 import time
 from datetime import datetime
 
+# define some globals for use in various functions
+ip1 = IPAddr('10.0.0.1')
+ip2 = IPAddr('10.0.0.2')
+ip3 = IPAddr('10.0.0.3')
+
+fwding = ( (match(dstip=ip1) >> fwd(1)) +
+           (match(dstip=ip2) >> fwd(2)) +
+           (match(dstip=ip3) >> fwd(3)) )
+
 class QueryTest(CountBucket):
     
     def __init__(self):
@@ -69,46 +78,52 @@ class QueryTest(CountBucket):
         print "*** In user callback for bucket", id(self)
         print "(packet, byte) counts:", counts
 
-def asymmetric_main():
-    """Just another candidate policy; the default policy is in main() below."""
+def test_main1():
+    """Tests a single match that is counted."""
+    test_bucket = QueryTest()
+    return (match(srcip=ip1) >> test_bucket) + fwding
+
+def test_main2():
+    """Tests buckets containing multiple matches for traffic."""
     b = [] # counting buckets
     for i in range(0,2):
         b.append(QueryTest())
         time.sleep(0.2)
 
-    pol1 = match(srcip=IPAddr('10.0.0.1')) >> b[0]
-    pol2 = match(srcip=IPAddr('10.0.0.2')) >> b[1]
-    pol3 = (match(srcip=IPAddr('10.0.0.2')) >>
-            modify(srcip=IPAddr('10.0.0.1')) >> fwd(2))
-    pol4 = match(srcip=IPAddr('10.0.0.3')) >> b[0]
-    pol5 = (match(srcip=IPAddr('10.0.0.1')) >> 
-            modify(srcip=IPAddr('10.0.0.2')) >> fwd(1))
+    pol1 = match(srcip=ip1) >> b[0]
+    pol2 = match(srcip=ip2) >> b[1]
+    pol3 = match(srcip=ip3) >> b[0]
 
-    return pol1 + pol2 + pol3 + pol4 + pol5
+    return pol1 + pol2 + pol3 + fwding
 
-def symmetric_main():
-    ip1 = IPAddr('10.0.0.1')
-    ip2 = IPAddr('10.0.0.2')
-    ip3 = IPAddr('10.0.0.3')
-
-    fwding = ( (match(dstip=ip1) >> fwd(1)) +
-               (match(dstip=ip2) >> fwd(2)) +
-               (match(dstip=ip3) >> fwd(3)) )
-
+def test_main3():
+    """Test if the same traffic feeding into multiple buckets gets accounted
+    correctly.
+    """
     b = [] # counting buckets
-    for i in range(0,4):
+    for i in range(0,3):
         b.append(QueryTest())
         time.sleep(0.2)
 
-    query1 = match(srcip=ip1) >> b[0]
-    query2 = match(srcip=ip2) >> b[1]
-    query3 = match(srcip=ip3) >> b[2]
-    query4 = match(srcip=ip1) >> match(dstip=ip2) >> b[3]
+    query1 = match(srcip=ip1) >> match(dstip=ip2) >> b[0]
+    query2 = match(srcip=ip1) >> match(dstip=ip2) >> b[1]
+    query3 = match(srcip=ip1) >> match(dstip=ip3) >> b[2]
 
-    return fwding + query1 + query2 + query3 + query4
+    return fwding + query1 + query2 + query3
+
+def test_main4():
+    """Test policy negation, but only for IP traffic."""
+    test_bucket = QueryTest()
+    matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
+                        (~match(srcip=ip1) & match(dstip=ip3)) +
+                        (~match(srcip=ip1) & match(dstip=ip1)) )
+    return (matched_traffic >> test_bucket) + fwding
+
+def test_main5():
+    """Test policy negation covering all other traffic."""
+    test_bucket = QueryTest()
+    matched_traffic = ~match(srcip=ip1)
+    return (matched_traffic >> test_bucket) + fwding
 
 def main():
-    ip1 = IPAddr('10.0.0.1')
-    test_bucket = QueryTest()
-    return ((~match(srcip=ip1)) >> test_bucket) + flood()
-
+    return test_main1()

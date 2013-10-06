@@ -470,11 +470,9 @@ class CountBucket(Query):
         """
         def stat_in_bucket(flow_stat, s):
             table_match = match(f['match']).intersect(match(switch=s))
-            if table_match in self.matches:
+            network_match = match(f['match'])
+            if table_match in self.matches or network_match in self.matches:
                 return True
-            # for m in self.matches:
-            #     if m.intersect(table_match) == table_match:
-            #         return True
             return False
 
         with self.in_update_cv:
