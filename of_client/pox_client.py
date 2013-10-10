@@ -99,7 +99,8 @@ class BackendChannel(asynchat.async_chat):
             pred = self.dict2OF(msg[1])
             priority = int(msg[2])
             actions = map(self.dict2OF,msg[3])
-            self.of_client.install_flow(pred,priority,actions)
+            cookie = int(msg[4])
+            self.of_client.install_flow(pred,priority,actions,cookie)
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
             priority = int(msg[2])
@@ -442,7 +443,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def install_flow(self,pred,priority,action_list):
+    def install_flow(self,pred,priority,action_list,cookie):
         switch = pred['switch']
         if 'inport' in pred:        
             inport = pred['inport']
@@ -455,7 +456,10 @@ class POXClient(revent.EventMixin):
                               idle_timeout=of.OFP_FLOW_PERMANENT,
                               hard_timeout=of.OFP_FLOW_PERMANENT,
                               match=match,
+                              flags=of.OFPFF_SEND_FLOW_REM,
+                              cookie=cookie,
                               actions=of_actions)
+
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:

@@ -135,8 +135,8 @@ class Backend(object):
     def send_packet(self,packet):
         self.send_to_OF_client(['packet',packet])
 
-    def send_install(self,pred,priority,action_list):
-        self.send_to_OF_client(['install',pred,priority,action_list])
+    def send_install(self,pred,priority,action_list,cookie):
+        self.send_to_OF_client(['install',pred,priority,action_list,cookie])
 
     def send_delete(self,pred,priority):
         self.send_to_OF_client(['delete',pred,priority])

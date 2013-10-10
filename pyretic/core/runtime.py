@@ -100,6 +100,9 @@ class Runtime(object):
         self.old_rules = self.manager.list()
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
+        self.classifier_version_no = 0
+        self.classifier_version_lock = Lock()
+        self.default_cookie = 0
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -225,7 +228,7 @@ class Runtime(object):
             else:
                 rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
                 if rule_tuple:
-                    self.install_rule(rule_tuple)
+                    self.install_rule(rule_tuple + (self.default_cookie,))
                     self.log.debug(
                         '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                             " | install rule",
@@ -536,7 +539,7 @@ class Runtime(object):
 
         ### UPDATE LOGIC
 
-        def nuclear_install(classifier):
+        def nuclear_install(classifier, curr_classifier_no):
             switches = self.network.topology.nodes()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
@@ -546,10 +549,12 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
+                                   [{'outport' : OFPP_CONTROLLER}],
+                                   curr_classifier_no))
 
             for rule in new_rules:
-                self.install_rule(rule)
+                self.install_rule(rule + (curr_classifier_no,))
                 
             for s in switches:
                 self.send_barrier(s)
@@ -567,7 +572,7 @@ class Runtime(object):
                     return rule
             return None
 
-        def install_diff_rules(classifier):
+        def install_diff_rules(classifier, curr_classifier_no):
             with self.old_rules_lock:
                 old_rules = self.old_rules
                 switches = self.network.topology.nodes()
@@ -595,13 +600,13 @@ class Runtime(object):
                 # install diff
                 if not to_add is None:
                     for rule in to_add:
-                        self.install_rule(rule)
+                        self.install_rule(rule + (curr_classifier_no,))
                 for rule in to_delete:
                     if rule[0]['switch'] in switches:
                         self.delete_rule((rule[0], rule[1]))
                 for rule in to_modify:
                     self.delete_rule((rule[0], rule[1]))
-                    self.install_rule(rule)
+                    self.install_rule(rule + (curr_classifier_no,))
     
                 # update old_rule
                 del old_rules[0:len(old_rules)]
@@ -613,16 +618,21 @@ class Runtime(object):
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(classifier, this_update_no, current_update_no):
+        def f(classifier, this_update_no, current_update_no, curr_classifier_no):
             if not this_update_no is None:
                 time.sleep(0.1)
                 if this_update_no != current_update_no.value:
                     return
 
             if self.mode == 'proactive0':
-                nuclear_install(classifier)
+                nuclear_install(classifier, curr_classifier_no)
             elif self.mode == 'proactive1':
-                install_diff_rules(classifier)
+                install_diff_rules(classifier, curr_classifier_no)
+
+        curr_version_no = None
+        with self.classifier_version_lock:
+            self.classifier_version_no += 1
+            curr_version_no = self.classifier_version_no
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
@@ -635,16 +645,17 @@ class Runtime(object):
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
-        p = Process(target=f,args=(classifier,this_update_no,current_update_no))
+        p = Process(target=f,args=(classifier,this_update_no,current_update_no,curr_version_no))
         p.daemon = True
         p.start()
             
-    def install_rule(self,(concrete_pred,priority,action_list)):
+    def install_rule(self,(concrete_pred,priority,action_list,cookie)):
         self.log.debug(
             '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
                 "sending openflow rule:",
-                (str(priority) + " " + repr(concrete_pred) + " "+ repr(action_list))))
-        self.backend.send_install(concrete_pred,priority,action_list)
+                (str(priority) + " " + repr(concrete_pred) + " "+
+                 repr(action_list) + " " + repr(cookie))))
+        self.backend.send_install(concrete_pred,priority,action_list,cookie)
 
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
@@ -666,7 +677,9 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
+                                   [{'outport' : OFPP_CONTROLLER}],
+                                   self.default_cookie))
         p = Process(target=f,args=(this_update_no,current_update_no))
         p.daemon = True
         p.start()
