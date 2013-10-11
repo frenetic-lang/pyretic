@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
-from utils import (TestCase, main)
 from mininet.net import Mininet
 from mininet.node import RemoteController
-import os
+import os, utils
+from utils import init
+
+
+### Module Parameters
 
 def get_controller():
     return 'pyretic.modules.hub'
@@ -25,15 +28,31 @@ def run_mininet():
     # cmd = '%s --topo clique,4,4' % mn
     # subprocess.call(shlex.split(cmd))
 
-def filter_mininet(line):
-    return line
-
 def filter_controller(line):
     if line.find('TEST') >= 0:
         return line
     else:
         return ''
 
+def filter_mininet(line):
+    return line
+
+
+### Tests
+
+test_hub = utils.TestModule( __name__, __file__, get_controller, run_mininet, filter_controller, filter_mininet)
+
+def test_hub_i(init):
+    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m i')
+def test_hub_r0(init):
+    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m r0')
+def test_hub_p0(init):
+    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
+def test_hub_p1(init):
+    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
+
+
+### Executing this file starts the mininet instance for this test.
+
 if __name__ == "__main__":
-    # Run the common main function from utils.py.
-    main(run_mininet)
+    run_mininet()

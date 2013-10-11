@@ -2,6 +2,34 @@
 
 from argparse import ArgumentParser
 import difflib, filecmp, os, shlex, shutil, signal, subprocess, sys, tempfile, time
+import filecmp, os, pytest
+
+### Fixtures
+
+class InitEnv():
+    def __init__(self, benchmark_dir, test_dir):
+        self.benchmark_dir = benchmark_dir
+        self.test_dir = test_dir
+
+@pytest.fixture(scope="module")
+def init():
+    '''Delete any old test files and return the name of the test output
+    directory.'''
+    benchmark_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+    test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
+    # Check for benchmarks.
+    assert os.path.exists(benchmark_dir)
+    # Create test dir if not already present.
+    if not os.path.exists(test_dir):
+        os.mkdir(test_dir)
+    # Delete any old test files.
+    for f in os.listdir(test_dir):
+        if f.endswith(".err") or f.endswith(".out"):
+            os.remove(os.path.join(test_dir, f))
+    return InitEnv(benchmark_dir, test_dir)
+
+
+### Utility functions
 
 class TestCase():
     def __init__(self, test_name, test_file, test_output_dir, filter_mininet, filter_controller, controller_module, controller_opts):
@@ -71,11 +99,28 @@ class TestCase():
         self._cleanup()
         return [os.path.join(self.test_output_dir, f) for f in mininet_files + controller_files]
 
+class TestModule():
+    def __init__(self, 
+                 name,
+                 filename,
+                 get_controller,
+                 run_mininet,
+                 filter_controller,
+                 filter_mininet):
+        self.name = name
+        self.filename = filename
+        self.get_controller = get_controller
+        self.run_mininet = run_mininet
+        self.filter_mininet = filter_mininet
+        self.filter_controller = filter_controller
+
 def run_test(module, test_output_dir, benchmark_dir, controller_args):
-    test_name = module.__name__.split('.')[-1]
-    test_file = os.path.abspath(module.__file__)
+    test_name = module.name.split('.')[-1]
+    test_file = os.path.abspath(module.filename)
     # Run the test.
-    test = TestCase(test_name, test_file, test_output_dir, module.filter_mininet, module.filter_controller, module.get_controller(), controller_args)
+    test = TestCase(test_name, test_file, test_output_dir, 
+                    module.filter_mininet, module.filter_controller,
+                    module.get_controller(), controller_args)
     files = test.run()
     files = [os.path.basename(f) for f in files]
     # Compare the output.
@@ -84,30 +129,20 @@ def run_test(module, test_output_dir, benchmark_dir, controller_args):
         for fname in mismatch:
             fname1 = os.path.join(benchmark_dir, fname)
             fname2 = os.path.join(test_output_dir, fname)
+            diffname = os.path.join(test_output_dir, '%s.diff' % fname)
             f1 = file(fname1, 'r')
             f2 = file(fname2, 'r')
-            sys.stderr.write('--- Diff: %s vs. %s ---\n' % (os.path.basename(fname1), os.path.basename(fname2)))
+            fdiff = file(diffname, 'w')
+            sys.stderr.write('--- Diff: %s vs. %s ---\n' %
+              (os.path.basename(fname1), os.path.basename(fname2)))
             d = difflib.Differ()
             diff = difflib.ndiff(f1.readlines(), f2.readlines())
             for line in diff:
                 sys.stderr.write(line)
+                fdiff.write(line)
             f1.close()
             f2.close()
+            fdiff.close()
         assert mismatch == []
     assert errors == []
     assert match == files
-
-def main(run_mininet):
-    # Parse command line args.
-    parser = ArgumentParser('Run a Pyretic system test.')
-    parser.add_argument("--mininet", action='store_true',
-        help="start the mininet for this test")
-    args = parser.parse_args()
-
-    if args.mininet:
-        run_mininet()
-    else:
-        print '''This program is intended to be invoked as part of a test suite
-        or with the "--mininet" flag to start a mininet instance.  Quitting
-        now.'''
-
