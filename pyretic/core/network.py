@@ -36,6 +36,7 @@ import networkx as nx
 from pyretic.core import util
 
 ### DEFINITIONS
+OFPP_IN_PORT = 0xfff8
 OFPP_CONTROLLER = 0xfffd
 
 LLDP_TYPE = 0x88cc

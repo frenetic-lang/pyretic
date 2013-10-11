@@ -523,6 +523,30 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
+        def portize(classifier,switch_to_attrs):
+            import copy
+            specialized_rules = []
+            for rule in classifier.rules:
+                phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
+                phys_outports = map(lambda a: a['outport'], phys_actions)
+                if not 'inport' in rule.match:
+                    switch = rule.match['switch']
+                    phys_outports = switch_to_attrs[switch]['ports'].keys()
+                    for outport in phys_outports:
+                        new_match = copy.deepcopy(rule.match)
+                        new_match['inport'] = outport
+                        new_actions = copy.deepcopy(rule.actions)
+                        for action in new_actions:
+                            try:
+                                if action['outport'] == outport:
+                                    action['outport'] = OFPP_IN_PORT
+                            except:
+                                raise TypeError  # INVARIANT: every set of actions must go out a port
+                            # this may not hold when we move to OF 1.3
+                        specialized_rules.append(Rule(new_match,new_actions))
+                specialized_rules.append(rule)
+            return Classifier(specialized_rules)
+
         def prioritize(classifier,switches):
             priority = {}
             for s in switches:
@@ -537,9 +561,12 @@ class Runtime(object):
         ### UPDATE LOGIC
 
         def nuclear_install(classifier):
-            switches = self.network.topology.nodes()
+            switch_attrs_tuples = self.network.topology.nodes(data=True)
+            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+            switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
+            classifier = portize(classifier,switch_to_attrs)
             new_rules = prioritize(classifier,switches)
 
             for s in switches:
@@ -570,9 +597,12 @@ class Runtime(object):
         def install_diff_rules(classifier):
             with self.old_rules_lock:
                 old_rules = self.old_rules
-                switches = self.network.topology.nodes()
+                switch_attrs_tuples = self.network.topology.nodes(data=True)
+                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+                switches = switch_to_attrs.keys()
                 classifier = switchify(classifier,switches)
                 classifier = concretize(classifier)
+                classifier = portize(classifier,switch_to_attrs)
                 new_rules = prioritize(classifier,switches)
 
                 # calculate diff
