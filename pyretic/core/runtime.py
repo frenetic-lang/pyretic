@@ -432,7 +432,7 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(classifier):
+        def bookkeep_buckets(diff_list):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
@@ -572,6 +572,65 @@ class Runtime(object):
                     return rule
             return None
 
+        def get_diff_lists(classifier, curr_classifier_no):
+            """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
+            (versioned) classifier."""
+            def add_version(rules, version):
+                new_rules = []
+                for r in rules:
+                    new_rules.append(r + (version,))
+                return new_rules
+
+            def buckets_removed(acts):
+                return filter(lambda a: not isinstance(a, CountBucket), acts)
+
+            switches = self.network.topology.nodes()
+            classifier = switchify(classifier, switches)
+            classifier = concretize(classifier)
+            new_rules = prioritize(classifier, switches)
+            new_rules = add_version(new_rules, curr_classifier_no)
+
+            with self.old_rules_lock:
+                old_rules = self.old_rules
+                to_add = list()
+                to_delete = list()
+                to_modify = list()
+                to_stay = list()
+                for old in old_rules:
+                    new = find_same_rule(old, new_rules)
+                    if new is None:
+                        to_delete.append(old)
+                    else:
+                        if buckets_removed(old[2]) != buckets_removed(new[2]):
+                            to_modify.append(new)
+                            # We add to the add/delete lists because the current
+                            # implementation is deleting the old rule and adding
+                            # the one. If that changes (e.g., actual modify
+                            # instead of delete+add) then this may need to be
+                            # handled differently.
+                            to_add.append(new)
+                            to_delete.append(old)
+                        else:
+                            to_stay.append(old)
+
+                for new in new_rules:
+                    old = find_same_rule(new, old_rules)
+                    if old is None:
+                        to_add.append(new)
+
+                # update old_rules to reflect changes in the classifier
+                for rule in to_delete:
+                    self.old_rules.remove(rule)
+                for rule in to_add:
+                    self.old_rules.add(rule)
+                # see note above where to_modify case is handled.
+                for rule in to_modify:
+                    for lst in [to_add, to_delete]:
+                        if rule in lst:
+                            lst.remove(rule)
+
+            return (to_add, to_delete, to_modify, to_stay)
+
         def install_diff_rules(classifier, curr_classifier_no):
             with self.old_rules_lock:
                 old_rules = self.old_rules
@@ -642,8 +701,14 @@ class Runtime(object):
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
         classifier = vlan_specialize(classifier)
-        bookkeep_buckets(classifier)
-        classifier = remove_buckets(classifier)
+
+        # Get diffs of rules to install from the old (versioned) classifier. The
+        # bookkeeping and removing of bucket actions happens at the end of the
+        # whole pipeline, because buckets need very precise mappings to the
+        # rules installed by the runtime.
+        diff_lists = get_diff_lists(classifier, curr_version_no)
+        bookkeep_buckets(diff_lists)
+        classifier = remove_buckets(diff_lists)
 
         p = Process(target=f,args=(classifier,this_update_no,current_update_no,curr_version_no))
         p.daemon = True
