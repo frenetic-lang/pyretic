@@ -62,31 +62,8 @@ class Runtime(object):
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
+        self.active_dynamic_policies = set()
         if mode != 'interpreted':
-            self.active_dynamic_policies = set()
-            def find_dynamic_sub_pols(policy,recursive_pols_seen):
-                dynamic_sub_pols = set()
-                if isinstance(policy,DynamicPolicy):
-                    dynamic_sub_pols.add(policy)
-                    dynamic_sub_pols |= find_dynamic_sub_pols(policy._policy,
-                                                              recursive_pols_seen)
-                elif isinstance(policy,CombinatorPolicy):
-                    for sub_policy in policy.policies:
-                        dynamic_sub_pols |= find_dynamic_sub_pols(sub_policy,
-                                                                  recursive_pols_seen)
-                elif isinstance(policy,recurse):
-                    if policy in recursive_pols_seen:
-                        return dynamic_sub_pols
-                    recursive_pols_seen.add(policy)
-                    dynamic_sub_pols |= find_dynamic_sub_pols(policy.policy,
-                                                              recursive_pols_seen)
-                elif isinstance(policy,DerivedPolicy):
-                    dynamic_sub_pols |= find_dynamic_sub_pols(policy.policy,
-                                                              recursive_pols_seen)
-                else:
-                    pass
-                return dynamic_sub_pols
-            self.find_dynamic_sub_pols = find_dynamic_sub_pols
             dynamic_sub_pols = self.find_dynamic_sub_pols(self.policy,set())
             for p in dynamic_sub_pols:
                 p.attach(self.handle_policy_change)
@@ -107,6 +84,29 @@ class Runtime(object):
                         'high': 3,
                         'please-make-it-stop': 4}
         return numeric_map.get(verbosity_option, 0)
+
+    def find_dynamic_sub_pols(self,policy,recursive_pols_seen):
+        dynamic_sub_pols = set()
+        if isinstance(policy,DynamicPolicy):
+            dynamic_sub_pols.add(policy)
+            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy._policy,
+                                                           recursive_pols_seen)
+        elif isinstance(policy,CombinatorPolicy):
+            for sub_policy in policy.policies:
+                dynamic_sub_pols |= self.find_dynamic_sub_pols(sub_policy,
+                                                               recursive_pols_seen)
+        elif isinstance(policy,recurse):
+            if policy in recursive_pols_seen:
+                return dynamic_sub_pols
+            recursive_pols_seen.add(policy)
+            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy.policy,
+                                                           recursive_pols_seen)
+        elif isinstance(policy,DerivedPolicy):
+            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy.policy,
+                                                           recursive_pols_seen)
+        else:
+            pass
+        return dynamic_sub_pols
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -523,6 +523,30 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
+        def portize(classifier,switch_to_attrs):
+            import copy
+            specialized_rules = []
+            for rule in classifier.rules:
+                phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
+                phys_outports = map(lambda a: a['outport'], phys_actions)
+                if not 'inport' in rule.match:
+                    switch = rule.match['switch']
+                    phys_outports = switch_to_attrs[switch]['ports'].keys()
+                    for outport in phys_outports:
+                        new_match = copy.deepcopy(rule.match)
+                        new_match['inport'] = outport
+                        new_actions = copy.deepcopy(rule.actions)
+                        for action in new_actions:
+                            try:
+                                if action['outport'] == outport:
+                                    action['outport'] = OFPP_IN_PORT
+                            except:
+                                raise TypeError  # INVARIANT: every set of actions must go out a port
+                            # this may not hold when we move to OF 1.3
+                        specialized_rules.append(Rule(new_match,new_actions))
+                specialized_rules.append(rule)
+            return Classifier(specialized_rules)
+
         def prioritize(classifier,switches):
             priority = {}
             for s in switches:
@@ -537,9 +561,12 @@ class Runtime(object):
         ### UPDATE LOGIC
 
         def nuclear_install(classifier):
-            switches = self.network.topology.nodes()
+            switch_attrs_tuples = self.network.topology.nodes(data=True)
+            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+            switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
+            classifier = portize(classifier,switch_to_attrs)
             new_rules = prioritize(classifier,switches)
 
             for s in switches:
@@ -570,9 +597,12 @@ class Runtime(object):
         def install_diff_rules(classifier):
             with self.old_rules_lock:
                 old_rules = self.old_rules
-                switches = self.network.topology.nodes()
+                switch_attrs_tuples = self.network.topology.nodes(data=True)
+                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+                switches = switch_to_attrs.keys()
                 classifier = switchify(classifier,switches)
                 classifier = concretize(classifier)
+                classifier = portize(classifier,switch_to_attrs)
                 new_rules = prioritize(classifier,switches)
 
                 # calculate diff
