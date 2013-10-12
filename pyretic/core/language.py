@@ -400,9 +400,13 @@ class CountBucket(Query):
         self.byte_count_persistent = 0
         self.in_update_cv = Condition()
         self.in_update = False
+        self.new_bucket = True
         
     def __repr__(self):
         return "CountBucket"
+
+    def is_new_bucket(self):
+        return self.new_bucket
 
     def eval(self, pkt):
         self.packet_count_persistent += 1
@@ -436,7 +440,6 @@ class CountBucket(Query):
         """
         with self.in_update_cv:
             self.in_update = True
-            self.matches = set([])
             self.runtime_stats_query_fun = None
             self.outstanding_switches = []
 
@@ -444,13 +447,26 @@ class CountBucket(Query):
         with self.in_update_cv:
             self.in_update = False
             self.in_update_cv.notify_all()
+            self.new_bucket = False
+        # TODO(ngsrinivas) additional logic to query rules with
+        # existing_rule=True
         
-    def add_match(self, m):
-        """Add a match m to list of classifier rules to be queried for
-        counts.
+    def add_match(self, match, version, to_be_deleted=False,
+                  existing_rule=False):
+        """Add a match to list of classifier rules to be queried for counts,
+        corresponding to a given version of the classifier.
         """
-        if not m in self.matches:
-            self.matches.add(m)
+        if not (match, version, to_be_deleted, existing_rule) in self.matches:
+            self.matches.add((match, version, to_be_deleted, existing_rule))
+
+    def delete_match(self, match, version, to_be_deleted=False,
+                     existing_rule=False):
+        """If a rule is deleted from the classifier, mark this rule (until we
+        get the flow_removed message with the counters on it).
+        """
+        if (match, version, to_be_deleted, existing_rule) in self.matches:
+            self.matches.remove((match, version, to_be_deleted, existing_rule))
+            self.matches.add((match, version, True, existing_rule)
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the

@@ -432,19 +432,29 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(diff_list):
+        def bookkeep_buckets(diff_lists):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
             the pyretic level and are removed before installing rules.
             """
+            def get_rule_match(rule):
+                return rule[0]
+
+            def get_rule_actions(rule):
+                return rule[2]
+
+            def get_rule_version(rule):
+                return rule[3]
+
             def collect_buckets(rules):
                 """Scan classifier rules and collect distinct buckets into a
                 dictionary.
                 """
                 bucket_list = {}
                 for rule in rules:
-                    for act in rule.actions:
+                    actions = get_rule_actions(rule)
+                    for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
                                 bucket_list[id(act)] = act
@@ -454,10 +464,19 @@ class Runtime(object):
                 for b in bucket_list.values():
                     b.start_update()
 
-            def hook_buckets_to_rule(rule):
-                for act in rule.actions:
+            def update_rules_for_buckets(rule, op):
+                rule_match = get_rule_match(rule)
+                rule_actions = get_rule_actions(rule)
+                rule_version = get_rule_version(rule)
+                for act in rule_actions:
                     if isinstance(act, CountBucket):
-                        act.add_match(rule.match)
+                        if op == "add":
+                            act.add_match(rule_match, rule_version)
+                        elif op == "delete":
+                            act.delete_match(rule_match, rule_version)
+                        elif op == "stay" or op == "modify":
+                            if act.is_new_bucket():
+                                act.add_match(rule_match, rule_version, existing_rule=True)
 
             def hook_buckets_to_pull_stats(bucket_list):
                 for b in bucket_list.values():
@@ -473,18 +492,29 @@ class Runtime(object):
                 "update buckets" lock guards against inconsistent classifier
                 match state *across* buckets.
                 """
-                bucket_list = collect_buckets(classifier.rules)
+                (to_add, to_delete, to_modify, to_stay) = diff_lists
+                all_rules = to_add + to_delete + to_modify + to_stay
+                bucket_list = collect_buckets(all_rules)
                 start_update(bucket_list)
-                map(hook_buckets_to_rule, classifier.rules)
+                map(lambda x: update_rules_for_buckets(x, "add"), to_add)
+                map(lambda x: update_rules_for_buckets(x, "delete"), to_delete)
+                map(lambda x: update_rules_for_buckets(x, "stay"), to_stay)
+                map(lambda x: update_rules_for_buckets(x, "modify"), to_modify)
                 hook_buckets_to_pull_stats(bucket_list)
                 finish_update(bucket_list)
         
-        def remove_buckets(classifier):
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: 
-                                          not isinstance(a, CountBucket),
-                                          rule.actions))
-                              for rule in classifier.rules)
+        def remove_buckets(diff_lists):
+            new_diff_lists = []
+            for lst in diff_lists:
+                new_lst = []
+                for rule in lst:
+                    acts = rule[2]
+                    new_acts = filter(lambda x: not isinstance(x, CountBucket),
+                                      acts)
+                    new_rule = (rule[0], rule[1], new_acts, rule[3])
+                    new_lst.append(new_rule)
+                new_diff_lists.append(new_lst)
+            return new_diff_lists
 
         def switchify(classifier,switches):
             new_rules = list()
@@ -708,7 +738,7 @@ class Runtime(object):
         # rules installed by the runtime.
         diff_lists = get_diff_lists(classifier, curr_version_no)
         bookkeep_buckets(diff_lists)
-        classifier = remove_buckets(diff_lists)
+        diff_lists = remove_buckets(diff_lists)
 
         p = Process(target=f,args=(classifier,this_update_no,current_update_no,curr_version_no))
         p.daemon = True
@@ -754,12 +784,7 @@ class Runtime(object):
         issue queries from the runtime."""
         def pull_bucket_stats():
             switch_list = []
-            for m in bucket.matches:
-                if m == identity:
-                    concrete_pred = {}
-                else:
-                    assert(isinstance(m, match))
-                    concrete_pred = { k:v for (k,v) in m.map.items() }
+            for (concrete_pred,_,_,_) in bucket.matches:
                 if 'switch' in concrete_pred:
                     switch_list.append(concrete_pred['switch'])
                 else:
