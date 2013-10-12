@@ -393,6 +393,7 @@ class CountBucket(Query):
         super(CountBucket, self).__init__()
         self.matches = set([])
         self.runtime_stats_query_fun = None
+        self.runtime_existing_stats_query_fun = None
         self.outstanding_switches = []
         self.packet_count = 0
         self.byte_count = 0
@@ -448,8 +449,11 @@ class CountBucket(Query):
             self.in_update = False
             self.in_update_cv.notify_all()
             self.new_bucket = False
-        # TODO(ngsrinivas) additional logic to query rules with
-        # existing_rule=True
+        # Now query rules which already existed when this bucket was created for
+        # accurate book-keeping.
+        # TODO(ngsrinivas) XXX: logic needs to be completed here.
+        self.runtime_existing_stats_query_fun()
+        self.clear_existing_rules()
         
     def add_match(self, match, version, to_be_deleted=False,
                   existing_rule=False):
@@ -466,14 +470,19 @@ class CountBucket(Query):
         """
         if (match, version, to_be_deleted, existing_rule) in self.matches:
             self.matches.remove((match, version, to_be_deleted, existing_rule))
-            self.matches.add((match, version, True, existing_rule)
+            self.matches.add((match, version, True, existing_rule))
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
         runtime.
         """
-        if not self.runtime_stats_query_fun:
-            self.runtime_stats_query_fun = fun
+        self.runtime_stats_query_fun = fun
+
+    def add_pull_existing_stats(self, fun):
+        """Point to function that issues stats queries *only for rules already
+        existing when the bucket was created* in the runtime.
+        """
+        self.runtime_existing_stats_query_fun = fun
 
     def pull_stats(self):
         """Issue stats queries from the runtime"""

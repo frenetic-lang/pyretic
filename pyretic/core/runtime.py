@@ -481,6 +481,7 @@ class Runtime(object):
             def hook_buckets_to_pull_stats(bucket_list):
                 for b in bucket_list.values():
                     b.add_pull_stats(self.pull_stats_for_bucket(b))
+                    b.add_pull_existing_stats(self.pull_existing_stats_for_bucket(b))
 
             def finish_update(bucket_list):
                 for b in bucket_list.values():
@@ -779,23 +780,39 @@ class Runtime(object):
         p.daemon = True
         p.start()
 
+    def pull_switches_for_preds(self, concrete_preds):
+        """Given a list of concrete predicates, query the list of switches
+        corresponding to the switches where these predicates apply.
+        """
+        switch_list = []
+        for concrete_pred in concrete_preds:
+            if 'switch' in concrete_pred:
+                switch_list.append(concrete_pred['switch'])
+            else:
+                switch_list = self.network.topology.nodes()
+                break
+        for s in switch_list:
+            bucket.add_outstanding_switch_query(s)
+            already_queried = self.add_global_outstanding_query(s, bucket)
+            if not already_queried:
+                self.request_flow_stats(s)
+
     def pull_stats_for_bucket(self,bucket):
         """Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
-            switch_list = []
-            for (concrete_pred,_,_,_) in bucket.matches:
-                if 'switch' in concrete_pred:
-                    switch_list.append(concrete_pred['switch'])
-                else:
-                    switch_list = self.network.topology.nodes()
-                    break
-            for s in switch_list:
-                bucket.add_outstanding_switch_query(s)
-                already_queried = self.add_global_outstanding_query(s, bucket)
-                if not already_queried:
-                    self.request_flow_stats(s)
+            preds = [p for (p,_,_,_) in bucket.matches]
+            self.pull_switches_for_preds(preds)
         return pull_bucket_stats
+
+    def pull_existing_stats_for_bucket(self,bucket):
+        """Returns a function that is called by new counting buckets which have
+        at least one rule that was already created in an earlier classifier.
+        """
+        def pull_existing_bucket_stats():
+            preds = [p for (p,_,_,existing) in bucket.matches if existing]
+            self.pull_switches_for_preds(preds)
+        return pull_existing_bucket_stats
 
     def add_global_outstanding_query(self, s, bucket):
         already_queried = False
