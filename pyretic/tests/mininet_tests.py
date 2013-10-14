@@ -1,7 +1,9 @@
 
-import pyretic.tests.test_hub as test_hub
 import pyretic.tests.utils as utils
 import filecmp, os, pytest
+
+import pyretic.tests.test_hub as test_hub
+import pyretic.tests.test_mac_learner as test_mac_learner
 
 ### Fixtures
 
@@ -31,10 +33,19 @@ def init():
 
 def test_hub_i(init):
     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m i')
-def test_hub_r0(init):
-    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m r0')
-def test_hub_p0(init):
-    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
-def test_hub_p1(init):
-    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
+# def test_hub_r0(init):
+#      utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m r0')
+# def test_hub_p0(init):
+#     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
+# def test_hub_p1(init):
+#     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
+
+def test_mac_learner_i(init):
+    utils.run_test(test_mac_learner, init.test_dir, init.benchmark_dir, '-m i')
+def test_mac_learner_r0(init):
+    utils.run_test(test_mac_learner, init.test_dir, init.benchmark_dir, '-m r0')
+# def test_mac_learner_p0(init):
+#     utils.run_test(test_mac_learner, init.test_dir, init.benchmark_dir, '-m p0')
+# def test_mac_learner_p1(init):
+#     utils.run_test(test_mac_learner, init.test_dir, init.benchmark_dir, '-m p1')
 
