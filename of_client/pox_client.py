@@ -75,7 +75,10 @@ class BackendChannel(asynchat.async_chat):
             if h in ['srcmac','dstmac']:
                 return packetaddr.EthAddr(val)
             elif h in ['srcip','dstip']:
-                return packetaddr.IPAddr(val)
+                try:
+                    return packetaddr.IPAddr(val)
+                except:
+                    return val
             elif h in ['vlan_id','vlan_pcp'] and val == 'None':
                 return None
             else:
@@ -399,9 +402,9 @@ class POXClient(revent.EventMixin):
         if 'protocol' in pred:
             match.nw_proto = pred['protocol']
         if 'srcip' in pred:
-            match.nw_src = pred['srcip']
+            match.set_nw_src(pred['srcip'])
         if 'dstip' in pred:
-            match.nw_dst = pred['dstip']
+            match.set_nw_dst(pred['dstip'])
         if 'tos' in pred:
             match.nw_tos = pred['tos']
         if 'srcport' in pred:

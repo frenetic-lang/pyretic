@@ -36,14 +36,14 @@ def run_mininet():
     # cmd = '%s --topo clique,4,4' % mn
     # subprocess.call(shlex.split(cmd))
 
-def filter_mininet(line):
-    return line
-
 def filter_controller(line):
     if line.find('TEST') >= 0:
         return line
     else:
         return ''
+
+def filter_mininet(line):
+    return line
 
 
 ### Tests
