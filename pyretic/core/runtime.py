@@ -64,7 +64,9 @@ class Runtime(object):
         self.extended_values_lock = RLock()
         self.active_dynamic_policies = set()
         if mode != 'interpreted':
-            dynamic_sub_pols = self.find_dynamic_sub_pols(self.policy,set())
+            dynamic_sub_pols = self.ast_fold(self.add_dynamic_sub_pols,
+                                             set(),
+                                             self.policy)
             for p in dynamic_sub_pols:
                 p.attach(self.handle_policy_change)
         self.in_update_network = False
@@ -85,28 +87,32 @@ class Runtime(object):
                         'please-make-it-stop': 4}
         return numeric_map.get(verbosity_option, 0)
 
-    def find_dynamic_sub_pols(self,policy,recursive_pols_seen):
-        dynamic_sub_pols = set()
-        if isinstance(policy,DynamicPolicy):
-            dynamic_sub_pols.add(policy)
-            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy._policy,
-                                                           recursive_pols_seen)
+    def ast_fold(self, fun, acc, policy):
+        if isinstance(policy,DerivedPolicy):
+            fun(acc,policy)
+            self.ast_fold(fun,acc,policy.policy)
+
         elif isinstance(policy,CombinatorPolicy):
+            fun(acc,policy)
             for sub_policy in policy.policies:
-                dynamic_sub_pols |= self.find_dynamic_sub_pols(sub_policy,
-                                                               recursive_pols_seen)
-        elif isinstance(policy,recurse):
-            if policy in recursive_pols_seen:
-                return dynamic_sub_pols
-            recursive_pols_seen.add(policy)
-            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy.policy,
-                                                           recursive_pols_seen)
-        elif isinstance(policy,DerivedPolicy):
-            dynamic_sub_pols |= self.find_dynamic_sub_pols(policy.policy,
-                                                           recursive_pols_seen)
+                self.ast_fold(fun,acc,sub_policy)
+
         else:
-            pass
-        return dynamic_sub_pols
+            fun(acc,policy)
+
+        return acc
+
+    def add_dynamic_sub_pols(self, acc, policy):
+        if isinstance(policy,DynamicPolicy):
+            acc.add(policy)
+
+    def add_query_sub_pols(self, acc, policy):
+        from pyretic.lib.query import packets
+        if isinstance(policy,Query):
+            acc.add(policy)
+        ### TODO remove this hack once packets is refactored        
+        elif isinstance(policy,packets):
+            acc.add(policy)
 
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
