@@ -447,13 +447,11 @@ class CountBucket(Query):
     def finish_update(self):
         with self.in_update_cv:
             self.in_update = False
+            if self.new_bucket:
+                self.runtime_existing_stats_query_fun()
+                self.clear_existing_rule_flags()
+                self.new_bucket = False
             self.in_update_cv.notify_all()
-            self.new_bucket = False
-        # Now query rules which already existed when this bucket was created for
-        # accurate book-keeping.
-        # TODO(ngsrinivas) XXX: logic needs to be completed here.
-        self.runtime_existing_stats_query_fun()
-        self.clear_existing_rules()
         
     def add_match(self, match, version, to_be_deleted=False,
                   existing_rule=False):
@@ -471,6 +469,15 @@ class CountBucket(Query):
         if (match, version, to_be_deleted, existing_rule) in self.matches:
             self.matches.remove((match, version, to_be_deleted, existing_rule))
             self.matches.add((match, version, True, existing_rule))
+
+    def clear_existing_rule_flags(self):
+        """Clear flags in the bucket.matches structure which indicate that a
+        rule was already existing on the data plane when the bucket was created.
+        """
+        for (match,version,to_be_deleted,existing) in self.matches:
+            if existing:
+                self.matches.remove((match,version,to_be_deleted,existing))
+                self.matches.add((match,version,to_be_deleted,False))
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
