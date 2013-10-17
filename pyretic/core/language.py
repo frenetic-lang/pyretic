@@ -489,6 +489,8 @@ class CountBucket(Query):
             while self.in_update: # ensure buckets not updated concurrently
                 self.in_update_cv.wait()
             if not self.runtime_stats_query_fun is None:
+                # Note: If a query is already in progress, this will wipe out
+                # all its intermediate results for it.
                 self.outstanding_switches = []
                 queries_issued = True
                 pull_function()

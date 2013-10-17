@@ -639,6 +639,23 @@ class POXClient(revent.EventMixin):
             else:
                 raise RuntimeException("Unknown port status event")
 
+    def _handle_FlowRemoved(self, event):
+        dpid = event.connection.dpid
+        ofp = event.ofp
+        flow_stat_dict = {}
+        flow_stat_dict['match'] = self.of_match_to_dict(ofp.match)
+        flow_stat_dict['cookie'] = ofp.cookie
+        flow_stat_dict['priority'] = ofp.priority
+        flow_stat_dict['timeout'] = event.timeout
+        flow_stat_dict['hard_timeout'] = event.hardTimeout
+        flow_stat_dict['soft_timeout'] = event.softTimeout
+        flow_stat_dict['deleted'] = event.deleted
+        flow_stat_dict['duration_sec'] = ofp.duration_sec
+        flow_stat_dict['duration_nsec'] = ofp.duration_nsec
+        flow_stat_dict['idle_timeout'] = ofp.idle_timeout
+        flow_stat_dict['packet_count'] = ofp.packet_count
+        flow_stat_dict['byte_count'] = ofp.byte_count
+        self.send_to_pyretic(['flow_removed', dpid, flow_stat_dict])
 
     def handle_lldp(self,packet,event):
         import pox.lib.packet as pkt
