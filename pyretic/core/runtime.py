@@ -442,6 +442,9 @@ class Runtime(object):
             def get_rule_match(rule):
                 return rule[0]
 
+            def get_rule_priority(rule):
+                return rule[1]
+
             def get_rule_actions(rule):
                 return rule[2]
 
@@ -466,18 +469,20 @@ class Runtime(object):
                     b.start_update()
 
             def update_rules_for_buckets(rule, op):
-                rule_match = get_rule_match(rule)
-                rule_actions = get_rule_actions(rule)
-                rule_version = get_rule_version(rule)
-                for act in rule_actions:
+                match = get_rule_match(rule)
+                priority = get_rule_priority(rule)
+                actions = get_rule_actions(rule)
+                version = get_rule_version(rule)
+                for act in actions:
                     if isinstance(act, CountBucket):
                         if op == "add":
-                            act.add_match(rule_match, rule_version)
+                            act.add_match(match, priority, version)
                         elif op == "delete":
-                            act.delete_match(rule_match, rule_version)
+                            act.delete_match(match, priority, version)
                         elif op == "stay" or op == "modify":
                             if act.is_new_bucket():
-                                act.add_match(rule_match, rule_version, existing_rule=True)
+                                act.add_match(match, priority, version,
+                                              existing_rule=True)
 
             def hook_buckets_to_pull_stats(bucket_list):
                 for b in bucket_list.values():

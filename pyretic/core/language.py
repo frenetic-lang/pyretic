@@ -452,22 +452,24 @@ class CountBucket(Query):
                 self.new_bucket = False
             self.in_update_cv.notify_all()
         
-    def add_match(self, match, version, to_be_deleted=False,
+    def add_match(self, match, priority, version, to_be_deleted=False,
                   existing_rule=False):
         """Add a match to list of classifier rules to be queried for counts,
         corresponding to a given version of the classifier.
         """
-        if not (match, version, to_be_deleted, existing_rule) in self.matches:
-            self.matches.add((match, version, to_be_deleted, existing_rule))
+        match_entry = (match, priority, version, to_be_deleted, existing_rule)
+        if not match_entry in self.matches:
+            self.matches.add(match_entry)
 
-    def delete_match(self, match, version, to_be_deleted=False,
+    def delete_match(self, match, priority, version, to_be_deleted=False,
                      existing_rule=False):
         """If a rule is deleted from the classifier, mark this rule (until we
         get the flow_removed message with the counters on it).
         """
-        if (match, version, to_be_deleted, existing_rule) in self.matches:
-            self.matches.remove((match, version, to_be_deleted, existing_rule))
-            self.matches.add((match, version, True, existing_rule))
+        match_entry = (match, priority, version, to_be_deleted, existing_rule)
+        if match_entry in self.matches:
+            self.matches.remove(match_entry)
+            self.matches.add((match, priority, version, True, existing_rule))
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
@@ -529,11 +531,13 @@ class CountBucket(Query):
             f = flow_stat
             table_match = match(f['match']).intersect(match(switch=s))
             network_match = match(f['match'])
+            priority = int(f['priority'])
             version_no = int(f['cookie'])
             for m in [table_match, network_match]:
                 for to_be_deleted in [True, False]:
                     for existing_rule in [True, False]:
-                        match_entry = (m, version_no, to_be_deleted, existing_rule)
+                        match_entry = (m, priority, version_no, to_be_deleted,
+                                       existing_rule)
                         if match_entry in self.matches:
                             return match_entry
             return None
@@ -550,7 +554,7 @@ class CountBucket(Query):
                         extracted_pkts = f['packet_count']
                         extracted_bytes = f['byte_count']
                         if matched_entry:
-                            (_,_,_,existing) = matched_entry
+                            (_,_,_,_,existing) = matched_entry
                             if not existing:
                                 self.packet_count += extracted_pkts
                                 self.byte_count   += extracted_bytes
@@ -574,7 +578,8 @@ class CountBucket(Query):
         self.in_update = True
         self.matches.remove(entry)
         # clear entry flag
-        cleared_entry = entry[:-1] + (True,)
+        (match, priority, version_no, to_be_deleted, existing) = entry
+        cleared_entry = (match, priority, version_no, to_be_deleted, False)
         self.matches.add(cleared_entry)
         self.in_update = False
         self.in_update_cv.notify_all()
