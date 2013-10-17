@@ -51,7 +51,6 @@ class Runtime(object):
                  show_traces=False, debug_packet_in=False):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
-        self.test_log = logging.getLogger('%s.Runtime.TEST' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
@@ -241,7 +240,6 @@ class Runtime(object):
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        self.test_log.debug('packet in: %s' % pyretic_pkt)
         if self.debug_packet_in:
             debugger.set_trace()
         if USE_IPDB:
@@ -351,7 +349,6 @@ class Runtime(object):
         return pyretic_packet.modifymany(d)
 
     def send_packet(self,pyretic_packet):
-        self.test_log.debug('packet out: %s' % pyretic_packet)
         concrete_packet = self.pyretic2concrete(pyretic_packet)
         self.backend.send_packet(concrete_packet)
 

@@ -15,7 +15,7 @@ class InitEnv():
 def init():
     '''Delete any old test files and return the name of the test output
     directory.'''
-    benchmark_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+    benchmark_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'regression')
     test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
     # Check for benchmarks.
     assert os.path.exists(benchmark_dir)
@@ -24,7 +24,7 @@ def init():
         os.mkdir(test_dir)
     # Delete any old test files.
     for f in os.listdir(test_dir):
-        if f.endswith(".err") or f.endswith(".out"):
+        if f.endswith(".err") or f.endswith(".out") or f.endswith(".diff"):
             os.remove(os.path.join(test_dir, f))
     return InitEnv(benchmark_dir, test_dir)
 
@@ -32,19 +32,19 @@ def init():
 ### Utility functions
 
 class TestCase():
-    def __init__(self, test_name, test_file, test_output_dir, filter_mininet, filter_controller, controller_module, controller_opts):
+    def __init__(self, test_name, test_file, test_output_dir, process_mininet_output, process_controller_output, controller_module, controller_opts):
         self.test_name = test_name
         self.test_file = test_file
         self.controller_module = controller_module
         self.test_output_dir = test_output_dir
-        self.filter_mininet = filter_mininet
-        self.filter_controller = filter_controller
+        self.process_mininet_output = process_mininet_output
+        self.process_controller_output = process_controller_output
         self.controller_opts = controller_opts
         self.name = '%s.%s' % (test_name, '.'.join(shlex.split(controller_opts)))
         self.tmpdir = tempfile.mkdtemp()
 
     def _start_controller(self):
-        cmd = ["pyretic.py", self.controller_module] + shlex.split(self.controller_opts)
+        cmd = ["pyretic.py", self.controller_module, '-v', 'high'] + shlex.split(self.controller_opts)
         out_name = '%s.controller.out' % self.name
         err_name = '%s.controller.err' % self.name
         out_path = os.path.join(self.tmpdir, out_name)
@@ -62,7 +62,7 @@ class TestCase():
         time.sleep(2)
 
     def _run_mininet(self):
-        cmd = shlex.split('sudo %s --mininet' % self.test_file)
+        cmd = shlex.split('sudo %s' % self.test_file)
         out_name = '%s.mininet.out' % self.name
         err_name = '%s.mininet.err' % self.name
         out_path = os.path.join(self.tmpdir, out_name)
@@ -74,14 +74,12 @@ class TestCase():
         err.close()
         return [out_name, err_name]
 
-    def _move_and_filter_result(self, filename, filter_line):
+    def _move_and_filter_result(self, filename, process_output):
         oldfname = os.path.join(self.tmpdir, filename)
         newfname = os.path.join(self.test_output_dir, filename)
         oldf = file(oldfname, 'r')
         newf = file(newfname, 'w')
-        for line in oldf:
-            filtered_line = filter_line(line)
-            newf.write(filtered_line)
+        process_output(oldf, newf)
         oldf.close()
         newf.close()
 
@@ -93,9 +91,9 @@ class TestCase():
         mininet_files = self._run_mininet()
         self._stop_controller()
         for f in controller_files:
-            self._move_and_filter_result(f, self.filter_controller)
+            self._move_and_filter_result(f, self.process_controller_output)
         for f in mininet_files:
-            self._move_and_filter_result(f, self.filter_mininet)
+            self._move_and_filter_result(f, self.process_mininet_output)
         self._cleanup()
         return [os.path.join(self.test_output_dir, f) for f in mininet_files + controller_files]
 
@@ -105,21 +103,21 @@ class TestModule():
                  filename,
                  get_controller,
                  run_mininet,
-                 filter_controller,
-                 filter_mininet):
+                 process_controller_output,
+                 process_mininet_output):
         self.name = name
         self.filename = filename
         self.get_controller = get_controller
         self.run_mininet = run_mininet
-        self.filter_mininet = filter_mininet
-        self.filter_controller = filter_controller
+        self.process_mininet_output = process_mininet_output
+        self.process_controller_output = process_controller_output
 
 def run_test(module, test_output_dir, benchmark_dir, controller_args):
     test_name = module.name.split('.')[-1]
     test_file = os.path.abspath(module.filename)
     # Run the test.
     test = TestCase(test_name, test_file, test_output_dir, 
-                    module.filter_mininet, module.filter_controller,
+                    module.process_mininet_output, module.process_controller_output,
                     module.get_controller(), controller_args)
     files = test.run()
     files = [os.path.basename(f) for f in files]
