@@ -523,11 +523,18 @@ class CountBucket(Query):
         matches this bucket is interested in.
         """
         def stat_in_bucket(flow_stat, s):
+            """Return a matching entry for the given flow_stat in bucket.matches."""
+            f = flow_stat
             table_match = match(f['match']).intersect(match(switch=s))
             network_match = match(f['match'])
-            if table_match in self.matches or network_match in self.matches:
-                return True
-            return False
+            version_no = int(f['cookie'])
+            for m in [table_match, network_match]:
+                for to_be_deleted in [True, False]:
+                    for existing_rule in [True, False]:
+                        match_entry = (m, version_no, to_be_deleted, existing_rule)
+                        if match_entry in self.matches:
+                            return match_entry
+            return None
 
         with self.in_update_cv:
             while self.in_update:
@@ -537,14 +544,38 @@ class CountBucket(Query):
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
-                        if stat_in_bucket(f, switch):
-                            self.packet_count += f['packet_count']
-                            self.byte_count   += f['byte_count']
+                        matched_entry = stat_in_bucket(f, switch)
+                        extracted_pkts = f['packet_count']
+                        extracted_bytes = f['byte_count']
+                        if matched_entry:
+                            (_,_,_,existing) = matched_entry
+                            if not existing:
+                                self.packet_count += extracted_pkts
+                                self.byte_count   += extracted_bytes
+                            else: # pre-existing rule when bucket was created
+                                self.packet_count_persistent -= extracted_pkts
+                                self.byte_count_persistent -= extracted_bytes
+                                self.clear_existing_rule_flag(matched_entry)
                 self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
         if not self.outstanding_switches:
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
+
+    def clear_existing_rule_flag(self, entry):
+        """Clear the "existing rule" flag for the provided entry in
+        self.matches. This method should only be called in the context of
+        holding the bucket's in_update_cv since it updates the matches
+        structure.
+        """
+        assert entry in self.matches
+        self.in_update = True
+        self.matches.remove(entry)
+        # clear entry flag
+        cleared_entry = entry[:-1] + (True,)
+        self.matches.add(cleared_entry)
+        self.in_update = False
+        self.in_update_cv.notify_all()
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should

@@ -316,6 +316,7 @@ class Runtime(object):
             output += str(flow_stat['actions']) + '\n\t'
             output += 'packet_count=' + str(flow_stat['packet_count']) 
             output += '\tbyte_count=' + str(flow_stat['byte_count'])
+            output += '\n\t cookie: \t' + str(flow_stat['cookie'])
             return output
         self.log.debug(
             '|%s|\n\t%s\n' % (str(datetime.now()),
