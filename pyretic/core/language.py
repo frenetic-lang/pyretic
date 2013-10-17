@@ -448,8 +448,7 @@ class CountBucket(Query):
         with self.in_update_cv:
             self.in_update = False
             if self.new_bucket:
-                self.runtime_existing_stats_query_fun()
-                self.clear_existing_rule_flags()
+                self.pull_existing_stats()
                 self.new_bucket = False
             self.in_update_cv.notify_all()
         
@@ -470,15 +469,6 @@ class CountBucket(Query):
             self.matches.remove((match, version, to_be_deleted, existing_rule))
             self.matches.add((match, version, True, existing_rule))
 
-    def clear_existing_rule_flags(self):
-        """Clear flags in the bucket.matches structure which indicate that a
-        rule was already existing on the data plane when the bucket was created.
-        """
-        for (match,version,to_be_deleted,existing) in self.matches:
-            if existing:
-                self.matches.remove((match,version,to_be_deleted,existing))
-                self.matches.add((match,version,to_be_deleted,False))
-
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
         runtime.
@@ -491,8 +481,9 @@ class CountBucket(Query):
         """
         self.runtime_existing_stats_query_fun = fun
 
-    def pull_stats(self):
-        """Issue stats queries from the runtime"""
+    def pull_helper(self, pull_function):
+        """Issue stats queries from the runtime using a provided runtime stats
+        pulling function."""
         queries_issued = False
         with self.in_update_cv:
             while self.in_update: # ensure buckets not updated concurrently
@@ -500,7 +491,12 @@ class CountBucket(Query):
             if not self.runtime_stats_query_fun is None:
                 self.outstanding_switches = []
                 queries_issued = True
-                self.runtime_stats_query_fun()
+                pull_function()
+        return queries_issued
+
+    def pull_stats(self):
+        """Issue stats queries from the runtime on user program's request."""
+        queries_issued = self.pull_helper(self.runtime_stats_query_fun)
         # If no queries were issued, then no matches, so just call userland
         # registered callback routines
         if not queries_issued:
@@ -508,6 +504,12 @@ class CountBucket(Query):
             self.byte_count = self.byte_count_persistent
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
+
+    def pull_existing_stats(self):
+        """Issue stats queries from the runtime to track counters on rules
+        already on switches.
+        """
+        self.pull_helper(self.runtime_existing_stats_query_fun())
 
     def add_outstanding_switch_query(self,switch):
         self.outstanding_switches.append(switch)
