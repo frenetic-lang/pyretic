@@ -89,32 +89,46 @@ class Runtime(object):
         return numeric_map.get(verbosity_option, 0)
 
     def ast_fold(self, fun, acc, policy):
-        if isinstance(policy,DerivedPolicy):
-            fun(acc,policy)
-            self.ast_fold(fun,acc,policy.policy)
-
-        elif isinstance(policy,CombinatorPolicy):
-            fun(acc,policy)
+        if (  policy == identity or
+              policy == drop or
+              isinstance(policy,match) or
+              isinstance(policy,modify) or
+              policy == Controller or
+              isinstance(policy,Query)):
+            return fun(acc,policy)
+        elif (isinstance(policy,negate) or
+              isinstance(policy,parallel) or
+              isinstance(policy,union) or
+              isinstance(policy,sequential) or
+              isinstance(policy,intersection)):
+            acc = fun(acc,policy)
             for sub_policy in policy.policies:
-                self.ast_fold(fun,acc,sub_policy)
-
+                acc = self.ast_fold(fun,acc,sub_policy)
+            return acc
+        elif (isinstance(policy,difference) or
+              isinstance(policy,if_) or
+              isinstance(policy,fwd) or
+              isinstance(policy,xfwd) or
+              isinstance(policy,DynamicPolicy)):
+            acc = fun(acc,policy)
+            return self.ast_fold(fun,acc,policy.policy)
         else:
-            fun(acc,policy)
-
-        return acc
+            raise NotImplementedError
 
     def add_dynamic_sub_pols(self, acc, policy):
         if isinstance(policy,DynamicPolicy):
-            acc.add(policy)
+            return acc | {policy}
+        else:
+            return acc
 
     def add_query_sub_pols(self, acc, policy):
         from pyretic.lib.query import packets
-        if isinstance(policy,Query):
-            acc.add(policy)
-        ### TODO remove this hack once packets is refactored        
-        elif isinstance(policy,packets):
-            acc.add(policy)
-
+        if ( isinstance(policy,Query) or
+             isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
+            return add | {policy}
+        else:
+            return acc
+          
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
             with self.update_network_lock:
