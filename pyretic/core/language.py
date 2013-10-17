@@ -471,6 +471,30 @@ class CountBucket(Query):
             self.matches.remove(match_entry)
             self.matches.add((match, priority, version, True, existing_rule))
 
+    def handle_flow_removed(self, match, priority, version, packet_count,
+                            byte_count):
+        """Act on a flow removed message pertaining to a bucket by
+           1. removing the rule from the matches structure, and
+           2. adding its counters into the bucket's persistent counts.
+        """
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+                for to_be_deleted in [True, False]:
+                    for existing in [True, False]:
+                        match_entry = (match, priority, version, to_be_deleted,
+                                       existing)
+                        if match_entry in self.matches:
+                            assert to_be_deleted
+                            if not existing:
+                                self.packet_count_persistent += packet_count
+                                self.byte_count_persistent += byte_count
+                            # Note that there is no else action. We just forget
+                            # that this rule was ever associated with the bucket
+                            # if we get a "flow removed" message before we got
+                            # the first ever stats reply from an existing rule.
+                            self.matches.remove(match_entry)
+
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
         runtime.
@@ -575,14 +599,10 @@ class CountBucket(Query):
         structure.
         """
         assert entry in self.matches
-        self.in_update = True
         self.matches.remove(entry)
-        # clear entry flag
         (match, priority, version_no, to_be_deleted, existing) = entry
         cleared_entry = (match, priority, version_no, to_be_deleted, False)
         self.matches.add(cleared_entry)
-        self.in_update = False
-        self.in_update_cv.notify_all()
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should

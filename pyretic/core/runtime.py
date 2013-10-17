@@ -95,6 +95,8 @@ class Runtime(object):
         self.update_network_no = Value('i', 0)
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
+        self.global_outstanding_deletes_lock = Lock()
+        self.global_outstanding_deletes = {}
         self.manager = Manager()
         self.old_rules_lock = Lock()
         self.old_rules = self.manager.list()
@@ -328,6 +330,21 @@ class Runtime(object):
                     bucket.handle_flow_stats_reply(switch, flow_stats)
                 del self.global_outstanding_queries[switch]
 
+    def handle_flow_removed(self, dpid, flow_stat_dict):
+        with self.global_outstanding_deletes_lock:
+            f = flow_stat_dict
+            match = f['match']
+            priority = f['priority']
+            version = f['cookie']
+            packet_count = f['packet_count']
+            byte_count = f['byte_count']
+            match_entry = (match, priority, version)
+            if match_entry in self.global_outstanding_deletes:
+                bucket_list = self.global_outstanding_deletes[match_entry]
+                for b in bucket_list:
+                    b.handle_flow_removed(match, priority, version)
+                del self.global_outstanding_deletes[match_entry]
+
     def concrete2pyretic(self,packet):
         def convert(h,val):
             if h in ['srcmac','dstmac']:
@@ -479,6 +496,8 @@ class Runtime(object):
                             act.add_match(match, priority, version)
                         elif op == "delete":
                             act.delete_match(match, priority, version)
+                            self.add_global_outstanding_delete((match, priority,
+                                                                version), act)
                         elif op == "stay" or op == "modify":
                             if act.is_new_bucket():
                                 act.add_match(match, priority, version,
@@ -820,15 +839,27 @@ class Runtime(object):
             self.pull_switches_for_preds(preds)
         return pull_existing_bucket_stats
 
-    def add_global_outstanding_query(self, s, bucket):
-        already_queried = False
-        with self.global_outstanding_queries_lock:
-            if not s in self.global_outstanding_queries:
-                self.global_outstanding_queries[s] = [bucket]
+    def add_global_outstanding(self, global_dict, global_lock, key, val):
+        """Helper function for adding a mapping for an outstanding query or rule
+        to objects (i.e., buckets) which are waiting for them."""
+        entry_found = False
+        with global_lock:
+            if not key in global_dict:
+                global_dict[key] = [val]
             else:
-                self.global_outstanding_queries[s].append(bucket)
-                already_queried = True
-        return already_queried
+                global_dict[key].append(val)
+                entry_found = True
+        return entry_found
+
+    def add_global_outstanding_query(self, s, bucket):
+        return self.add_global_outstanding(self.global_outstanding_queries,
+                                           self.global_outstanding_queries_lock,
+                                           s, bucket)
+
+    def add_global_outstanding_delete(self, rule, bucket):
+        return self.add_global_outstanding(self.global_outstanding_deletes,
+                                           self.global_outstanding_deletes_lock,
+                                           rule, bucket)
 
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
