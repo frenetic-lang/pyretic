@@ -520,10 +520,10 @@ class Runtime(object):
             for lst in diff_lists:
                 new_lst = []
                 for rule in lst:
-                    acts = rule[2]
+                    (match,priority,acts,version) = rule
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
-                    new_rule = (rule[0], rule[1], new_acts, rule[3])
+                    new_rule = (match, priority, new_acts, version)
                     new_lst.append(new_rule)
                 new_diff_lists.append(new_lst)
             return new_diff_lists
@@ -581,11 +581,19 @@ class Runtime(object):
 
         ### UPDATE LOGIC
 
-        def nuclear_install(classifier, curr_classifier_no):
+        def nuclear_install(new_rules, curr_classifier_no):
+            """This function installs the new classifier through send_clear's
+            first followed by install_rule's, instead of the (safer) rule
+            deletes and rule adds. However it's retained here in case it's
+            needed later for performance.
+
+            The main trouble with clearing a switch flow table with a send_clear
+            instead of a rule-by-rule send_delete is that there are no flow
+            removed messages which get to the controller. These flow removed
+            messages are important to accurately count buckets as rules get
+            deleted due to classifier revisions.
+            """
             switches = self.network.topology.nodes()
-            classifier = switchify(classifier,switches)
-            classifier = concretize(classifier)
-            new_rules = prioritize(classifier,switches)
 
             for s in switches:
                 self.send_barrier(s)
@@ -596,7 +604,7 @@ class Runtime(object):
                                    curr_classifier_no))
 
             for rule in new_rules:
-                self.install_rule(rule + (curr_classifier_no,))
+                self.install_rule(rule)
                 
             for s in switches:
                 self.send_barrier(s)
@@ -700,55 +708,12 @@ class Runtime(object):
             elif self.mode == 'proactive1':
                 return get_incremental_diff(new_rules)
 
-        def install_diff_rules(classifier, curr_classifier_no):
-            with self.old_rules_lock:
-                old_rules = self.old_rules
-                switches = self.network.topology.nodes()
-                classifier = switchify(classifier,switches)
-                classifier = concretize(classifier)
-                new_rules = prioritize(classifier,switches)
-
-                # calculate diff
-                to_add = list()
-                to_delete = list()
-                to_modify = list()
-                for old in old_rules:
-                    new = find_same_rule(old, new_rules)
-                    if new is None:
-                        to_delete.append(old)
-                    else:
-                        if old[2] != new[2]:
-                            to_modify.append(new)
-    
-                for new in new_rules:
-                    old = find_same_rule(new, old_rules)
-                    if old is None:
-                        to_add.append(new)
-    
-                # install diff
-                if not to_add is None:
-                    for rule in to_add:
-                        self.install_rule(rule + (curr_classifier_no,))
-                for rule in to_delete:
-                    if rule[0]['switch'] in switches:
-                        self.delete_rule((rule[0], rule[1]))
-                for rule in to_modify:
-                    self.delete_rule((rule[0], rule[1]))
-                    self.install_rule(rule + (curr_classifier_no,))
-    
-                # update old_rule
-                del old_rules[0:len(old_rules)]
-                for rule in new_rules:
-                    old_rules.append(rule)
-
-                for s in switches:
-                    self.send_barrier(s)
-
         def install_diff_lists(diff_lists):
             """Take the set of rules (added, deleted, modified, untouched), and
             do necessary flow installs/deletes/modifies.
             """
             (to_add, to_delete, to_modify, to_stay) = diff_lists
+            switches = self.network.topology.nodes()
             if to_add:
                 for rule in to_add:
                     self.install_rule(rule)
@@ -765,16 +730,12 @@ class Runtime(object):
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(classifier, this_update_no, current_update_no, curr_classifier_no):
+        def f(diff_lists, this_update_no, current_update_no):
             if not this_update_no is None:
                 time.sleep(0.1)
                 if this_update_no != current_update_no.value:
                     return
-
-            if self.mode == 'proactive0':
-                nuclear_install(classifier, curr_classifier_no)
-            elif self.mode == 'proactive1':
-                install_diff_rules(classifier, curr_classifier_no)
+            install_diff_lists(diff_lists)
 
         curr_version_no = None
         with self.classifier_version_lock:
@@ -799,7 +760,7 @@ class Runtime(object):
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
-        p = Process(target=f,args=(classifier,this_update_no,current_update_no,curr_version_no))
+        p = Process(target=f, args=(diff_lists, this_update_no, current_update_no))
         p.daemon = True
         p.start()
             
