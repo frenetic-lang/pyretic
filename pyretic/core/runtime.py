@@ -603,7 +603,6 @@ class Runtime(object):
                 if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
                     self.request_flow_stats(s)
 
-
         ### INCREMENTAL UPDATE LOGIC
 
         def find_same_rule(target, rule_list):
@@ -614,23 +613,39 @@ class Runtime(object):
                     return rule
             return None
 
-        def get_diff_lists(classifier, curr_classifier_no):
-            """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
-            (versioned) classifier."""
+        def get_new_rules(classifier, curr_classifier_no):
             def add_version(rules, version):
                 new_rules = []
                 for r in rules:
                     new_rules.append(r + (version,))
                 return new_rules
 
-            def buckets_removed(acts):
-                return filter(lambda a: not isinstance(a, CountBucket), acts)
-
             switches = self.network.topology.nodes()
             classifier = switchify(classifier, switches)
             classifier = concretize(classifier)
             new_rules = prioritize(classifier, switches)
             new_rules = add_version(new_rules, curr_classifier_no)
+
+        def get_nuclear_diff(new_rules):
+            """Compute diff lists for a nuclear install, i.e., when all rules
+            are removed and the full new classifier is installed afresh.
+            """
+            with self.old_rules_lock:
+                to_delete = self.old_rules
+                to_add = new_rules
+                to_modify = list()
+                to_stay = list()
+                self.old_rules = new_rules
+            return (to_add, to_delete, to_modify, to_stay)
+
+        def get_incremental_diff(new_rules):
+            """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
+            (versioned) classifier."""
+            def different_actions(old_acts, new_acts):
+                def buckets_removed(acts):
+                    return filter(lambda a: not isinstance(a, CountBucket),
+                                  acts)
+                return buckets_removed(old_acts) != buckets_removed(new_acts)
 
             with self.old_rules_lock:
                 old_rules = self.old_rules
@@ -644,9 +659,9 @@ class Runtime(object):
                     if new is None:
                         to_delete.append(old)
                     else:
-                        if buckets_removed(old[2]) != buckets_removed(new[2]):
-                            (new_match,new_priority,new_actions,_) = new
-                            (_,_,_,old_version) = old
+                        (new_match,new_priority,new_actions,_) = new
+                        (_,_,old_actions,old_version) = old
+                        if different_actions(old_actions, new_actions):
                             modified_rule = (new_match, new_priority,
                                              new_actions, old_version)
                             to_modify.append(modified_rule)
@@ -677,6 +692,13 @@ class Runtime(object):
                     to_delete.remove(rule)
 
             return (to_add, to_delete, to_modify, to_stay)
+
+        def get_diff_lists(new_rules):
+            assert self.mode in ['proactive0', 'proactive1']
+            if self.mode == 'proactive0':
+                return get_nuclear_diff(new_rules)
+            elif self.mode == 'proactive1':
+                return get_incremental_diff(new_rules)
 
         def install_diff_rules(classifier, curr_classifier_no):
             with self.old_rules_lock:
@@ -772,7 +794,8 @@ class Runtime(object):
         # bookkeeping and removing of bucket actions happens at the end of the
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
-        diff_lists = get_diff_lists(classifier, curr_version_no)
+        new_rules = get_new_rules(classifier, curr_version_no)
+        diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
