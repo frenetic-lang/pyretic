@@ -456,24 +456,13 @@ class Runtime(object):
             bucket for querying later. Count bucket actions operate at
             the pyretic level and are removed before installing rules.
             """
-            def get_rule_match(rule):
-                return rule[0]
-
-            def get_rule_priority(rule):
-                return rule[1]
-
-            def get_rule_actions(rule):
-                return rule[2]
-
-            def get_rule_version(rule):
-                return rule[3]
-
             def collect_buckets(rules):
                 """Scan classifier rules and collect distinct buckets into a
                 dictionary.
                 """
                 bucket_list = {}
                 for rule in rules:
+                    (_,_,actions,_) = rule
                     actions = get_rule_actions(rule)
                     for act in actions:
                         if isinstance(act, CountBucket):
@@ -486,10 +475,7 @@ class Runtime(object):
                     b.start_update()
 
             def update_rules_for_buckets(rule, op):
-                match = get_rule_match(rule)
-                priority = get_rule_priority(rule)
-                actions = get_rule_actions(rule)
-                version = get_rule_version(rule)
+                (match, priority, actions, version) = rule
                 for act in actions:
                     if isinstance(act, CountBucket):
                         if op == "add":
@@ -651,6 +637,7 @@ class Runtime(object):
                 to_add = list()
                 to_delete = list()
                 to_modify = list()
+                to_modify_old = list() # old counterparts of modified rules
                 to_stay = list()
                 for old in old_rules:
                     new = find_same_rule(old, new_rules)
@@ -658,13 +645,17 @@ class Runtime(object):
                         to_delete.append(old)
                     else:
                         if buckets_removed(old[2]) != buckets_removed(new[2]):
-                            to_modify.append(new)
-                            # We add to the add/delete lists because the current
-                            # implementation is deleting the old rule and adding
-                            # the one. If that changes (e.g., actual modify
-                            # instead of delete+add) then this may need to be
-                            # handled differently.
-                            to_add.append(new)
+                            (new_match,new_priority,new_actions,_) = new
+                            (_,_,_,old_version) = old
+                            modified_rule = (new_match, new_priority,
+                                             new_actions, old_version)
+                            to_modify.append(modified_rule)
+                            to_modify_old.append(old)
+                            # We also add the new and old rules to the to_add
+                            # and to_delete lists (resp.) to keep track of the
+                            # changes to be made to old_rules. These are later
+                            # removed from to_add and to_delete when returning.
+                            to_add.append(modified_rule)
                             to_delete.append(old)
                         else:
                             to_stay.append(old)
@@ -679,11 +670,11 @@ class Runtime(object):
                     self.old_rules.remove(rule)
                 for rule in to_add:
                     self.old_rules.add(rule)
-                # see note above where to_modify case is handled.
+                # see note above where to_modify* lists are populated.
                 for rule in to_modify:
-                    for lst in [to_add, to_delete]:
-                        if rule in lst:
-                            lst.remove(rule)
+                    to_add.remove(rule)
+                for rule in to_modify_old:
+                    to_delete.remove(rule)
 
             return (to_add, to_delete, to_modify, to_stay)
 
@@ -730,6 +721,25 @@ class Runtime(object):
 
                 for s in switches:
                     self.send_barrier(s)
+
+        def install_diff_lists(diff_lists):
+            """Take the set of rules (added, deleted, modified, untouched), and
+            do necessary flow installs/deletes/modifies.
+            """
+            (to_add, to_delete, to_modify, to_stay) = diff_lists
+            if to_add:
+                for rule in to_add:
+                    self.install_rule(rule)
+            if to_delete:
+                for rule in to_delete:
+                    (match_dict,priority,_,_) = rule
+                    if match_dict['switch'] in switches:
+                        self.delete_rule((match_dict, priority))
+            if to_modify:
+                for rule in to_modify:
+                    self.modify_rule(rule)
+            for s in switches:
+                self.send_barrier(s)
 
         ### PROCESS THAT DOES INSTALL
 
