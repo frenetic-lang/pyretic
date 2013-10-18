@@ -36,15 +36,22 @@ def run_mininet():
 def process_controller_output(oldf, newf):
     lines = oldf.readlines()
     lines.sort()
-    keywords = ['TEST', 'WARNING', 'ERROR', 'error']
+    keywords = ['TEST', 'ERROR', 'error']
+    ## filter out lines that do not contain one of the keywords
     for line in lines:
         for kw in keywords:
             if line.find(kw) >= 0:
                 newf.write(line)
 
 def process_mininet_output(oldf, newf):
-    for line in oldf:
-        newf.write(line)
+    lines = oldf.readlines()
+    lines.sort()
+    keywords = ['TEST', 'ERROR', 'error', 'received']
+    ## filter out lines that do not contain one of the keywords
+    for line in lines:
+        for kw in keywords:
+            if line.find(kw) >= 0:
+                newf.write(line)
 
 
 ### Tests
@@ -56,9 +63,9 @@ def test_hub_i(init):
 def test_hub_r0(init):
     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m r0')
 def test_hub_p0(init):
-    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
-# def test_hub_p1(init):
-#     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
+   utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
+def test_hub_p1(init):
+    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
 
 
 ### Executing this file starts the mininet instance for this test.

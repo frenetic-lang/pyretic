@@ -1,6 +1,1 @@
-*** Ping: testing ping reachability
-h1 -> h2 h3 h4 
-h2 -> h1 h3 h4 
-h3 -> h1 h2 h4 
-h4 -> h1 h2 h3 
 *** Results: 0% dropped (12/12 received)

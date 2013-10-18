@@ -19,7 +19,8 @@ def run_mininet():
 def process_controller_output(oldf, newf):
     lines = oldf.readlines()
     lines.sort()
-    keywords = ['TEST', 'WARNING', 'ERROR', 'error']
+    keywords = ['TEST', 'ERROR', 'error']
+    ## filter out lines that do not contain one of the keywords
     for line in lines:
         for kw in keywords:
             if line.find(kw) >= 0:
@@ -28,7 +29,8 @@ def process_controller_output(oldf, newf):
 def process_mininet_output(oldf, newf):
     lines = oldf.readlines()
     lines.sort()
-    keywords = ['TEST', 'WARNING', 'ERROR', 'error', 'received']
+    keywords = ['TEST', 'ERROR', 'error', 'received']
+    ## filter out lines that do not contain one of the keywords
     for line in lines:
         for kw in keywords:
             if line.find(kw) >= 0:
@@ -43,10 +45,10 @@ def test_arp_i(init):
     utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m i')
 def test_arp_r0(init):
     utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m r0')
-# def test_arp_p0(init):
-#     utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m p0')
-# def test_arp_p1(init):
-#     utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m p1')
+def test_arp_p0(init):
+    utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m p0')
+def test_arp_p1(init):
+    utils.run_test(test_arp, init.test_dir, init.benchmark_dir, '-m p1')
 
 if __name__ == "__main__":
     run_mininet()

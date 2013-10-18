@@ -39,7 +39,8 @@ def run_mininet():
 def process_controller_output(oldf, newf):
     lines = oldf.readlines()
     lines.sort()
-    keywords = ['TEST', 'WARNING', 'ERROR', 'error']
+    keywords = ['TEST', 'ERROR', 'error']
+    ## filter out lines that do not contain one of the keywords
     for line in lines:
         for kw in keywords:
             if line.find(kw) >= 0:
@@ -48,7 +49,8 @@ def process_controller_output(oldf, newf):
 def process_mininet_output(oldf, newf):
     lines = oldf.readlines()
     lines.sort()
-    keywords = ['TEST', 'WARNING', 'ERROR', 'error', 'received']
+    keywords = ['TEST', 'ERROR', 'error', 'received']
+    ## filter out lines that do not contain one of the keywords
     for line in lines:
         for kw in keywords:
             if line.find(kw) >= 0:
