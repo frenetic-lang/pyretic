@@ -781,6 +781,9 @@ class Runtime(object):
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
 
+    def modify_rule(self, (concrete_pred,priority,action_list,cookie)):
+        self.backend.send_modify(concrete_pred,priority,action_list,cookie)
+
     def send_barrier(self,switch):
         self.backend.send_barrier(switch)
 

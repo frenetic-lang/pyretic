@@ -140,6 +140,9 @@ class Backend(object):
     def send_install(self,pred,priority,action_list,cookie):
         self.send_to_OF_client(['install',pred,priority,action_list,cookie])
 
+    def send_modify(self,pred,priority,action_list,cookie):
+        self.send_to_OF_client(['modify',pred,priority,action_list,cookie])
+
     def send_delete(self,pred,priority):
         self.send_to_OF_client(['delete',pred,priority])
         
