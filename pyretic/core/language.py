@@ -1002,6 +1002,7 @@ class egress_network(DynamicFilter):
 # Class hierarchy syntax tree traversal
 
 def ast_fold(fun, acc, policy):
+    import pyretic.lib.query as query
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -1022,7 +1023,8 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,if_) or
           isinstance(policy,fwd) or
           isinstance(policy,xfwd) or
-          isinstance(policy,DynamicPolicy)):
+          isinstance(policy,DynamicPolicy) or
+          isinstance(policy,query.packets)):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
     else:

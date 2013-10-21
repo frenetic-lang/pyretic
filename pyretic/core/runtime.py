@@ -190,7 +190,7 @@ class Runtime(object):
             rule = None
             ### DON'T INSTALL RULES THAT CONTAIN QUERIES
             from pyretic.lib.query import packets, count_packets, count_bytes
-            if eval_trace.contains_class(packets.FilterWrappedFwdBucket):
+            if eval_trace.contains_class(FwdBucket):
                 pass
             elif eval_trace.contains_class(count_packets):
                 pass
