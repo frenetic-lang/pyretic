@@ -90,7 +90,8 @@ class Runtime(object):
         if self.mode == 'reactive0' and eligible:
             self.reactive0_install(pyretic_pkt,output)
 
-        map(self.send_packet,output)
+        concrete_output = map(self.pyretic2concrete,output)
+        map(self.send_packet,concrete_output)
 
 
 #############
@@ -614,8 +615,7 @@ class Runtime(object):
 # TO OPENFLOW         
 #######################
 
-    def send_packet(self,pyretic_packet):
-        concrete_packet = self.pyretic2concrete(pyretic_packet)
+    def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
     def install_rule(self,(concrete_pred,priority,action_list)):
@@ -762,7 +762,8 @@ class ConcreteNetwork(Network):
         self.debug_log.setLevel(logging.WARNING)
 
     def inject_packet(self, pkt):
-        self.runtime.send_packet(pkt)
+        concrete_pkt = self.runtime.pyretic2concrete(pkt)
+        self.runtime.send_packet(concrete_pkt)
 
     #
     # Topology Detection
