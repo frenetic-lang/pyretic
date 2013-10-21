@@ -63,12 +63,11 @@ class Runtime(object):
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
         self.active_dynamic_policies = set()
-        if mode != 'interpreted':
-            dynamic_sub_pols = self.ast_fold(self.add_dynamic_sub_pols,
-                                             set(),
-                                             self.policy)
-            for p in dynamic_sub_pols:
-                p.attach(self.handle_policy_change)
+        dynamic_sub_pols = ast_fold(add_dynamic_sub_pols,
+                                    set(),
+                                    self.policy)
+        for p in dynamic_sub_pols:
+            p.attach(self.handle_policy_change)
         self.in_update_network = False
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
@@ -87,46 +86,6 @@ class Runtime(object):
                         'please-make-it-stop': 4}
         return numeric_map.get(verbosity_option, 0)
 
-    def ast_fold(self, fun, acc, policy):
-        if (  policy == identity or
-              policy == drop or
-              isinstance(policy,match) or
-              isinstance(policy,modify) or
-              policy == Controller or
-              isinstance(policy,Query)):
-            return fun(acc,policy)
-        elif (isinstance(policy,negate) or
-              isinstance(policy,parallel) or
-              isinstance(policy,union) or
-              isinstance(policy,sequential) or
-              isinstance(policy,intersection)):
-            acc = fun(acc,policy)
-            for sub_policy in policy.policies:
-                acc = self.ast_fold(fun,acc,sub_policy)
-            return acc
-        elif (isinstance(policy,difference) or
-              isinstance(policy,if_) or
-              isinstance(policy,fwd) or
-              isinstance(policy,xfwd) or
-              isinstance(policy,DynamicPolicy)):
-            acc = fun(acc,policy)
-            return self.ast_fold(fun,acc,policy.policy)
-        else:
-            raise NotImplementedError
-
-    def add_dynamic_sub_pols(self, acc, policy):
-        if isinstance(policy,DynamicPolicy):
-            return acc | {policy}
-        else:
-            return acc
-
-    def add_query_sub_pols(self, acc, policy):
-        from pyretic.lib.query import packets
-        if ( isinstance(policy,Query) or
-             isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
-            return add | {policy}
-        else:
-            return acc
           
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -149,8 +108,8 @@ class Runtime(object):
                 self.in_update_network = False
 
     def handle_policy_change(self, changed, old, new):
-        old_dynamics = self.ast_fold(self.add_dynamic_sub_pols, set(), old)
-        new_dynamics = self.ast_fold(self.add_dynamic_sub_pols, set(), new)
+        old_dynamics = ast_fold(add_dynamic_sub_pols, set(), old)
+        new_dynamics = ast_fold(add_dynamic_sub_pols, set(), new)
         for p in (old_dynamics - new_dynamics):
             p.detach()
         for p in (new_dynamics - old_dynamics):

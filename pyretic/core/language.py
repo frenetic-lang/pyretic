@@ -999,6 +999,51 @@ class egress_network(DynamicFilter):
 
 
 ###############################################################################
+# Class hierarchy syntax tree traversal
+
+def ast_fold(fun, acc, policy):
+    if (  policy == identity or
+          policy == drop or
+          isinstance(policy,match) or
+          isinstance(policy,modify) or
+          policy == Controller or
+          isinstance(policy,Query)):
+        return fun(acc,policy)
+    elif (isinstance(policy,negate) or
+          isinstance(policy,parallel) or
+          isinstance(policy,union) or
+          isinstance(policy,sequential) or
+          isinstance(policy,intersection)):
+        acc = fun(acc,policy)
+        for sub_policy in policy.policies:
+            acc = ast_fold(fun,acc,sub_policy)
+        return acc
+    elif (isinstance(policy,difference) or
+          isinstance(policy,if_) or
+          isinstance(policy,fwd) or
+          isinstance(policy,xfwd) or
+          isinstance(policy,DynamicPolicy)):
+        acc = fun(acc,policy)
+        return ast_fold(fun,acc,policy.policy)
+    else:
+        raise NotImplementedError
+    
+def add_dynamic_sub_pols(acc, policy):
+    if isinstance(policy,DynamicPolicy):
+        return acc | {policy}
+    else:
+        return acc
+
+def add_query_sub_pols(acc, policy):
+    from pyretic.lib.query import packets
+    if ( isinstance(policy,Query) or
+         isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
+        return add | {policy}
+    else:
+        return acc
+
+
+###############################################################################
 # Classifiers
 # an intermediate representation for proactive compilation.
 
