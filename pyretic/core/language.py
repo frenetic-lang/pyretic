@@ -340,29 +340,35 @@ class Controller(Policy):
         return id(self) == id(other)
 
 # FIXME: Srinivas =).
-class Query(Policy):
+class Query(Filter):
     """Abstract class representing a data structure
     into which packets (conceptually) go and with which callbacks can register.
     """
     ### init : unit -> unit
     def __init__(self):
+        from multiprocessing import Lock
         self.callbacks = []
+        self.bucket = set()
+        self.bucket_lock = Lock()
         super(Query,self).__init__()
-        
-    def __repr__(self):
-        return "Query"
 
     def eval(self, pkt):
-        for callback in self.callbacks:
-            callback(pkt)
+        with self.bucket_lock:
+            self.bucket.add(pkt)
         return set()
 
     def compile(self):
         raise NotImplementedError
 
+    def compile(self):
+        raise NotImplementedError
+        
     ### register_callback : (Packet -> X) -> unit
     def register_callback(self, fn):
         self.callbacks.append(fn)
+
+    def __repr__(self):
+        return "Query"
 
 
 class FwdBucket(Query):
@@ -372,6 +378,13 @@ class FwdBucket(Query):
     def compile(self):
         r = Rule(identity,[Controller])
         return Classifier([r])
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                for callback in self.callbacks:
+                    callback(pkt)
+            self.bucket.clear()
     
     def __repr__(self):
         return "FwdBucket"
@@ -401,14 +414,16 @@ class CountBucket(Query):
     def __repr__(self):
         return "CountBucket"
 
-    def eval(self, pkt):
-        self.packet_count_persistent += 1
-        self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
-        return set()
-
     def compile(self):
         r = Rule(identity,[self])
         return Classifier([r])
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                self.packet_count_persistent += 1
+                self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
+            self.bucket.clear()
 
     def start_update(self):
         """Use a condition variable to mediate access to bucket state as it is
@@ -976,7 +991,7 @@ def add_query_sub_pols(acc, policy):
     else:
         return acc
 
-def will_query_eval(acc, policy):
+def queries_in_eval(acc, policy):
     res,pkts = acc
     if policy == drop:
         acc = (res,set())
@@ -992,18 +1007,18 @@ def will_query_eval(acc, policy):
     elif isinstance(policy,Query):
         acc = (res | {policy}, set())
     elif isinstance(policy,DerivedPolicy):
-        acc = will_query_eval(acc,policy.policy)
+        acc = queries_in_eval(acc,policy.policy)
     elif isinstance(policy,parallel):
         parallel_res = set()
         parallel_pkts = set()
         for sub_pol in policy.policies:
-            new_res,new_pkts = will_query_eval((res,pkts),sub_pol)
+            new_res,new_pkts = queries_in_eval((res,pkts),sub_pol)
             parallel_res |= new_res
             parallel_pkts |= new_pkts
         acc = (parallel_res,parallel_pkts)
     elif isinstance(policy,sequential):
         for sub_pol in policy.policies:
-            acc = will_query_eval(acc,sub_pol)
+            acc = queries_in_eval(acc,sub_pol)
             if not acc[1]:
                 break
     return acc

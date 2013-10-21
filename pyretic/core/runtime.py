@@ -82,14 +82,21 @@ class Runtime(object):
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
-        if self.mode == 'reactive0':
-            eligible = self.eligible(pyretic_pkt)
+        # find the queries, if any in the policy, that will be evaluated
+        queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
 
+        # evaluate the policy
         output = self.policy.eval(pyretic_pkt)
-        
-        if self.mode == 'reactive0' and eligible:
+
+        # apply the queries whose buckets have received new packets
+        for q in queries:
+            q.apply()
+
+        # if in reactive mode and no packets are forwarded to buckets, install microflow
+        if self.mode == 'reactive0' and not queries:
             self.reactive0_install(pyretic_pkt,output)
 
+        # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
         map(self.send_packet,concrete_output)
 
@@ -143,10 +150,6 @@ class Runtime(object):
 #######################
 # REACTIVE COMPILATION
 #######################
-
-    def eligible(self,pyretic_pkt):
-        queries,pkts = will_query_eval((set(),{pyretic_pkt}),self.policy)
-        return not queries
 
     def reactive0_install(self,in_pkt,out_pkts):
         rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
