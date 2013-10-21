@@ -50,11 +50,10 @@ class Runtime(object):
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
-        self.active_dynamic_policies = set()
-        dynamic_sub_pols = ast_fold(add_dynamic_sub_pols,
-                                    set(),
-                                    self.policy)
-        for p in dynamic_sub_pols:
+        self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols,
+                                         set(),
+                                         self.policy)
+        for p in self.dynamic_sub_pols:
             p.attach(self.handle_policy_change)
         self.in_update_network = False
         self.update_network_lock = Lock()
@@ -126,11 +125,12 @@ class Runtime(object):
                 self.in_update_network = False
 
     def handle_policy_change(self, changed, old, new):
-        old_dynamics = ast_fold(add_dynamic_sub_pols, set(), old)
-        new_dynamics = ast_fold(add_dynamic_sub_pols, set(), new)
-        for p in (old_dynamics - new_dynamics):
+        import copy
+        old_dynamic_sub_pols = copy.copy(self.dynamic_sub_pols)
+        self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, set(), self.policy)
+        for p in (old_dynamic_sub_pols - self.dynamic_sub_pols):
             p.detach()
-        for p in (new_dynamics - old_dynamics):
+        for p in (self.dynamic_sub_pols - old_dynamic_sub_pols):
             p.attach(self.handle_policy_change)
         if self.in_update_network:
             pass
