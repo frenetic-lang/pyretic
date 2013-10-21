@@ -86,6 +86,7 @@ class Runtime(object):
             self.mode == 'proactive0' or self.mode == 'proactive1'):
             output = self.policy.eval(pyretic_pkt)
         else:
+            queries,pkts = will_query_eval((set(),{pyretic_pkt}),self.policy)
             (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
             self.reactive0(pyretic_pkt,output,eval_trace)
 
@@ -186,25 +187,24 @@ class Runtime(object):
         return (concrete_pred,0,action_list)
 
     def reactive0(self,in_pkt,out_pkts,eval_trace):
-        if self.mode == 'reactive0':
-            rule = None
-            ### DON'T INSTALL RULES THAT CONTAIN QUERIES
-            from pyretic.lib.query import packets, count_packets, count_bytes
-            if eval_trace.contains_class(FwdBucket):
-                pass
-            elif eval_trace.contains_class(count_packets):
-                pass
-            elif eval_trace.contains_class(count_bytes):
-                pass
-            else:
-                rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
-                if rule_tuple:
-                    self.install_rule(rule_tuple)
-                    self.log.debug(
-                        '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                            " | install rule",
-                            rule_tuple[0],
-                            'actions='+repr(rule_tuple[2])))
+        rule = None
+        ### DON'T INSTALL RULES THAT CONTAIN QUERIES
+        from pyretic.lib.query import packets, count_packets, count_bytes
+        if eval_trace.contains_class(FwdBucket):
+            pass
+        elif eval_trace.contains_class(count_packets):
+            pass
+        elif eval_trace.contains_class(count_bytes):
+            pass
+        else:
+            rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
+            if rule_tuple:
+                self.install_rule(rule_tuple)
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  " | install rule",
+                                                  rule_tuple[0],
+                                                  'actions='+repr(rule_tuple[2])))
 
 
 #########################

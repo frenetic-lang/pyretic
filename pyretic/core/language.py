@@ -1044,6 +1044,39 @@ def add_query_sub_pols(acc, policy):
     else:
         return acc
 
+def will_query_eval(acc, policy):
+    res,pkts = acc
+    if policy == drop:
+        acc = (res,set())
+    elif policy == identity:
+        pass
+    elif (isinstance(policy,match) or 
+          isinstance(policy,modify) or 
+          isinstance(policy,negate)):
+        new_pkts = set()
+        for pkt in pkts:
+            new_pkts |= policy.eval(pkt)
+        acc = (res,new_pkts)
+    elif isinstance(policy,Query):
+        acc = (res | {policy}, set())
+    elif isinstance(policy,DerivedPolicy):
+        acc = will_query_eval(acc,policy.policy)
+    elif isinstance(policy,parallel):
+        parallel_res = set()
+        parallel_pkts = set()
+        for sub_pol in policy.policies:
+            new_res,new_pkts = will_query_eval((res,pkts),sub_pol)
+            parallel_res |= new_res
+            parallel_pkts |= new_pkts
+        acc = (parallel_res,parallel_pkts)
+    elif isinstance(policy,sequential):
+        for sub_pol in policy.policies:
+            acc = will_query_eval(acc,sub_pol)
+            if not acc[1]:
+                break
+    return acc
+
+
 
 ###############################################################################
 # Classifiers
