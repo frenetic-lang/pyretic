@@ -47,14 +47,12 @@ class Runtime(object):
         self.mode = mode
         self.backend = backend
         self.backend.runtime = self
+        self.policy_lock = RLock()
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
-        self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols,
-                                         set(),
-                                         self.policy)
-        for p in self.dynamic_sub_pols:
-            p.attach(self.handle_policy_change)
+        self.dynamic_sub_pols = set()
+        self.update_dynamic_sub_pols()
         self.in_update_network = False
         self.update_network_lock = Lock()
         self.update_network_no = Value('i', 0)
@@ -79,25 +77,26 @@ class Runtime(object):
 ######################
 
     def handle_packet_in(self, concrete_pkt):
-        pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+        with self.policy_lock:
+            pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
-        # find the queries, if any in the policy, that will be evaluated
-        queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
+            # find the queries, if any in the policy, that will be evaluated
+            queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
 
-        # evaluate the policy
-        output = self.policy.eval(pyretic_pkt)
+            # evaluate the policy
+            output = self.policy.eval(pyretic_pkt)
 
-        # apply the queries whose buckets have received new packets
-        for q in queries:
-            q.apply()
-
-        # if in reactive mode and no packets are forwarded to buckets, install microflow
-        if self.mode == 'reactive0' and not queries:
-            self.reactive0_install(pyretic_pkt,output)
+            # apply the queries whose buckets have received new packets
+            for q in queries:
+                q.apply()
 
         # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
         map(self.send_packet,concrete_output)
+
+        # if in reactive mode and no packets are forwarded to buckets, install microflow
+        if self.mode == 'reactive0' and not queries:
+            self.reactive0_install(pyretic_pkt,output)
 
 
 #############
@@ -111,20 +110,45 @@ class Runtime(object):
                 this_update_network_no = self.update_network_no.value
                 self.in_update_network = True
                 self.prev_network = self.network.copy()
-                self.policy.set_network(self.prev_network)
+
+                with self.policy_lock:
+                    self.policy.set_network(self.prev_network)
+                    self.update_dynamic_sub_pols()
+                    if self.mode == 'proactive0' or self.mode == 'proactive1':
+                        classifier = self.policy.compile()
+
                 if self.mode == 'reactive0':
                     self.clear_all(this_update_network_no,self.update_network_no)
                 elif self.mode == 'proactive0' or self.mode == 'proactive1':
-                    classifier = self.policy.compile()
                     self.log.debug(
                         '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                            "generate classifier",
-                            "policy="+repr(self.policy),
-                            "classifier="+repr(classifier)))
+                                                      "generate classifier",
+                                                      "policy="+repr(self.policy),
+                                                      "classifier="+repr(classifier)))
                     self.install_classifier(classifier,this_update_network_no,self.update_network_no)
+
                 self.in_update_network = False
 
     def handle_policy_change(self, changed, old, new):
+        if self.in_update_network:
+            return
+
+        with self.policy_lock:
+            self.update_dynamic_sub_pols()
+            if self.mode == 'proactive0' or self.mode == 'proactive1':
+                classifier = self.policy.compile()
+
+        if self.mode == 'reactive0':
+            self.clear_all() 
+        elif self.mode == 'proactive0' or self.mode == 'proactive1':
+            self.log.debug(
+                '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                              "generate classifier",
+                                              "policy="+repr(self.policy),
+                                              "classifier="+repr(classifier)))
+            self.install_classifier(classifier)
+
+    def update_dynamic_sub_pols(self):
         import copy
         old_dynamic_sub_pols = copy.copy(self.dynamic_sub_pols)
         self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, set(), self.policy)
@@ -132,19 +156,6 @@ class Runtime(object):
             p.detach()
         for p in (self.dynamic_sub_pols - old_dynamic_sub_pols):
             p.attach(self.handle_policy_change)
-        if self.in_update_network:
-            pass
-        else:
-            if self.mode == 'reactive0':
-                self.clear_all() 
-            elif self.mode == 'proactive0' or self.mode == 'proactive1':
-                classifier = self.policy.compile()
-                self.log.debug(
-                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                        "generate classifier",
-                        "policy="+repr(self.policy),
-                        "classifier="+repr(classifier)))
-                self.install_classifier(classifier)
 
 
 #######################
