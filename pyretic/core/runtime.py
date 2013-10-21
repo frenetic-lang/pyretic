@@ -37,25 +37,13 @@ from datetime import datetime
 
 TABLE_MISS_PRIORITY = 0
 
-try:
-    import ipdb as debugger
-    USE_IPDB=True
-except:
-    import pdb as debugger
-    import traceback, sys
-    USE_IPDB=False
-
-
 class Runtime(object):
-    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal', 
-                 show_traces=False, debug_packet_in=False):
+    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
-        self.debug_packet_in = debug_packet_in
-        self.show_traces = show_traces
         self.mode = mode
         self.backend = backend
         self.backend.runtime = self
@@ -93,35 +81,14 @@ class Runtime(object):
 
     def handle_packet_in(self, concrete_pkt):
         pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        if self.debug_packet_in:
-            debugger.set_trace()
-        if USE_IPDB:
-             with debugger.launch_ipdb_on_exception():
-                 if (self.mode == 'interpreted' or 
-                     self.mode == 'proactive0' or self.mode == 'proactive1'):
-                     output = self.policy.eval(pyretic_pkt)
-                 else:
-                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
-                     self.reactive0(pyretic_pkt,output,eval_trace)
+
+        if (self.mode == 'interpreted' or 
+            self.mode == 'proactive0' or self.mode == 'proactive1'):
+            output = self.policy.eval(pyretic_pkt)
         else:
-            try:
-                if (self.mode == 'interpreted' or 
-                    self.mode == 'proactive0' or self.mode == 'proactive1'):
-                    output = self.policy.eval(pyretic_pkt)
-                else:
-                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
-                    self.reactive0(pyretic_pkt,output,eval_trace)
-            except :
-                type, value, tb = sys.exc_info()
-                traceback.print_exc()
-                debugger.post_mortem(tb)
-        if self.show_traces:
-            self.log.info("<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<")
-            self.log.info(str(util.repr_plus([pyretic_pkt], sep="\n\n")))
-            self.log.info("")
-            self.log.info(">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>")
-            self.log.info(str(util.repr_plus(output, sep="\n\n")))
-            self.log.info("")
+            (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
+            self.reactive0(pyretic_pkt,output,eval_trace)
+
         map(self.send_packet,output)
 
 
