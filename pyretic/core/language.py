@@ -97,9 +97,6 @@ class Policy(object):
     def __eval__(self, pkt):
         raise NotImplementedError
 
-    def track_eval(self, pkt, dry):
-        return (self.eval(pkt), EvalTrace(self))
-
     def compile(self):
         raise NotImplementedError
 
@@ -550,15 +547,6 @@ class negate(CombinatorPolicy,Filter):
         else:
             return {pkt}
 
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policies[0].track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            return (set(),eval_trace)
-        else:
-            return ({pkt},eval_trace)
-
     def compile(self):
         inner_classifier = self.policies[0].compile()
         classifier = Classifier([])
@@ -601,15 +589,6 @@ class parallel(CombinatorPolicy):
         for policy in self.policies:
             output |= policy.eval(pkt)
         return output
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        output = set()
-        for policy in self.policies:
-            (results,trace) = policy.track_eval(pkt,dry)
-            output |= results
-            eval_trace.add_trace(trace)
-        return (output,eval_trace)
 
     def compile(self):
         if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
@@ -682,27 +661,6 @@ class sequential(CombinatorPolicy):
             prev_output = output
         return output
 
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        prev_output = {pkt}
-        output = prev_output
-        for policy in self.policies:
-            if not prev_output:
-                return (set(),eval_trace)
-            if policy == identity:
-                eval_trace.add_trace(EvalTrace(policy))
-                continue
-            if policy == drop:
-                eval_trace.add_trace(EvalTrace(policy))
-                return (set(),eval_trace)
-            output = set()
-            for p in prev_output:
-                (results,trace) = policy.track_eval(p,dry)
-                output |= results
-                eval_trace.add_trace(trace)
-            prev_output = output
-        return (output,eval_trace)
-
     def compile(self):
         assert(len(self.policies) > 0)
         classifiers = map(lambda p: p.compile(),self.policies)
@@ -746,15 +704,6 @@ class dropped_by(CombinatorPolicy,Filter):
         else:
             return {pkt}
 
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policies[0].track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            return (set(),eval_trace)
-        else:
-            return ({pkt},eval_trace)
-
     def compile(self):
         r = Rule(identity,[Controller])
         return Classifier([r])
@@ -776,12 +725,6 @@ class DerivedPolicy(Policy):
 
     def eval(self, pkt):
         return self.policy.eval(pkt)
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policy.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        return (results,eval_trace)
 
     def compile(self):
         return self.policy.compile()
@@ -827,17 +770,6 @@ class if_(DerivedPolicy):
             return self.t_branch.eval(pkt)
         else:
             return self.f_branch.eval(pkt)
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.pred.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            (results,trace) = self.t_branch.track_eval(pkt,dry)
-        else:
-            (results,trace) = self.f_branch.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        return (results,eval_trace)
 
     def __repr__(self):
         return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
@@ -1327,31 +1259,3 @@ class Classifier(object):
             if pkts is not None:
                 return pkts
         raise TypeError('Classifier is not total.')
-
-
-###############################################################################
-# Run time helpers
-#
-
-class EvalTrace(object):
-    def __init__(self,ne):
-        self.ne = ne
-        self.traces = []
-
-    def add_trace(self,trace):
-        self.traces.append(trace)
-
-    def contains_class(self,cls):
-        if self.ne.__class__ == cls:
-            return True
-        for trace in self.traces:
-            if trace.contains_class(cls):
-                return True
-        return False
-
-    def __repr__(self):
-        if self.traces:
-            return self.ne.name() + '[' + ']['.join(map(repr,self.traces))+']'
-        else:
-            return self.ne.name()
-

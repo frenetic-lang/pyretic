@@ -27,7 +27,7 @@
 ################################################################################
 
 """Pyretic Query Library"""
-from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket, EvalTrace
+from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
 import time
 from threading import Thread
 
@@ -128,12 +128,6 @@ class AggregateFwdBucket(FwdBucket):
     def eval(self, pkt):
         self.update_aggregate(pkt)
         return set()
-
-    def track_eval(self, pkt, dry):
-        if dry:
-            return (set(), EvalTrace(self))
-        else:
-            return (self.eval(pkt), EvalTrace(self))
 
 
 class count_packets(AggregateFwdBucket):
