@@ -86,6 +86,48 @@ class Runtime(object):
                         'please-make-it-stop': 4}
         return numeric_map.get(verbosity_option, 0)
 
+
+######################
+# PACKET INTERPRETER 
+######################
+
+    def handle_packet_in(self, concrete_pkt):
+        pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+        if self.debug_packet_in:
+            debugger.set_trace()
+        if USE_IPDB:
+             with debugger.launch_ipdb_on_exception():
+                 if (self.mode == 'interpreted' or 
+                     self.mode == 'proactive0' or self.mode == 'proactive1'):
+                     output = self.policy.eval(pyretic_pkt)
+                 else:
+                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
+                     self.reactive0(pyretic_pkt,output,eval_trace)
+        else:
+            try:
+                if (self.mode == 'interpreted' or 
+                    self.mode == 'proactive0' or self.mode == 'proactive1'):
+                    output = self.policy.eval(pyretic_pkt)
+                else:
+                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
+                    self.reactive0(pyretic_pkt,output,eval_trace)
+            except :
+                type, value, tb = sys.exc_info()
+                traceback.print_exc()
+                debugger.post_mortem(tb)
+        if self.show_traces:
+            self.log.info("<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<")
+            self.log.info(str(util.repr_plus([pyretic_pkt], sep="\n\n")))
+            self.log.info("")
+            self.log.info(">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>")
+            self.log.info(str(util.repr_plus(output, sep="\n\n")))
+            self.log.info("")
+        map(self.send_packet,output)
+
+
+#############
+# DYNAMICS  
+#############
           
     def update_network(self):
         if self.network.topology != self.prev_network.topology:
@@ -128,23 +170,10 @@ class Runtime(object):
                         "classifier="+repr(classifier)))
                 self.install_classifier(classifier)
 
-    def handle_switch_join(self,switch_id):
-        self.network.handle_switch_join(switch_id)
 
-    def handle_switch_part(self,switch_id):
-        self.network.handle_switch_part(switch_id)
-
-    def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
-
-    def handle_port_mod(self, switch, port_no, config, status):
-        self.network.handle_port_mod(switch, port_no, config, status)
-
-    def handle_port_part(self, switch, port_no):
-        self.network.handle_port_part(switch, port_no)
-
-    def handle_link_update(self, s1, p_no1, s2, p_no2):
-        self.network.handle_link_update(s1, p_no1, s2, p_no2)
+#######################
+# REACTIVE COMPILATION
+#######################
 
     def match_on_all_fields(self, pkt):
         pred = pkt.copy()
@@ -189,7 +218,6 @@ class Runtime(object):
 
         return (concrete_pred,0,action_list)
 
-
     def reactive0(self,in_pkt,out_pkts,eval_trace):
         if self.mode == 'reactive0':
             rule = None
@@ -211,119 +239,10 @@ class Runtime(object):
                             rule_tuple[0],
                             'actions='+repr(rule_tuple[2])))
 
-    def handle_packet_in(self, concrete_pkt):
-        pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-        if self.debug_packet_in:
-            debugger.set_trace()
-        if USE_IPDB:
-             with debugger.launch_ipdb_on_exception():
-                 if (self.mode == 'interpreted' or 
-                     self.mode == 'proactive0' or self.mode == 'proactive1'):
-                     output = self.policy.eval(pyretic_pkt)
-                 else:
-                     (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
-                     self.reactive0(pyretic_pkt,output,eval_trace)
-        else:
-            try:
-                if (self.mode == 'interpreted' or 
-                    self.mode == 'proactive0' or self.mode == 'proactive1'):
-                    output = self.policy.eval(pyretic_pkt)
-                else:
-                    (output,eval_trace) = self.policy.track_eval(pyretic_pkt,dry=False)
-                    self.reactive0(pyretic_pkt,output,eval_trace)
-            except :
-                type, value, tb = sys.exc_info()
-                traceback.print_exc()
-                debugger.post_mortem(tb)
-        if self.show_traces:
-            self.log.info("<<<<<<<<< RECV <<<<<<<<<<<<<<<<<<<<<<<<<<")
-            self.log.info(str(util.repr_plus([pyretic_pkt], sep="\n\n")))
-            self.log.info("")
-            self.log.info(">>>>>>>>> SEND >>>>>>>>>>>>>>>>>>>>>>>>>>")
-            self.log.info(str(util.repr_plus(output, sep="\n\n")))
-            self.log.info("")
-        map(self.send_packet,output)
-  
-    def pyretic2concrete(self,packet):
-        concrete_packet = ConcretePacket()
-        for header in ['switch','inport','outport']:
-            try:
-                concrete_packet[header] = packet[header]
-                packet = packet.pop(header)
-            except:
-                pass
-        for header in native_headers + content_headers:
-            try:
-                val = packet[header]
-                concrete_packet[header] = val
-            except:
-                pass
-        extended_values = extended_values_from(packet)
-        if extended_values:
-            vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
-            concrete_packet['vlan_id'] = vlan_id
-            concrete_packet['vlan_pcp'] = vlan_pcp
-        return concrete_packet
 
-    def handle_flow_stats_reply(self, switch, flow_stats):
-        def convert(f,val):
-            if f == 'match':
-                import ast
-                val = ast.literal_eval(val)
-                return { g : convert(g,v) for g,v in val.items() }
-            if f == 'actions':
-                import ast
-                vals = ast.literal_eval(val)
-                return [ { g : convert(g,v) for g,v in val.items() }
-                         for val in vals ]
-            if f in ['srcmac','dstmac']:
-                return MAC(val)
-            elif f in ['srcip','dstip']:
-                return IP(val)
-            else:
-                return val
-        flow_stats = [ { f : convert(f,v) 
-                         for (f,v) in flow_stat.items() }
-                       for flow_stat in flow_stats       ]
-        flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
-        def flow_stat_str(flow_stat):
-            output = str(flow_stat['priority']) + ':\t' 
-            output += str(flow_stat['match']) + '\n\t->'
-            output += str(flow_stat['actions']) + '\n\t'
-            output += 'packet_count=' + str(flow_stat['packet_count']) 
-            output += '\tbyte_count=' + str(flow_stat['byte_count'])
-            return output
-        self.log.debug(
-            '|%s|\n\t%s\n' % (str(datetime.now()),
-                '\n'.join(['flow table for switch='+repr(switch)] + 
-                    [flow_stat_str(f) for f in flow_stats])))
-        with self.global_outstanding_queries_lock:
-            if switch in self.global_outstanding_queries:
-                for bucket in self.global_outstanding_queries[switch]:
-                    bucket.handle_flow_stats_reply(switch, flow_stats)
-                del self.global_outstanding_queries[switch]
-
-    def concrete2pyretic(self,packet):
-        def convert(h,val):
-            if h in ['srcmac','dstmac']:
-                return MAC(val)
-            elif h in ['srcip','dstip']:
-                return IP(val)
-            else:
-                return val
-        try:
-            vlan_id = packet['vlan_id']
-            vlan_pcp = packet['vlan_pcp']
-            extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
-        except KeyError:
-            extended_values = util.frozendict()       
-        pyretic_packet = Packet(extended_values)
-        d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
-        return pyretic_packet.modifymany(d)
-
-    def send_packet(self,pyretic_packet):
-        concrete_packet = self.pyretic2concrete(pyretic_packet)
-        self.backend.send_packet(concrete_packet)
+#########################
+# PROACTIVE COMPILATION 
+#########################
 
     def install_classifier(self, classifier, this_update_no=None, current_update_no=None):
         if classifier is None:
@@ -562,7 +481,6 @@ class Runtime(object):
                 if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
                     self.request_flow_stats(s)
 
-
         ### INCREMENTAL UPDATE LOGIC
 
         def find_same_rule(target, rule_list):
@@ -647,38 +565,11 @@ class Runtime(object):
         p = Process(target=f,args=(classifier,this_update_no,current_update_no))
         p.daemon = True
         p.start()
-            
-    def install_rule(self,(concrete_pred,priority,action_list)):
-        self.log.debug(
-            '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
-                "sending openflow rule:",
-                (str(priority) + " " + repr(concrete_pred) + " "+ repr(action_list))))
-        self.backend.send_install(concrete_pred,priority,action_list)
 
-    def delete_rule(self,(concrete_pred,priority)):
-        self.backend.send_delete(concrete_pred,priority)
 
-    def send_barrier(self,switch):
-        self.backend.send_barrier(switch)
-
-    def send_clear(self,switch):
-        self.backend.send_clear(switch)
-
-    def clear_all(self,this_update_no=None,current_update_no=None):
-        def f(this_update_no, current_update_no):
-            if not this_update_no is None:
-                time.sleep(0.1)
-                if this_update_no != current_update_no.value:
-                    return
-            switches = self.network.topology.nodes()
-            for s in switches:
-                self.send_barrier(s)
-                self.send_clear(s)
-                self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
-        p = Process(target=f,args=(this_update_no,current_update_no))
-        p.daemon = True
-        p.start()
+###################
+# QUERYING SUPPORT
+###################
 
     def pull_stats_for_bucket(self,bucket):
         """Returns a function that can be used by counting buckets to
@@ -713,11 +604,162 @@ class Runtime(object):
                 already_queried = True
         return already_queried
 
+
+####################################
+# PACKET MARSHALLING/UNMARSHALLING 
+####################################
+
+    def concrete2pyretic(self,packet):
+        def convert(h,val):
+            if h in ['srcmac','dstmac']:
+                return MAC(val)
+            elif h in ['srcip','dstip']:
+                return IP(val)
+            else:
+                return val
+        try:
+            vlan_id = packet['vlan_id']
+            vlan_pcp = packet['vlan_pcp']
+            extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
+        except KeyError:
+            extended_values = util.frozendict()       
+        pyretic_packet = Packet(extended_values)
+        d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
+        return pyretic_packet.modifymany(d)
+
+    def pyretic2concrete(self,packet):
+        concrete_packet = {}
+        for header in ['switch','inport','outport']:
+            try:
+                concrete_packet[header] = packet[header]
+                packet = packet.pop(header)
+            except:
+                pass
+        for header in native_headers + content_headers:
+            try:
+                val = packet[header]
+                concrete_packet[header] = val
+            except:
+                pass
+        extended_values = extended_values_from(packet)
+        if extended_values:
+            vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
+            concrete_packet['vlan_id'] = vlan_id
+            concrete_packet['vlan_pcp'] = vlan_pcp
+        return concrete_packet
+
+
+#######################
+# TO OPENFLOW         
+#######################
+
+    def send_packet(self,pyretic_packet):
+        concrete_packet = self.pyretic2concrete(pyretic_packet)
+        self.backend.send_packet(concrete_packet)
+
+    def install_rule(self,(concrete_pred,priority,action_list)):
+        self.log.debug(
+            '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
+                "sending openflow rule:",
+                (str(priority) + " " + repr(concrete_pred) + " "+ repr(action_list))))
+        self.backend.send_install(concrete_pred,priority,action_list)
+
+    def delete_rule(self,(concrete_pred,priority)):
+        self.backend.send_delete(concrete_pred,priority)
+
+    def send_barrier(self,switch):
+        self.backend.send_barrier(switch)
+
+    def send_clear(self,switch):
+        self.backend.send_clear(switch)
+
+    def clear_all(self,this_update_no=None,current_update_no=None):
+        def f(this_update_no, current_update_no):
+            if not this_update_no is None:
+                time.sleep(0.1)
+                if this_update_no != current_update_no.value:
+                    return
+            switches = self.network.topology.nodes()
+            for s in switches:
+                self.send_barrier(s)
+                self.send_clear(s)
+                self.send_barrier(s)
+                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+        p = Process(target=f,args=(this_update_no,current_update_no))
+        p.daemon = True
+        p.start()
+
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
+
+
+#######################
+# FROM OPENFLOW       
+#######################
+
+    def handle_switch_join(self,switch_id):
+        self.network.handle_switch_join(switch_id)
+
+    def handle_switch_part(self,switch_id):
+        self.network.handle_switch_part(switch_id)
+
+    def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
+        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
+
+    def handle_port_mod(self, switch, port_no, config, status):
+        self.network.handle_port_mod(switch, port_no, config, status)
+
+    def handle_port_part(self, switch, port_no):
+        self.network.handle_port_part(switch, port_no)
+
+    def handle_link_update(self, s1, p_no1, s2, p_no2):
+        self.network.handle_link_update(s1, p_no1, s2, p_no2)
+
+    def handle_flow_stats_reply(self, switch, flow_stats):
+        def convert(f,val):
+            if f == 'match':
+                import ast
+                val = ast.literal_eval(val)
+                return { g : convert(g,v) for g,v in val.items() }
+            if f == 'actions':
+                import ast
+                vals = ast.literal_eval(val)
+                return [ { g : convert(g,v) for g,v in val.items() }
+                         for val in vals ]
+            if f in ['srcmac','dstmac']:
+                return MAC(val)
+            elif f in ['srcip','dstip']:
+                return IP(val)
+            else:
+                return val
+        flow_stats = [ { f : convert(f,v) 
+                         for (f,v) in flow_stat.items() }
+                       for flow_stat in flow_stats       ]
+        flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
+        def flow_stat_str(flow_stat):
+            output = str(flow_stat['priority']) + ':\t' 
+            output += str(flow_stat['match']) + '\n\t->'
+            output += str(flow_stat['actions']) + '\n\t'
+            output += 'packet_count=' + str(flow_stat['packet_count']) 
+            output += '\tbyte_count=' + str(flow_stat['byte_count'])
+            return output
+        self.log.debug(
+            '|%s|\n\t%s\n' % (str(datetime.now()),
+                '\n'.join(['flow table for switch='+repr(switch)] + 
+                    [flow_stat_str(f) for f in flow_stats])))
+        with self.global_outstanding_queries_lock:
+            if switch in self.global_outstanding_queries:
+                for bucket in self.global_outstanding_queries[switch]:
+                    bucket.handle_flow_stats_reply(switch, flow_stats)
+                del self.global_outstanding_queries[switch]
+            
+
+##########################
+# VIRTUAL HEADER SUPPORT 
+##########################
 
     def encode_extended_values(self, extended_values):
         with self.extended_values_lock:
@@ -737,11 +779,6 @@ class Runtime(object):
             assert extended_values is not None, "use of vlan that pyretic didn't allocate! not allowed."
             return extended_values
 
-
-################################################################################
-# Extended Values
-################################################################################
-
 @util.cached
 def extended_values_from(packet):
     extended_values = {}
@@ -752,11 +789,8 @@ def extended_values_from(packet):
 
 
 ################################################################################
-# Concrete Packet and Network
+# Concrete Network
 ################################################################################
-
-class ConcretePacket(dict):
-    pass
 
 class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
@@ -912,4 +946,3 @@ class ConcreteNetwork(Network):
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         self.debug_log.debug(self.topology)
         self.update_network()
-
