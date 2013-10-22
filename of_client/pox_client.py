@@ -462,7 +462,6 @@ class POXClient(revent.EventMixin):
                               flags=of.OFPFF_SEND_FLOW_REM,
                               cookie=cookie,
                               actions=of_actions)
-
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
@@ -504,7 +503,11 @@ class POXClient(revent.EventMixin):
         sr.body.match = match
         sr.body.table_id = 0xff
         sr.body.out_port = of.OFPP_NONE
-        self.switches[switch]['connection'].send(sr) 
+        try:
+            self.switches[switch]['connection'].send(sr)
+        except KeyError, e:
+            print ( ("ERROR:flow_stats_request: No connection to switch %d" +
+                     " available") % switch )
     
     def clear(self,switch=None):
         if switch is None:
@@ -657,7 +660,7 @@ class POXClient(revent.EventMixin):
         flow_stat_dict['priority'] = ofp.priority
         flow_stat_dict['timeout'] = event.timeout
         flow_stat_dict['hard_timeout'] = event.hardTimeout
-        flow_stat_dict['soft_timeout'] = event.softTimeout
+        flow_stat_dict['idle_timeout'] = event.idleTimeout
         flow_stat_dict['deleted'] = event.deleted
         flow_stat_dict['duration_sec'] = ofp.duration_sec
         flow_stat_dict['duration_nsec'] = ofp.duration_nsec

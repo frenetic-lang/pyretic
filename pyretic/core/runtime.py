@@ -99,7 +99,8 @@ class Runtime(object):
         self.global_outstanding_deletes = {}
         self.manager = Manager()
         self.old_rules_lock = Lock()
-        self.old_rules = self.manager.list()
+        # self.old_rules = self.manager.list() # not multiprocess state anymore!
+        self.old_rules = []
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
         self.classifier_version_no = 0
@@ -291,39 +292,41 @@ class Runtime(object):
             concrete_packet['vlan_pcp'] = vlan_pcp
         return concrete_packet
 
+    def ofp_convert(self,f,val):
+        if f == 'match':
+            import ast
+            val = ast.literal_eval(val)
+            return { g : self.ofp_convert(g,v) for g,v in val.items() }
+        if f == 'actions':
+            import ast
+            vals = ast.literal_eval(val)
+            return [ { g : self.ofp_convert(g,v) for g,v in val.items() }
+                     for val in vals ]
+        if f in ['srcmac','dstmac']:
+            return MAC(val)
+        elif f in ['srcip','dstip']:
+            return IP(val)
+        else:
+            return val
+
+    def flow_stat_str(self, flow_stat):
+        output = str(flow_stat['priority']) + ':\t'
+        output += str(flow_stat['match']) + '\n\t->'
+        output += str(flow_stat.get('actions', [])) + '\n\t'
+        output += 'packet_count=' + str(flow_stat['packet_count'])
+        output += '\tbyte_count=' + str(flow_stat['byte_count'])
+        output += '\n\t cookie: \t' + str(flow_stat['cookie'])
+        return output
+
     def handle_flow_stats_reply(self, switch, flow_stats):
-        def convert(f,val):
-            if f == 'match':
-                import ast
-                val = ast.literal_eval(val)
-                return { g : convert(g,v) for g,v in val.items() }
-            if f == 'actions':
-                import ast
-                vals = ast.literal_eval(val)
-                return [ { g : convert(g,v) for g,v in val.items() }
-                         for val in vals ]
-            if f in ['srcmac','dstmac']:
-                return MAC(val)
-            elif f in ['srcip','dstip']:
-                return IP(val)
-            else:
-                return val
-        flow_stats = [ { f : convert(f,v) 
+        flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]
         flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
-        def flow_stat_str(flow_stat):
-            output = str(flow_stat['priority']) + ':\t' 
-            output += str(flow_stat['match']) + '\n\t->'
-            output += str(flow_stat['actions']) + '\n\t'
-            output += 'packet_count=' + str(flow_stat['packet_count']) 
-            output += '\tbyte_count=' + str(flow_stat['byte_count'])
-            output += '\n\t cookie: \t' + str(flow_stat['cookie'])
-            return output
         self.log.debug(
             '|%s|\n\t%s\n' % (str(datetime.now()),
                 '\n'.join(['flow table for switch='+repr(switch)] + 
-                    [flow_stat_str(f) for f in flow_stats])))
+                    [self.flow_stat_str(f) for f in flow_stats])))
         with self.global_outstanding_queries_lock:
             if switch in self.global_outstanding_queries:
                 for bucket in self.global_outstanding_queries[switch]:
@@ -331,18 +334,22 @@ class Runtime(object):
                 del self.global_outstanding_queries[switch]
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
+        flow_stat = { f : self.ofp_convert(f,v)
+                      for (f,v) in flow_stat_dict.items() }
+        self.log.debug(
+            '|%s|\n\t%s\n\t%s' %
+            (str(datetime.now()), "flow removed message: rule:",
+             self.flow_stat_str(flow_stat)))
         with self.global_outstanding_deletes_lock:
-            f = flow_stat_dict
+            f = flow_stat
             match = f['match']
             priority = f['priority']
             version = f['cookie']
-            packet_count = f['packet_count']
-            byte_count = f['byte_count']
-            match_entry = (match, priority, version)
+            match_entry = (util.frozendict(match), priority, version)
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
-                for b in bucket_list:
-                    b.handle_flow_removed(match, priority, version)
+                for bucket in bucket_list:
+                    bucket.handle_flow_removed(match, priority, version, f)
                 del self.global_outstanding_deletes[match_entry]
 
     def concrete2pyretic(self,packet):
@@ -463,7 +470,6 @@ class Runtime(object):
                 bucket_list = {}
                 for rule in rules:
                     (_,_,actions,_) = rule
-                    actions = get_rule_actions(rule)
                     for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
@@ -482,7 +488,8 @@ class Runtime(object):
                             act.add_match(match, priority, version)
                         elif op == "delete":
                             act.delete_match(match, priority, version)
-                            self.add_global_outstanding_delete((match, priority,
+                            self.add_global_outstanding_delete((util.frozendict(match),
+                                                                priority,
                                                                 version), act)
                         elif op == "stay" or op == "modify":
                             if act.is_new_bucket():
@@ -633,6 +640,7 @@ class Runtime(object):
             classifier = concretize(classifier)
             new_rules = prioritize(classifier, switches)
             new_rules = add_version(new_rules, curr_classifier_no)
+            return new_rules
 
         def get_nuclear_diff(new_rules):
             """Compute diff lists for a nuclear install, i.e., when all rules
@@ -714,14 +722,14 @@ class Runtime(object):
             """
             (to_add, to_delete, to_modify, to_stay) = diff_lists
             switches = self.network.topology.nodes()
-            if to_add:
-                for rule in to_add:
-                    self.install_rule(rule)
             if to_delete:
                 for rule in to_delete:
                     (match_dict,priority,_,_) = rule
                     if match_dict['switch'] in switches:
                         self.delete_rule((match_dict, priority))
+            if to_add:
+                for rule in to_add:
+                    self.install_rule(rule)
             if to_modify:
                 for rule in to_modify:
                     self.modify_rule(rule)
@@ -802,7 +810,7 @@ class Runtime(object):
         p.daemon = True
         p.start()
 
-    def pull_switches_for_preds(self, concrete_preds):
+    def pull_switches_for_preds(self, concrete_preds, bucket):
         """Given a list of concrete predicates, query the list of switches
         corresponding to the switches where these predicates apply.
         """
@@ -823,8 +831,8 @@ class Runtime(object):
         """Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
-            preds = [p for (p,_,_,_) in bucket.matches]
-            self.pull_switches_for_preds(preds)
+            preds = [p for (p,_,_,_,_) in bucket.matches]
+            self.pull_switches_for_preds(preds, bucket)
         return pull_bucket_stats
 
     def pull_existing_stats_for_bucket(self,bucket):
@@ -832,8 +840,8 @@ class Runtime(object):
         at least one rule that was already created in an earlier classifier.
         """
         def pull_existing_bucket_stats():
-            preds = [p for (p,_,_,existing) in bucket.matches if existing]
-            self.pull_switches_for_preds(preds)
+            preds = [p for (p,_,_,_,existing) in bucket.matches if existing]
+            self.pull_switches_for_preds(preds, bucket)
         return pull_existing_bucket_stats
 
     def add_global_outstanding(self, global_dict, global_lock, key, val):

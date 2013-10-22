@@ -457,7 +457,8 @@ class CountBucket(Query):
         """Add a match to list of classifier rules to be queried for counts,
         corresponding to a given version of the classifier.
         """
-        match_entry = (match, priority, version, to_be_deleted, existing_rule)
+        match_entry = (util.frozendict(match), priority, version, to_be_deleted,
+                       existing_rule)
         if not match_entry in self.matches:
             self.matches.add(match_entry)
 
@@ -466,24 +467,27 @@ class CountBucket(Query):
         """If a rule is deleted from the classifier, mark this rule (until we
         get the flow_removed message with the counters on it).
         """
-        match_entry = (match, priority, version, to_be_deleted, existing_rule)
+        match_entry = (util.frozendict(match), priority, version, to_be_deleted,
+                       existing_rule)
         if match_entry in self.matches:
             self.matches.remove(match_entry)
-            self.matches.add((match, priority, version, True, existing_rule))
+            self.matches.add((util.frozendict(match), priority, version, True,
+                              existing_rule))
 
-    def handle_flow_removed(self, match, priority, version, packet_count,
-                            byte_count):
+    def handle_flow_removed(self, match, priority, version, flow_stat):
         """Act on a flow removed message pertaining to a bucket by
            1. removing the rule from the matches structure, and
            2. adding its counters into the bucket's persistent counts.
         """
+        packet_count = flow_stat['packet_count']
+        byte_count   = flow_stat['byte_count']
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
                 for to_be_deleted in [True, False]:
                     for existing in [True, False]:
-                        match_entry = (match, priority, version, to_be_deleted,
-                                       existing)
+                        match_entry = (util.frozendict(match), priority,
+                                       version, to_be_deleted, existing)
                         if match_entry in self.matches:
                             assert to_be_deleted
                             if not existing:
@@ -514,7 +518,7 @@ class CountBucket(Query):
         with self.in_update_cv:
             while self.in_update: # ensure buckets not updated concurrently
                 self.in_update_cv.wait()
-            if not self.runtime_stats_query_fun is None:
+            if pull_function:
                 # Note: If a query is already in progress, this will wipe out
                 # all its intermediate results for it.
                 self.outstanding_switches = []
@@ -553,8 +557,8 @@ class CountBucket(Query):
         def stat_in_bucket(flow_stat, s):
             """Return a matching entry for the given flow_stat in bucket.matches."""
             f = flow_stat
-            table_match = match(f['match']).intersect(match(switch=s))
-            network_match = match(f['match'])
+            table_match = match(f['match']).intersect(match(switch=s)).map
+            network_match = util.frozendict(f['match'])
             priority = int(f['priority'])
             version_no = int(f['cookie'])
             for m in [table_match, network_match]:

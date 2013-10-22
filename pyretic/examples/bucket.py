@@ -75,7 +75,8 @@ class QueryTest(CountBucket):
             time.sleep(interval)
 
     def query_callback(self, counts):
-        print "*** In user callback for bucket", id(self)
+        print "***", str(datetime.now()), "| In user callback for bucket",
+        print id(self)
         print "(packet, byte) counts:", counts
 
 def test_main1():
@@ -126,4 +127,4 @@ def test_main5():
     return (matched_traffic >> test_bucket) + fwding
 
 def main():
-    return test_main1()
+    return test_main4()
