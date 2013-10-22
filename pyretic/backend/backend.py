@@ -29,7 +29,6 @@
 
 import threading
 from pyretic.backend.comm import *
-from pyretic.core.runtime import ConcretePacket
 
 class BackendServer(asyncore.dispatcher):
     """Receives connections and establishes handlers for each backend.
@@ -105,7 +104,7 @@ class BackendChannel(asynchat.async_chat):
         elif msg[0] == 'link':
             self.backend.runtime.handle_link_update(msg[1],msg[2],msg[3],msg[4])
         elif msg[0] == 'packet':
-            packet = ConcretePacket(msg[1])
+            packet = msg[1]
             self.backend.runtime.handle_packet_in(packet)
         elif msg[0] == 'flow_stats_reply':
             self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])

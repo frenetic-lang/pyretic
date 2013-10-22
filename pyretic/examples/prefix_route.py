@@ -27,64 +27,27 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+
+################################################################################
+# SETUP                                                                        #
+# -------------------------------------------------------------------          #
+# mininet:  mininet.sh --topo simple_prefix                                    #
+################################################################################
+
 from pyretic.lib.corelib import *
-from pyretic.lib.virt import *
+from pyretic.lib.std import *
 
-class spanning_tree(vdef):
-    def __init__(self):
-        super(spanning_tree,self).__init__()
+ipp1 = IPPrefix('10.0.0.0/31')
+ipp2 = IPPrefix('10.0.0.2/31')
+ipp3 = IPPrefix('10.0.0.4/31')
 
-        @singleton
-        class ingress_policy(DynamicPolicy):
-            def set_network(self,network):
-                self.policy = self.vmap.ingress_policy()
-                DynamicPolicy.set_network(self,network)            
-        self.ingress_policy = ingress_policy
+l3route = ((match(dstip=ipp1) >> fwd(1)) +
+           (match(dstip=ipp2) >> fwd(2)) +
+           (match(dstip=ipp3) >> fwd(3)) )
 
-        @singleton
-        class fabric_policy(DynamicPolicy):
-            def set_network(self,network):
-                self.policy = self.vmap.one_to_one_fabric_policy() 
-                DynamicPolicy.set_network(self,network)            
-        self.fabric_policy = fabric_policy
-
-        @singleton
-        class egress_policy(DynamicPolicy):
-            def set_network(self,network):
-                self.policy = self.vmap.egress_policy()
-                DynamicPolicy.set_network(self,network)            
-        self.egress_policy = egress_policy
-    
-    def make_vmap(self):
-        mapping = vmap()
-        for sw, attrs in self.derived.topology.nodes(data=True):
-            elocs = self.underlying.topology.egress_locations(sw)
-            mstlocs = set()
-            for attrs in self.derived.topology[sw].itervalues():
-                mstlocs.add(attrs[sw])
-            locs = elocs | {Location(sw,p) for p in mstlocs}
-            for loc in locs:
-                mapping.d2u[Location(loc.switch,loc.port_no)] = \
-                    [Location(loc.switch, loc.port_no)]
-        return mapping
+def main():
+    return l3route
 
 
-    def set_network(self,network):
-        self.underlying = network
-        self.derived = self.DerivedNetwork(self.underlying)
-        self.derived.topology = Topology.minimum_spanning_tree(network.topology)
-        self.derived.inherited.clear()
-        super(spanning_tree,self).set_network(network)
-        print "------- Underlying Spanning Tree Topology ---------"
-        print self.underlying.topology
-        print "------- Derived Spanning Tree Topology ---------"
-        print self.derived.topology
 
-
-transform = spanning_tree()
-
-        
-    
-
-    
 

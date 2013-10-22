@@ -27,11 +27,40 @@
 ################################################################################
 
 """Pyretic Query Library"""
-from pyretic.core.language import Policy, DynamicPolicy, FwdBucket, DerivedPolicy, match, all_packets, EvalTrace
+from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
 import time
 from threading import Thread
 
-class packets(DynamicPolicy):
+class LimitFilter(DynamicFilter):
+    def __init__(self,limit=None,group_by=[]):
+        self.limit = limit
+        self.group_by = group_by
+        self.seen = {}
+        self.done = []
+        super(LimitFilter,self).__init__(identity)
+
+    def update_policy(self,pkt):
+        if self.group_by:    # MATCH ON PROVIDED GROUP_BY
+            pred = match([(field,pkt[field]) for field in self.group_by])
+        else:              # OTHERWISE, MATCH ON ALL AVAILABLE GROUP_BY
+            pred = match([(field,pkt[field]) 
+                              for field in pkt.available_group_by()])
+        # INCREMENT THE NUMBER OF TIMES MATCHING PKT SEEN
+        try:
+            self.seen[pred] += 1
+        except KeyError:
+            self.seen[pred] = 1
+
+        if self.seen[pred] == self.limit:
+            val = {h : pkt[h] for h in self.group_by}
+            self.done.append(match(val))
+            self.policy = ~union(self.done)
+
+    def __repr__(self):
+        return "LimitFilter\n%s" % repr(self.policy)
+
+
+class packets(DerivedPolicy):
     """Effectively a FwdBucket which calls back all registered routines on each 
     packet evaluated.
     A positive integer limit will cause callback to cease after limit packets of
@@ -39,71 +68,20 @@ class packets(DynamicPolicy):
     grouping - two packets are in the same group if they match on all headers in the
     group_by.  If no group_by is specified, the default is to match on all available
     headers."""
-    class FilterWrappedFwdBucket(Policy):
-        def __init__(self,limit=None,group_by=[]):
-            self.limit = limit
-            self.group_by = group_by
-            self.seen = {}
-            self.fwd_bucket = FwdBucket()
-            self.register_callback = self.fwd_bucket.register_callback
-            super(packets.FilterWrappedFwdBucket,self).__init__()
 
-        def eval(self,pkt):
-            if not self.limit is None:
-                if self.group_by:    # MATCH ON PROVIDED GROUP_BY
-                    pred = match([(field,pkt[field]) for field in self.group_by])
-                else:              # OTHERWISE, MATCH ON ALL AVAILABLE GROUP_BY
-                    pred = match([(field,pkt[field]) 
-                                  for field in pkt.available_group_by()])
-                # INCREMENT THE NUMBER OF TIMES MATCHING PKT SEEN
-                try:
-                    self.seen[pred] += 1
-                except KeyError:
-                    self.seen[pred] = 1
-
-                if self.seen[pred] > self.limit:
-                    return set()
-            self.fwd_bucket.eval(pkt)
-            return {pkt}
-        
     def __init__(self,limit=None,group_by=[]):
-        self.limit = limit
-        self.seen = {}
-        self.group_by = group_by
-        self.pwfb = self.FilterWrappedFwdBucket(limit,group_by)
-        self.register_callback = self.pwfb.register_callback
-        super(packets,self).__init__(all_packets)
-
-    def eval(self,pkt):
-        """Don't look any more such packets"""
-        if self.policy.eval(pkt) and not self.pwfb.eval(pkt):
-            val = {h : pkt[h] for h in self.group_by}
-            self.policy = ~match(val) & self.policy
-        return set()
-
-    def track_eval(self,pkt,dry):
-        """Don't look any more such packets"""
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policy.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results: 
-            if not dry:
-                (results,trace) = self.pwfb.track_eval(pkt,dry)
-                eval_trace.add_trace(trace)
-                if not results:
-                    val = {h : pkt[h] for h in self.group_by}
-                    self.policy = ~match(val) & self.policy
-            else:
-                eval_trace.add_trace(EvalTrace(self.pwfb))
-        return (set(),eval_trace)
-
-    def compile(self):
-        classifier = ((self.policy >> self.pwfb.fwd_bucket) + ~self.policy).compile()
-        return classifier
-
+        self.fb = FwdBucket()
+        self.register_callback = self.fb.register_callback
+        if limit is None:
+            super(packets,self).__init__(self.fb)
+        else:
+            self.limit_filter = LimitFilter(limit,group_by)
+            self.fb.register_callback(self.limit_filter.update_policy)
+            super(packets,self).__init__(self.limit_filter >> self.fb)
+        
     def __repr__(self):
         return "packets\n%s" % repr(self.policy)
-        
+
 
 class AggregateFwdBucket(FwdBucket):
     """An abstract FwdBucket which calls back all registered routines every interval
@@ -150,12 +128,6 @@ class AggregateFwdBucket(FwdBucket):
     def eval(self, pkt):
         self.update_aggregate(pkt)
         return set()
-
-    def track_eval(self, pkt, dry):
-        if dry:
-            return (set(), EvalTrace(self))
-        else:
-            return (self.eval(pkt), EvalTrace(self))
 
 
 class count_packets(AggregateFwdBucket):

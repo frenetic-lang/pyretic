@@ -91,7 +91,11 @@ class arp(DynamicPolicy):
         self.outstanding_requests = collections.defaultdict(dict)
         self.query = packets()
         self.query.register_callback(self.handle_arp)
+        self.network = None
         super(arp,self).__init__(self.query)
+
+    def set_network(self, network):
+        self.network = network
 
     def handle_arp(self,pkt):
         switch = pkt['switch']
@@ -125,6 +129,9 @@ class arp(DynamicPolicy):
 
                 # FORWARD REQUEST OUT OF ALL EGRESS PORTS
                 self.outstanding_requests[srcip][dstip] = True
+                if self.network is None:
+                    return
+
                 for loc in self.network.topology.egress_locations() - {Location(switch,inport)}:
                     switch  = loc.switch
                     outport = loc.port_no

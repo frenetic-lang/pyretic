@@ -60,16 +60,6 @@ class Policy(object):
     """Top-level abstract class for policies.
     All Pyretic policies evaluate on a single packet and return a set of packets.
     """
-    def __init__(self):
-        self._network = None
-
-    @property
-    def network(self):
-        return self._network
-
-    def set_network(self, network):
-        self._network = network
-
     ### add : Policy -> Policy
     def __add__(self, pol):
         if isinstance(pol,parallel):
@@ -97,9 +87,6 @@ class Policy(object):
     ### eval : Packet -> Set Packet
     def __eval__(self, pkt):
         raise NotImplementedError
-
-    def track_eval(self, pkt, dry):
-        return (self.eval(pkt), EvalTrace(self))
 
     def compile(self):
         raise NotImplementedError
@@ -344,29 +331,35 @@ class Controller(Policy):
         return id(self) == id(other)
 
 # FIXME: Srinivas =).
-class Query(Policy):
+class Query(Filter):
     """Abstract class representing a data structure
     into which packets (conceptually) go and with which callbacks can register.
     """
     ### init : unit -> unit
     def __init__(self):
+        from multiprocessing import Lock
         self.callbacks = []
+        self.bucket = set()
+        self.bucket_lock = Lock()
         super(Query,self).__init__()
-        
-    def __repr__(self):
-        return "Query"
 
     def eval(self, pkt):
-        for callback in self.callbacks:
-            callback(pkt)
+        with self.bucket_lock:
+            self.bucket.add(pkt)
         return set()
 
     def compile(self):
         raise NotImplementedError
 
+    def compile(self):
+        raise NotImplementedError
+        
     ### register_callback : (Packet -> X) -> unit
     def register_callback(self, fn):
         self.callbacks.append(fn)
+
+    def __repr__(self):
+        return "Query"
 
 
 class FwdBucket(Query):
@@ -376,6 +369,13 @@ class FwdBucket(Query):
     def compile(self):
         r = Rule(identity,[Controller])
         return Classifier([r])
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                for callback in self.callbacks:
+                    callback(pkt)
+            self.bucket.clear()
     
     def __repr__(self):
         return "FwdBucket"
@@ -413,13 +413,18 @@ class CountBucket(Query):
         return self.new_bucket
 
     def eval(self, pkt):
-        self.packet_count_persistent += 1
-        self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
         return set()
 
     def compile(self):
         r = Rule(identity,[self])
         return Classifier([r])
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                self.packet_count_persistent += 1
+                self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
+            self.bucket.clear()
 
     def start_update(self):
         """Use a condition variable to mediate access to bucket state as it is
@@ -635,11 +640,6 @@ class CombinatorPolicy(Policy):
         self.policies = list(policies)
         super(CombinatorPolicy,self).__init__()
 
-    def set_network(self, network):
-        super(CombinatorPolicy,self).set_network(network)
-        for policy in self.policies:
-            policy.set_network(network)
-
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
 
@@ -654,15 +654,6 @@ class negate(CombinatorPolicy,Filter):
             return set()
         else:
             return {pkt}
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policies[0].track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            return (set(),eval_trace)
-        else:
-            return ({pkt},eval_trace)
 
     def compile(self):
         inner_classifier = self.policies[0].compile()
@@ -706,15 +697,6 @@ class parallel(CombinatorPolicy):
         for policy in self.policies:
             output |= policy.eval(pkt)
         return output
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        output = set()
-        for policy in self.policies:
-            (results,trace) = policy.track_eval(pkt,dry)
-            output |= results
-            eval_trace.add_trace(trace)
-        return (output,eval_trace)
 
     def compile(self):
         if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
@@ -787,27 +769,6 @@ class sequential(CombinatorPolicy):
             prev_output = output
         return output
 
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        prev_output = {pkt}
-        output = prev_output
-        for policy in self.policies:
-            if not prev_output:
-                return (set(),eval_trace)
-            if policy == identity:
-                eval_trace.add_trace(EvalTrace(policy))
-                continue
-            if policy == drop:
-                eval_trace.add_trace(EvalTrace(policy))
-                return (set(),eval_trace)
-            output = set()
-            for p in prev_output:
-                (results,trace) = policy.track_eval(p,dry)
-                output |= results
-                eval_trace.add_trace(trace)
-            prev_output = output
-        return (output,eval_trace)
-
     def compile(self):
         assert(len(self.policies) > 0)
         classifiers = map(lambda p: p.compile(),self.policies)
@@ -841,30 +802,6 @@ class intersection(sequential,Filter):
             raise TypeError
 
 
-class dropped_by(CombinatorPolicy,Filter):
-    def __init__(self, dropper):
-        super(dropped_by,self).__init__([dropper])
-
-    def eval(self, pkt):
-        if self.policies[0].eval(pkt):
-            return set()
-        else:
-            return {pkt}
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policies[0].track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            return (set(),eval_trace)
-        else:
-            return ({pkt},eval_trace)
-
-    def compile(self):
-        r = Rule(identity,[Controller])
-        return Classifier([r])
-
-
 ################################################################################
 # Derived Policies                                                             #
 ################################################################################
@@ -875,18 +812,8 @@ class DerivedPolicy(Policy):
         self.policy = policy
         super(DerivedPolicy,self).__init__()
 
-    def set_network(self, network):
-        super(DerivedPolicy,self).set_network(network)
-        self.policy.set_network(network)
-
     def eval(self, pkt):
         return self.policy.eval(pkt)
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.policy.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        return (results,eval_trace)
 
     def compile(self):
         return self.policy.compile()
@@ -909,14 +836,6 @@ class difference(DerivedPolicy,Filter):
         return "difference:\n%s" % util.repr_plus([self.f1,self.f2])
 
 
-class match_modify(DerivedPolicy):
-    def __init__(self, field, match_val, mod_val):
-        self.field = field
-        self.match_val = match_val
-        self.mod_val = mod_val
-        super(match_modify,self).__init__(match(field=match_val) >>
-                                          modify(field=mod_val))
-
 class if_(DerivedPolicy):
     """if predicate holds, t_branch, otherwise f_branch."""
     ### init : Policy -> Policy -> Policy -> unit
@@ -932,17 +851,6 @@ class if_(DerivedPolicy):
             return self.t_branch.eval(pkt)
         else:
             return self.f_branch.eval(pkt)
-
-    def track_eval(self, pkt, dry):
-        eval_trace = EvalTrace(self)
-        (results,trace) = self.pred.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        if results:
-            (results,trace) = self.t_branch.track_eval(pkt,dry)
-        else:
-            (results,trace) = self.f_branch.track_eval(pkt,dry)
-        eval_trace.add_trace(trace)
-        return (results,eval_trace)
 
     def __repr__(self):
         return "if\n%s\nthen\n%s\nelse\n%s" % (util.repr_plus([self.pred]),
@@ -974,17 +882,6 @@ class xfwd(DerivedPolicy):
         return "xfwd %s" % self.outport
 
 
-class recurse(DerivedPolicy):
-    """A policy that can refer to itself w/o causing the runtime/compiler to die."""
-    def set_network(self, network):
-        if network == self.policy._network:
-            return
-        super(recurse,self).set_network(network)
-
-    def __repr__(self):
-        return "[recurse]:\n%s" % repr(self.policy)
-
-
 ################################################################################
 # Dynamic Policies                                                             #
 ################################################################################
@@ -998,6 +895,9 @@ class DynamicPolicy(DerivedPolicy):
         self._policy = policy
         self.notify = None
         super(DerivedPolicy,self).__init__()
+
+    def set_network(self, network):
+        pass
 
     def attach(self,notify):
         self.notify = notify
@@ -1017,10 +917,6 @@ class DynamicPolicy(DerivedPolicy):
     def policy(self, policy):
         prev_policy = self._policy
         self._policy = policy
-        if self.network:
-            if (not self._policy.network or
-                (self.network.topology != self._policy.network.topology)):
-                self._policy.set_network(self.network)
         self.changed(self,prev_policy,policy)
 
     def __repr__(self):
@@ -1040,7 +936,6 @@ class flood(DynamicPolicy):
 
     def set_network(self, network):
         changed = False
-        super(flood,self).set_network(network)
         if not network is None:
             updated_mst = Topology.minimum_spanning_tree(network.topology)
             if not self.mst is None:
@@ -1071,7 +966,6 @@ class ingress_network(DynamicFilter):
         super(ingress_network,self).__init__()
 
     def set_network(self, network):
-        super(ingress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
@@ -1091,7 +985,6 @@ class egress_network(DynamicFilter):
         super(egress_network,self).__init__()
 
     def set_network(self, network):
-        super(egress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
@@ -1101,6 +994,86 @@ class egress_network(DynamicFilter):
 
     def __repr__(self):
         return "egress_network"
+
+
+###############################################################################
+# Class hierarchy syntax tree traversal
+
+def ast_fold(fun, acc, policy):
+    import pyretic.lib.query as query
+    if (  policy == identity or
+          policy == drop or
+          isinstance(policy,match) or
+          isinstance(policy,modify) or
+          policy == Controller or
+          isinstance(policy,Query)):
+        return fun(acc,policy)
+    elif (isinstance(policy,negate) or
+          isinstance(policy,parallel) or
+          isinstance(policy,union) or
+          isinstance(policy,sequential) or
+          isinstance(policy,intersection)):
+        acc = fun(acc,policy)
+        for sub_policy in policy.policies:
+            acc = ast_fold(fun,acc,sub_policy)
+        return acc
+    elif (isinstance(policy,difference) or
+          isinstance(policy,if_) or
+          isinstance(policy,fwd) or
+          isinstance(policy,xfwd) or
+          isinstance(policy,DynamicPolicy) or
+          isinstance(policy,query.packets)):
+        acc = fun(acc,policy)
+        return ast_fold(fun,acc,policy.policy)
+    else:
+        raise NotImplementedError
+    
+def add_dynamic_sub_pols(acc, policy):
+    if isinstance(policy,DynamicPolicy):
+        return acc | {policy}
+    else:
+        return acc
+
+def add_query_sub_pols(acc, policy):
+    from pyretic.lib.query import packets
+    if ( isinstance(policy,Query) or
+         isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
+        return add | {policy}
+    else:
+        return acc
+
+def queries_in_eval(acc, policy):
+    res,pkts = acc
+    if policy == drop:
+        acc = (res,set())
+    elif policy == identity:
+        pass
+    elif (isinstance(policy,match) or 
+          isinstance(policy,modify) or 
+          isinstance(policy,negate)):
+        new_pkts = set()
+        for pkt in pkts:
+            new_pkts |= policy.eval(pkt)
+        acc = (res,new_pkts)
+    elif isinstance(policy,Query):
+        acc = (res | {policy}, set())
+    elif isinstance(policy,DerivedPolicy):
+        acc = queries_in_eval(acc,policy.policy)
+    elif isinstance(policy,parallel):
+        parallel_res = set()
+        parallel_pkts = set()
+        for sub_pol in policy.policies:
+            new_res,new_pkts = queries_in_eval((res,pkts),sub_pol)
+            parallel_res |= new_res
+            parallel_pkts |= new_pkts
+        acc = (parallel_res,parallel_pkts)
+    elif isinstance(policy,sequential):
+        for sub_pol in policy.policies:
+            acc = queries_in_eval(acc,sub_pol)
+            if not acc[1]:
+                break
+    return acc
+
 
 
 ###############################################################################
@@ -1352,31 +1325,3 @@ class Classifier(object):
             if pkts is not None:
                 return pkts
         raise TypeError('Classifier is not total.')
-
-
-###############################################################################
-# Run time helpers
-#
-
-class EvalTrace(object):
-    def __init__(self,ne):
-        self.ne = ne
-        self.traces = []
-
-    def add_trace(self,trace):
-        self.traces.append(trace)
-
-    def contains_class(self,cls):
-        if self.ne.__class__ == cls:
-            return True
-        for trace in self.traces:
-            if trace.contains_class(cls):
-                return True
-        return False
-
-    def __repr__(self):
-        if self.traces:
-            return self.ne.name() + '[' + ']['.join(map(repr,self.traces))+']'
-        else:
-            return self.ne.name()
-

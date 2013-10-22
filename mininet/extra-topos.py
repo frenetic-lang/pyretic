@@ -137,67 +137,6 @@ class BumpCliqueTopo(CliqueTopo):
             self.addLink('s102',server_id)
 
 
-### ONE-OFF TOPOS FOR EXAMPLES
-class Figure3Topo(Topo):
-    
-    def __init__(self):
-        
-        # Add default members to class.
-        super(Figure3Topo, self).__init__()
-
-        # Set Node IDs for hosts and switches
-        switch1 = 's1'
-        switch2 = 's2' 
-
-        data_server = 'data1'
-        compute_server_1 = 'compute1'
-        compute_server_2 = 'compute2'
-        
-        # Add nodes
-        self.addSwitch(switch1)
-        self.addSwitch(switch2)
-                
-        self.addHost(data_server)
-        self.addHost(compute_server_1)
-        self.addHost(compute_server_2)
-
-        # Add edges
-        self.addLink(switch1, data_server)
-        self.addLink(switch1, compute_server_1)
-        self.addLink(switch2, compute_server_2)
-
-        self.addLink(switch1, switch2)
-        
-
-class YTopo(Topo):
-    
-    def __init__(self):
-        
-        # Add default members to class.
-        super(YTopo, self).__init__()
-
-        # Set Node IDs for hosts and switches
-        host_ids = range(1,5)
-        switch_ids = range(1,5)
-        
-        # Add nodes
-        for switch_id in switch_ids: 
-            self.addSwitch('s'+str(switch_id))
-
-        for host_id in host_ids: 
-            self.addHost('h'+str(host_id))
-        
-        # Add edges
-        self.addLink('s1', 'h1')
-        self.addLink('s1', 'h2')
-        self.addLink('s3', 'h3')
-        self.addLink('s4', 'h4')
-
-        self.addLink('s1', 's2')
-        self.addLink('s2', 's3')
-        self.addLink('s2', 's4')
-
-
 class OneSwitchGatewayTopoNoSubnets(Topo):
     def __init__(self, numClients=3, numServers=3):        
         super(OneSwitchGatewayTopoNoSubnets, self).__init__()
@@ -378,6 +317,23 @@ class ThreeSwitchGatewayTopo(Topo):
         self.addLink('s1001','s1002')  # s1001[2] -- s1002[3]
 
 
+class SimplePrefixTopo(Topo):
+    def __init__(self):
+        
+        # Add default members to class.
+        super(SimplePrefixTopo, self).__init__()
+
+        # Set Node IDs for hosts and switches
+
+        self.addHost('h1', ip='10.0.0.1')
+        self.addHost('h2', ip='10.0.0.2')
+        self.addHost('h3', ip='10.0.0.5')
+        self.addSwitch('s1')
+
+        # Add edges
+        self.addLink('s1', 'h1')
+        self.addLink('s1', 'h2')
+        self.addLink('s1', 'h3')
 
 
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
@@ -388,11 +344,10 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'bump_chain': BumpChainTopo,
           'bump_cycle': BumpCycleTopo,
           'bump_clique': BumpCliqueTopo,
-          'figure3' : Figure3Topo,
-          'ytopo': YTopo,
           'gateway1': OneSwitchGatewayTopo,
           'gateway1_ns': OneSwitchGatewayTopoNoSubnets,
           'gateway3': ThreeSwitchGatewayTopo,
           'gateway3_ns': ThreeSwitchGatewayTopoNoSubnets,
+          'simple_prefix': SimplePrefixTopo
 }
  

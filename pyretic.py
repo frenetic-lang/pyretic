@@ -46,13 +46,13 @@ of_client = None
 
 def signal_handler(signal, frame):
     print '\n----starting pyretic shutdown------'
-#    for thread in threading.enumerate():
-#        print (thread,thread.isAlive())
+    # for thread in threading.enumerate():
+    #     print (thread,thread.isAlive())
     print "attempting to kill of_client"
     of_client.kill()
-    print "attempting get output of of_client:"
-    output = of_client.communicate()[0]
-    print output
+    # print "attempting get output of of_client:"
+    # output = of_client.communicate()[0]
+    # print output
     print "pyretic.py done"
     sys.exit(0)
 
@@ -160,7 +160,7 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(log_level)
     
-    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity,False,False)
+    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()

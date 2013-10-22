@@ -57,7 +57,6 @@ class mac_learner(DynamicPolicy):
         self.update_policy()
 
     def set_network(self,network):
-        Policy.set_network(self,network)  # AVOID UNECESSARY CALCULATIONS IN INTERNAL POLICY ABOUT TO BE REPLACED
         self.set_initial_state()
 
     def update_policy(self):

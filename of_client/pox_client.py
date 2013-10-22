@@ -75,7 +75,10 @@ class BackendChannel(asynchat.async_chat):
             if h in ['srcmac','dstmac']:
                 return packetaddr.EthAddr(val)
             elif h in ['srcip','dstip']:
-                return packetaddr.IPAddr(val)
+                try:
+                    return packetaddr.IPAddr(val)
+                except:
+                    return val
             elif h in ['vlan_id','vlan_pcp'] and val == 'None':
                 return None
             else:
@@ -403,9 +406,9 @@ class POXClient(revent.EventMixin):
         if 'protocol' in pred:
             match.nw_proto = pred['protocol']
         if 'srcip' in pred:
-            match.nw_src = pred['srcip']
+            match.set_nw_src(pred['srcip'])
         if 'dstip' in pred:
-            match.nw_dst = pred['dstip']
+            match.set_nw_dst(pred['dstip'])
         if 'tos' in pred:
             match.nw_tos = pred['tos']
         if 'srcport' in pred:
@@ -465,9 +468,9 @@ class POXClient(revent.EventMixin):
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
-            print "ERROR:install_flow: %s to switch %d" % (str(e),switch)
+            print "WARNING:install_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
-            print "ERROR:install_flow: No connection to switch %d available" % switch
+            print "WARNING:install_flow: No connection to switch %d available" % switch
 
     def install_flow(self,pred,priority,action_list,cookie):
         self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD)
@@ -488,9 +491,9 @@ class POXClient(revent.EventMixin):
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
-            print "ERROR:delete_flow: %s to switch %d" % (str(e),switch)
+            print "WARNING:delete_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
-            print "ERROR:delete_flow: No connection to switch %d available" % switch
+            print "WARNING:delete_flow: No connection to switch %d available" % switch
 
     def barrier(self,switch):
         b = of.ofp_barrier_request()
