@@ -49,6 +49,7 @@ class Runtime(object):
         self.backend.runtime = self
         self.policy_lock = RLock()
         self.network_lock = Lock()
+        self.switch_lock = Lock()
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
@@ -214,7 +215,7 @@ class Runtime(object):
 # PROACTIVE COMPILATION 
 #########################
 
-    def install_classifier(self, classifier, this_update_no=None, current_update_no=None):
+    def install_classifier(self, classifier):
         if classifier is None:
             return
 
@@ -510,16 +511,12 @@ class Runtime(object):
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(classifier, this_update_no, current_update_no):
-            if not this_update_no is None:
-                time.sleep(0.1)
-                if this_update_no != current_update_no.value:
-                    return
-
-            if self.mode == 'proactive0':
-                nuclear_install(classifier)
-            elif self.mode == 'proactive1':
-                install_diff_rules(classifier)
+        def f(classifier):
+            with self.switch_lock:
+                if self.mode == 'proactive0':
+                    nuclear_install(classifier)
+                elif self.mode == 'proactive1':
+                    install_diff_rules(classifier)
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
@@ -532,7 +529,7 @@ class Runtime(object):
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
-        p = Process(target=f,args=(classifier,this_update_no,current_update_no))
+        p = Process(target=f,args=(classifier,))
         p.daemon = True
         p.start()
 
@@ -642,19 +639,15 @@ class Runtime(object):
     def send_clear(self,switch):
         self.backend.send_clear(switch)
 
-    def clear_all(self,this_update_no=None,current_update_no=None):
-        def f(this_update_no, current_update_no):
-            if not this_update_no is None:
-                time.sleep(0.1)
-                if this_update_no != current_update_no.value:
-                    return
+    def clear_all(self):
+        def f():
             switches = self.network.topology.nodes()
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
                 self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
-        p = Process(target=f,args=(this_update_no,current_update_no))
+        p = Process(target=f)
         p.daemon = True
         p.start()
 
@@ -767,7 +760,7 @@ class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
-        self.wait_period = 1
+        self.wait_period = 0.25
         self.update_no_lock = threading.Lock()
         self.update_no = 0
         self.log = logging.getLogger('%s.ConcreteNetwork' % __name__)
@@ -782,8 +775,19 @@ class ConcreteNetwork(Network):
     # Topology Detection
     #
 
-    def update_network(self):
-        self.runtime.update_network()
+    def queue_update(self,this_update_no):
+        def f(this_update_no):
+            time.sleep(self.wait_period)
+            if this_update_no == self.update_no:
+                self.runtime.update_network()
+
+        p = threading.Thread(target=f,args=(this_update_no,))
+        p.start()
+
+    def get_update_no(self):
+        with self.update_no_lock:
+            self.update_no += 1
+            return self.update_no
            
     def inject_discovery_packet(self, dpid, port_no):
         self.runtime.inject_discovery_packet(dpid, port_no)
@@ -791,21 +795,10 @@ class ConcreteNetwork(Network):
     def handle_switch_join(self, switch):
         self.debug_log.debug("handle_switch_joins")
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
-        with self.update_no_lock:
-            self.update_no += 1
-            this_update_no = self.update_no
         self.topology.add_switch(switch)
         self.log.info("OpenFlow switch %s connected" % switch)
         self.debug_log.debug(str(self.topology))
         
-        def f():
-            time.sleep(self.wait_period)
-            if this_update_no == self.update_no:
-                self.update_network()
-
-        p = threading.Thread(target=f,args=())
-        p.start()
-
     def remove_associated_link(self,location):
         port = self.topology.node[location.switch]["ports"][location.port_no]
         if not port.linked_to is None:
@@ -830,42 +823,29 @@ class ConcreteNetwork(Network):
             self.remove_associated_link(Location(switch,port_no))
         self.topology.remove_node(switch)
         self.debug_log.debug(str(self.topology))
-        self.update_network()
+        self.queue_update(self.get_update_no())
         
     def handle_port_join(self, switch, port_no, config, status):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
-        with self.update_no_lock:
-            self.update_no += 1
-            this_update_no = self.update_no
+        this_update_no = self.get_update_no()
         self.topology.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.topology))
-
-            def f():
-                time.sleep(self.wait_period)
-                if this_update_no == self.update_no:
-                    self.update_network()
-
-        p = threading.Thread(target=f,args=())
-        p.start()
-
+            self.queue_update(this_update_no)
+            
     def handle_port_part(self, switch, port_no):
         self.debug_log.debug("handle_port_parts")
         try:
             self.remove_associated_link(Location(switch,port_no))
             del self.topology.node[switch]["ports"][port_no]
             self.debug_log.debug(str(self.topology))
-            self.update_network()
+            self.queue_update(self.get_update_no())
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
     def handle_port_mod(self, switch, port_no, config, status):
         self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
-        with self.update_no_lock:
-            self.update_no += 1
-            this_update_no = self.update_no
-
         # GET PREV VALUES
         try:
             prev_config = self.topology.node[switch]["ports"][port_no].config
@@ -889,20 +869,18 @@ class ConcreteNetwork(Network):
             self.port_up(switch, port_no)
 
     def port_up(self, switch, port_no):
-        with self.update_no_lock:
-            self.update_no += 1
-            this_update_no = self.update_no
+        this_update_no = self.get_update_no()
         self.debug_log.debug("port_up %s:%s" % (switch,port_no))
         self.inject_discovery_packet(switch,port_no)
         self.debug_log.debug(str(self.topology))
-        self.update_network()
+        self.queue_update(this_update_no)
 
     def port_down(self, switch, port_no, double_check=False):
         self.debug_log.debug("port_down %s:%s:double_check=%s" % (switch,port_no,double_check))
         try:
             self.remove_associated_link(Location(switch,port_no))
             self.debug_log.debug(str(self.topology))
-            self.update_network()
+            self.queue_update(self.get_update_no())
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
@@ -946,16 +924,5 @@ class ConcreteNetwork(Network):
             self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
-        with self.update_no_lock:
-            self.update_no += 1
-            this_update_no = self.update_no
-
         self.debug_log.debug(self.topology)
-
-        def f():
-            time.sleep(self.wait_period)
-            if this_update_no == self.update_no:
-                self.update_network()
-
-        p = threading.Thread(target=f,args=())
-        p.start()
+        self.queue_update(self.get_update_no())
