@@ -84,6 +84,7 @@ class TestCase():
         newf.close()
 
     def _cleanup(self):
+        subprocess.call(['sudo', 'mn', '-c'])        
         shutil.rmtree(self.tmpdir)
 
     def run(self):
