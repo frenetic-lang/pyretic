@@ -48,14 +48,13 @@ class Runtime(object):
         self.backend = backend
         self.backend.runtime = self
         self.policy_lock = RLock()
+        self.network_lock = Lock()
         self.vlan_to_extended_values_db = {}
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
         self.dynamic_sub_pols = set()
         self.update_dynamic_sub_pols()
         self.in_update_network = False
-        self.update_network_lock = Lock()
-        self.update_network_no = Value('i', 0)
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
         self.manager = Manager()
@@ -102,32 +101,6 @@ class Runtime(object):
 #############
 # DYNAMICS  
 #############
-          
-    def update_network(self):
-        if self.network.topology != self.prev_network.topology:
-            with self.update_network_lock:
-                self.update_network_no.value += 1
-                this_update_network_no = self.update_network_no.value
-                self.in_update_network = True
-                self.prev_network = self.network.copy()
-
-                with self.policy_lock:
-                    self.policy.set_network(self.prev_network)
-                    self.update_dynamic_sub_pols()
-                    if self.mode == 'proactive0' or self.mode == 'proactive1':
-                        classifier = self.policy.compile()
-
-                if self.mode == 'reactive0':
-                    self.clear_all(this_update_network_no,self.update_network_no)
-                elif self.mode == 'proactive0' or self.mode == 'proactive1':
-                    self.log.debug(
-                        '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                                                      "generate classifier",
-                                                      "policy="+repr(self.policy),
-                                                      "classifier="+repr(classifier)))
-                    self.install_classifier(classifier,this_update_network_no,self.update_network_no)
-
-                self.in_update_network = False
 
     def handle_policy_change(self, changed, old, new):
         if self.in_update_network:
@@ -135,9 +108,30 @@ class Runtime(object):
 
         with self.policy_lock:
             self.update_dynamic_sub_pols()
+            classifier = None
             if self.mode == 'proactive0' or self.mode == 'proactive1':
                 classifier = self.policy.compile()
 
+        self.update_switches(classifier)
+          
+    def update_network(self):
+        with self.network_lock:
+            if self.network.topology != self.prev_network.topology:
+                self.in_update_network = True
+                self.prev_network = self.network.copy()
+
+                with self.policy_lock:
+                    self.policy.set_network(self.prev_network)
+                    self.update_dynamic_sub_pols()
+                    classifier = None
+                    if self.mode == 'proactive0' or self.mode == 'proactive1':
+                        classifier = self.policy.compile()
+
+                    self.update_switches(classifier)
+
+                self.in_update_network = False
+
+    def update_switches(self,classifier):
         if self.mode == 'reactive0':
             self.clear_all() 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
