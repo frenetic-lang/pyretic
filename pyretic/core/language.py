@@ -36,6 +36,7 @@ import struct
 import time
 from ipaddr import IPv4Network
 from bitarray import bitarray
+import logging
 
 from pyretic.core import util
 from pyretic.core.network import *
@@ -402,6 +403,8 @@ class CountBucket(Query):
         self.in_update_cv = Condition()
         self.in_update = False
         self.new_bucket = True
+        # TODO(ngsrinivas) find a way to avoid having a log *per* bucket
+        self.log = logging.getLogger('%s.CountBucket' % __name__)
         
     def __repr__(self):
         return "CountBucket"
@@ -451,6 +454,7 @@ class CountBucket(Query):
                 self.pull_existing_stats()
                 self.new_bucket = False
             self.in_update_cv.notify_all()
+        self.log.info("Updated bucket %d" % id(self))
         
     def add_match(self, match, priority, version, to_be_deleted=False,
                   existing_rule=False):
@@ -481,23 +485,28 @@ class CountBucket(Query):
         """
         packet_count = flow_stat['packet_count']
         byte_count   = flow_stat['byte_count']
+        self.log.debug("In bucket %d handle_flow_removed, got counts %d %d" %
+                       (id(self), packet_count, byte_count) )
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-                for to_be_deleted in [True, False]:
-                    for existing in [True, False]:
-                        match_entry = (util.frozendict(match), priority,
-                                       version, to_be_deleted, existing)
-                        if match_entry in self.matches:
-                            assert to_be_deleted
-                            if not existing:
-                                self.packet_count_persistent += packet_count
-                                self.byte_count_persistent += byte_count
-                            # Note that there is no else action. We just forget
-                            # that this rule was ever associated with the bucket
-                            # if we get a "flow removed" message before we got
-                            # the first ever stats reply from an existing rule.
-                            self.matches.remove(match_entry)
+            for to_be_deleted in [True, False]:
+                for existing in [True, False]:
+                    match_entry = (util.frozendict(match), priority,
+                                   version, to_be_deleted, existing)
+                    if match_entry in self.matches:
+                        assert to_be_deleted
+                        if not existing:
+                            self.log.debug("%s %d" % ("Adding persistent "
+                                                       + "counts to bucket",
+                                                       id(self) ) )
+                            self.packet_count_persistent += packet_count
+                            self.byte_count_persistent += byte_count
+                        # Note that there is no else action. We just forget
+                        # that this rule was ever associated with the bucket
+                        # if we get a "flow removed" message before we got
+                        # the first ever stats reply from an existing rule.
+                        self.matches.remove(match_entry)
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the

@@ -126,15 +126,15 @@ def main():
     sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
 
     # Set up multiprocess logging.
-    verbosity_map = { 'low' : logging.WARNING,
-                      'normal' : logging.INFO,
-                      'high' : logging.DEBUG,
+    verbosity_map = { 'low' : logging.ERROR,
+                      'normal' : logging.WARNING,
+                      'high' : logging.INFO,
                       'please-make-it-stop' : logging.DEBUG }
     logging_queue = Queue()
 
     # Make a logging process.
     def log_writer(queue, log_level):
-        formatter = logging.Formatter('%(levelname)s:%(name)s: %(message)s')
+        formatter = logging.Formatter('%(levelname)s:%(name)s:%(asctime)s: %(message)s')
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         handler.setLevel(log_level)

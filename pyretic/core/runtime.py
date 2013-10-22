@@ -319,6 +319,7 @@ class Runtime(object):
         return output
 
     def handle_flow_stats_reply(self, switch, flow_stats):
+        self.log.debug('received a flow stats reply from switch ' + str(switch))
         flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]
@@ -332,6 +333,8 @@ class Runtime(object):
                 for bucket in self.global_outstanding_queries[switch]:
                     bucket.handle_flow_stats_reply(switch, flow_stats)
                 del self.global_outstanding_queries[switch]
+            self.log.debug('in stats_reply: outstanding switches is now:' +
+                           str(self.global_outstanding_queries) )
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
         flow_stat = { f : self.ofp_convert(f,v)
@@ -342,14 +345,14 @@ class Runtime(object):
              self.flow_stat_str(flow_stat)))
         with self.global_outstanding_deletes_lock:
             f = flow_stat
-            match = f['match']
+            rule_match = match(f['match']).intersect(match(switch=dpid)).map
             priority = f['priority']
             version = f['cookie']
-            match_entry = (util.frozendict(match), priority, version)
+            match_entry = (util.frozendict(rule_match), priority, version)
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
                 for bucket in bucket_list:
-                    bucket.handle_flow_removed(match, priority, version, f)
+                    bucket.handle_flow_removed(rule_match, priority, version, f)
                 del self.global_outstanding_deletes[match_entry]
 
     def concrete2pyretic(self,packet):
@@ -817,7 +820,9 @@ class Runtime(object):
         switch_list = []
         for concrete_pred in concrete_preds:
             if 'switch' in concrete_pred:
-                switch_list.append(concrete_pred['switch'])
+                switch_id = concrete_pred['switch']
+                if not switch_id in switch_list:
+                    switch_list.append(switch_id)
             else:
                 switch_list = self.network.topology.nodes()
                 break
@@ -826,6 +831,8 @@ class Runtime(object):
             already_queried = self.add_global_outstanding_query(s, bucket)
             if not already_queried:
                 self.request_flow_stats(s)
+                self.log.debug('in pull_stats: sent out stats query to switch '
+                               + str(s))
 
     def pull_stats_for_bucket(self,bucket):
         """Returns a function that can be used by counting buckets to
@@ -852,7 +859,8 @@ class Runtime(object):
             if not key in global_dict:
                 global_dict[key] = [val]
             else:
-                global_dict[key].append(val)
+                if not val in global_dict[key]:
+                    global_dict[key].append(val)
                 entry_found = True
         return entry_found
 

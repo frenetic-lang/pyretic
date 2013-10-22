@@ -39,6 +39,7 @@
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
+from pyretic.modules.mac_learner import mac_learner
 
 import time
 from datetime import datetime
@@ -70,8 +71,9 @@ class QueryTest(CountBucket):
             for m in self.matches:
                 output += str(m) + '\n'
             self.pull_stats()
-            output += 'issued query, going to sleep for %f' % interval
-            print output
+            # print output
+            print ">>>", str(datetime.now()), ('issued query, sleeping for %f' %
+                                               interval)
             time.sleep(interval)
 
     def query_callback(self, counts):
@@ -82,7 +84,7 @@ class QueryTest(CountBucket):
 def test_main1():
     """Tests a single match that is counted."""
     test_bucket = QueryTest()
-    return (match(srcip=ip1) >> test_bucket) + fwding
+    return (match(srcip=ip1) >> test_bucket)
 
 def test_main2():
     """Tests buckets containing multiple matches for traffic."""
@@ -95,7 +97,7 @@ def test_main2():
     pol2 = match(srcip=ip2) >> b[1]
     pol3 = match(srcip=ip3) >> b[0]
 
-    return pol1 + pol2 + pol3 + fwding
+    return pol1 + pol2 + pol3
 
 def test_main3():
     """Test if the same traffic feeding into multiple buckets gets accounted
@@ -110,7 +112,7 @@ def test_main3():
     query2 = match(srcip=ip1) >> match(dstip=ip2) >> b[1]
     query3 = match(srcip=ip1) >> match(dstip=ip3) >> b[2]
 
-    return fwding + query1 + query2 + query3
+    return query1 + query2 + query3
 
 def test_main4():
     """Test policy negation, but only for IP traffic."""
@@ -118,13 +120,13 @@ def test_main4():
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
                         (~match(srcip=ip1) & match(dstip=ip3)) +
                         (~match(srcip=ip1) & match(dstip=ip1)) )
-    return (matched_traffic >> test_bucket) + fwding
+    return (matched_traffic >> test_bucket)
 
 def test_main5():
     """Test policy negation covering all other traffic."""
     test_bucket = QueryTest()
     matched_traffic = ~match(srcip=ip1)
-    return (matched_traffic >> test_bucket) + fwding
+    return (matched_traffic >> test_bucket)
 
 def main():
-    return test_main4()
+    return test_main1() + mac_learner()

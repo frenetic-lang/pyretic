@@ -497,6 +497,8 @@ class POXClient(revent.EventMixin):
         self.switches[switch]['connection'].send(b) 
 
     def flow_stats_request(self,switch):
+        print "INFO:Backend:Got flow stats request from pyretic for switch",
+        print switch
         sr = of.ofp_stats_request()
         sr.body = of.ofp_flow_stats_request()
         match = of.ofp_match()
@@ -505,6 +507,7 @@ class POXClient(revent.EventMixin):
         sr.body.out_port = of.OFPP_NONE
         try:
             self.switches[switch]['connection'].send(sr)
+            print "INFO:Backend:Sent flow stats request on switch connection."
         except KeyError, e:
             print ( ("ERROR:flow_stats_request: No connection to switch %d" +
                      " available") % switch )
