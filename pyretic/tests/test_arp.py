@@ -13,7 +13,7 @@ def get_controller():
 
 def run_mininet():
     mn = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mininet.sh'))
-    cmd = '%s --topo cycle,4,4 --mac --test=pingall' % mn
+    cmd = '%s --topo cycle,3,4 --mac --test=pingall' % mn
     subprocess.call(shlex.split(cmd))
 
 def process_controller_output(oldf, newf):

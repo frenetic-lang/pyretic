@@ -12,26 +12,26 @@ def get_controller():
     return 'pyretic.modules.hub'
 
 def run_mininet():
-    mn = Mininet()
-    mn.autoSetMacs = True
-    s1 = mn.addSwitch('s1')
-    h1 = mn.addHost('h1')
-    h2 = mn.addHost('h2')
-    h3 = mn.addHost('h3')
-    h4 = mn.addHost('h4')
-    mn.addLink(h1, s1)
-    mn.addLink(h2, s1)
-    mn.addLink(h3, s1)
-    mn.addLink(h4, s1)
-    mn.addController('c0', RemoteController)
-    mn.run(mn.pingAll)
+    # mn = Mininet()
+    # mn.autoSetMacs = True
+    # s1 = mn.addSwitch('s1')
+    # h1 = mn.addHost('h1')
+    # h2 = mn.addHost('h2')
+    # h3 = mn.addHost('h3')
+    # h4 = mn.addHost('h4')
+    # mn.addLink(h1, s1)
+    # mn.addLink(h2, s1)
+    # mn.addLink(h3, s1)
+    # mn.addLink(h4, s1)
+    # mn.addController('c0', RemoteController)
+    # mn.run(mn.pingAll)
 
     # Alternately, run mininet via the command line.  Note that we need to use
     # absolute path names because sudo mucks with the env.
 
-    # mn = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mininet.sh'))
-    # cmd = '%s --topo single,4 --mac --test=pingall' % mn
-    # subprocess.call(shlex.split(cmd))
+    mn = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mininet.sh'))
+    cmd = '%s --topo cycle,3,4 --mac --test=pingall' % mn
+    subprocess.call(shlex.split(cmd))
 
 def process_controller_output(oldf, newf):
     lines = oldf.readlines()

@@ -33,7 +33,7 @@ def run_mininet():
     # absolute path names because sudo mucks with the env.
 
     mn = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../mininet.sh'))
-    cmd = '%s --topo tree,2,2 --mac --test=pingall' % mn
+    cmd = '%s --topo cycle,3,4 --mac --test=pingall' % mn
     subprocess.call(shlex.split(cmd))
 
 def process_controller_output(oldf, newf):
