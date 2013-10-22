@@ -462,9 +462,9 @@ class POXClient(revent.EventMixin):
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
-            print "ERROR:install_flow: %s to switch %d" % (str(e),switch)
+            print "WARNING:install_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
-            print "ERROR:install_flow: No connection to switch %d available" % switch
+            print "WARNING:install_flow: No connection to switch %d available" % switch
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
@@ -479,9 +479,9 @@ class POXClient(revent.EventMixin):
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
-            print "ERROR:delete_flow: %s to switch %d" % (str(e),switch)
+            print "WARNING:delete_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
-            print "ERROR:delete_flow: No connection to switch %d available" % switch
+            print "WARNING:delete_flow: No connection to switch %d available" % switch
 
     def barrier(self,switch):
         b = of.ofp_barrier_request()
