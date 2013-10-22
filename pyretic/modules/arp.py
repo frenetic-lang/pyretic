@@ -125,6 +125,9 @@ class arp(DynamicPolicy):
 
                 # FORWARD REQUEST OUT OF ALL EGRESS PORTS
                 self.outstanding_requests[srcip][dstip] = True
+                if self.network is None:
+                    return
+
                 for loc in self.network.topology.egress_locations() - {Location(switch,inport)}:
                     switch  = loc.switch
                     outport = loc.port_no

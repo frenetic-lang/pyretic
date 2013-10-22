@@ -767,13 +767,18 @@ def extended_values_from(packet):
 # Concrete Network
 ################################################################################
 
+import threading 
+
 class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
         self.runtime = runtime
+        self.wait_period = 1
+        self.update_no_lock = threading.Lock()
+        self.update_no = 0
         self.log = logging.getLogger('%s.ConcreteNetwork' % __name__)
         self.debug_log = logging.getLogger('%s.DEBUG_TOPO_DISCOVERY' % __name__)
-        self.debug_log.setLevel(logging.WARNING)
+        self.debug_log.setLevel(logging.DEBUG)
 
     def inject_packet(self, pkt):
         concrete_pkt = self.runtime.pyretic2concrete(pkt)
@@ -792,10 +797,20 @@ class ConcreteNetwork(Network):
     def handle_switch_join(self, switch):
         self.debug_log.debug("handle_switch_joins")
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
+        with self.update_no_lock:
+            self.update_no += 1
+            this_update_no = self.update_no
         self.topology.add_switch(switch)
         self.log.info("OpenFlow switch %s connected" % switch)
         self.debug_log.debug(str(self.topology))
-        self.update_network()
+        
+        def f():
+            time.sleep(self.wait_period)
+            if this_update_no == self.update_no:
+                self.update_network()
+
+        p = threading.Thread(target=f,args=())
+        p.start()
 
     def remove_associated_link(self,location):
         port = self.topology.node[location.switch]["ports"][location.port_no]
@@ -825,11 +840,21 @@ class ConcreteNetwork(Network):
         
     def handle_port_join(self, switch, port_no, config, status):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
+        with self.update_no_lock:
+            self.update_no += 1
+            this_update_no = self.update_no
         self.topology.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.topology))
-            self.update_network()
+
+            def f():
+                time.sleep(self.wait_period)
+                if this_update_no == self.update_no:
+                    self.update_network()
+
+        p = threading.Thread(target=f,args=())
+        p.start()
 
     def handle_port_part(self, switch, port_no):
         self.debug_log.debug("handle_port_parts")
@@ -843,6 +868,10 @@ class ConcreteNetwork(Network):
         
     def handle_port_mod(self, switch, port_no, config, status):
         self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
+        with self.update_no_lock:
+            self.update_no += 1
+            this_update_no = self.update_no
+
         # GET PREV VALUES
         try:
             prev_config = self.topology.node[switch]["ports"][port_no].config
@@ -866,6 +895,9 @@ class ConcreteNetwork(Network):
             self.port_up(switch, port_no)
 
     def port_up(self, switch, port_no):
+        with self.update_no_lock:
+            self.update_no += 1
+            this_update_no = self.update_no
         self.debug_log.debug("port_up %s:%s" % (switch,port_no))
         self.inject_discovery_packet(switch,port_no)
         self.debug_log.debug(str(self.topology))
@@ -920,5 +952,16 @@ class ConcreteNetwork(Network):
             self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
+        with self.update_no_lock:
+            self.update_no += 1
+            this_update_no = self.update_no
+
         self.debug_log.debug(self.topology)
-        self.update_network()
+
+        def f():
+            time.sleep(self.wait_period)
+            if this_update_no == self.update_no:
+                self.update_network()
+
+        p = threading.Thread(target=f,args=())
+        p.start()
