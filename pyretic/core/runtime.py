@@ -761,6 +761,7 @@ import threading
 class ConcreteNetwork(Network):
     def __init__(self,runtime=None):
         super(ConcreteNetwork,self).__init__()
+        self.next_topo = self.topology.copy()
         self.runtime = runtime
         self.wait_period = 0.25
         self.update_no_lock = threading.Lock()
@@ -780,8 +781,12 @@ class ConcreteNetwork(Network):
     def queue_update(self,this_update_no):
         def f(this_update_no):
             time.sleep(self.wait_period)
-            if this_update_no == self.update_no:
-                self.runtime.update_network()
+            with self.update_no_lock:
+                if this_update_no != self.update_no:
+                    return
+
+            self.topology = self.next_topo.copy()
+            self.runtime.update_network()
 
         p = threading.Thread(target=f,args=(this_update_no,))
         p.start()
@@ -796,52 +801,52 @@ class ConcreteNetwork(Network):
         
     def handle_switch_join(self, switch):
         self.debug_log.debug("handle_switch_joins")
-        ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN TOPOLOGY
-        self.topology.add_switch(switch)
+        ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN NEXT_TOPO
+        self.next_topo.add_switch(switch)
         self.log.info("OpenFlow switch %s connected" % switch)
-        self.debug_log.debug(str(self.topology))
+        self.debug_log.debug(str(self.next_topo))
         
     def remove_associated_link(self,location):
-        port = self.topology.node[location.switch]["ports"][location.port_no]
+        port = self.next_topo.node[location.switch]["ports"][location.port_no]
         if not port.linked_to is None:
             # REMOVE CORRESPONDING EDGE
             try:      
-                self.topology.remove_edge(location.switch, port.linked_to.switch)
+                self.next_topo.remove_edge(location.switch, port.linked_to.switch)
             except:
                 pass  # ALREADY REMOVED
             # UNLINK LINKED_TO PORT
             try:      
-                self.topology.node[port.linked_to.switch]["ports"][port.linked_to.port_no].linked_to = None
+                self.next_topo.node[port.linked_to.switch]["ports"][port.linked_to.port_no].linked_to = None
             except KeyError:
                 pass  # LINKED TO PORT ALREADY DELETED
             # UNLINK SELF
-            self.topology.node[location.switch]["ports"][location.port_no].linked_to = None
+            self.next_topo.node[location.switch]["ports"][location.port_no].linked_to = None
         
     def handle_switch_part(self, switch):
         self.log.info("OpenFlow switch %s disconnected" % switch)
         self.debug_log.debug("handle_switch_parts")
         # REMOVE ALL ASSOCIATED LINKS
-        for port_no in self.topology.node[switch]["ports"].keys():
+        for port_no in self.next_topo.node[switch]["ports"].keys():
             self.remove_associated_link(Location(switch,port_no))
-        self.topology.remove_node(switch)
-        self.debug_log.debug(str(self.topology))
+        self.next_topo.remove_node(switch)
+        self.debug_log.debug(str(self.next_topo))
         self.queue_update(self.get_update_no())
         
     def handle_port_join(self, switch, port_no, config, status):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         this_update_no = self.get_update_no()
-        self.topology.add_port(switch,port_no,config,status)
+        self.next_topo.add_port(switch,port_no,config,status)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
-            self.debug_log.debug(str(self.topology))
+            self.debug_log.debug(str(self.next_topo))
             self.queue_update(this_update_no)
             
     def handle_port_part(self, switch, port_no):
         self.debug_log.debug("handle_port_parts")
         try:
             self.remove_associated_link(Location(switch,port_no))
-            del self.topology.node[switch]["ports"][port_no]
-            self.debug_log.debug(str(self.topology))
+            del self.next_topo.node[switch]["ports"][port_no]
+            self.debug_log.debug(str(self.next_topo))
             self.queue_update(self.get_update_no())
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
@@ -850,16 +855,16 @@ class ConcreteNetwork(Network):
         self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
         # GET PREV VALUES
         try:
-            prev_config = self.topology.node[switch]["ports"][port_no].config
-            prev_status = self.topology.node[switch]["ports"][port_no].status
+            prev_config = self.next_topo.node[switch]["ports"][port_no].config
+            prev_status = self.next_topo.node[switch]["ports"][port_no].status
         except KeyError:
             self.log.warning("KeyError CASE!!!!!!!!")
             self.port_down(switch, port_no)
             return
 
         # UPDATE VALUES
-        self.topology.node[switch]["ports"][port_no].config = config
-        self.topology.node[switch]["ports"][port_no].status = status
+        self.next_topo.node[switch]["ports"][port_no].config = config
+        self.next_topo.node[switch]["ports"][port_no].status = status
 
         # DETERMINE IF/WHAT CHANGED
         if (prev_config and not config):
@@ -874,14 +879,14 @@ class ConcreteNetwork(Network):
         this_update_no = self.get_update_no()
         self.debug_log.debug("port_up %s:%s" % (switch,port_no))
         self.inject_discovery_packet(switch,port_no)
-        self.debug_log.debug(str(self.topology))
+        self.debug_log.debug(str(self.next_topo))
         self.queue_update(this_update_no)
 
     def port_down(self, switch, port_no, double_check=False):
         self.debug_log.debug("port_down %s:%s:double_check=%s" % (switch,port_no,double_check))
         try:
             self.remove_associated_link(Location(switch,port_no))
-            self.debug_log.debug(str(self.topology))
+            self.debug_log.debug(str(self.next_topo))
             self.queue_update(self.get_update_no())
             if double_check: self.inject_discovery_packet(switch,port_no)
         except KeyError:  
@@ -890,15 +895,15 @@ class ConcreteNetwork(Network):
     def handle_link_update(self, s1, p_no1, s2, p_no2):
         self.debug_log.debug("handle_link_updates")
         try:
-            p1 = self.topology.node[s1]["ports"][p_no1]
-            p2 = self.topology.node[s2]["ports"][p_no2]
+            p1 = self.next_topo.node[s1]["ports"][p_no1]
+            p2 = self.next_topo.node[s2]["ports"][p_no2]
         except KeyError:
             self.log.warning("node doesn't yet exist")
-            return  # at least one of these ports isn't (yet) in the topology
+            return  # at least one of these ports isn't (yet) in the next_topo
 
         # LINK ALREADY EXISTS
         try:
-            link = self.topology[s1][s2]
+            link = self.next_topo[s1][s2]
 
             # LINK ON SAME PORT PAIR
             if link[s1] == p_no1 and link[s2] == p_no2:         
@@ -921,10 +926,10 @@ class ConcreteNetwork(Network):
         
         # ADD LINK IF PORTS ARE UP
         if p1.possibly_up() and p2.possibly_up():
-            self.topology.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
-            self.topology.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
-            self.topology.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
+            self.next_topo.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
+            self.next_topo.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
+            self.next_topo.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
-        self.debug_log.debug(self.topology)
+        self.debug_log.debug(self.next_topo)
         self.queue_update(self.get_update_no())
