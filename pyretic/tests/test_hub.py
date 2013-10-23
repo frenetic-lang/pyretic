@@ -64,9 +64,6 @@ def test_hub_r0(init):
     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m r0')
 def test_hub_p0(init):
     utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p0')
-def test_hub_p1(init):
-    utils.run_test(test_hub, init.test_dir, init.benchmark_dir, '-m p1')
-
 
 ### Executing this file starts the mininet instance for this test.
 
