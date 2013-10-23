@@ -694,21 +694,6 @@ class intersection(sequential,Filter):
             raise TypeError
 
 
-class dropped_by(CombinatorPolicy,Filter):
-    def __init__(self, dropper):
-        super(dropped_by,self).__init__([dropper])
-
-    def eval(self, pkt):
-        if self.policies[0].eval(pkt):
-            return set()
-        else:
-            return {pkt}
-
-    def compile(self):
-        r = Rule(identity,[Controller])
-        return Classifier([r])
-
-
 ################################################################################
 # Derived Policies                                                             #
 ################################################################################
@@ -742,14 +727,6 @@ class difference(DerivedPolicy,Filter):
     def __repr__(self):
         return "difference:\n%s" % util.repr_plus([self.f1,self.f2])
 
-
-class match_modify(DerivedPolicy):
-    def __init__(self, field, match_val, mod_val):
-        self.field = field
-        self.match_val = match_val
-        self.mod_val = mod_val
-        super(match_modify,self).__init__(match(field=match_val) >>
-                                          modify(field=mod_val))
 
 class if_(DerivedPolicy):
     """if predicate holds, t_branch, otherwise f_branch."""
@@ -795,12 +772,6 @@ class xfwd(DerivedPolicy):
 
     def __repr__(self):
         return "xfwd %s" % self.outport
-
-
-class recurse(DerivedPolicy):
-    """A policy that can refer to itself w/o causing the runtime/compiler to die."""
-    def __repr__(self):
-        return "[recurse]:\n%s" % repr(self.policy)
 
 
 ################################################################################
