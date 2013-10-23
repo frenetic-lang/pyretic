@@ -59,16 +59,6 @@ class Policy(object):
     """Top-level abstract class for policies.
     All Pyretic policies evaluate on a single packet and return a set of packets.
     """
-    def __init__(self):
-        self._network = None
-
-    @property
-    def network(self):
-        return self._network
-
-    def set_network(self, network):
-        self._network = network
-
     ### add : Policy -> Policy
     def __add__(self, pol):
         if isinstance(pol,parallel):
@@ -542,11 +532,6 @@ class CombinatorPolicy(Policy):
         self.policies = list(policies)
         super(CombinatorPolicy,self).__init__()
 
-    def set_network(self, network):
-        super(CombinatorPolicy,self).set_network(network)
-        for policy in self.policies:
-            policy.set_network(network)
-
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
 
@@ -734,10 +719,6 @@ class DerivedPolicy(Policy):
         self.policy = policy
         super(DerivedPolicy,self).__init__()
 
-    def set_network(self, network):
-        super(DerivedPolicy,self).set_network(network)
-        self.policy.set_network(network)
-
     def eval(self, pkt):
         return self.policy.eval(pkt)
 
@@ -818,11 +799,6 @@ class xfwd(DerivedPolicy):
 
 class recurse(DerivedPolicy):
     """A policy that can refer to itself w/o causing the runtime/compiler to die."""
-    def set_network(self, network):
-        if network == self.policy._network:
-            return
-        super(recurse,self).set_network(network)
-
     def __repr__(self):
         return "[recurse]:\n%s" % repr(self.policy)
 
@@ -840,6 +816,9 @@ class DynamicPolicy(DerivedPolicy):
         self._policy = policy
         self.notify = None
         super(DerivedPolicy,self).__init__()
+
+    def set_network(self, network):
+        pass
 
     def attach(self,notify):
         self.notify = notify
@@ -859,10 +838,6 @@ class DynamicPolicy(DerivedPolicy):
     def policy(self, policy):
         prev_policy = self._policy
         self._policy = policy
-        if self.network:
-            if (not self._policy.network or
-                (self.network.topology != self._policy.network.topology)):
-                self._policy.set_network(self.network)
         self.changed(self,prev_policy,policy)
 
     def __repr__(self):
@@ -882,7 +857,6 @@ class flood(DynamicPolicy):
 
     def set_network(self, network):
         changed = False
-        super(flood,self).set_network(network)
         if not network is None:
             updated_mst = Topology.minimum_spanning_tree(network.topology)
             if not self.mst is None:
@@ -913,7 +887,6 @@ class ingress_network(DynamicFilter):
         super(ingress_network,self).__init__()
 
     def set_network(self, network):
-        super(ingress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
@@ -933,7 +906,6 @@ class egress_network(DynamicFilter):
         super(egress_network,self).__init__()
 
     def set_network(self, network):
-        super(egress_network,self).set_network(network)
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses

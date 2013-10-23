@@ -122,7 +122,8 @@ class Runtime(object):
                 self.prev_network = self.network.copy()
 
                 with self.policy_lock:
-                    self.policy.set_network(self.prev_network)
+                    for policy in self.dynamic_sub_pols:
+                        policy.set_network(self.network)
                     self.update_dynamic_sub_pols()
                     classifier = None
                     if self.mode == 'proactive0' or self.mode == 'proactive1':
@@ -150,6 +151,7 @@ class Runtime(object):
         for p in (old_dynamic_sub_pols - self.dynamic_sub_pols):
             p.detach()
         for p in (self.dynamic_sub_pols - old_dynamic_sub_pols):
+            p.set_network(self.network)
             p.attach(self.handle_policy_change)
 
 
