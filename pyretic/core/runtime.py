@@ -398,12 +398,11 @@ class Runtime(object):
             import copy
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
-                phys_outports = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
+                    phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
+                    outports_used = map(lambda a: a['outport'], phys_actions)
                     switch = rule.match['switch']
-                    phys_outports = switch_to_attrs[switch]['ports'].keys()
-                    for outport in phys_outports:
+                    for outport in outports_used:
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
                         new_actions = copy.deepcopy(rule.actions)
