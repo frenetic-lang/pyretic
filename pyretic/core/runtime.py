@@ -189,7 +189,7 @@ class Runtime(object):
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (concrete_pred,0,action_list)
+            return (concrete_pred,0,action_list,self.default_cookie)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -216,7 +216,7 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (concrete_pred,0,action_list)
+        return (concrete_pred,0,action_list,self.default_cookie)
 
 #########################
 # PROACTIVE COMPILATION 
@@ -424,10 +424,16 @@ class Runtime(object):
             return Classifier(crs)
 
         def portize(classifier,switch_to_attrs):
+            # The invariant expected for actions in the classifier in this
+            # function is that they are either forwarding actions, or
+            # CountBucket objects.
             import copy
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
+                phys_actions = filter(lambda a: not isinstance(a,CountBucket)
+                                      and a['outport'] != OFPP_CONTROLLER
+                                      and a['outport'] != OFPP_IN_PORT,
+                                      rule.actions)
                 phys_outports = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
                     switch = rule.match['switch']
@@ -435,14 +441,21 @@ class Runtime(object):
                     for outport in phys_outports:
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
-                        new_actions = copy.deepcopy(rule.actions)
-                        for action in new_actions:
-                            try:
-                                if action['outport'] == outport:
-                                    action['outport'] = OFPP_IN_PORT
-                            except:
-                                raise TypeError  # INVARIANT: every set of actions must go out a port
-                            # this may not hold when we move to OF 1.3
+                        new_actions = []
+                        for act in rule.actions:
+                            if not isinstance(act, CountBucket):
+                                # INVARIANT: every set of actions must go out a
+                                # port. This may not hold when we move to OF
+                                # 1.3.
+                                assert 'outport' in act
+                                if act['outport'] == outport:
+                                    new_act = copy.deepcopy(act)
+                                    new_act['outport'] = OFPP_IN_PORT
+                                    new_actions.append(new_act)
+                                else:
+                                    new_actions.append(act)
+                            else:
+                                new_actions.append(act)
                         specialized_rules.append(Rule(new_match,new_actions))
                 specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -671,7 +684,8 @@ class Runtime(object):
             already_queried = self.add_global_outstanding_query(s, bucket)
             if not already_queried:
                 self.request_flow_stats(s)
-                self.log.debug('in pull_stats: sent out stats query to switch '
+                # TODO(ngsrinivas): revert to self.log.debug after debugging
+                self.log.error('in pull_stats: sent out stats query to switch '
                                + str(s))
 
     def pull_stats_for_bucket(self,bucket):
@@ -793,7 +807,9 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
+                                   [{'outport' : OFPP_CONTROLLER}],
+                                   self.default_cookie))
         p = Process(target=f)
         p.daemon = True
         p.start()
@@ -856,7 +872,8 @@ class Runtime(object):
         return output
 
     def handle_flow_stats_reply(self, switch, flow_stats):
-        self.log.debug('received a flow stats reply from switch ' + str(switch))
+        # TODO(ngsrinivas): revert to self.log.debug after debugging
+        self.log.error('received a flow stats reply from switch ' + str(switch))
         flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]
@@ -870,7 +887,8 @@ class Runtime(object):
                 for bucket in self.global_outstanding_queries[switch]:
                     bucket.handle_flow_stats_reply(switch, flow_stats)
                 del self.global_outstanding_queries[switch]
-            self.log.debug('in stats_reply: outstanding switches is now:' +
+            # TODO(ngsrinivas): revert to self.log.debug after debugging
+            self.log.error('in stats_reply: outstanding switches is now:' +
                            str(self.global_outstanding_queries) )
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
