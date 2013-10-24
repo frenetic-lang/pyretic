@@ -628,6 +628,9 @@ class Runtime(object):
                     self.modify_rule(rule)
             for s in switches:
                 self.send_barrier(s)
+                print '------------------------ issued test request ---------------------'
+                self.request_flow_stats(s)
+
 
         ### PROCESS THAT DOES INSTALL
 
