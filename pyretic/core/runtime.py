@@ -591,7 +591,7 @@ class Runtime(object):
                 for rule in to_delete:
                     self.old_rules.remove(rule)
                 for rule in to_add:
-                    self.old_rules.add(rule)
+                    self.old_rules.append(rule)
                 # see note above where to_modify* lists are populated.
                 for rule in to_modify:
                     to_add.remove(rule)
@@ -628,8 +628,6 @@ class Runtime(object):
                     self.modify_rule(rule)
             for s in switches:
                 self.send_barrier(s)
-                print '------------------------ issued test request ---------------------'
-                self.request_flow_stats(s)
 
 
         ### PROCESS THAT DOES INSTALL

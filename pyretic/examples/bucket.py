@@ -129,4 +129,4 @@ def test_main5():
     return (matched_traffic >> test_bucket)
 
 def main():
-    return test_main1() + mac_learner()
+    return test_main1() + fwding

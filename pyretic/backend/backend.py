@@ -107,6 +107,7 @@ class BackendChannel(asynchat.async_chat):
             packet = msg[1]
             self.backend.runtime.handle_packet_in(packet)
         elif msg[0] == 'flow_stats_reply':
+            print "INFO:Backend: Received a flow_stats_reply from pox_client"
             self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])
         elif msg[0] == 'flow_removed':
             self.backend.runtime.handle_flow_removed(msg[1], msg[2])
