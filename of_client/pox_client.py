@@ -58,7 +58,7 @@ class BackendChannel(asynchat.async_chat):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connect((host, port))
         self.ac_in_buffer_size = 4096 * 3
-        self.ac_out_buffer_size = 4096 * 3
+        self.ac_out_buffer_size = 4096 * 30
         self.set_terminator(TERM_CHAR)
         return
 
@@ -500,9 +500,6 @@ class POXClient(revent.EventMixin):
         self.switches[switch]['connection'].send(b) 
 
     def flow_stats_request(self,switch):
-        # TODO(ngsrinivas): add debug logging/remove print after debugging
-        print "INFO:Pox_client: Got flow stats request from pyretic for switch",
-        print switch
         sr = of.ofp_stats_request()
         sr.body = of.ofp_flow_stats_request()
         match = of.ofp_match()
@@ -511,8 +508,6 @@ class POXClient(revent.EventMixin):
         sr.body.out_port = of.OFPP_NONE
         try:
             self.switches[switch]['connection'].send(sr)
-            # TODO(ngsrinivas): add debug logging/remove print after debugging
-            print "INFO:Pox_client: Sent flow stats request on switch connection."
         except KeyError, e:
             print ( ("ERROR:flow_stats_request: No connection to switch %d" +
                      " available") % switch )
@@ -617,7 +612,6 @@ class POXClient(revent.EventMixin):
 
     def _handle_FlowStatsReceived (self, event):
         dpid = event.connection.dpid
-        print "INFO:Pox_client: Received flow stats from switch", dpid
         def handle_ofp_flow_stat(flow_stat):
             flow_stat_dict = {}
             flow_stat_dict['table_id'] = flow_stat.table_id 

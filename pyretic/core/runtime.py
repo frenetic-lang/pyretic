@@ -685,8 +685,7 @@ class Runtime(object):
             already_queried = self.add_global_outstanding_query(s, bucket)
             if not already_queried:
                 self.request_flow_stats(s)
-                # TODO(ngsrinivas): revert to self.log.debug after debugging
-                self.log.error('in pull_stats: sent out stats query to switch '
+                self.log.debug('in pull_stats: sent out stats query to switch '
                                + str(s))
 
     def pull_stats_for_bucket(self,bucket):
@@ -873,8 +872,7 @@ class Runtime(object):
         return output
 
     def handle_flow_stats_reply(self, switch, flow_stats):
-        # TODO(ngsrinivas): revert to self.log.debug after debugging
-        self.log.error('received a flow stats reply from switch ' + str(switch))
+        self.log.debug('received a flow stats reply from switch ' + str(switch))
         flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]
@@ -888,8 +886,7 @@ class Runtime(object):
                 for bucket in self.global_outstanding_queries[switch]:
                     bucket.handle_flow_stats_reply(switch, flow_stats)
                 del self.global_outstanding_queries[switch]
-            # TODO(ngsrinivas): revert to self.log.debug after debugging
-            self.log.error('in stats_reply: outstanding switches is now:' +
+            self.log.debug('in stats_reply: outstanding switches is now:' +
                            str(self.global_outstanding_queries) )
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
