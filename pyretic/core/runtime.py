@@ -77,6 +77,11 @@ class Runtime(object):
 ######################
 
     def handle_packet_in(self, concrete_pkt):
+        """The packet interpreter.
+        
+        :param concrete_packet: the packet to be interpreted.
+        :type limit: payload of an OpenFlow packet_in message.
+        """
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
@@ -104,6 +109,9 @@ class Runtime(object):
 #############
 
     def handle_policy_change(self, changed, old, new):
+        """Updates switch classifiers when some sub-policy in 
+        self.policy changes.
+        """
         if self.in_update_network:
             return
 
