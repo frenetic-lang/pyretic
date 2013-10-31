@@ -534,7 +534,7 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
-        def portize(classifier,switch_to_attrs):
+        def OF_inportize(classifier):
             """
             Specialize classifier to ensure that packets to be forwarded 
             out the inport on which they arrived are handled correctly.
@@ -545,25 +545,42 @@ class Runtime(object):
             :rtype: Classifier
             """
             import copy
+            def specialize_actions(actions,outport):
+                new_actions = copy.deepcopy(actions)
+                for action in new_actions:
+                    try:
+                        if action['outport'] == outport:
+                            action['outport'] = OFPP_IN_PORT
+                    except:
+                        raise TypeError  # INVARIANT: every set of actions must go out a port
+                                         # this may not hold when we move to OF 1.3
+                return new_actions
+
             specialized_rules = []
             for rule in classifier.rules:
+                phys_actions = filter(lambda a: (a['outport'] != OFPP_CONTROLLER 
+                                                 and a['outport'] != OFPP_IN_PORT),
+                                      rule.actions)
+                outports_used = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
-                    phys_actions = filter(lambda a: a['outport'] != OFPP_CONTROLLER and a['outport'] != OFPP_IN_PORT,rule.actions)
-                    outports_used = map(lambda a: a['outport'], phys_actions)
+                    # Add a modified rule for each of the outports_used
                     switch = rule.match['switch']
                     for outport in outports_used:
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
-                        new_actions = copy.deepcopy(rule.actions)
-                        for action in new_actions:
-                            try:
-                                if action['outport'] == outport:
-                                    action['outport'] = OFPP_IN_PORT
-                            except:
-                                raise TypeError  # INVARIANT: every set of actions must go out a port
-                            # this may not hold when we move to OF 1.3
+                        new_actions = specialize_actions(rule.actions,outport)
                         specialized_rules.append(Rule(new_match,new_actions))
-                specialized_rules.append(rule)
+                    # And a default rule for any inport outside the set of outports_used
+                    specialized_rules.append(rule)
+                else:
+                    if rule.match['inport'] in outports_used:
+                        # Modify the set of actions
+                        new_actions = specialize_actions(rule.actions,rule.match['inport'])
+                        specialized_rules.append(Rule(rule.match,new_actions))
+                    else:
+                        # Leave as before
+                        specialized_rules.append(rule)
+
             return Classifier(specialized_rules)
 
         def prioritize(classifier):
@@ -601,7 +618,7 @@ class Runtime(object):
             switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
-            classifier = portize(classifier,switch_to_attrs)
+            classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
 
             for s in switches:
@@ -643,7 +660,7 @@ class Runtime(object):
                 switches = switch_to_attrs.keys()
                 classifier = switchify(classifier,switches)
                 classifier = concretize(classifier)
-                classifier = portize(classifier,switch_to_attrs)
+                classifier = OF_inportize(classifier)
                 new_rules = prioritize(classifier)
 
                 # calculate diff
