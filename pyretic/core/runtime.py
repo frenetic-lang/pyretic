@@ -124,7 +124,7 @@ class Runtime(object):
 # DYNAMICS  
 #############
 
-    def handle_policy_change(self,changed,old,new):
+    def handle_policy_change(self):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         some sub-policy in self.policy changes.

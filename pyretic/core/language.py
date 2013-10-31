@@ -1062,9 +1062,9 @@ class DynamicPolicy(DerivedPolicy):
     def detach(self):
         self.notify = None
 
-    def changed(self,changed,old,new):
+    def changed(self):
         if self.notify:
-            self.notify(changed,old,new)
+            self.notify()
 
     @property
     def policy(self):
@@ -1074,7 +1074,7 @@ class DynamicPolicy(DerivedPolicy):
     def policy(self, policy):
         prev_policy = self._policy
         self._policy = policy
-        self.changed(self,prev_policy,policy)
+        self.changed()
 
     def __repr__(self):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
