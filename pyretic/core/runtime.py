@@ -566,7 +566,7 @@ class Runtime(object):
                 specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def prioritize(classifier,switches):
+        def prioritize(classifier):
             """
             Add priorities to classifier rules based on their ordering.
             
@@ -576,13 +576,14 @@ class Runtime(object):
             :rtype: Classifier
             """
             priority = {}
-            for s in switches:
-                priority[s] = 60000
             tuple_rules = list()
             for rule in classifier.rules:
                 s = rule.match['switch']
+                try:
+                    priority[s] -= 1
+                except KeyError:
+                    priority[s] = 60000
                 tuple_rules.append((rule.match,priority[s],rule.actions))
-                priority[s] -= 1
             return tuple_rules
 
         ### UPDATE LOGIC
@@ -601,7 +602,7 @@ class Runtime(object):
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
             classifier = portize(classifier,switch_to_attrs)
-            new_rules = prioritize(classifier,switches)
+            new_rules = prioritize(classifier)
 
             for s in switches:
                 self.send_barrier(s)
@@ -643,7 +644,7 @@ class Runtime(object):
                 classifier = switchify(classifier,switches)
                 classifier = concretize(classifier)
                 classifier = portize(classifier,switch_to_attrs)
-                new_rules = prioritize(classifier,switches)
+                new_rules = prioritize(classifier)
 
                 # calculate diff
                 to_add = list()
