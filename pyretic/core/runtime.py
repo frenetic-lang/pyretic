@@ -83,6 +83,11 @@ class Runtime(object):
 ######################
 
     def handle_packet_in(self, concrete_pkt):
+        """The packet interpreter.
+        
+        :param concrete_packet: the packet to be interpreted.
+        :type limit: payload of an OpenFlow packet_in message.
+        """
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
@@ -110,6 +115,9 @@ class Runtime(object):
 #############
 
     def handle_policy_change(self, changed, old, new):
+        """Updates switch classifiers when some sub-policy in 
+        self.policy changes.
+        """
         if self.in_update_network:
             return
 
@@ -430,15 +438,14 @@ class Runtime(object):
             import copy
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: not isinstance(a,CountBucket)
-                                      and a['outport'] != OFPP_CONTROLLER
-                                      and a['outport'] != OFPP_IN_PORT,
-                                      rule.actions)
-                phys_outports = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
+                    phys_actions = filter(lambda a: not isinstance(a,CountBucket)
+                                          and a['outport'] != OFPP_CONTROLLER
+                                          and a['outport'] != OFPP_IN_PORT,
+                                          rule.actions)
+                    outports_used = map(lambda a: a['outport'], phys_actions)
                     switch = rule.match['switch']
-                    phys_outports = switch_to_attrs[switch]['ports'].keys()
-                    for outport in phys_outports:
+                    for outport in outports_used:
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
                         new_actions = []

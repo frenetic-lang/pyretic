@@ -26,12 +26,18 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-"""Pyretic Query Library"""
 from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
 import time
 from threading import Thread
 
 class LimitFilter(DynamicFilter):
+    """A DynamicFilter that matches the first limit packets in a specified grouping.
+
+    :param limit: the number of packets to be matched in each grouping.
+    :type limit: int
+    :param group_by: the fields by which to group packets.
+    :type group_by: list string
+    """
     def __init__(self,limit=None,group_by=[]):
         self.limit = limit
         self.group_by = group_by
@@ -61,14 +67,13 @@ class LimitFilter(DynamicFilter):
 
 
 class packets(DerivedPolicy):
-    """Effectively a FwdBucket which calls back all registered routines on each 
-    packet evaluated.
-    A positive integer limit will cause callback to cease after limit packets of
-    a given group have been seen.  group_by defines the set of headers used for 
-    grouping - two packets are in the same group if they match on all headers in the
-    group_by.  If no group_by is specified, the default is to match on all available
-    headers."""
+    """A FwdBucket preceeded by a LimitFilter.
 
+    :param limit: the number of packets to be matched in each grouping.
+    :type limit: int
+    :param group_by: the fields by which to group packets.
+    :type group_by: list string
+    """
     def __init__(self,limit=None,group_by=[]):
         self.fb = FwdBucket()
         self.register_callback = self.fb.register_callback
