@@ -38,6 +38,21 @@ from datetime import datetime
 TABLE_MISS_PRIORITY = 0
 
 class Runtime(object):
+    """
+    The Runtime system.  Includes packet handling, compilation to OF switches,
+    topology maintenance, dynamic update of policies, querying support, etc.
+    
+    :param backend: handles the connection to switches
+    :type backend: Backend
+    :param main: the program to run
+    :type main: pyretic program (.py)
+    :param kwargs: arguments to main
+    :type kwargs: dict from strings to values
+    :param mode: one of interpreted/i, reactive0/r0, proactive0/p0
+    :type mode: string
+    :param verbosity: one of low, normal, high, please-make-it-stop
+    :type verbosity: string
+    """
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
@@ -77,7 +92,8 @@ class Runtime(object):
 ######################
 
     def handle_packet_in(self, concrete_pkt):
-        """The packet interpreter.
+        """
+        The packet interpreter.
         
         :param concrete_packet: the packet to be interpreted.
         :type limit: payload of an OpenFlow packet_in message.
@@ -108,9 +124,10 @@ class Runtime(object):
 # DYNAMICS  
 #############
 
-    def handle_policy_change(self, changed, old, new):
-        """Updates switch classifiers when some sub-policy in 
-        self.policy changes.
+    def handle_policy_change(self,changed,old,new):
+        """
+        Updates runtime behavior (both interpreter and switch classifiers)
+        some sub-policy in self.policy changes.
         """
         if self.in_update_network:
             return
@@ -123,7 +140,11 @@ class Runtime(object):
 
         self.update_switches(classifier)
           
-    def update_network(self):
+    def handle_network_change(self):
+        """
+        Updates runtime behavior (both interpreter and switch classifiers)
+        when the concrete network topology changes.
+        """
         with self.network_lock:
             if self.network.topology != self.prev_network.topology:
                 self.in_update_network = True
@@ -142,6 +163,12 @@ class Runtime(object):
                 self.in_update_network = False
 
     def update_switches(self,classifier):
+        """
+        Updates switch tables based on input classifier
+
+        :param classifier: the input classifier
+        :type classifier: Classifier
+        """
         if self.mode == 'reactive0':
             self.clear_all() 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
@@ -153,6 +180,9 @@ class Runtime(object):
             self.install_classifier(classifier)
 
     def update_dynamic_sub_pols(self):
+        """
+        Updates the set of active dynamic sub-policies in self.policy
+        """
         import copy
         old_dynamic_sub_pols = copy.copy(self.dynamic_sub_pols)
         self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, set(), self.policy)
@@ -168,6 +198,14 @@ class Runtime(object):
 #######################
 
     def reactive0_install(self,in_pkt,out_pkts):
+        """
+        Reactively installs switch table entries based on a given policy evaluation.
+
+        :param in_pkt: the input on which the policy was evaluated
+        :type in_pkt: Packet
+        :param out_pkts: the output of the evaluation
+        :type out_pkts: set Packet
+        """
         rule_tuple = self.match_on_all_fields_rule_tuple(in_pkt,out_pkts)
         if rule_tuple:
             self.install_rule(rule_tuple)
@@ -178,6 +216,14 @@ class Runtime(object):
                                               'actions='+repr(rule_tuple[2])))
 
     def match_on_all_fields(self, pkt):
+        """
+        Produces a concrete predicate exactly matching a given packet.
+
+        :param pkt: the packet to match
+        :type pkt: Packet
+        :returns: an exact-match predicate 
+        :rtype: dict of strings to values
+        """        
         pred = pkt.copy()
         del pred['header_len']
         del pred['payload_len']
@@ -185,6 +231,17 @@ class Runtime(object):
         return pred
 
     def match_on_all_fields_rule_tuple(self, pkt_in, pkts_out):
+        """
+        Produces a rule tuple exactly matching a given packet 
+        and outputing a given set of packets..
+
+        :param pkt_in: the input packet
+        :type pkt_in: Packet
+        :param pkts_out: the output packets
+        :type pkts_out: set Packet
+        :returns: an exact-match (microflow) rule 
+        :rtype: (dict of strings to values, int, list int)
+        """        
         concrete_pkt_in = self.pyretic2concrete(pkt_in)
         concrete_pred = self.match_on_all_fields(concrete_pkt_in)
         action_list = []
@@ -226,34 +283,58 @@ class Runtime(object):
 #########################
 
     def install_classifier(self, classifier):
+        """
+        Proactively installs switch table entries based on the input classifier
+
+        :param classifier: the input classifer
+        :type classifier: Classifier
+        """
         if classifier is None:
             return
 
         ### CLASSIFIER TRANSFORMS 
 
         def remove_drop(classifier):
+            """
+            Removes drop policies from the action list.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != drop,rule.actions))
                               for rule in classifier.rules)
 
         def remove_identity(classifier):
+            """
+            Removes identity policies from the action list.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             # DISCUSS (cole): convert identity to inport rather
             # than drop?
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != identity,rule.actions))
                               for rule in classifier.rules)
-
-        def send_drops_to_controller(classifier):
-            def replace_empty_with_controller(actions):
-                if len(actions) == 0:
-                    return [Controller]
-                else:
-                    return actions
-            return Classifier(Rule(rule.match,
-                                   replace_empty_with_controller(rule.actions))
-                              for rule in classifier.rules)
                 
         def controllerify(classifier):
+            """
+            Replaces each rule whose actions includes a send to controller action
+            with one whose sole action sends packets to the controller. (Thereby
+            avoiding the tricky situation of needing to determine whether a given 
+            packet reached the controller b/c that packet is being forwarded to a 
+            query bucket or b/c corresponding rules haven't yet been installed.
+                        
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             def controllerify_rule(rule):
                 if reduce(lambda acc, a: acc | (a == Controller),rule.actions,False):
                     # DISCUSS (cole): should other actions be taken at the switch
@@ -266,8 +347,14 @@ class Runtime(object):
                               for rule in classifier.rules)
 
         def vlan_specialize(classifier):
-            """Add Openflow's "default" VLAN match to identify packets which
+            """
+            Add Openflow's "default" VLAN match to identify packets which
             don't have any VLAN tags on them.
+
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
             """
             specialized_rules = []
             default_vlan_match = match(vlan_id=0xFFFF, vlan_pcp=0)
@@ -282,8 +369,18 @@ class Runtime(object):
             return Classifier(specialized_rules)
 
         def layer_3_specialize(classifier):
+            """
+            Specialize a layer-3 rule to several rules that match on layer-2 fields.
+            OpenFlow requires a layer-3 match to match on layer-2 ethtype.  Also, 
+            make sure that LLDP packets are reserved for use by the runtime.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             specialized_rules = []
-            #Add a rule that routes the LLDP messages to the controller for topology maintenance.
+            # Add a rule that routes the LLDP messages to the controller for topology maintenance.
             specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
             for rule in classifier.rules:
                 if ( isinstance(rule.match, match) and
@@ -309,13 +406,20 @@ class Runtime(object):
             return Classifier(specialized_rules)
 
         def bookkeep_buckets(classifier):
-            """Whenever rules are associated with counting buckets,
+            """
+            Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
             the pyretic level and are removed before installing rules.
+
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
             """
             def collect_buckets(rules):
-                """Scan classifier rules and collect distinct buckets into a
+                """
+                Scan classifier rules and collect distinct buckets into a
                 dictionary.
                 """
                 bucket_list = {}
@@ -356,6 +460,14 @@ class Runtime(object):
                 finish_update(bucket_list)
         
         def remove_buckets(classifier):
+            """
+            Remove CountBucket policies from classifier rule actions.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             return Classifier(Rule(rule.match,
                                    filter(lambda a: 
                                           not isinstance(a, CountBucket),
@@ -363,6 +475,18 @@ class Runtime(object):
                               for rule in classifier.rules)
 
         def switchify(classifier,switches):
+            """
+            Specialize a classifer to a set of switches.  Any rule that doesn't 
+            specify a match on switch is turned into a set of rules matching on
+            each switch respectively.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :param switches: the network switches
+            :type switches: set int
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             new_rules = list()
             for rule in classifier.rules:
                 if isinstance(rule.match, match) and 'switch' in rule.match.map:
@@ -377,6 +501,14 @@ class Runtime(object):
             return Classifier(new_rules)
 
         def concretize(classifier):
+            """
+            Convert policies into dictionaries.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             def concretize_rule_actions(rule):
                 def concretize_match(pred):
                     if pred == false:
@@ -403,6 +535,15 @@ class Runtime(object):
             return Classifier(crs)
 
         def portize(classifier,switch_to_attrs):
+            """
+            Specialize classifier to ensure that packets to be forwarded 
+            out the inport on which they arrived are handled correctly.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             import copy
             specialized_rules = []
             for rule in classifier.rules:
@@ -426,6 +567,14 @@ class Runtime(object):
             return Classifier(specialized_rules)
 
         def prioritize(classifier,switches):
+            """
+            Add priorities to classifier rules based on their ordering.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            :returns: the output classifier
+            :rtype: Classifier
+            """
             priority = {}
             for s in switches:
                 priority[s] = 60000
@@ -439,6 +588,13 @@ class Runtime(object):
         ### UPDATE LOGIC
 
         def nuclear_install(classifier):
+            """
+            Delete all rules currently installed on switches and then
+            install input classifier from scratch.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            """
             switch_attrs_tuples = self.network.topology.nodes(data=True)
             switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
             switches = switch_to_attrs.keys()
@@ -472,6 +628,13 @@ class Runtime(object):
             return None
 
         def install_diff_rules(classifier):
+            """
+            Calculate and install the difference between the input classifier
+            and the current switch tables.
+            
+            :param classifier: the input classifer
+            :type classifier: Classifier
+            """
             with self.old_rules_lock:
                 old_rules = self.old_rules
                 switch_attrs_tuples = self.network.topology.nodes(data=True)
@@ -548,7 +711,8 @@ class Runtime(object):
 ###################
 
     def pull_stats_for_bucket(self,bucket):
-        """Returns a function that can be used by counting buckets to
+        """
+        Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
             switch_list = []
@@ -793,7 +957,7 @@ class ConcreteNetwork(Network):
                     return
 
             self.topology = self.next_topo.copy()
-            self.runtime.update_network()
+            self.runtime.handle_network_change()
 
         p = threading.Thread(target=f,args=(this_update_no,))
         p.start()
