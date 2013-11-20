@@ -1,4 +1,3 @@
-
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -29,8 +28,11 @@
 ################################################################################
 
 import pyretic.core.util as util
+
 from pyretic.core.language import *
 from pyretic.core.network import *
+from pyretic.core.packet import *
+
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
@@ -791,6 +793,8 @@ class Runtime(object):
         return pyretic_packet.modifymany(d)
     def pyretic2concrete(self,packet):
         concrete_packet = {}
+        headers         = {}
+
         for header in ['switch','inport','outport']:
             try:
                 concrete_packet[header] = packet[header]
@@ -818,7 +822,6 @@ class Runtime(object):
             concrete_packet['vlan_pcp'] = vlan_pcp
         concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
-
 
 #######################
 # TO OPENFLOW         

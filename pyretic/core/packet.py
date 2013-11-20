@@ -1,5 +1,6 @@
 import pyretic.vendor
 from ryu.lib.packet import *
+from ryu.lib.packet import vlan
 
 import struct
 import re
@@ -10,6 +11,475 @@ from pyretic.core.network import IPAddr, EthAddr
 from pyretic.core import util
 
 from ryu.lib import addrconv
+
+["switch", "inport", "header_len", "payload_len", "srcmac", "dstmac", "ethtype", 'vlan_id', 'vlan_pcp', "ethtype", "srcip", "dstip", "protocol", "tos", "srcport", "dstport", "ethtype", "protocol", "srcip", "dstip", "raw"]
+
+__all__ = ['of_field', 'of_fields', 'get_packet_processor', 'Packet']
+_field_list = dict()
+
+IPV4 = 0x0800
+IPV6 = 0x86dd
+VLAN = 0x8100
+ARP  = 0x0806
+
+ICMP_PROTO = 1
+TCP_PROTO  = 6
+UDP_PROTO  = 17
+
+def arp_packet_gen():
+    pkt = packet.Packet()
+    pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", ARP))
+    pkt.protocols.append(arp.arp())
+
+    return pkt
+
+def ipv6_packet_gen():
+    pkt = packet.Packet()
+    pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", IPV6))
+    pkt.protocols.append(ipv6.ipv6(6, 0, 0, 0, 0, 0, '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:0'))
+
+    return pkt
+
+def udp_packet_gen():
+    pkt = packet.Packet()
+    pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", IPV4))
+    pkt.protocols.append(ipv4.ipv4(proto=UDP_PROTO))
+    pkt.protocols.append(udp.udp(0, 0))
+
+    return pkt
+
+def tcp_packet_gen():
+    pkt = packet.Packet()
+    pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", IPV4))
+    pkt.protocols.append(ipv4.ipv4(proto=TCP_PROTO))
+    pkt.protocols.append(tcp.tcp(0, 0, 0, 0, 0, 0, 0, 0, 0))
+
+    return pkt
+def icmp_packet_gen():
+    pkt = packet.Packet()
+    pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", IPV4))
+    pkt.protocols.append(ipv4.ipv4(proto=ICMP_PROTO))
+    pkt.protocols.append(icmp.icmp(0, 0, 0))
+
+    return pkt
+
+ethertype_packets = {
+    IPV4: {
+        ICMP_PROTO: icmp_packet_gen,
+        TCP_PROTO : tcp_packet_gen,
+        UDP_PROTO : udp_packet_gen
+    },
+    IPV6: ipv6_packet_gen,
+    ARP: arp_packet_gen
+}
+
+def build_empty_packet(ethertype, proto=None):
+    if ethertype:
+        pkt = ethertype_packets[ethertype]
+        if proto is not None and not callable(pkt): pkt = pkt[proto]
+
+
+        return pkt()
+
+    return packet.Packet()
+
+
+def of_fields(version="1.0"):
+    return _field_list[version]
+
+def get_protocol(ryu_pkt, protocol):
+    for idx, i in enumerate(ryu_pkt.protocols):
+        if hasattr(i, "protocol_name") and i.protocol_name==protocol:
+            return idx
+
+    return None
+
+################################################################################
+# Processor
+################################################################################
+class Processor(object):
+    def __init__(self):
+        pass
+
+    def compile(self):
+        fields = of_fields()
+        fields = [field() for _, field in fields.items()]
+
+        validators         = { field.validator.__class__.__name__: dict() for field in fields }
+
+        for field in fields:
+            exclusive_validators = validators[field.validator.__class__.__name__]
+            exclusive_validators.setdefault(field.validator, set())
+            exclusive_validators[field.validator].add(field)
+
+        def extract_exclusive_headers(ryu_pkt, exclusive_groups):
+                headers = {}
+                for validator, fields in exclusive_groups.items():
+                    if not iter(fields).next().is_valid(ryu_pkt):
+                        continue
+
+                    for field in fields:
+                        headers[field.pyretic_field] = field.decode(ryu_pkt)
+
+                    break
+
+                return headers
+
+        def pack_pyretic_headers(pyr_pkt, tmp_pkt, exclusive_groups):
+                headers = {}
+                for validator, fields in exclusive_groups.items():
+                    if not iter(fields).next().is_valid(pyr_pkt):
+                        continue
+
+                    for field in fields:
+                        field.encode_in_place(pyr_pkt, tmp_pkt)
+
+                    break
+
+                return pyr_pkt
+
+        def expand(ryu_pkt):
+            if not isinstance(ryu_pkt, packet.Packet):
+                ryu_pkt = packet.Packet(ryu_pkt)
+
+            headers = {}
+
+            for key, exclusive_groups in validators.items():
+                headers.update( extract_exclusive_headers(ryu_pkt, exclusive_groups) )
+
+            return headers
+
+        def contract(pyr_pkt):
+            pkt = packet.Packet(pyr_pkt['raw'])
+
+            if len(pyr_pkt['raw']) == 0:
+                pkt = build_empty_packet(pyr_pkt.get('ethtype', None), pyr_pkt.get('protocol', None))
+
+            def convert(h, v):
+                if isinstance(v, IPAddr):
+                    return str(v)
+                elif isinstance(v, EthAddr):
+                    return str(v)
+                else:
+                    return v
+
+            pyr_pkt = { h : convert(h, v) for h,v in pyr_pkt.items() }
+
+
+            for key, exclusive_groups in validators.items():
+                pack_pyretic_headers(pyr_pkt, pkt, exclusive_groups)
+
+            pkt.serialize()
+            pyr_pkt['raw'] = str(pkt.data)
+
+            return str(pkt.data)
+
+
+        setattr(self, 'unpack', expand)
+        setattr(self, 'pack', contract)
+
+        # Build the packet processor pipeline
+        return self
+
+
+################################################################################
+# Field Validators
+################################################################################
+class Validator(object):
+    __slots__ = ['value']
+
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.value == other.value
+
+    def __repr__(self):
+        return "%s: %s" % (self.__class__.__name__, self.value)
+
+    def __hash__(self):
+        return hash("%s_%s" % (self.__class__.__name__, self.value))
+
+    def __call__(self, obj, pkt):
+        if isinstance(pkt, packet.Packet):
+            return self.validate_ryu_packet(obj, pkt)
+
+        return self.validate_pyretic_packet(obj, pkt)
+
+class ProtocolValidator(Validator):
+    def validate_ryu_packet(self, obj, ryu_pkt):
+        try:
+            return obj.protocol(ryu_pkt, "ipv4").proto == self.value
+        except:
+            return False
+
+    def validate_pyretic_packet(self, obj, pkt):
+        try:
+            return pkt["protocol"] == self.value
+        except:
+            return False
+
+
+
+class EthertypeValidator(Validator):
+    def validate_ryu_packet(self, obj, ryu_pkt):
+        try:
+            layer = obj.protocol(ryu_pkt, "vlan")
+            if layer is None: layer = obj.protocol(ryu_pkt, "ethernet")
+            return layer.ethertype == self.value
+        except:
+            return False
+
+    def validate_pyretic_packet(self, obj, pkt):
+        try:
+            return pkt["ethtype"] == self.value
+        except:
+            return False
+
+class VlanValidator(Validator):
+    def __init__(self):
+        self.value = VLAN
+
+
+    def validate_ryu_packet(self, obj, ryu_pkt):
+        try:
+            return obj.protocol(ryu_pkt, "ethernet").ethertype == VLAN
+        except:
+            return False
+
+    def validate_pyretic_packet(self, obj, pkt):
+        if (not 'vlan_id' in pkt) and (not 'vlan_pcp' in pkt):
+            return True
+
+        try: return 'vlan_id' in pkt
+        except: return False
+
+        try: return 'vlan_pcp' in pkt
+        except: return False
+
+
+class TrueValidator(Validator):
+    def validate_ryu_packet(self, obj, ryu_pkt):
+        return True
+
+    def validate_pyretic_packet(self, obj, pkt):
+        return True
+
+def proto_validator(value):
+    return ProtocolValidator(value)
+
+def ether_validator(value):
+    return EthertypeValidator(value)
+
+def true_validator(*args, **kwargs):
+    return TrueValidator(True)
+
+def vlan_validator(*args, **kwargs):
+    return VlanValidator()
+
+
+################################################################################
+# Field definition and Decorators
+################################################################################
+def of_field(match="", pyretic_field="", validator=true_validator(), version="1.0"):
+    matches = match.split(".")
+
+    def _of_field(cls):
+        if len(matches) == 2: protocol, field = matches
+
+        def get_protocol(ryu_pkt, protocol):
+            for idx, i in enumerate(ryu_pkt.protocols):
+                if hasattr(i, "protocol_name") and i.protocol_name==protocol:
+                    return idx
+
+            return None
+
+        def _get_protocol(self, ryu_pkt, _protocol = None):
+            if _protocol is None:
+                _protocol = protocol
+
+            idx = get_protocol(ryu_pkt, _protocol)
+            if idx is None: return None
+
+            return ryu_pkt.protocols[idx]
+
+        def field_decode(self, ryu_pkt):
+            #if not self.is_valid(ryu_pkt): return None
+
+            layer = self.protocol(ryu_pkt)
+            if layer is None: return None
+
+            return getattr(layer, field)
+
+        def field_encode(self, pyretic_pkt):
+            pkt = packet.Packet(pyretic_pkt['raw'])
+
+            field_encode_in_place(self, pyretic_pkt, pkt)
+
+            pkt.serialize()
+            pyretic_pkt['raw'] = pkt.data
+
+            return pyretic_pkt
+
+        def field_encode_in_place(self, pyretic_pkt, pkt):
+            if not pyretic_field in pyretic_pkt: return pyretic_pkt
+
+            layer = self.protocol(pkt)
+            # Try to create the layer if it's not found
+            if layer is None: raise ValueError
+
+            setattr(layer, field, pyretic_pkt[pyretic_field])
+
+            return pyretic_pkt
+
+
+        def is_valid(self, ryu_pkt):
+            return self.validator(self, ryu_pkt)
+
+        # Add this field as an available field
+        _field_list.setdefault(version, dict())
+        _field_list[version][cls.__name__] = cls
+
+        # Augment field clss with proper attributes and methods
+        if not hasattr(cls, "protocol"): setattr(cls, "protocol", _get_protocol)
+        if not hasattr(cls, "validator"): setattr(cls, "validator", validator)
+        if not hasattr(cls, "is_valid"): setattr(cls, "is_valid", is_valid)
+        if not hasattr(cls, "decode"): setattr(cls, "decode", field_decode)
+        if not hasattr(cls, "encode"): setattr(cls, "encode", field_encode)
+        if not hasattr(cls, "encode_in_place"): setattr(cls, "encode_in_place", field_encode_in_place)
+        if not hasattr(cls, "pyretic_field"): setattr(cls, "pyretic_field", pyretic_field)
+
+        return cls
+
+    return _of_field
+
+@of_field("udp.dst_port", "dstport", proto_validator(UDP_PROTO), "1.0")
+class UdpDstPort(object): pass
+
+@of_field("udp.src_port", "srcport", proto_validator(UDP_PROTO), "1.0")
+class UdpSrcPort(object): pass
+
+@of_field("tcp.dst_port", "dstport", proto_validator(TCP_PROTO), "1.0")
+class TcpDstPort(object): pass
+
+@of_field("tcp.src_port", "srcport", proto_validator(TCP_PROTO), "1.0")
+class TcpSrcPort(object): pass
+
+@of_field("vlan.pcp", "vlan_pcp", vlan_validator(), "1.0")
+class VlanPcp(object):
+    def encode_in_place(self, pyr, pkt):
+        if (not 'vlan_id' in pyr and not 'vlan_pcp' in pyr and vlan.vlan in pkt):
+            for idx, proto in enumerate(pkt.protocols):
+                if isinstance(proto, vlan.vlan):
+                    pkt.protocols.pop(idx)
+
+            return pyr
+
+        if not 'vlan_pcp' in pyr:
+            return pyr
+
+        if not vlan.vlan in pkt:
+            pkt.protocols.insert(1, vlan.vlan(ethertype=pkt.protocols[0].ethertype))
+            pkt.protocols[0].ethertype = VLAN
+
+        gen = (protocol for protocol in pkt.protocols if protocol.__class__ == vlan.vlan)
+        vl = gen.next()
+        vl.pcp = pyr['vlan_pcp']
+
+        return pyr
+
+@of_field("vlan.vid", "vlan_id", vlan_validator(), "1.0")
+class VlanID(object):
+    def encode_in_place(self, pyr, pkt):
+        if (not 'vlan_id' in pyr and not 'vlan_pcp' in pyr and vlan.vlan in pkt):
+            for idx, proto in enumerate(pkt.protocols):
+                if isinstance(proto, vlan.vlan):
+                    pkt.protocols.pop(idx)
+
+            return pyr
+
+        if not 'vlan_id' in pyr:
+            return pyr
+
+        if not vlan.vlan in pkt:
+            pkt.protocols.insert(1, vlan.vlan(ethertype=pkt.protocols[0].ethertype))
+            pkt.protocols[0].ethertype = VLAN
+
+        gen = (protocol for protocol in pkt.protocols if protocol.__class__ == vlan.vlan)
+        vl = gen.next()
+        vl.vid = pyr['vlan_id']
+
+        return pyr
+
+@of_field("ethernet.src", "srcmac", version="1.0")
+class SrcMac(object): pass
+
+@of_field("ethernet.dst", "dstmac", version="1.0")
+class DstMac(object): pass
+
+@of_field("", "header_len", version="1.0")
+class HeaderLength(object):
+    def decode(self, ryu_pkt):
+        return len(ryu_pkt.protocols[0])
+
+    def encode_in_place(self, pyr, pkt):
+        return pyr
+
+@of_field("", "payload_len", version="1.0")
+class PayloadLength(object):
+    def decode(self, ryu_pkt):
+        return len(ryu_pkt.data)
+
+    def encode_in_place(self, pyr, pkt):
+        return pyr
+
+
+@of_field("ethernet.ethertype", "ethtype", version="1.0")
+class EthType(object):
+    def decode(self, ryu_pkt):
+        try:
+            layer = self.protocol(ryu_pkt, 'vlan')
+            if layer is None: layer = self.protocol(ryu_pkt, 'ethernet')
+
+            return layer.ethertype
+        except:
+            return None
+
+@of_field("ipv6.srcip", "srcip", ether_validator(IPV6), version="1.0")
+class Ipv6SrcIp(object): pass
+
+@of_field("ipv6.dstip", "dstip", ether_validator(IPV6), version="1.0")
+class Ipv6DstIp(object): pass
+
+@of_field("ipv4.src", "srcip", ether_validator(IPV4), version="1.0")
+class Ipv4SrcIp(object): pass
+
+@of_field("ipv4.dst", "dstip", ether_validator(IPV4), version="1.0")
+class Ipv4DstIp(object): pass
+
+@of_field("ipv4.proto", "protocol", ether_validator(IPV4), version="1.0")
+class Protocol(object): pass
+
+@of_field("ipv4.tos", "tos", ether_validator(IPV4), version="1.0")
+class TOS(object): pass
+
+@of_field("icmp.type", "srcport", proto_validator(ICMP_PROTO), version="1.0")
+class IcmpType(object): pass
+
+@of_field("icmp.code", "dstport", proto_validator(ICMP_PROTO), version="1.0")
+class IcmpCode(object): pass
+
+@of_field("arp.opcode", "protocol", ether_validator(ARP), version="1.0")
+class ArpOpcode(object): pass
+
+@of_field("arp.src_ip", "srcip", ether_validator(ARP), version="1.0")
+class ArpSrcIp(object): pass
+
+@of_field("arp.dst_ip", "dstip", ether_validator(ARP), version="1.0")
+class ArpDstIp(object): pass
+
+def get_packet_processor():
+    return Processor().compile()
 
 ################################################################################
 # Packet 
@@ -102,268 +572,3 @@ class Packet(object):
             except KeyError: 
                 pass
         return "\n".join(outer)
-
-################################################################################
-# Packet Processor
-################################################################################
-class PacketProcessor(object):
-    def __init__(self):
-        _mappers = {}
-        pass
-
-    """ Gets a raw located packet on the network, and returns
-    headers that pyretic understands. """
-    def unpack(self, raw_located_pkt):
-        headers = raw_located_pkt
-        pkt    = packet.Packet(raw_located_pkt['raw'])
-
-        # For each protocol extract pyretic headers
-        for protocol in pkt.protocols:
-            # Order matters, higher layer protocols override lower levels
-            headers = dict(self.headers_of(protocol).items() + headers.items())
-
-        headers["payload_len"] = len(raw_located_pkt['raw'])
-        headers["header_len"]  = 14
-
-        return headers
-
-    def headers_of(self, layer):
-        if layer.__class__ == 'str':
-            return layer
-
-        return self.mapper_for(layer.protocol_name).to_headers(layer)
-
-    def mapper_for(self, protocol):
-        return globals().get(protocol.capitalize() + "Mapper", Mapper)
-
-    def mapper_list(self):
-        return Mapper.__subclasses__()
-
-    def pack(self, pyretic_pkt):
-        pkt = packet.Packet()
-
-        #TODO: I believe right now we only support "one" vlan tag.
-        #      I am not sure whether we support sets for vlan_ids or not
-        protocols = map( lambda mapper: mapper.pack(pyretic_pkt), self.mapper_list() )
-        protocols = filter( lambda x: x, protocols )
-
-        # TODO: Serious issue here if the ordering of layers is wrong
-        #       Should be fixed...
-        #
-        # protocols = sorted(protocols, key=lambda protocol: protocol[1])
-
-        for p in protocols:
-            if p:
-                pkt.add_protocol( p )
-
-        pkt.serialize()
-        return str(pkt.data)
-
-class Mapper(object):
-    _header   = {}
-    _vheader  = {}
-    _name     = None
-    _ryu_class= None
-
-    @classmethod
-    def to_headers(cls, layer):
-        header = {}
-
-        # Add pyretic headers
-        for h, v in cls._header.iteritems():
-            method = None
-            if isinstance(v, tuple):
-                method, v = v
-
-            res = getattr(layer, v)
-            if method:
-                res = method(res)
-
-            #TODO: is this required?
-            if callable(res):
-                res=res()
-
-            header[h] = res
-
-        # Add the virtual headers
-        of_headers = cls._header.values()
-        for k, v in layer.stringify_attrs():
-            if k not in of_headers and v is not None:
-                header["v_%s_%s" % (layer.protocol_name, k)] = v
-
-        return header
-
-    @classmethod
-    def protocol_name(cls):
-        if not cls._name:
-            cls._name = cls.__name__.split("Mapper")[0].lower()
-        return cls._name
-
-    @classmethod
-    def protocol_class(cls):
-        if not cls._ryu_class:
-            kls = cls.protocol_name()
-            cls._ryu_class = getattr(globals()[kls], kls)
-
-        return cls._ryu_class
-
-    @classmethod
-    def pack_headers(cls,pkt):
-        headers = {}
-        for k, v in pkt.iteritems():
-            if k[0] == 'v' and k.split("_")[1] == cls.protocol_name():
-                headers[str.join("_",k.split("_")[2:])] = v
-
-        for k, v in cls._header.iteritems():
-            value = v
-            if isinstance( v, tuple ):
-                value = v[1]
-
-            if k in pkt:
-                if isinstance(pkt[k], IPAddr) or isinstance(pkt[k], EthAddr):
-                    headers[value] = str(pkt[k])
-                else:
-                    headers[value] = pkt[k]
-
-        return headers
-
-
-    @classmethod
-    def pack(cls, pkt):
-        headers = cls.pack_headers(pkt)
-
-        try:
-            return cls.protool_class()(**headers)
-        except:
-            return None
-
-
-
-class EthernetMapper(Mapper):
-    _header = {
-       "srcmac"      : (addrconv.mac.text_to_bin, "src"),
-       "dstmac"      : (addrconv.mac.text_to_bin, "dst"),
-       "ethtype"     : "ethertype" 
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        headers = cls.pack_headers(pkt)
-        if pkt.get('vlan_id'):
-            headers['ethertype'] = 0x8100
-
-        return cls.protocol_class()(**headers)
-
-
-class VlanMapper(Mapper):
-    _header = {
-        'vlan_id' : "vid",
-        'vlan_pcp': "pcp",
-        'ethtype' : "ethertype"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if not 'vlan_id' in pkt:
-            return None
-
-        headers = cls.pack_headers(pkt)
-        return cls.protocol_class()(**headers)
-
-
-class Ipv4Mapper(Mapper):
-    _header = {
-        'srcip'   : (addrconv.ipv4.text_to_bin, "src"),
-        'dstip'   : (addrconv.ipv4.text_to_bin, "dst"),
-        'protocol': "proto",
-        'tos': "tos"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if pkt['ethtype'] == 0x0800:
-            headers = cls.pack_headers(pkt)
-            return cls.protocol_class()(**headers)
-        return None
-
-class Ipv6Mapper(Mapper):
-    _header = {
-        'srcip'   : (addrconv.ipv6.text_to_bin, "src"),
-        'dstip'   : (addrconv.ipv6.text_to_bin, "dst"),
-        'protocol': "nxt",
-        'tos'     : "traffic_class"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if pkt['ethtype'] == 0x86DD:
-            headers = cls.pack_headers(pkt)
-            return cls.protocol_class()(**headers)
-        return None
-
-class UdpMapper(Mapper):
-    _header = {
-        'srcport': "src_port",
-        'dstport': "dst_port"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if pkt['protocol'] == 0x11:
-            headers = cls.pack_headers(pkt)
-            return cls.protocol_class()(**headers)
-        return None
-
-class TcpMapper(Mapper):
-    _header = {
-        'srcport': "src_port",
-        'dstport': "dst_port"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if pkt['protocol'] == 0x06:
-            headers = cls.pack_headers(pkt)
-            return cls.protocol_class()(**headers)
-        return None
-
-class DhcpMapper(Mapper):
-    @classmethod
-    def pack(cls, pkt):
-        pass
-
-class IcmpMapper(Mapper):
-    _header = {
-        'srcport': "type",
-        'dstport': "code"
-    }
-
-    @classmethod
-    def pack(cls, pkt):
-        if not 'v_icmp_data' in pkt:
-            return None
-
-        headers = cls.pack_headers(pkt)
-        # type is reserved so it should be fed as type_ into the
-        # __init__ method of ICMP class
-        headers["type_"] = headers["type"]
-        del headers["type"]
-
-        return cls.protocol_class()(**headers)
-
-class ArpMapper(Mapper):
-    _header = {
-        "protocol": "opcode",
-        "srcip"   : (addrconv.ipv4.text_to_bin, "src_ip"),
-        "dstip"   : (addrconv.ipv4.text_to_bin, "dst_ip"),
-    }
-    
-    @classmethod
-    def pack(cls, pkt):
-        if pkt['ethtype'] == 0x0806:
-            headers = cls.pack_headers(pkt)
-            return cls.protocol_class()(**headers)
-        return None
-
-def get_packet_processor():
-    return PacketProcessor()
