@@ -1,0 +1,20 @@
+{
+   "OFPPortStatus": {
+      "desc": {
+         "OFPPort": {
+            "advertised": 10240, 
+            "config": 0, 
+            "curr": 10248, 
+            "curr_speed": 5000, 
+            "hw_addr": "f2:0b:a4:d0:3f:70", 
+            "max_speed": 5000, 
+            "name": "\u79c1\u306e\u30dd\u30fc\u30c8", 
+            "peer": 10248, 
+            "port_no": 7, 
+            "state": 4, 
+            "supported": 10248
+         }
+      }, 
+      "reason": 0
+   }
+}
