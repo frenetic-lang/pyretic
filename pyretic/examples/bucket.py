@@ -72,8 +72,8 @@ class QueryTest(CountBucket):
                 output += str(m) + '\n'
             self.pull_stats()
             # print output
-            print ">>>", str(datetime.now()), ('issued query, sleeping for %f' %
-                                               interval)
+            print ">>>", str(datetime.now()), ('issued query %d, sleeping for %f' %
+                                               (id(self), interval))
             time.sleep(interval)
 
     def query_callback(self, counts):
@@ -128,5 +128,10 @@ def test_main5():
     matched_traffic = ~match(srcip=ip1)
     return (matched_traffic >> test_bucket)
 
+def test_main6():
+    """Ensure no double counting of packets destined to controller."""
+    return ( (match(dstip=ip1) >> QueryTest()) +
+             (match(dstip=ip1) >> Controller) )
+
 def main():
-    return test_main1() + fwding
+    return test_main3() + mac_learner()

@@ -523,15 +523,6 @@ class CountBucket(Query):
     def is_new_bucket(self):
         return self.new_bucket
 
-    def eval(self, pkt):
-        """evaluate this policy on a single packet
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return set()
-
     def compile(self):
         """Produce a Classifier for this policy
 
@@ -546,6 +537,9 @@ class CountBucket(Query):
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
             self.bucket.clear()
+        self.log.error('In bucket ' +  str(id(self)) + ' apply(): ' +
+                       'persistent packet count is ' +
+                       str(self.packet_count_persistent))
 
     def start_update(self):
         """Use a condition variable to mediate access to bucket state as it is
@@ -611,8 +605,13 @@ class CountBucket(Query):
         """
         packet_count = flow_stat['packet_count']
         byte_count   = flow_stat['byte_count']
-        self.log.debug("In bucket %d handle_flow_removed, got counts %d %d" %
-                       (id(self), packet_count, byte_count) )
+        if packet_count > 0:
+            self.log.error(("In bucket %d handle_flow_removed\n" +
+                            "got counts %d %d\n" +
+                            "match %s") %
+                           (id(self), packet_count, byte_count,
+                            str(match) + ' ' + str(priority) + ' ' +
+                            str(version)) )
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
@@ -622,10 +621,16 @@ class CountBucket(Query):
                                    version, to_be_deleted, existing)
                     if match_entry in self.matches:
                         assert to_be_deleted
-                        if not existing:
-                            self.log.debug("%s %d" % ("Adding persistent "
-                                                       + "counts to bucket",
-                                                       id(self) ) )
+                        if not existing: # Note: If pre-existing rule was
+                            # removed, then forget that this rule ever
+                            # existed. We don't count it.
+                            if packet_count > 0:
+                                self.log.error(("Adding persistent pkt count %d"
+                                                + " to bucket %d") % (
+                                        packet_count, id(self) ) )
+                                self.log.error(("persistent count is now %d" %
+                                                (self.packet_count_persistent +
+                                                 packet_count) ) )
                             self.packet_count_persistent += packet_count
                             self.byte_count_persistent += byte_count
                         # Note that there is no else action. We just forget
@@ -676,7 +681,7 @@ class CountBucket(Query):
         """Issue stats queries from the runtime to track counters on rules
         already on switches.
         """
-        self.pull_helper(self.runtime_existing_stats_query_fun())
+        self.pull_helper(self.runtime_existing_stats_query_fun)
 
     def add_outstanding_switch_query(self,switch):
         self.outstanding_switches.append(switch)
@@ -727,6 +732,10 @@ class CountBucket(Query):
                                 self.clear_existing_rule_flag(matched_entry)
                 self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
+        self.log.error( ('*** bucket %d flow_stats_reply\n' % id(self)) +
+                        ('table pktcount %d persistent pktcount %d total %d' % (
+                    self.packet_count - self.packet_count_persistent,
+                    self.packet_count_persistent, self.packet_count ) ) )
         if not self.outstanding_switches:
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
@@ -746,7 +755,7 @@ class CountBucket(Query):
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should
         # be on names.
-        return isinstance(other, CountBucket)
+        return id(self) == id(other)
 
 ################################################################################
 # Combinator Policies                                                          #

@@ -332,34 +332,32 @@ class Runtime(object):
                                 bucket_list[id(act)] = act
                 return bucket_list
 
-            def start_update(bucket_list):
-                for b in bucket_list.values():
-                    b.start_update()
-
             def update_rules_for_buckets(rule, op):
                 (match, priority, actions, version) = rule
+                hashable_match = util.frozendict(match)
+                rule_key = (hashable_match, priority, version)
                 for act in actions:
                     if isinstance(act, CountBucket):
                         if op == "add":
                             act.add_match(match, priority, version)
                         elif op == "delete":
                             act.delete_match(match, priority, version)
-                            self.add_global_outstanding_delete((util.frozendict(match),
-                                                                priority,
-                                                                version), act)
+                            self.add_global_outstanding_delete(rule_key, act)
                         elif op == "stay" or op == "modify":
                             if act.is_new_bucket():
                                 act.add_match(match, priority, version,
                                               existing_rule=True)
 
-            def hook_buckets_to_pull_stats(bucket_list):
-                for b in bucket_list.values():
-                    b.add_pull_stats(self.pull_stats_for_bucket(b))
-                    b.add_pull_existing_stats(self.pull_existing_stats_for_bucket(b))
-
-            def finish_update(bucket_list):
-                for b in bucket_list.values():
-                    b.finish_update()
+                # debug: check the existence of entries in outstanding_deletes
+                # for all buckets in actions list, if op is deleting the rule.
+                if op == "delete":
+                    with self.global_outstanding_deletes_lock:
+                        for act in actions:
+                            if isinstance(act, CountBucket):
+                                assert (rule_key in
+                                        self.global_outstanding_deletes)
+                                assert (act in
+                                        self.global_outstanding_deletes[rule_key])
 
             with self.update_buckets_lock:
                 """The start_update and finish_update functions per bucket guard
@@ -370,13 +368,17 @@ class Runtime(object):
                 (to_add, to_delete, to_modify, to_stay) = diff_lists
                 all_rules = to_add + to_delete + to_modify + to_stay
                 bucket_list = collect_buckets(all_rules)
-                start_update(bucket_list)
+                map(lambda x: x.start_update(), bucket_list.values())
                 map(lambda x: update_rules_for_buckets(x, "add"), to_add)
                 map(lambda x: update_rules_for_buckets(x, "delete"), to_delete)
                 map(lambda x: update_rules_for_buckets(x, "stay"), to_stay)
                 map(lambda x: update_rules_for_buckets(x, "modify"), to_modify)
-                hook_buckets_to_pull_stats(bucket_list)
-                finish_update(bucket_list)
+                map(lambda x: x.add_pull_stats(self.pull_stats_for_bucket(x)),
+                    bucket_list.values())
+                map(lambda x: x.add_pull_existing_stats(
+                        self.pull_existing_stats_for_bucket(x)),
+                    bucket_list.values())
+                map(lambda x: x.finish_update(), bucket_list.values())
         
         def remove_buckets(diff_lists):
             new_diff_lists = []
@@ -545,7 +547,8 @@ class Runtime(object):
             are removed and the full new classifier is installed afresh.
             """
             with self.old_rules_lock:
-                to_delete = self.old_rules
+                import copy
+                to_delete = copy.copy(self.old_rules)
                 to_add = new_rules
                 to_modify = list()
                 to_stay = list()
@@ -614,7 +617,7 @@ class Runtime(object):
             elif self.mode == 'proactive1':
                 return get_incremental_diff(new_rules)
 
-        def install_diff_lists(diff_lists):
+        def install_diff_lists(diff_lists, classifier_version_no):
             """Take the set of rules (added, deleted, modified, untouched), and
             do necessary flow installs/deletes/modifies.
             """
@@ -622,6 +625,17 @@ class Runtime(object):
             switch_attrs_tuples = self.network.topology.nodes(data=True)
             switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
             switches = switch_to_attrs.keys()
+
+            # If the controller just came up, clear out the switches.
+            if classifier_version_no == 1:
+                for s in switches:
+                    self.send_barrier(s)
+                    self.send_clear(s)
+                    self.send_barrier(s)
+                    self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
+                                       [{'outport' : OFPP_CONTROLLER}],
+                                       self.default_cookie))
+
             if to_delete:
                 for rule in to_delete:
                     (match_dict,priority,_,_) = rule
@@ -635,13 +649,14 @@ class Runtime(object):
                     self.modify_rule(rule)
             for s in switches:
                 self.send_barrier(s)
+            self.log.error('\n-----\n\n\ninstalled new set of rules\n\n\n----')
 
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(diff_lists):
+        def f(diff_lists,curr_version_no):
             with self.switch_lock:
-                install_diff_lists(diff_lists)
+                install_diff_lists(diff_lists,curr_version_no)
 
         curr_version_no = None
         with self.classifier_version_lock:
@@ -666,7 +681,7 @@ class Runtime(object):
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
-        p = Process(target=f, args=(diff_lists,))
+        p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
         p.start()
 
@@ -909,6 +924,9 @@ class Runtime(object):
             priority = f['priority']
             version = f['cookie']
             match_entry = (util.frozendict(rule_match), priority, version)
+            if f['packet_count'] > 0:
+                self.log.error("Got removed flow\n%s with count %d" %
+                               (str(match_entry), f['packet_count']) )
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
                 for bucket in bucket_list:
