@@ -1,0 +1,4 @@
+coverage
+nose
+pep8
+pylint==0.25.0

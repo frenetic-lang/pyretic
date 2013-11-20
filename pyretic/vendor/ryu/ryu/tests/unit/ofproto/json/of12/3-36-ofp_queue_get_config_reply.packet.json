@@ -1,0 +1,53 @@
+{
+   "OFPQueueGetConfigReply": {
+      "port": 4294967295, 
+      "queues": [
+         {
+            "OFPPacketQueue": {
+               "len": 48, 
+               "port": 77, 
+               "properties": [
+                  {
+                     "OFPQueuePropMinRate": {
+                        "len": 16, 
+                        "property": 1, 
+                        "rate": 10
+                     }
+                  }, 
+                  {
+                     "OFPQueuePropMaxRate": {
+                        "len": 16, 
+                        "property": 2, 
+                        "rate": 900
+                     }
+                  }
+               ], 
+               "queue_id": 99
+            }
+         }, 
+         {
+            "OFPPacketQueue": {
+               "len": 48, 
+               "port": 77, 
+               "properties": [
+                  {
+                     "OFPQueuePropMinRate": {
+                        "len": 16, 
+                        "property": 1, 
+                        "rate": 100
+                     }
+                  }, 
+                  {
+                     "OFPQueuePropMaxRate": {
+                        "len": 16, 
+                        "property": 2, 
+                        "rate": 200
+                     }
+                  }
+               ], 
+               "queue_id": 88
+            }
+         }
+      ]
+   }
+}
