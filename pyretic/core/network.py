@@ -74,7 +74,6 @@ class IPPrefix(object):
     def __repr__(self):
         return "%s/%d" % (repr(self.pattern),self.masklen)
 
-
 class IPAddr(object):
     def __init__(self, ip):
 
@@ -187,93 +186,9 @@ class EthAddr(object):
 class MAC(EthAddr):
     pass
 
-        
 ################################################################################
-# Packet and tools
+# Tools
 ################################################################################
-
-
-class Packet(object):
-    __slots__ = ["header"]
-    
-    def __init__(self, state={}):
-        self.header = util.frozendict(state)
-
-    def available_fields(self):
-        return self.header.keys()
-
-    def __eq__(self, other):
-        return ( id(self) == id(other)
-                 or ( isinstance(other, self.__class__)
-                      and self.header == other.header ) )
-
-    def __ne__(self, other):
-        return not (self == other)
-              
-    def modify(self, **kwargs):
-        return self.modifymany(kwargs)
-              
-    def modifymany(self, d):
-        add = {}
-        delete = []
-        for k, v in d.items():
-            if v is None:
-                delete.append(k)
-            else:
-                add[k] = v
-        return Packet(self.header.update(add).remove(delete))
-
-    def __getitem__(self, item):
-        return self.header[item]
-
-    def __hash__(self):
-        return hash(self.header)
-        
-    def __repr__(self):
-        import hashlib
-        fixed_fields = {}
-        fixed_fields['location'] = ['switch', 'inport', 'outport']
-        fixed_fields['vlocation'] = ['vswitch', 'vinport', 'voutport']
-        fixed_fields['source']   = ['srcip', 'srcmac']
-        fixed_fields['dest']     = ['dstip', 'dstmac']
-        order = ['location','vlocation','source','dest']
-        all_fields = self.header.keys()
-        outer = []
-        size = max(map(len, self.header) or map(len, order) or [len('md5'),0]) + 3
-        ### LOCATION, VLOCATION, SOURCE, and DEST - EACH ON ONE LINE
-        for fields in order:
-            inner = ["%s:%s" % (fields, " " * (size - len(fields)))]
-            all_none = True
-            for field in fixed_fields[fields]:
-                try:             
-                    all_fields.remove(field)
-                except:          
-                    pass
-                try:             
-                    inner.append(repr(self.header[field])) 
-                    all_none = False
-                except KeyError: 
-                    inner.append('None')
-            if not all_none:
-                outer.append('\t'.join(inner))
-        ### MD5 OF PAYLOAD
-        field = 'raw'
-        outer.append("%s:%s%s" % ('md5',
-                                    " " * (size - len(field)),
-                                    hashlib.md5(self.header[field]).hexdigest()))
-        all_fields.remove(field)
-        ### ANY ADDITIONAL FIELDS
-        for field in sorted(all_fields):
-            try:             
-                if self.header[field]:
-                    outer.append("%s:%s\t%s" % (field,
-                                                " " * (size - len(field)),
-                                                repr(self.header[field])))
-            except KeyError: 
-                pass
-        return "\n".join(outer)
-
-
 class Port(object):
     def __init__(self, port_no, config=True, status=True,linked_to=None):
         self.port_no = port_no

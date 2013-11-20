@@ -40,7 +40,6 @@ from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
 
-
 def inport_value_hack(outport):
     if outport > 1:
         return 1
@@ -135,120 +134,11 @@ class POXClient(revent.EventMixin):
         self.backend_channel = BackendChannel(ip, port, self)
         self.adjacency = {} # From Link to time.time() stamp
 
-    def packet_from_network(self, switch, inport, raw):
-        h = {}
-        h["switch"] = switch
-        h["inport"] = inport
-        
-        p = packetlib.ethernet(raw)
-        h["header_len"] = p.hdr_len
-        h["payload_len"] = p.payload_len
-        h["srcmac"] = p.src.toRaw()
-        h["dstmac"] = p.dst.toRaw()
-        h["ethtype"] = p.type
-
-        p = p.next
-        if isinstance(p, packetlib.vlan):
-            h['vlan_id'] = p.id
-            h['vlan_pcp'] = p.pcp
-            h["ethtype"] = p.eth_type
-            p = p.next
-
-        if isinstance(p, packetlib.ipv4):
-            h["srcip"] = p.srcip.toRaw()
-            h["dstip"] = p.dstip.toRaw()
-            h["protocol"] = p.protocol
-            h["tos"] = p.tos
-            p = p.next
-
-            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-                h["srcport"] = p.srcport
-                h["dstport"] = p.dstport
-            elif isinstance(p, packetlib.icmp):
-                h["srcport"] = p.type
-                h["dstport"] = p.code
-        elif isinstance(p, packetlib.arp):
-            if p.opcode <= 255:
-                h["ethtype"] = packetlib.ethernet.ARP_TYPE
-                h["protocol"] = p.opcode
-                h["srcip"] = p.protosrc.toRaw()
-                h["dstip"] = p.protodst.toRaw()
-
-        h["raw"] = raw 
-        return h
-
-    def make_arp(self, packet):
-        p = packetlib.ethernet()
-        p.src = packet["srcmac"]
-        p.dst = packet["dstmac"]
-        
-        p.type = packetlib.ethernet.ARP_TYPE
-        p.next = packetlib.arp(prev=p)
-        
-        p.next.hwsrc = packet["srcmac"]
-        p.next.hwdst = packet["dstmac"]
-        p.next.protosrc = packet["srcip"]
-        p.next.protodst = packet["dstip"]
-        p.next.opcode = packet['protocol']
-
-        return p
-
+    def packet_from_network(self, **kwargs):
+        return kwargs
 
     def packet_to_network(self, packet):
-        if len(packet["raw"]) == 0:
-            if packet["ethtype"] == packetlib.ethernet.ARP_TYPE:
-                p_begin = p = self.make_arp(packet)
-            else:  # BLANK PACKET FOR NOW - MAY NEED TO SUPPORT OTHER PACKETS LATER
-                p_begin = p = packetlib.ethernet()
-        else:
-            p_begin = p = packetlib.ethernet(packet["raw"])
-
-        # ETHERNET PACKET IS OUTERMOST
-        p.src = packet["srcmac"]
-        p.dst = packet["dstmac"]
-
-        if 'vlan_id' in packet:
-            if isinstance(p.next, packetlib.vlan):
-                p = p.next
-            else:
-                # Make a vlan header
-                old_eth_type = p.type
-                p.type = 0x8100
-                p.next = packetlib.vlan(next=p.next)
-                p = p.next
-                p.eth_type = old_eth_type
-            p.id = packet['vlan_id']
-            p.pcp = packet['vlan_pcp']
-        else:
-            if isinstance(p.next, packetlib.vlan):
-                p.type = p.next.eth_type # Restore encapsulated eth type
-                p.next = p.next.next # Remove vlan from header
-
-        # GET PACKET INSIDE ETHERNET/VLAN
-        p = p.next
-        if isinstance(p, packetlib.ipv4):
-            p.srcip = packet["srcip"]
-            p.dstip = packet["dstip"]
-            p.protocol = packet["protocol"]
-            p.tos = packet["tos"]
-
-            p = p.next
-            if isinstance(p, packetlib.udp) or isinstance(p, packetlib.tcp):
-                p.srcport = packet["srcport"]
-                p.dstport = packet["dstport"]
-            elif isinstance(p, packetlib.icmp):
-                p.type = packet["srcport"]
-                p.code = packet["dstport"]
-
-        elif isinstance(p, packetlib.arp):
-            if 'vlan_id' in packet:
-                p.opcode = packet["protocol"]
-                p.protosrc = packet["srcip"]
-                p.protodst = packet["dstip"]
-            else:
-                p_begin = self.make_arp(packet)
-        
-        return p_begin.pack()
+        return packet['raw']
 
     def _handle_ComponentRegistered (self, event):
         if event.name == "openflow":
@@ -755,7 +645,7 @@ class POXClient(revent.EventMixin):
             print "dpid\t%s" % event.dpid
             print
 
-        received = self.packet_from_network(event.dpid, event.ofp.in_port, event.data)
+        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data)
         self.send_to_pyretic(['packet',received])
         
        

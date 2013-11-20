@@ -767,7 +767,12 @@ class Runtime(object):
 # PACKET MARSHALLING/UNMARSHALLING 
 ####################################
 
-    def concrete2pyretic(self,packet):
+    def concrete2pyretic(self,raw_pkt):
+        packet = get_packet_processor().unpack(raw_pkt['raw'])
+        packet['raw'] = raw_pkt['raw']
+        packet['switch'] = raw_pkt['switch']
+        packet['inport'] = raw_pkt['inport']
+
         def convert(h,val):
             if h in ['srcmac','dstmac']:
                 return MAC(val)
@@ -784,12 +789,12 @@ class Runtime(object):
         pyretic_packet = Packet(extended_values)
         d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
         return pyretic_packet.modifymany(d)
-
     def pyretic2concrete(self,packet):
         concrete_packet = {}
         for header in ['switch','inport','outport']:
             try:
                 concrete_packet[header] = packet[header]
+                headers[header]         = packet[header]
                 packet = packet.pop(header)
             except:
                 pass
@@ -799,11 +804,19 @@ class Runtime(object):
                 concrete_packet[header] = val
             except:
                 pass
+        for header in packet.header:
+            try:
+                if header in ['switch', 'inport', 'outport']: next
+                val = packet[header]
+                headers[header] = val
+            except:
+                pass
         extended_values = extended_values_from(packet)
         if extended_values:
             vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
             concrete_packet['vlan_id'] = vlan_id
             concrete_packet['vlan_pcp'] = vlan_pcp
+        concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
 
 
