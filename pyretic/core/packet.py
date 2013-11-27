@@ -1,18 +1,11 @@
+import struct, re
 import pyretic.vendor
+
 from ryu.lib.packet import *
-from ryu.lib.packet import vlan
+from ryu.lib        import addrconv
 
-import struct
-import re
-
-from bitarray import bitarray
-
-from pyretic.core.network import IPAddr, EthAddr
 from pyretic.core import util
-
-from ryu.lib import addrconv
-
-["switch", "inport", "header_len", "payload_len", "srcmac", "dstmac", "ethtype", 'vlan_id', 'vlan_pcp', "ethtype", "srcip", "dstip", "protocol", "tos", "srcport", "dstport", "ethtype", "protocol", "srcip", "dstip", "raw"]
+from pyretic.core.network import IPAddr, EthAddr
 
 __all__ = ['of_field', 'of_fields', 'get_packet_processor', 'Packet']
 _field_list = dict()
@@ -26,6 +19,9 @@ ICMP_PROTO = 1
 TCP_PROTO  = 6
 UDP_PROTO  = 17
 
+##################################################
+# EMPTY TEMPLATE PACKETS FOR DIFFERENT PROTCOLS 
+##################################################
 def arp_packet_gen():
     pkt = packet.Packet()
     pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", ARP))
@@ -181,6 +177,12 @@ class Processor(object):
         # Build the packet processor pipeline
         return self
 
+def get_packet_processor():
+    try:
+        return get_packet_processor.processor   
+    except AttributeError:
+        get_packet_processor.processor = Processor().compile()
+        return get_packet_processor.processor
 
 ################################################################################
 # Field Validators
@@ -279,7 +281,7 @@ def vlan_validator(*args, **kwargs):
 
 
 ################################################################################
-# Field definition and Decorators
+# Field Decorator
 ################################################################################
 def of_field(match="", pyretic_field="", validator=true_validator(), version="1.0"):
     matches = match.split(".")
@@ -353,6 +355,9 @@ def of_field(match="", pyretic_field="", validator=true_validator(), version="1.
 
     return _of_field
 
+#######################
+# OPENFLOW 1.0 FIELDS
+#######################
 @of_field("udp.dst_port", "dstport", proto_validator(UDP_PROTO), "1.0")
 class UdpDstPort(object): pass
 
@@ -477,9 +482,6 @@ class ArpSrcIp(object): pass
 
 @of_field("arp.dst_ip", "dstip", ether_validator(ARP), version="1.0")
 class ArpDstIp(object): pass
-
-def get_packet_processor():
-    return Processor().compile()
 
 ################################################################################
 # Packet 
