@@ -288,8 +288,10 @@ class Runtime(object):
 
         def layer_3_specialize(classifier):
             specialized_rules = []
-            #Add a rule that routes the LLDP messages to the controller for topology maintenance.
+            # Add a rule that routes the LLDP messages to the controller for topology maintenance.
             specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
+            # Add a rule that drops IPv6 traffic.
+            specialized_rules.append(Rule(match(ethtype=IPV6_TYPE) & match(protocol=58),[]))
             for rule in classifier.rules:
                 if ( isinstance(rule.match, match) and
                      ( 'srcip' in rule.match.map or 
