@@ -80,8 +80,14 @@ class QueryTest(CountBucket):
         print "***", str(datetime.now()), "| In user callback for bucket",
         print id(self)
         print "(packet, byte) counts:", counts
+        print "-----------------------------------"
 
-def test_main1():
+def test0():
+    """Tests a single match that is counted."""
+    test_bucket = QueryTest()
+    return test_bucket
+
+def test1():
     """Tests a single match that is counted."""
     test_bucket = QueryTest()
     return (match(srcip=ip1) >> test_bucket)
@@ -134,4 +140,4 @@ def test_main6():
              (match(dstip=ip1) >> Controller) )
 
 def main():
-    return test_main3() + mac_learner()
+    return test0() + fwding
