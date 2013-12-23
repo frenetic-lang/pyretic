@@ -714,7 +714,7 @@ class Runtime(object):
         """Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
-            preds = [p for (p,_,_,_,_) in bucket.matches]
+            preds = [me.match for me in bucket.matches.keys()]
             self.pull_switches_for_preds(preds, bucket)
         return pull_bucket_stats
 
@@ -723,7 +723,7 @@ class Runtime(object):
         at least one rule that was already created in an earlier classifier.
         """
         def pull_existing_bucket_stats():
-            preds = [p for (p,_,_,_,existing) in bucket.matches if existing]
+            preds = [me.match for me,ms in bucket.matches.items() if ms.existing_rule]
             self.pull_switches_for_preds(preds, bucket)
         return pull_existing_bucket_stats
 

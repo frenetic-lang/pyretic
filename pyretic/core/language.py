@@ -503,7 +503,7 @@ class CountBucket(Query):
     """
     def __init__(self):
         super(CountBucket, self).__init__()
-        self.matches = set([])
+        self.matches = {}
         self.runtime_stats_query_fun = None
         self.runtime_existing_stats_query_fun = None
         self.outstanding_switches = []
@@ -575,28 +575,65 @@ class CountBucket(Query):
                 self.new_bucket = False
             self.in_update_cv.notify_all()
         self.log.info("Updated bucket %d" % id(self))
-        
-    def add_match(self, match, priority, version, to_be_deleted=False,
-                  existing_rule=False):
+       
+
+    class match_entry(object):
+        def __init__(self,match,priority,version):
+            self.match = util.frozendict(match)
+            self.priority = priority
+            self.version = version
+
+        def __hash__(self):
+            return hash(self.match) ^ hash(self.priority) ^ hash(self.version)
+
+        def __eq__(self,other):
+            try:
+                return (self.match == other.match and 
+                        self.priority == other.priority and 
+                        self.version == other.version)
+            except:
+                return False
+
+        def __repr__(self):
+            return ('(match=' + repr(self.match) + 
+                    ',priority=' + repr(self.priority) + 
+                    ',version=' + repr(self.version) + ')')
+
+    class match_status(object):
+        def __init__(self,to_be_deleted=False,existing_rule=False):
+            self.to_be_deleted = to_be_deleted
+            self.existing_rule = existing_rule
+
+        def __hash__(self):
+            return hash(self.to_be_deleted) ^ hash(self.existing_rule)
+
+        def __eq__(self,other):
+            try:
+                return (self.to_be_deleted == other.to_be_deleted and 
+                        self.existing_rule == other.existing_rule)
+            except:
+                return False
+            
+        def __repr__(self):
+            return '(to_be_deleted=%s,existing_rule=%s)' % \
+                (self.to_be_deleted,self.existing_rule)
+
+    def add_match(self, match, priority, version):
         """Add a match to list of classifier rules to be queried for counts,
         corresponding to a given version of the classifier.
         """
-        match_entry = (util.frozendict(match), priority, version, to_be_deleted,
-                       existing_rule)
-        if not match_entry in self.matches:
-            self.matches.add(match_entry)
+        k = self.match_entry(match, priority, version)
+        if not k in self.matches:
+            self.matches[k] = self.match_status() 
 
     def delete_match(self, match, priority, version, to_be_deleted=False,
                      existing_rule=False):
         """If a rule is deleted from the classifier, mark this rule (until we
         get the flow_removed message with the counters on it).
         """
-        match_entry = (util.frozendict(match), priority, version, to_be_deleted,
-                       existing_rule)
-        if match_entry in self.matches:
-            self.matches.remove(match_entry)
-            self.matches.add((util.frozendict(match), priority, version, True,
-                              existing_rule))
+        k = self.match_entry(match, priority,version)
+        if k in self.matches:
+            self.matches[k].to_be_deleted = True
 
     def handle_flow_removed(self, match, priority, version, flow_stat):
         """Act on a flow removed message pertaining to a bucket by
@@ -617,9 +654,8 @@ class CountBucket(Query):
                 self.in_update_cv.wait()
             for to_be_deleted in [True, False]:
                 for existing in [True, False]:
-                    match_entry = (util.frozendict(match), priority,
-                                   version, to_be_deleted, existing)
-                    if match_entry in self.matches:
+                    k = self.match_entry(match, priority, version)
+                    if k in self.matches:
                         assert to_be_deleted
                         if not existing: # Note: If pre-existing rule was
                             # removed, then forget that this rule ever
@@ -637,7 +673,7 @@ class CountBucket(Query):
                         # that this rule was ever associated with the bucket
                         # if we get a "flow removed" message before we got
                         # the first ever stats reply from an existing rule.
-                        self.matches.remove(match_entry)
+                        del self.matches[k]
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
@@ -696,18 +732,14 @@ class CountBucket(Query):
         """
         def stat_in_bucket(flow_stat, s):
             """Return a matching entry for the given flow_stat in bucket.matches."""
-            f = flow_stat
-            table_match = match(f['match']).intersect(match(switch=s)).map
-            network_match = util.frozendict(f['match'])
-            priority = int(f['priority'])
-            version_no = int(f['cookie'])
-            for m in [table_match, network_match]:
-                for to_be_deleted in [True, False]:
-                    for existing_rule in [True, False]:
-                        match_entry = (m, priority, version_no, to_be_deleted,
-                                       existing_rule)
-                        if match_entry in self.matches:
-                            return match_entry
+            import copy
+            f = copy.copy(flow_stat['match'])
+            f['switch'] = s
+            if not 'vlan_pcp' in f:
+                f['vlan_pcp'] = 0
+            fme = self.match_entry(f,flow_stat['priority'],flow_stat['cookie'])
+            if fme in self.matches.keys():
+                return fme
             return None
 
         with self.in_update_cv:
@@ -718,18 +750,19 @@ class CountBucket(Query):
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
-                        matched_entry = stat_in_bucket(f, switch)
+                        me = stat_in_bucket(f, switch)
                         extracted_pkts = f['packet_count']
                         extracted_bytes = f['byte_count']
-                        if matched_entry:
-                            (_,_,_,_,existing) = matched_entry
-                            if not existing:
+                        if me:
+                            if not self.matches[me].existing_rule:
                                 self.packet_count += extracted_pkts
                                 self.byte_count   += extracted_bytes
                             else: # pre-existing rule when bucket was created
                                 self.packet_count_persistent -= extracted_pkts
                                 self.byte_count_persistent -= extracted_bytes
-                                self.clear_existing_rule_flag(matched_entry)
+                                self.clear_existing_rule_flag(me)
+                    else:
+                        raise RuntimeError("weird flow entry")
                 self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
         self.log.error( ('*** bucket %d flow_stats_reply\n' % id(self)) +
@@ -746,11 +779,8 @@ class CountBucket(Query):
         holding the bucket's in_update_cv since it updates the matches
         structure.
         """
-        assert entry in self.matches
-        self.matches.remove(entry)
-        (match, priority, version_no, to_be_deleted, existing) = entry
-        cleared_entry = (match, priority, version_no, to_be_deleted, False)
-        self.matches.add(cleared_entry)
+        assert k in self.matches
+        self.matches[k].existing_rule = False
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should
