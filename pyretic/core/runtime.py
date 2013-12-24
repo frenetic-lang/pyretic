@@ -651,7 +651,7 @@ class Runtime(object):
                     self.modify_rule(rule)
             for s in switches:
                 self.send_barrier(s)
-            self.log.error('\n-----\n\n\ninstalled new set of rules\n\n\n----')
+            self.log.debug('\n-----\n\n\ninstalled new set of rules\n\n\n----')
 
 
         ### PROCESS THAT DOES INSTALL
@@ -927,7 +927,7 @@ class Runtime(object):
             version = f['cookie']
             match_entry = (util.frozendict(rule_match), priority, version)
             if f['packet_count'] > 0:
-                self.log.error("Got removed flow\n%s with count %d" %
+                self.log.debug("Got removed flow\n%s with count %d" %
                                (str(match_entry), f['packet_count']) )
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
