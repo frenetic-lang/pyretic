@@ -83,7 +83,7 @@ class QueryTest(CountBucket):
         print "-----------------------------------"
 
 def test0():
-    """Tests a single match that is counted."""
+    """Tests a single bucket that counts all packets.."""
     test_bucket = QueryTest()
     return test_bucket
 
@@ -92,7 +92,7 @@ def test1():
     test_bucket = QueryTest()
     return (match(srcip=ip1) >> test_bucket)
 
-def test_main2():
+def test2():
     """Tests buckets containing multiple matches for traffic."""
     b = [] # counting buckets
     for i in range(0,2):
@@ -105,7 +105,7 @@ def test_main2():
 
     return pol1 + pol2 + pol3
 
-def test_main3():
+def test3():
     """Test if the same traffic feeding into multiple buckets gets accounted
     correctly.
     """
@@ -120,7 +120,7 @@ def test_main3():
 
     return query1 + query2 + query3
 
-def test_main4():
+def test4():
     """Test policy negation, but only for IP traffic."""
     test_bucket = QueryTest()
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
@@ -128,13 +128,13 @@ def test_main4():
                         (~match(srcip=ip1) & match(dstip=ip1)) )
     return (matched_traffic >> test_bucket)
 
-def test_main5():
+def test5():
     """Test policy negation covering all other traffic."""
     test_bucket = QueryTest()
     matched_traffic = ~match(srcip=ip1)
     return (matched_traffic >> test_bucket)
 
-def test_main6():
+def test6():
     """Ensure no double counting of packets destined to controller."""
     return ( (match(dstip=ip1) >> QueryTest()) +
              (match(dstip=ip1) >> Controller) )

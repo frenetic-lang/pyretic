@@ -652,28 +652,27 @@ class CountBucket(Query):
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            for to_be_deleted in [True, False]:
-                for existing in [True, False]:
-                    k = self.match_entry(match, priority, version)
-                    if k in self.matches:
-                        assert to_be_deleted
-                        if not existing: # Note: If pre-existing rule was
-                            # removed, then forget that this rule ever
-                            # existed. We don't count it.
-                            if packet_count > 0:
-                                self.log.error(("Adding persistent pkt count %d"
-                                                + " to bucket %d") % (
-                                        packet_count, id(self) ) )
-                                self.log.error(("persistent count is now %d" %
-                                                (self.packet_count_persistent +
-                                                 packet_count) ) )
-                            self.packet_count_persistent += packet_count
-                            self.byte_count_persistent += byte_count
-                        # Note that there is no else action. We just forget
-                        # that this rule was ever associated with the bucket
-                        # if we get a "flow removed" message before we got
-                        # the first ever stats reply from an existing rule.
-                        del self.matches[k]
+            k = self.match_entry(match, priority, version)
+            if k in self.matches:
+                status = self.matches[k]
+                assert status.to_be_deleted
+                if not status.existing_rule: # Note: If pre-existing rule was
+                    # removed, then forget that this rule ever
+                    # existed. We don't count it.
+                    if packet_count > 0:
+                        self.log.error(("Adding persistent pkt count %d"
+                                        + " to bucket %d") % (
+                                packet_count, id(self) ) )
+                        self.log.error(("persistent count is now %d" %
+                                        (self.packet_count_persistent +
+                                         packet_count) ) )
+                    self.packet_count_persistent += packet_count
+                    self.byte_count_persistent += byte_count
+                # Note that there is no else action. We just forget
+                # that this rule was ever associated with the bucket
+                # if we get a "flow removed" message before we got
+                # the first ever stats reply from an existing rule.
+                del self.matches[k]
 
     def add_pull_stats(self, fun):
         """Point to function that issues stats queries in the
