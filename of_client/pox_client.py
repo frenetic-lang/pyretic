@@ -427,6 +427,10 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
             if 'dstip' in actions:
                 of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
+            if 'srcport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_src(actions['srcport']))
+            if 'dstport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_dst(actions['dstport']))
             if 'vlan_id' in actions:
                 if actions['vlan_id'] is None:
                     of_actions.append(of.ofp_action_strip_vlan())
