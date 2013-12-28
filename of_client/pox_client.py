@@ -378,7 +378,7 @@ class POXClient(revent.EventMixin):
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
         try:
             self.switches[switch]['connection'].send(msg)
-        except Runtimerror, e:
+        except RuntimeError, e:
             print "ERROR:send_to_switch: %s to switch %d" % (str(e),switch)
             # TODO - ATTEMPT TO RECONNECT SOCKET
         except KeyError, e:
