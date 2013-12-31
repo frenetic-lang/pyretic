@@ -106,7 +106,8 @@ def test0():
     switches.)
 
     These filters should continue to work with dynamic topology and policy
-    updates.
+    updates. However, counting must be done carefully when there are openflow
+    packet-ins.
     """
     test_bucket = QueryTest()
     return test_bucket
@@ -182,7 +183,17 @@ def test3():
     return query1 + query2 + query3
 
 def test4():
-    """Test policy negation, but only for IP traffic."""
+    """Test policy negation, but only for IP traffic.
+
+    Display filter for checking correctness:
+
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (not ip.src == 10.0.0.1)
+    and ( ip.dst == 10.0.0.1 || ip.dst == 10.0.0.2 || ip.dst == 10.0.0.3) ) ||
+    (arp && (not arp.src.proto_ipv4 == 10.0.0.1) && (arp.dst.proto_ipv4 ==
+    10.0.0.1 || arp.dst.proto_ipv4 == 10.0.0.2 || arp.dst.proto_ipv4 ==
+    10.0.0.3) ) || of.pktin )
+    """
     test_bucket = QueryTest()
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
                         (~match(srcip=ip1) & match(dstip=ip3)) +
@@ -190,7 +201,17 @@ def test4():
     return (matched_traffic >> test_bucket)
 
 def test5():
-    """Test policy negation covering all other traffic."""
+    """Test policy negation covering all other traffic.
+
+    Display filter for checking correctness:
+
+    (not (ip.addr==192.168.0.0/16 or (arp and (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or (of
+    and not of.pktin) or ip.addr == 10.0.2.0/24 or (arp && ( arp.src.proto_ipv4
+    == 10.0.2.0/24 or arp.dst.proto_ipv4 == 10.0.2.0/24 ) ) ) ) and (not ( (ip
+    && ip.src == 10.0.0.1 ) or (arp && arp.src.proto_ipv4 == 10.0.0.1) or ipv6))
+    """
     test_bucket = QueryTest()
     matched_traffic = ~match(srcip=ip1)
     return (matched_traffic >> test_bucket)

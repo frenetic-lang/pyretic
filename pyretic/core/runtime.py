@@ -36,6 +36,7 @@ import logging, sys, time
 from datetime import datetime
 
 TABLE_MISS_PRIORITY = 0
+TABLE_START_PRIORITY = 60000
 
 class Runtime(object):
     def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
@@ -230,6 +231,24 @@ class Runtime(object):
 # PROACTIVE COMPILATION 
 #########################
 
+    def install_defaults(self, s):
+        """ Install backup rules on switch s by default. """
+        # Fallback "send to controller" rule under table miss
+        self.install_rule(({'switch' : s},
+                           TABLE_MISS_PRIORITY,
+                           [{'outport' : OFPP_CONTROLLER}],
+                           self.default_cookie))
+        # Send all LLDP packets to controller for topology maintenance
+        self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
+                           TABLE_START_PRIORITY + 2,
+                           [{'outport' : OFPP_CONTROLLER}],
+                           self.default_cookie))
+        # Drop all IPv6 packets by default.
+        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE, 'protocol':58},
+                           TABLE_START_PRIORITY + 1,
+                           [],
+                           self.default_cookie))
+
     def install_classifier(self, classifier):
         if classifier is None:
             return
@@ -288,10 +307,6 @@ class Runtime(object):
 
         def layer_3_specialize(classifier):
             specialized_rules = []
-            # Add a rule that routes the LLDP messages to the controller for topology maintenance.
-            specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
-            # Add a rule that drops IPv6 traffic.
-            specialized_rules.append(Rule(match(ethtype=IPV6_TYPE) & match(protocol=58),[]))
             for rule in classifier.rules:
                 if ( isinstance(rule.match, match) and
                      ( 'srcip' in rule.match.map or 
@@ -474,7 +489,7 @@ class Runtime(object):
         def prioritize(classifier,switches):
             priority = {}
             for s in switches:
-                priority[s] = 60000
+                priority[s] = TABLE_START_PRIORITY
             tuple_rules = list()
             for rule in classifier.rules:
                 s = rule.match['switch']
@@ -504,9 +519,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
-                                   [{'outport' : OFPP_CONTROLLER}],
-                                   curr_classifier_no))
+                self.install_defaults(s)
 
             for rule in new_rules:
                 self.install_rule(rule)
@@ -634,9 +647,7 @@ class Runtime(object):
                     self.send_barrier(s)
                     self.send_clear(s)
                     self.send_barrier(s)
-                    self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
-                                       [{'outport' : OFPP_CONTROLLER}],
-                                       self.default_cookie))
+                    self.install_defaults(s)
 
             if to_delete:
                 for rule in to_delete:
@@ -831,9 +842,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s}, TABLE_MISS_PRIORITY,
-                                   [{'outport' : OFPP_CONTROLLER}],
-                                   self.default_cookie))
+                self.install_defaults(s)
         p = Process(target=f)
         p.daemon = True
         p.start()
