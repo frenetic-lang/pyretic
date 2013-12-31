@@ -83,17 +83,64 @@ class QueryTest(CountBucket):
         print "-----------------------------------"
 
 def test0():
-    """Tests a single bucket that counts all packets.."""
+    """Tests a single bucket that counts all packets.
+
+    Check correctness of bucket counts with the following wireshark capture
+    filters after starting capture on the _any_ interface. You may have to
+    change the x11 port in the filter below (typically 6010, but may vary --
+    verify from outputs of netstat or lsof on the terminal).
+
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) and (ip.addr == 10.0.0.0/16 or
+    arp or of.pktin) )
+
+    Here including packets with ip.addr in 10.0 subnet and ARPs is a proxy for
+    all packets which hit openflow rules on the switch -- which are those that
+    are counted by the query.
+
+    If there are no openflow packet-ins, the number of packets displayed is, in
+    fact, the right bucket count. Otherwise, you need to inspect the packet-ins
+    to see which of those satisfy the filters in matching filters
+    below. (Currently there is no way to specify wireshark capture filters on
+    headers of packets sent to the controller as part of packet-in eventsfrom
+    switches.)
+
+    These filters should continue to work with dynamic topology and policy
+    updates.
+    """
     test_bucket = QueryTest()
     return test_bucket
 
 def test1():
-    """Tests a single match that is counted."""
+    """Tests a single match that is counted.
+
+    Display filter for checking correctness:
+
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (ip.src == 10.0.0.1 ||
+    (arp && (arp.src.proto_ipv4 == 10.0.0.1 ) ) ) ) || of.pktin )
+    """
     test_bucket = QueryTest()
     return (match(srcip=ip1) >> test_bucket)
 
 def test2():
-    """Tests buckets containing multiple matches for traffic."""
+    """Tests buckets containing multiple matches for traffic.
+
+    Display filters for checking correctness:
+
+    bucket 0:
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (ip.src == 10.0.0.1 ||
+    ip.src == 10.0.0.3 || (arp && (arp.src.proto_ipv4 == 10.0.0.1 ||
+    arp.src.proto_ipv4 == 10.0.0.3) ) ) ) || of.pktin )
+
+    bucket 1:
+
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (ip.src == 10.0.0.2 ||
+    (arp && (arp.src.proto_ipv4 == 10.0.0.2 ) ) ) ) || of.pktin )
+
+    """
     b = [] # counting buckets
     for i in range(0,2):
         b.append(QueryTest())
@@ -108,6 +155,20 @@ def test2():
 def test3():
     """Test if the same traffic feeding into multiple buckets gets accounted
     correctly.
+
+    Display filters for checking correctness:
+
+    Buckets 0 and 1:
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( (ip.src == 10.0.0.1 and
+    ip.dst == 10.0.0.2) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    arp.dst.proto_ipv4 == 10.0.0.2 ) || of.pktin )
+
+    Bucket 2:
+    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
+    of) or tcp.port==41414 or sll.pkttype==4) ) and ( (ip.src == 10.0.0.1 and
+    ip.dst == 10.0.0.3) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    arp.dst.proto_ipv4 == 10.0.0.3 ) || of.pktin )
     """
     b = [] # counting buckets
     for i in range(0,3):
