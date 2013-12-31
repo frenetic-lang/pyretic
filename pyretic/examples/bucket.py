@@ -217,7 +217,14 @@ def test5():
     return (matched_traffic >> test_bucket)
 
 def test6():
-    """Ensure no double counting of packets destined to controller."""
+    """Ensure no double counting of packets destined to controller.
+
+    Display filter for checking correctness:
+
+    (not (of.pktin or of.pktout or ip.addr==192.168.0.0/16 or tcp.port==6011 or
+    (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4) ) and ( (
+    (ip.dst == 10.0.0.1 || (arp && (arp.dst.proto_ipv4 == 10.0.0.1 ) ) ) ) )
+    """
     return ( (match(dstip=ip1) >> QueryTest()) +
              (match(dstip=ip1) >> Controller) )
 
