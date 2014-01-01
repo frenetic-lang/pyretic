@@ -90,13 +90,11 @@ def test0():
     change the x11 port in the filter below (typically 6010, but may vary --
     verify from outputs of netstat or lsof on the terminal).
 
-    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
-    of) or tcp.port==41414 or sll.pkttype==4) and (ip.addr == 10.0.0.0/16 or
-    arp or of.pktin) )
-
-    Here including packets with ip.addr in 10.0 subnet and ARPs is a proxy for
-    all packets which hit openflow rules on the switch -- which are those that
-    are counted by the query.
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) )
 
     If there are no openflow packet-ins, the number of packets displayed is, in
     fact, the right bucket count. Otherwise, you need to inspect the packet-ins
@@ -118,8 +116,10 @@ def test1():
     Display filter for checking correctness:
 
     (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
-    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (ip.src == 10.0.0.1 ||
-    (arp && (arp.src.proto_ipv4 == 10.0.0.1 ) ) ) ) || of.pktin )
+    of) or tcp.port==41414 or sll.pkttype==4 or ip.addr == 10.0.2.0/24 or (arp
+    && ( arp.src.proto_ipv4 == 10.0.2.0/24 or arp.dst.proto_ipv4 == 10.0.2.0/24
+    ) ) ) ) and ( ( (ip.src == 10.0.0.1 || (arp && (arp.src.proto_ipv4 ==
+    10.0.0.1 ) ) ) ) || of.pktin )
     """
     test_bucket = QueryTest()
     return (match(srcip=ip1) >> test_bucket)
@@ -229,4 +229,4 @@ def test6():
              (match(dstip=ip1) >> Controller) )
 
 def main():
-    return test0() + fwding
+    return test0() + mac_learner()
