@@ -707,6 +707,13 @@ class Runtime(object):
         corresponding to the switches where these predicates apply.
         """
         switch_list = []
+        if not concrete_preds:
+            return False
+        self.log.debug('-------------------------------------------------------------')
+        self.log.debug('--- In pull_switches_for_preds: printing concrete predicates:')
+        for concrete_pred in concrete_preds:
+            self.log.debug(str(concrete_pred))
+        self.log.debug('-------------------------------------------------------------')
         for concrete_pred in concrete_preds:
             if 'switch' in concrete_pred:
                 switch_id = concrete_pred['switch']
@@ -715,6 +722,9 @@ class Runtime(object):
             else:
                 switch_list = self.network.topology.nodes()
                 break
+        self.log.info('Pulling stats from switches '
+                      + str(switch_list) + ' for bucket ' +
+                      str(id(bucket)))
         for s in switch_list:
             bucket.add_outstanding_switch_query(s)
             already_queried = self.add_global_outstanding_query(s, bucket)
@@ -722,13 +732,17 @@ class Runtime(object):
                 self.request_flow_stats(s)
                 self.log.debug('in pull_stats: sent out stats query to switch '
                                + str(s))
+            else:
+                self.log.debug("in pull_stats: didn't send stats req to switch"
+                               + str(s))
+        return True
 
     def pull_stats_for_bucket(self,bucket):
         """Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
             preds = [me.match for me in bucket.matches.keys()]
-            self.pull_switches_for_preds(preds, bucket)
+            return self.pull_switches_for_preds(preds, bucket)
         return pull_bucket_stats
 
     def pull_existing_stats_for_bucket(self,bucket):
@@ -737,7 +751,7 @@ class Runtime(object):
         """
         def pull_existing_bucket_stats():
             preds = [me.match for me,ms in bucket.matches.items() if ms.existing_rule]
-            self.pull_switches_for_preds(preds, bucket)
+            return self.pull_switches_for_preds(preds, bucket)
         return pull_existing_bucket_stats
 
     def add_global_outstanding(self, global_dict, global_lock, key, val):
@@ -905,7 +919,7 @@ class Runtime(object):
         return output
 
     def handle_flow_stats_reply(self, switch, flow_stats):
-        self.log.debug('received a flow stats reply from switch ' + str(switch))
+        self.log.info('received a flow stats reply from switch ' + str(switch))
         flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]

@@ -697,8 +697,9 @@ class CountBucket(Query):
                 # Note: If a query is already in progress, this will wipe out
                 # all its intermediate results for it.
                 self.outstanding_switches = []
-                queries_issued = True
-                pull_function()
+                queries_issued = pull_function() # return value denotes whether
+                                                 # we expect a stats_reply in
+                                                 # future
         return queries_issued
 
     def pull_stats(self):
