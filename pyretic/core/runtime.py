@@ -124,11 +124,14 @@ class Runtime(object):
 # DYNAMICS  
 #############
 
-    def handle_policy_change(self):
+    def handle_policy_change(self,sub_pol):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         some sub-policy in self.policy changes.
         """
+        map(lambda p: p.invalidate_classifier(), 
+            on_recompile_path(set(),id(sub_pol),self.policy))
+
         if self.in_update_network:
             return
 
