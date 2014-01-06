@@ -1197,6 +1197,9 @@ def add_query_sub_pols(acc, policy):
     else:
         return acc
 
+def add_all_sub_pols(acc, policy):
+    return acc | {policy}
+
 def queries_in_eval(acc, policy):
     res,pkts = acc
     if policy == drop:
