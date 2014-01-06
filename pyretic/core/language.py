@@ -473,6 +473,10 @@ class FwdBucket(Query):
     """Class for registering callbacks on individual packets sent to
     the controller.
     """
+    def __init__(self):
+        super(FwdBucket, self).__init__()
+        self.log = logging.getLogger('%s.FwdBucket' % __name__)
+
     def compile(self):
         """Produce a Classifier for this policy
 
@@ -484,6 +488,7 @@ class FwdBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
+                self.log.error('In FwdBucket apply(): packet is:\n' + str(pkt))
                 for callback in self.callbacks:
                     callback(pkt)
             self.bucket.clear()
@@ -534,6 +539,7 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
+                self.log.error('In CountBucket apply(): Packet is:' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
             self.bucket.clear()
@@ -754,6 +760,13 @@ class CountBucket(Query):
                         extracted_pkts = f['packet_count']
                         extracted_bytes = f['byte_count']
                         if me:
+                            if extracted_pkts > 0:
+                                self.log.error('In bucket ' + str(id(self)) +
+                                               ': found matching stats_reply:')
+                                self.log.error(str(me))
+                                self.log.error('packets: ' +
+                                               str(extracted_pkts) + ' bytes: '
+                                               + str(extracted_bytes))
                             if not self.matches[me].existing_rule:
                                 self.packet_count += extracted_pkts
                                 self.byte_count   += extracted_bytes

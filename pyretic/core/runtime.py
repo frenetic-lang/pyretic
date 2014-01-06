@@ -694,6 +694,12 @@ class Runtime(object):
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
+        self.log.error('================================')
+        self.log.error('Final classifier to be installed:')
+        for rule in new_rules:
+            self.log.error(str(rule))
+        self.log.error('================================')
+
         p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
         p.start()
@@ -928,6 +934,15 @@ class Runtime(object):
             '|%s|\n\t%s\n' % (str(datetime.now()),
                 '\n'.join(['flow table for switch='+repr(switch)] + 
                     [self.flow_stat_str(f) for f in flow_stats])))
+        # Debug prints whenever some flow has non-zero counters
+        for f in flow_stats:
+            extracted_pkts = f['packet_count']
+            extracted_bytes = f['byte_count']
+            if extracted_pkts > 0:
+                self.log.debug('in stats_reply: found a non-zero stats match:\n' +
+                               str(f))
+                self.log.debug('packets: ' + str(extracted_pkts) + ' bytes: ' +
+                               str(extracted_bytes))
         with self.global_outstanding_queries_lock:
             if switch in self.global_outstanding_queries:
                 for bucket in self.global_outstanding_queries[switch]:
@@ -950,8 +965,9 @@ class Runtime(object):
             version = f['cookie']
             match_entry = (util.frozendict(rule_match), priority, version)
             if f['packet_count'] > 0:
-                self.log.debug("Got removed flow\n%s with count %d" %
-                               (str(match_entry), f['packet_count']) )
+                self.log.error("Got removed flow\n%s with counts %d %d" %
+                               (str(match_entry), f['packet_count'],
+                                f['byte_count']) )
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
                 for bucket in bucket_list:
