@@ -82,7 +82,7 @@ class Policy(object):
 
         :rtype: Classifier
         """
-        raise NotImplementedError
+        return self._classifier
 
     def __add__(self, pol):
         """
@@ -195,14 +195,97 @@ class Filter(Policy):
         return negate([self])
 
 
-def _intersect_ip(ipfx, opfx):
-    most_specific = None
-    if (IPv4Network(ipfx) in IPv4Network(opfx)):
-        most_specific = ipfx
-    elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
-        most_specific = opfx
-    return most_specific
+class Singleton(Filter):
+    """Abstract policy from which Singletons descend"""
 
+    _classifier = None
+
+    def compile(self):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        if self.__class__._classifier is None:
+            self.__class__._classifier = self.generate_classifier()
+        return self.__class__._classifier
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity, [self])])
+
+
+@singleton
+class identity(Singleton):
+    """The identity policy, leaves all packets unchanged."""
+    def eval(self, pkt):
+        """
+        evaluate this policy on a single packet
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        return {pkt}
+
+    def intersect(self, other):
+        return other
+
+    def covers(self, other):
+        return True
+
+    def __eq__(self, other):
+        return ( id(self) == id(other)
+            or ( isinstance(other, match) and len(other.map) == 0) )
+
+    def __repr__(self):
+        return "identity"
+
+passthrough = identity   # Imperative alias
+true = identity          # Logic alias
+all_packets = identity   # Matching alias
+
+
+@singleton
+class drop(Singleton):
+    """The drop policy, produces the empty set of packets."""
+    def eval(self, pkt):
+        """
+        evaluate this policy on a single packet
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        return set()
+
+    def intersect(self, other):
+        return self
+
+    def covers(self, other):
+        return False
+
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def __repr__(self):
+        return "drop"
+
+none = drop
+false = drop             # Logic alias
+no_packets = drop        # Matching alias
+
+
+@singleton
+class Controller(Singleton):
+    def eval(self, pkt):
+        return set()
+
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def __repr__(self):
+        return "Controller"
+    
 
 class match(Filter):
     """
@@ -216,6 +299,7 @@ class match(Filter):
         if len(args) == 0 and len(kwargs) == 0:
             raise TypeError
         self.map = util.frozendict(dict(*args, **kwargs))
+        self._classifier = self.generate_classifier()
         super(match,self).__init__()
 
     def eval(self, pkt):
@@ -237,12 +321,7 @@ class match(Filter):
                     return set()
         return {pkt}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         r1 = Rule(self,[identity])
         r2 = Rule(identity,[drop])
         return Classifier([r1, r2])
@@ -252,6 +331,15 @@ class match(Filter):
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
+
+        def _intersect_ip(ipfx, opfx):
+            most_specific = None
+            if (IPv4Network(ipfx) in IPv4Network(opfx)):
+                most_specific = ipfx
+            elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
+                most_specific = opfx
+            return most_specific
+
         if pol == identity:
             return self
         elif pol == drop:
@@ -318,82 +406,6 @@ class match(Filter):
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
 
-@singleton
-class identity(Filter):
-    """The identity policy, leaves all packets unchanged."""
-    def eval(self, pkt):
-        """
-        evaluate this policy on a single packet
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return {pkt}
-
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        return Classifier([Rule(identity, [identity])])
-
-    def intersect(self, other):
-        return other
-
-    def covers(self, other):
-        return True
-
-    def __eq__(self, other):
-        return ( id(self) == id(other)
-            or ( isinstance(other, match) and len(other.map) == 0) )
-
-    def __repr__(self):
-        return "identity"
-
-passthrough = identity   # Imperative alias
-true = identity          # Logic alias
-all_packets = identity   # Matching alias
-
-
-@singleton
-class drop(Filter):
-    """The drop policy, produces the empty set of packets."""
-    def eval(self, pkt):
-        """
-        evaluate this policy on a single packet
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return set()
-
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        return Classifier([Rule(identity, [drop])])
-
-    def intersect(self, other):
-        return self
-
-    def covers(self, other):
-        return False
-
-    def __eq__(self, other):
-        return id(self) == id(other)
-
-    def __repr__(self):
-        return "drop"
-
-none = drop
-false = drop             # Logic alias
-no_packets = drop        # Matching alias
-
 
 class modify(Policy):
     """
@@ -409,9 +421,10 @@ class modify(Policy):
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
             reduce(lambda acc, f:
-                   acc and (f in compilable_headers),
+                       acc and (f in compilable_headers),
                    self.map.keys(),
                    True)
+        self._classifier = self.generate_classifier()
         super(modify,self).__init__()
 
     def eval(self, pkt):
@@ -424,12 +437,7 @@ class modify(Policy):
         """
         return {pkt.modifymany(self.map)}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         if self.has_virtual_headers:
             r = Rule(identity,[Controller])
         else:
@@ -443,22 +451,6 @@ class modify(Policy):
         return ( isinstance(other, modify)
            and (self.map == other.map) )
 
-@singleton
-class Controller(Policy):
-    def eval(self, pkt):
-        return set()
-    
-    def compile(self):
-        r = Rule(identity, [Controller])
-        self._classifier = Classifier([r])
-        return self._classifier
-
-    def __eq__(self, other):
-        return id(self) == id(other)
-
-    def __repr__(self):
-        return "Controller"
-    
 
 # FIXME: Srinivas =).
 class Query(Filter):
@@ -499,13 +491,12 @@ class FwdBucket(Query):
     Class for registering callbacks on individual packets sent to
     the controller.
     """
-    def compile(self):
-        """Produce a Classifier for this policy
+    def __init__(self):
+        self._classifier = self.generate_classifier()
+        super(FwdBucket,self).__init__()
 
-        :rtype: Classifier
-        """
-        r = Rule(identity,[Controller])
-        return Classifier([r])
+    def generate_classifier(self):
+        return Classifier([Rule(identity,[Controller])])
 
     def apply(self):
         with self.bucket_lock:
@@ -539,6 +530,7 @@ class CountBucket(Query):
         self.byte_count_persistent = 0
         self.in_update_cv = Condition()
         self.in_update = False
+        self._classifier = self.generate_classifier()
         
     def __repr__(self):
         return "CountBucket"
@@ -553,14 +545,8 @@ class CountBucket(Query):
         """
         return set()
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        r = Rule(identity,[self])
-        return Classifier([r])
+    def generate_classifier(self):
+        return Classifier([Rule(identity,[self])])
 
     def apply(self):
         with self.bucket_lock:
@@ -691,7 +677,18 @@ class CombinatorPolicy(Policy):
     ### init : List Policy -> unit
     def __init__(self, policies=[]):
         self.policies = list(policies)
+        self._classifier = None
         super(CombinatorPolicy,self).__init__()
+
+    def compile(self):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        if not self._classifier:
+            self._classifier = self.generate_classifier()
+        return self._classifier
 
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
@@ -721,12 +718,7 @@ class negate(CombinatorPolicy,Filter):
         else:
             return {pkt}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         inner_classifier = self.policies[0].compile()
         classifier = Classifier([])
         for r in inner_classifier.rules:
@@ -781,12 +773,7 @@ class parallel(CombinatorPolicy):
             output |= policy.eval(pkt)
         return output
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
             return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
@@ -877,18 +864,13 @@ class sequential(CombinatorPolicy):
             prev_output = output
         return output
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         assert(len(self.policies) > 0)
         classifiers = map(lambda p: p.compile(),self.policies)
         for c in classifiers:
             assert(c is not None)
         return reduce(lambda acc, c: acc >> c, classifiers)
-
+        
 
 class intersection(sequential,Filter):
     """
@@ -934,6 +916,7 @@ class DerivedPolicy(Policy):
     """
     def __init__(self, policy=identity):
         self.policy = policy
+        self._classifier = None
         super(DerivedPolicy,self).__init__()
 
     def eval(self, pkt):
@@ -952,7 +935,9 @@ class DerivedPolicy(Policy):
 
         :rtype: Classifier
         """
-        return self.policy.compile()
+        if not self._classifier:
+            self._classifier = self.policy.compile()
+        return self._classifier
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)
@@ -1054,6 +1039,7 @@ class DynamicPolicy(DerivedPolicy):
     def __init__(self,policy=drop):
         self._policy = policy
         self.notify = None
+        self._classifier = None
         super(DerivedPolicy,self).__init__()
 
     def set_network(self, network):
@@ -1164,7 +1150,6 @@ class egress_network(DynamicFilter):
 
     def __repr__(self):
         return "egress_network"
-
 
 ###############################################################################
 # Class hierarchy syntax tree traversal
