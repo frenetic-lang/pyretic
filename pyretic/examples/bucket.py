@@ -190,15 +190,21 @@ def test4():
     Display filters for checking correctness:
 
     Buckets 0 and 1:
-    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
-    of) or tcp.port==41414 or sll.pkttype==4) ) and ( (ip.src == 10.0.0.1 and
-    ip.dst == 10.0.0.2) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( (ip.src == 10.0.0.1
+    and ip.dst == 10.0.0.2) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
     arp.dst.proto_ipv4 == 10.0.0.2 ) )
 
     Bucket 2:
-    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
-    of) or tcp.port==41414 or sll.pkttype==4) ) and ( (ip.src == 10.0.0.1 and
-    ip.dst == 10.0.0.3) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( (ip.src == 10.0.0.1
+    and ip.dst == 10.0.0.3) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
     arp.dst.proto_ipv4 == 10.0.0.3 ) )
     """
     b = [] # counting buckets
@@ -217,12 +223,15 @@ def test5():
 
     Display filter for checking correctness:
 
-    (not (ip.addr==192.168.0.0/16 or tcp.port==6010 or (tcp.port==6633 and not
-    of) or tcp.port==41414 or sll.pkttype==4) ) and ( ( (not ip.src == 10.0.0.1)
-    and ( ip.dst == 10.0.0.1 || ip.dst == 10.0.0.2 || ip.dst == 10.0.0.3) ) ||
-    (arp && (not arp.src.proto_ipv4 == 10.0.0.1) && (arp.dst.proto_ipv4 ==
-    10.0.0.1 || arp.dst.proto_ipv4 == 10.0.0.2 || arp.dst.proto_ipv4 ==
-    10.0.0.3) ) )
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ( (not ip.src ==
+    10.0.0.1) and ( ip.dst == 10.0.0.1 || ip.dst == 10.0.0.2 || ip.dst ==
+    10.0.0.3) ) || (arp && (not arp.src.proto_ipv4 == 10.0.0.1) &&
+    (arp.dst.proto_ipv4 == 10.0.0.1 || arp.dst.proto_ipv4 == 10.0.0.2 ||
+    arp.dst.proto_ipv4 == 10.0.0.3) ) )
     """
     test_bucket = QueryTest()
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
@@ -239,8 +248,9 @@ def test6():
     192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
     or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or (of
     and not of.pktin) or ip.addr == 10.0.2.0/24 or (arp && ( arp.src.proto_ipv4
-    == 10.0.2.0/24 or arp.dst.proto_ipv4 == 10.0.2.0/24 ) ) ) ) and (not ( (ip
-    && ip.src == 10.0.0.1 ) or (arp && arp.src.proto_ipv4 == 10.0.0.1) or ipv6))
+    == 10.0.2.0/24 or arp.dst.proto_ipv4 == 10.0.2.0/24 ) ) or ipv6 ) ) and (not
+    ( (ip && ip.src == 10.0.0.1 ) or (arp && arp.src.proto_ipv4 == 10.0.0.1) or
+    ipv6))
     """
     test_bucket = QueryTest()
     matched_traffic = ~match(srcip=ip1)
@@ -251,9 +261,12 @@ def test7():
 
     Display filter for checking correctness:
 
-    (not (of.pktin or of.pktout or ip.addr==192.168.0.0/16 or tcp.port==6011 or
-    (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4) ) and ( (
-    (ip.dst == 10.0.0.1 || (arp && (arp.dst.proto_ipv4 == 10.0.0.1 ) ) ) ) )
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and (ip.dst == 10.0.0.1 ||
+    (arp && (arp.dst.proto_ipv4 == 10.0.0.1 ) ) )
     """
     return ( (match(dstip=ip1) >> QueryTest()) +
              (match(dstip=ip1) >> Controller) )
