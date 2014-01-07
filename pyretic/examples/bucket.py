@@ -67,11 +67,11 @@ class QueryTest(CountBucket):
         """Thread that issues stats queries every 10 seconds."""
         interval = 2.5
         while True:
-            output = str(datetime.now()) + "| bucket " + str(id(self)) + ": print matches\n"
-            for m in self.matches:
-                output += str(m) + '\n'
-            self.pull_stats()
+            output = str(datetime.now()) + "| bucket " + str(id(self))
+            output += ": print matches\n"
+            output += self.get_matches()
             # print output
+            self.pull_stats()
             print ">>>", str(datetime.now()), ('issued query %d, sleeping for %f' %
                                                (id(self), interval))
             time.sleep(interval)

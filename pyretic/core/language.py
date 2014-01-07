@@ -528,6 +528,16 @@ class CountBucket(Query):
     def is_new_bucket(self):
         return self.new_bucket
 
+    def get_matches(self):
+        """ Return matches contained in bucket as a string """
+        output = ""
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            for m in self.matches:
+                output += str(m) + '\n'
+        return output
+
     def compile(self):
         """Produce a Classifier for this policy
 
@@ -539,7 +549,8 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
-                self.log.error('In CountBucket apply(): Packet is:' + repr(pkt))
+                self.log.error('In CountBucket ' + str(id(self)) + ' apply():'
+                               + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
             self.bucket.clear()
