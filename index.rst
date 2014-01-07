@@ -20,9 +20,12 @@ Indices and tables
 * :ref:`search`
 
 
+Language
+========
 
-Pyretic Module : Language
+pyretic.core.language
 **************************
+
 .. inheritance-diagram:: pyretic.core.language
 .. http://www.graphviz.org/content/attrs
 
@@ -33,8 +36,9 @@ Pyretic Module : Language
    :member-order: bysource
 
 
-Pyretic Library : Query
+pyretic.library.query
 **************************
+
 .. automodule:: pyretic.lib.query
    :show-inheritance:
    :members:
@@ -42,17 +46,10 @@ Pyretic Library : Query
    :member-order: bysource
 
 
-Pyretic Module : Network
-**************************
+Runtime
+========
 
-This is something I want to say that is not in the docstring.
-
-.. automodule:: pyretic.core.network
-   :show-inheritance:
-   :members:
-   :member-order: bysource
-
-Pyretic Module : Runtime
+pyretic.core.runtime
 **************************
 
 .. automodule:: pyretic.core.runtime
@@ -60,11 +57,11 @@ Pyretic Module : Runtime
    :members:
    :member-order: bysource
 
-.. autoclass:: Runtime
+
+pyretic.core.network
+**************************
+
+.. automodule:: pyretic.core.network
    :show-inheritance:
    :members:
-
-.. autoclass:: ConcreteNetwork
-   :show-inheritance:
-   :members:
-
+   :member-order: bysource

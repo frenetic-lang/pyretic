@@ -57,14 +57,16 @@ content_headers = [ "raw", "header_len", "payload_len"]
 ################################################################################
 
 class Policy(object):
-    """Top-level abstract class for policies.
+    """
+    Top-level abstract class for policies.
     All Pyretic policies have methods for
 
     - evaluating on a single packet.
     - compilation to a switch Classifier
     """
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -73,14 +75,16 @@ class Policy(object):
         raise NotImplementedError
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
         raise NotImplementedError
 
     def __add__(self, pol):
-        """The parallel composition operator.
+        """
+        The parallel composition operator.
 
         :param pol: the Policy to the right of the operator
         :type pol: Policy
@@ -92,7 +96,8 @@ class Policy(object):
             return parallel([self, pol])
 
     def __rshift__(self, other):
-        """The sequential composition operator.
+        """
+        The sequential composition operator.
 
         :param pol: the Policy to the right of the operator
         :type pol: Policy
@@ -104,11 +109,11 @@ class Policy(object):
             return sequential([self, other])
 
     def __eq__(self, other):
-        '''Syntactic equality.'''
+        """Syntactic equality."""
         raise NotImplementedError
 
     def __ne__(self,other):
-        '''Syntactic inequality.'''
+        """Syntactic inequality."""
         return not (self == other)
 
     def name(self):
@@ -119,7 +124,8 @@ class Policy(object):
 
 
 class Filter(Policy):
-    """Abstact class for filter policies.
+    """
+    Abstact class for filter policies.
     A filter Policy will always either 
 
     - pass packets through unchanged
@@ -128,7 +134,8 @@ class Filter(Policy):
     No packets will ever be modified by a Filter.
     """
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -137,7 +144,8 @@ class Filter(Policy):
         raise NotImplementedError
 
     def __or__(self, pol):
-        """The Boolean OR operator.
+        """
+        The Boolean OR operator.
 
         :param pol: the filter Policy to the right of the operator
         :type pol: Filter
@@ -149,7 +157,8 @@ class Filter(Policy):
             raise TypeError
 
     def __and__(self, pol):
-        """The Boolean AND operator.
+        """
+        The Boolean AND operator.
 
         :param pol: the filter Policy to the right of the operator
         :type pol: Filter
@@ -161,7 +170,8 @@ class Filter(Policy):
             raise TypeError
 
     def __sub__(self, pol):
-        """The Boolean subtraction operator.
+        """
+        The Boolean subtraction operator.
 
         :param pol: the filter Policy to the right of the operator
         :type pol: Filter
@@ -173,7 +183,8 @@ class Filter(Policy):
             raise TypeError
 
     def __invert__(self):
-        """The Boolean negation operator.
+        """
+        The Boolean negation operator.
 
         :param pol: the filter Policy to the right of the operator
         :type pol: Filter
@@ -192,7 +203,8 @@ def _intersect_ip(ipfx, opfx):
 
 
 class match(Filter):
-    """Match on all specified fields.
+    """
+    Match on all specified fields.
     Matched packets are kept, non-matched packets are dropped.
 
     :param *args: field matches in argument format
@@ -205,7 +217,8 @@ class match(Filter):
         super(match,self).__init__()
 
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -223,7 +236,8 @@ class match(Filter):
         return {pkt}
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -306,7 +320,8 @@ class match(Filter):
 class identity(Filter):
     """The identity policy, leaves all packets unchanged."""
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -315,7 +330,8 @@ class identity(Filter):
         return {pkt}
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -343,7 +359,8 @@ all_packets = identity   # Matching alias
 class drop(Filter):
     """The drop policy, produces the empty set of packets."""
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -352,7 +369,8 @@ class drop(Filter):
         return set()
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -376,7 +394,8 @@ no_packets = drop        # Matching alias
 
 
 class modify(Policy):
-    """Match on all specified fields to specified values.
+    """
+    Modify on all specified fields to specified values.
 
     :param *args: field assignments in argument format
     :param **kwargs: field assignments in keyword-argument format
@@ -394,7 +413,8 @@ class modify(Policy):
         super(modify,self).__init__()
 
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -403,7 +423,8 @@ class modify(Policy):
         return {pkt.modifymany(self.map)}
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -439,7 +460,8 @@ class Controller(Policy):
 
 # FIXME: Srinivas =).
 class Query(Filter):
-    """Abstract class representing a data structure
+    """
+    Abstract class representing a data structure
     into which packets (conceptually) go and with which callbacks can register.
     """
     ### init : unit -> unit
@@ -451,7 +473,8 @@ class Query(Filter):
         super(Query,self).__init__()
 
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -470,7 +493,8 @@ class Query(Filter):
 
 
 class FwdBucket(Query):
-    """Class for registering callbacks on individual packets sent to
+    """
+    Class for registering callbacks on individual packets sent to
     the controller.
     """
     def __init__(self):
@@ -503,7 +527,8 @@ class FwdBucket(Query):
 
 
 class CountBucket(Query):
-    """Class for registering callbacks on counts of packets sent to
+    """
+    Class for registering callbacks on counts of packets sent to
     the controller.
     """
     def __init__(self):
@@ -539,7 +564,8 @@ class CountBucket(Query):
         return output
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -559,7 +585,8 @@ class CountBucket(Query):
                        str(self.packet_count_persistent))
 
     def start_update(self):
-        """Use a condition variable to mediate access to bucket state as it is
+        """
+        Use a condition variable to mediate access to bucket state as it is
         being updated.
 
         Why condition variables and not locks? The main reason is that the state
@@ -692,7 +719,8 @@ class CountBucket(Query):
                 del self.matches[k]
 
     def add_pull_stats(self, fun):
-        """Point to function that issues stats queries in the
+        """
+        Point to function that issues stats queries in the
         runtime.
         """
         self.runtime_stats_query_fun = fun
@@ -740,7 +768,8 @@ class CountBucket(Query):
         self.outstanding_switches.append(switch)
 
     def handle_flow_stats_reply(self,switch,flow_stats):
-        """Given a flow_stats_reply from switch s, collect only those
+        """
+        Given a flow_stats_reply from switch s, collect only those
         counts which are relevant to this bucket.
 
         Very simple processing for now: just collect all packet and
@@ -816,7 +845,8 @@ class CountBucket(Query):
 ################################################################################
 
 class CombinatorPolicy(Policy):
-    """Abstract class for policy combinators.
+    """
+    Abstract class for policy combinators.
 
     :param policies: the policies to be combined.
     :type policies: list Policy
@@ -835,13 +865,15 @@ class CombinatorPolicy(Policy):
 
 
 class negate(CombinatorPolicy,Filter):
-    """Combinator that negates the input policy.
+    """
+    Combinator that negates the input policy.
 
     :param policies: the policies to be negated.
     :type policies: list Filter
     """
     def eval(self, pkt):
-        """evaluate this policy on a single packet
+        """
+        evaluate this policy on a single packet
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -853,7 +885,8 @@ class negate(CombinatorPolicy,Filter):
             return {pkt}
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -871,7 +904,8 @@ class negate(CombinatorPolicy,Filter):
 
 
 class parallel(CombinatorPolicy):
-    """Combinator for several policies in parallel.
+    """
+    Combinator for several policies in parallel.
 
     :param policies: the policies to be combined.
     :type policies: list Policy
@@ -897,7 +931,8 @@ class parallel(CombinatorPolicy):
             return parallel(self.policies + [pol])
 
     def eval(self, pkt):
-        """evaluates to the set union of the evaluation
+        """
+        evaluates to the set union of the evaluation
         of self.policies on pkt
 
         :param pkt: the packet on which to be evaluated
@@ -910,7 +945,8 @@ class parallel(CombinatorPolicy):
         return output
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -921,7 +957,8 @@ class parallel(CombinatorPolicy):
 
 
 class union(parallel,Filter):
-    """Combinator for several filter policies in parallel.
+    """
+    Combinator for several filter policies in parallel.
 
     :param policies: the policies to be combined.
     :type policies: list Filter
@@ -951,7 +988,8 @@ class union(parallel,Filter):
 
 
 class sequential(CombinatorPolicy):
-    """Combinator for several policies in sequence.
+    """
+    Combinator for several policies in sequence.
 
     :param policies: the policies to be combined.
     :type policies: list Policy
@@ -977,7 +1015,8 @@ class sequential(CombinatorPolicy):
             return sequential(self.policies + [pol])
 
     def eval(self, pkt):
-        """evaluates to the set union of each policy in 
+        """
+        evaluates to the set union of each policy in 
         self.policies on each packet in the output of the 
         previous.  The first policy in self.policies is 
         evaled on pkt.
@@ -1002,7 +1041,8 @@ class sequential(CombinatorPolicy):
         return output
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -1014,7 +1054,8 @@ class sequential(CombinatorPolicy):
 
 
 class intersection(sequential,Filter):
-    """Combinator for several filter policies in sequence.
+    """
+    Combinator for several filter policies in sequence.
 
     :param policies: the policies to be combined.
     :type policies: list Filter
@@ -1048,7 +1089,8 @@ class intersection(sequential,Filter):
 ################################################################################
 
 class DerivedPolicy(Policy):
-    """Abstract class for a policy derived from another policy.
+    """
+    Abstract class for a policy derived from another policy.
 
     :param policy: the internal policy (assigned to self.policy)
     :type policy: Policy
@@ -1058,7 +1100,8 @@ class DerivedPolicy(Policy):
         super(DerivedPolicy,self).__init__()
 
     def eval(self, pkt):
-        """evaluates to the output of self.policy.
+        """
+        evaluates to the output of self.policy.
 
         :param pkt: the packet on which to be evaluated
         :type pkt: Packet
@@ -1067,7 +1110,8 @@ class DerivedPolicy(Policy):
         return self.policy.eval(pkt)
 
     def compile(self):
-        """Produce a Classifier for this policy
+        """
+        Produce a Classifier for this policy
 
         :rtype: Classifier
         """
@@ -1082,7 +1126,8 @@ class DerivedPolicy(Policy):
 
 
 class difference(DerivedPolicy,Filter):
-    """The difference between two filter policies..
+    """
+    The difference between two filter policies..
 
     :param f1: the minuend
     :type f1: Filter
@@ -1099,7 +1144,8 @@ class difference(DerivedPolicy,Filter):
 
 
 class if_(DerivedPolicy):
-    """if pred holds, t_branch, otherwise f_branch.
+    """
+    if pred holds, t_branch, otherwise f_branch.
 
     :param pred: the predicate
     :type pred: Filter
@@ -1128,7 +1174,8 @@ class if_(DerivedPolicy):
 
 
 class fwd(DerivedPolicy):
-    """fwd out a specified port.
+    """
+    fwd out a specified port.
 
     :param outport: the port on which to forward.
     :type outport: int
@@ -1142,7 +1189,8 @@ class fwd(DerivedPolicy):
 
 
 class xfwd(DerivedPolicy):
-    """fwd out a specified port, unless the packet came in on that same port.
+    """
+    fwd out a specified port, unless the packet came in on that same port.
     (Semantically equivalent to OpenFlow's forward action
 
     :param outport: the port on which to forward.
@@ -1161,8 +1209,10 @@ class xfwd(DerivedPolicy):
 ################################################################################
 
 class DynamicPolicy(DerivedPolicy):
-    """Abstact class for dynamic policies.
-    The behavior of a dynamic policy changes each time self.policy is reassigned."""
+    """
+    Abstact class for dynamic policies.
+    The behavior of a dynamic policy changes each time self.policy is reassigned.
+    """
     ### init : unit -> unit
     def __init__(self,policy=drop):
         self._policy = policy
@@ -1178,9 +1228,9 @@ class DynamicPolicy(DerivedPolicy):
     def detach(self):
         self.notify = None
 
-    def changed(self,changed,old,new):
+    def changed(self):
         if self.notify:
-            self.notify(changed,old,new)
+            self.notify()
 
     @property
     def policy(self):
@@ -1190,21 +1240,25 @@ class DynamicPolicy(DerivedPolicy):
     def policy(self, policy):
         prev_policy = self._policy
         self._policy = policy
-        self.changed(self,prev_policy,policy)
+        self.changed()
 
     def __repr__(self):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
 
 
 class DynamicFilter(DynamicPolicy,Filter):
-    """Abstact class for dynamic filter policies.
-    The behavior of a dynamic filter policy changes each time self.policy is reassigned."""
+    """
+    Abstact class for dynamic filter policies.
+    The behavior of a dynamic filter policy changes each time self.policy is reassigned.
+    """
     pass
 
 
 class flood(DynamicPolicy):
-    """Policy that floods packets on a minimum spanning tree, recalculated
-    every time the network is updated (set_network)."""
+    """
+    Policy that floods packets on a minimum spanning tree, recalculated
+    every time the network is updated (set_network).
+    """
     def __init__(self):
         self.mst = None
         super(flood,self).__init__()
@@ -1234,8 +1288,10 @@ class flood(DynamicPolicy):
 
 
 class ingress_network(DynamicFilter):
-    """Returns True if a packet is located at a (switch,inport) pair entering
-    the network, False otherwise."""
+    """
+    Returns True if a packet is located at a (switch,inport) pair entering
+    the network, False otherwise.
+    """
     def __init__(self):
         self.egresses = None
         super(ingress_network,self).__init__()
@@ -1253,8 +1309,10 @@ class ingress_network(DynamicFilter):
 
 
 class egress_network(DynamicFilter):
-    """Returns True if a packet is located at a (switch,outport) pair leaving
-    the network, False otherwise."""
+    """
+    Returns True if a packet is located at a (switch,outport) pair leaving
+    the network, False otherwise.
+    """
     def __init__(self):
         self.egresses = None
         super(egress_network,self).__init__()
@@ -1356,8 +1414,10 @@ def queries_in_eval(acc, policy):
 # an intermediate representation for proactive compilation.
 
 class Rule(object):
-    '''A rule contains a filter and the parallel composition of zero or more
-    Pyretic actions.'''
+    """
+    A rule contains a filter and the parallel composition of zero or more
+    Pyretic actions.
+    """
 
     # Matches m should be of the match class.  Actions acts should be a list of
     # either modify, identity, or drop policies.
@@ -1372,18 +1432,20 @@ class Rule(object):
         return str(self)
 
     def __eq__(self, other):
-        '''Based on syntactic equality of policies.'''
+        """Based on syntactic equality of policies."""
         return ( id(self) == id(other)
             or ( self.match == other.match
                  and self.actions == other.actions ) )
 
     def __ne__(self, other):
-        '''Based on syntactic equality of policies.'''
+        """Based on syntactic equality of policies."""
         return not (self == other)
 
     def eval(self, in_pkt):
-        '''If this rule matches the packet, then return the union of the sets
-        of packets produced by the actions.  Otherwise, return None.'''
+        """
+        If this rule matches the packet, then return the union of the sets
+        of packets produced by the actions.  Otherwise, return None.
+        """
         filtered_pkt = self.match.eval(in_pkt)
         if len(filtered_pkt) == 0:
             return None
@@ -1395,10 +1457,12 @@ class Rule(object):
 
 
 class Classifier(object):
-    '''A classifier contains a list of rules, where the order of the list implies
+    """
+    A classifier contains a list of rules, where the order of the list implies
     the relative priorities of the rules.  Semantically, classifiers are
     functions from packets to sets of packets, similar to OpenFlow flow
-    tables.'''
+    tables.
+    """
 
     def __init__(self, new_rules=[]):
         import types
@@ -1419,12 +1483,12 @@ class Classifier(object):
         return str(self)
 
     def __eq__(self, other):
-        '''Based on syntactic equality of policies.'''
+        """Based on syntactic equality of policies."""
         return ( id(self) == id(other)
             or ( self.rules == other.rules ) )
 
     def __ne__(self, other):
-        '''Based on syntactic equality of policies.'''
+        """Based on syntactic equality of policies."""
         return not (self == other)
 
     def __add__(self,c2):
@@ -1592,9 +1656,11 @@ class Classifier(object):
         return opt_c
 
     def eval(self, in_pkt):
-        '''Evaluate against each rule in the classifier, starting with the
+        """
+        Evaluate against each rule in the classifier, starting with the
         highest priority.  Return the set of packets resulting from applying
-        the actions of the first rule that matches.'''
+        the actions of the first rule that matches.
+        """
         for rule in self.rules:
             pkts = rule.eval(in_pkt)
             if pkts is not None:

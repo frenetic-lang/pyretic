@@ -382,7 +382,7 @@ class POXClient(revent.EventMixin):
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
         try:
             self.switches[switch]['connection'].send(msg)
-        except Runtimerror, e:
+        except RuntimeError, e:
             print "ERROR:send_to_switch: %s to switch %d" % (str(e),switch)
             # TODO - ATTEMPT TO RECONNECT SOCKET
         except KeyError, e:
@@ -431,6 +431,10 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
             if 'dstip' in actions:
                 of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
+            if 'srcport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_src(actions['srcport']))
+            if 'dstport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_dst(actions['dstport']))
             if 'vlan_id' in actions:
                 if actions['vlan_id'] is None:
                     of_actions.append(of.ofp_action_strip_vlan())
