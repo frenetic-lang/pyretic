@@ -694,11 +694,11 @@ class Runtime(object):
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
-        self.log.error('================================')
-        self.log.error('Final classifier to be installed:')
+        self.log.info('================================')
+        self.log.info('Final classifier to be installed:')
         for rule in new_rules:
-            self.log.error(str(rule))
-        self.log.error('================================')
+            self.log.info(str(rule))
+        self.log.info('================================')
 
         p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
@@ -965,7 +965,7 @@ class Runtime(object):
             version = f['cookie']
             match_entry = (util.frozendict(rule_match), priority, version)
             if f['packet_count'] > 0:
-                self.log.error("Got removed flow\n%s with counts %d %d" %
+                self.log.debug("Got removed flow\n%s with counts %d %d" %
                                (str(match_entry), f['packet_count'],
                                 f['byte_count']) )
             if match_entry in self.global_outstanding_deletes:

@@ -488,7 +488,7 @@ class FwdBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
-                self.log.error('In FwdBucket apply(): packet is:\n' + str(pkt))
+                self.log.info('In FwdBucket apply(): packet is:\n' + str(pkt))
                 for callback in self.callbacks:
                     callback(pkt)
             self.bucket.clear()
@@ -549,12 +549,12 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
-                self.log.error('In CountBucket ' + str(id(self)) + ' apply():'
+                self.log.info('In CountBucket ' + str(id(self)) + ' apply():'
                                + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
             self.bucket.clear()
-        self.log.error('In bucket ' +  str(id(self)) + ' apply(): ' +
+        self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
                        'persistent packet count is ' +
                        str(self.packet_count_persistent))
 
@@ -660,7 +660,7 @@ class CountBucket(Query):
         packet_count = flow_stat['packet_count']
         byte_count   = flow_stat['byte_count']
         if packet_count > 0:
-            self.log.error(("In bucket %d handle_flow_removed\n" +
+            self.log.debug(("In bucket %d handle_flow_removed\n" +
                             "got counts %d %d\n" +
                             "match %s") %
                            (id(self), packet_count, byte_count,
@@ -677,10 +677,10 @@ class CountBucket(Query):
                     # removed, then forget that this rule ever
                     # existed. We don't count it.
                     if packet_count > 0:
-                        self.log.error(("Adding persistent pkt count %d"
+                        self.log.debug(("Adding persistent pkt count %d"
                                         + " to bucket %d") % (
                                 packet_count, id(self) ) )
-                        self.log.error(("persistent count is now %d" %
+                        self.log.debug(("persistent count is now %d" %
                                         (self.packet_count_persistent +
                                          packet_count) ) )
                     self.packet_count_persistent += packet_count
@@ -772,10 +772,10 @@ class CountBucket(Query):
                         extracted_bytes = f['byte_count']
                         if me:
                             if extracted_pkts > 0:
-                                self.log.error('In bucket ' + str(id(self)) +
+                                self.log.debug('In bucket ' + str(id(self)) +
                                                ': found matching stats_reply:')
-                                self.log.error(str(me))
-                                self.log.error('packets: ' +
+                                self.log.debug(str(me))
+                                self.log.debug('packets: ' +
                                                str(extracted_pkts) + ' bytes: '
                                                + str(extracted_bytes))
                             if not self.matches[me].existing_rule:
@@ -789,7 +789,7 @@ class CountBucket(Query):
                         raise RuntimeError("weird flow entry")
                 self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
-        self.log.error( ('*** bucket %d flow_stats_reply\n' % id(self)) +
+        self.log.info( ('*** Bucket %d flow_stats_reply\n' % id(self)) +
                         ('table pktcount %d persistent pktcount %d total %d' % (
                     self.packet_count - self.packet_count_persistent,
                     self.packet_count_persistent, self.packet_count ) ) )
