@@ -581,7 +581,7 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
-        def OF_inportize(classifier, switch_to_attrs):
+        def OF_inportize(classifier):
             """
             Specialize classifier to ensure that packets to be forwarded 
             out the inport on which they arrived are handled correctly.
