@@ -26,8 +26,9 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
+from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket, Query
 import time
+import re
 from threading import Thread
 
 class LimitFilter(DynamicFilter):
@@ -145,3 +146,53 @@ class count_bytes(AggregateFwdBucket):
     """AggregateFwdBucket that calls back with aggregate bytesize of packets."""
     def aggregator(self,aggregate,pkt):
         return aggregate + pkt['header_len'] + pkt['payload_len']
+
+class RegexpQuery(Query):
+    """
+    Class for registering callbacks on matching string in packet data?
+    """
+    def __init__(self, pattern=""):
+        super(RegexpQuery, self).__init__()
+        self.re = pattern
+
+    def compile(self):
+        """Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        r = Rule(identity,[Controller])
+        return Classifier([r])
+
+    @property
+    def re(self):
+        return self._re
+
+    @re.setter
+    def re(self, pattern):
+        if not isinstance(pattern, re._pattern_type):
+            pattern = re.compile(pattern, re.S)
+
+        self._re = pattern
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                #XXX Should we go with raw data or payload?
+                #XXX Logic for iteration here? first match or all of them?
+                for m in self.re.finditer(pkt['raw']):
+                    for callback in self.callbacks:
+                        callback(pkt, m)
+
+            self.bucket.clear()
+
+    def __repr__(self):
+        return "RegexpQuery"
+
+    def __eq__(self, other):
+        # TODO: if buckets eventually have names, equality should
+        # be on names.
+        return isinstance(other, RegexpQuery) and (other.re == self.re)
+
+
+
+

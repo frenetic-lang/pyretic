@@ -1,0 +1,37 @@
+{
+   "OFPFlowMod": {
+      "actions": [
+         {
+            "OFPActionOutput": {
+               "max_len": 65535, 
+               "port": 6
+            }
+         }
+      ], 
+      "buffer_id": 65535, 
+      "command": 0, 
+      "cookie": 0, 
+      "flags": 0, 
+      "hard_timeout": 0, 
+      "idle_timeout": 0, 
+      "match": {
+         "OFPMatch": {
+            "dl_dst": "8gukffjq", 
+            "dl_src": "////////", 
+            "dl_type": 0, 
+            "dl_vlan": 0, 
+            "dl_vlan_pcp": 0, 
+            "in_port": 0, 
+            "nw_dst": 0, 
+            "nw_proto": 0, 
+            "nw_src": 0, 
+            "nw_tos": 0, 
+            "tp_dst": 0, 
+            "tp_src": 0, 
+            "wildcards": 4194295
+         }
+      }, 
+      "out_port": 65532, 
+      "priority": 123
+   }
+}
