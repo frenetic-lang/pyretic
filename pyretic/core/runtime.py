@@ -381,7 +381,7 @@ class Runtime(object):
             :rtype: Classifier
             """
             specialized_rules = []
-            default_vlan_match = match(vlan_id=0xFFFF, vlan_pcp=0)
+            default_vlan_match = match(vlan_id=0x0000, vlan_pcp=0)
             for rule in classifier.rules:
                 if ( ( isinstance(rule.match, match) and
                        not 'vlan_id' in rule.match.map ) or
@@ -1146,6 +1146,11 @@ class Runtime(object):
                 self.log.debug("Got removed flow\n%s with counts %d %d" %
                                (str(match_entry), f['packet_count'],
                                 f['byte_count']) )
+            self.log.debug('Printing global structure for deleted rules:')
+            for k,v in self.global_outstanding_deletes.iteritems():
+                self.log.debug(str(k) + " : " + str(v))
+            self.log.debug('Printing current match being checked:')
+            self.log.debug(str(match_entry))
             if match_entry in self.global_outstanding_deletes:
                 bucket_list = self.global_outstanding_deletes[match_entry]
                 for bucket in bucket_list:

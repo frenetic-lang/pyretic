@@ -548,7 +548,7 @@ class CountBucket(Query):
         self.log = logging.getLogger('%s.CountBucket' % __name__)
         
     def __repr__(self):
-        return "CountBucket"
+        return "CountBucket " + str(id(self))
 
     def is_new_bucket(self):
         return self.new_bucket
@@ -811,6 +811,9 @@ class CountBucket(Query):
                                 self.packet_count += extracted_pkts
                                 self.byte_count   += extracted_bytes
                             else: # pre-existing rule when bucket was created
+                                self.log.debug(('In bucket %d: removing' +
+                                                'pre-existing rule counts %d' +
+                                                ' %d') % id(self))
                                 self.packet_count_persistent -= extracted_pkts
                                 self.byte_count_persistent -= extracted_bytes
                                 self.clear_existing_rule_flag(me)
