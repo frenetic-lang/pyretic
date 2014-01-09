@@ -30,6 +30,7 @@
 
 import pyretic.core.util as util
 from pyretic.core.language import *
+from pyretic.core.language_tools import *
 from pyretic.core.network import *
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
