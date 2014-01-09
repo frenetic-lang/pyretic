@@ -73,7 +73,10 @@ class Runtime(object):
         self.extended_values_lock = RLock()
         self.dynamic_sub_pols = set()
         self.update_dynamic_sub_pols()
-        self.in_update_network = False
+        self.in_network_update = False
+        self.in_bucket_apply = False
+        self.network_triggered_policy_update = False
+        self.bucket_triggered_policy_update = False
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
         self.manager = Manager()
@@ -111,14 +114,23 @@ class Runtime(object):
             output = self.policy.eval(pyretic_pkt)
 
             # apply the queries whose buckets have received new packets
+            self.in_bucket_apply = True
             for q in queries:
                 q.apply()
-
+            self.in_bucket_apply = False
+            
+            # if the query changed the policy, update the controller and switch state
+            if self.bucket_triggered_policy_update:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+                self.bucket_triggered_policy_update = False
+                    
         # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
         map(self.send_packet,concrete_output)
 
         # if in reactive mode and no packets are forwarded to buckets, install microflow
+        # Note: lack of forwarding to bucket implies no bucket-trigger update could have occured
         if self.mode == 'reactive0' and not queries:
             self.reactive0_install(pyretic_pkt,output)
 
@@ -132,58 +144,72 @@ class Runtime(object):
         Updates runtime behavior (both interpreter and switch classifiers)
         some sub-policy in self.policy changes.
         """
-        map(lambda p: p.invalidate_classifier(), 
-            on_recompile_path(set(),id(sub_pol),self.policy))
-
-        if self.in_update_network:
-            return
-
         with self.policy_lock:
-            self.update_dynamic_sub_pols()
-            classifier = None
-            if self.mode == 'proactive0' or self.mode == 'proactive1':
-                classifier = self.policy.compile()
 
-        self.update_switches(classifier)
-          
+            # tag stale classifiers as invalid
+            map(lambda p: p.invalidate_classifier(), 
+                on_recompile_path(set(),id(sub_pol),self.policy))
+
+            # if change was driven by a network update, flag
+            if self.in_network_update:
+                self.network_triggered_policy_update = True
+
+            # if this change driven by a bucket side-effect, flag
+            elif self.in_bucket_apply:
+                self.bucket_triggered_policy_update = True
+
+            # otherwise, update controller and switches accordingly
+            else:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+
+
     def handle_network_change(self):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         when the concrete network topology changes.
         """
         with self.network_lock:
-            if self.network.topology != self.prev_network.topology:
-                self.in_update_network = True
-                self.prev_network = self.network.copy()
 
-                with self.policy_lock:
-                    for policy in self.dynamic_sub_pols:
-                        policy.set_network(self.network)
+            # if the topology hasn't changed, ignore
+            if self.network.topology == self.prev_network.topology:
+                return
+
+            # otherwise copy the network object
+            self.in_network_update = True
+            self.prev_network = self.network.copy()
+
+            # update the policy w/ the new network object
+            with self.policy_lock:
+                for policy in self.dynamic_sub_pols:
+                    policy.set_network(self.network)
+
+                if self.network_triggered_policy_update:
                     self.update_dynamic_sub_pols()
-                    classifier = None
-                    if self.mode == 'proactive0' or self.mode == 'proactive1':
-                        classifier = self.policy.compile()
+                    self.update_switch_classifiers()
+                    self.network_triggered_policy_update = False
 
-                    self.update_switches(classifier)
+            self.in_network_update = False
 
-                self.in_update_network = False
-
-    def update_switches(self,classifier):
+    
+    def update_switch_classifiers(self):
         """
-        Updates switch tables based on input classifier
-
-        :param classifier: the input classifier
-        :type classifier: Classifier
+        Updates switch classifiers
         """
+        classifier = None
+        
         if self.mode == 'reactive0':
             self.clear_all() 
+
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
+            classifier = self.policy.compile()
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
                                               "policy="+repr(self.policy),
                                               "classifier="+repr(classifier)))
             self.install_classifier(classifier)
+
 
     def update_dynamic_sub_pols(self):
         """
