@@ -30,6 +30,7 @@
 import pyretic.core.util as util
 
 from pyretic.core.language import *
+from pyretic.core.language_tools import *
 from pyretic.core.network import *
 from pyretic.core.packet import *
 
@@ -126,11 +127,14 @@ class Runtime(object):
 # DYNAMICS  
 #############
 
-    def handle_policy_change(self):
+    def handle_policy_change(self,sub_pol):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         some sub-policy in self.policy changes.
         """
+        map(lambda p: p.invalidate_classifier(), 
+            on_recompile_path(set(),id(sub_pol),self.policy))
+
         if self.in_update_network:
             return
 
