@@ -26,8 +26,8 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
-import time
+from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, CountBucket, FwdBucket, DynamicPolicy
+import time, copy
 from threading import Thread
 from multiprocessing import Lock
 
@@ -48,9 +48,9 @@ class LimitFilter(DynamicFilter):
 
     def get_pred_from_pkt(self, pkt):
         if self.group_by:    # MATCH ON PROVIDED GROUP_BY
-            pred = match([(field,pkt[field]) for field in self.group_by])
+            return match([(field,pkt[field]) for field in self.group_by])
         else:              # OTHERWISE, MATCH ON ALL AVAILABLE GROUP_BY
-            pred = match([(field,pkt[field]) 
+            return match([(field,pkt[field])
                               for field in pkt.available_group_by()])
 
     def update_policy(self,pkt):
@@ -118,7 +118,6 @@ class counts(DynamicPolicy):
         """Setup for pulling stats and related book-keeping."""
         self.callbacks = []
         self.bucket_dict = {}
-        self.queried_preds = set([])
         self.reported_counts = {}
         self.queried_preds = set([])
         self.queried_preds_lock = Lock()
@@ -127,7 +126,7 @@ class counts(DynamicPolicy):
         """Setup polling of stats from switches every `interval` seconds. If
         interval is None, the application needs to call pull_stats directly."""
         if interval:
-            self.qt = threading.Thread(target=self.query_thread, args=(interval,))
+            self.qt = Thread(target=self.query_thread, args=(interval,))
             self.qt.daemon = True
             self.qt.start()
 
@@ -155,12 +154,12 @@ class counts(DynamicPolicy):
         def collect(pkt_byte_counts):
             with self.queried_preds_lock:
                 if pred in self.queried_preds:
-                    self.returned_counts[pred] = pkt_byte_counts
+                    self.reported_counts[pred] = pkt_byte_counts
                     self.queried_preds.remove(pred)
             # Check if all queried buckets have returned
             if not self.queried_preds:
                 for f in self.callbacks:
-                    f(self.returned_counts)
+                    f(self.reported_counts)
         return collect
 
     def register_callback(self, fn):
@@ -171,8 +170,8 @@ class counts(DynamicPolicy):
         with self.queried_preds_lock:
             self.queried_preds = set(copy.deepcopy(self.bucket_dict.keys()))
             self.reported_counts = {}
-        for pred in self.queried_preds:
-            self.bucket_dict[pred].pull_stats()
+            for pred in self.queried_preds:
+                self.bucket_dict[pred].pull_stats()
 
     def __repr__(self):
         return "counts\n%s" % repr(self.policy)

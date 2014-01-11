@@ -57,10 +57,19 @@ def byte_counts():
   q.register_callback(byte_count_printer)
   return q
 
+def proactive_counts():
+    q = counts(2.5,['srcip','dstip'])
+    q.register_callback(proactive_counts_printer)
+    return q
+
+def proactive_counts_printer(counts):
+    print "----proactive counts----"
+    print counts
 
 ### Main ###
 
 def main():
-    return (packet_counts() + 
-            byte_counts() + 
-            mac_learner())
+#    return (packet_counts() +
+#            byte_counts() +
+#            mac_learner())
+    return (proactive_counts() + mac_learner())
