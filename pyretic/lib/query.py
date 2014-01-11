@@ -29,6 +29,7 @@
 from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket
 import time
 from threading import Thread
+from multiprocessing import Lock
 
 class LimitFilter(DynamicFilter):
     """A DynamicFilter that matches the first limit packets in a specified grouping.
@@ -119,14 +120,23 @@ class counts(DynamicPolicy):
         self.bucket_dict = {}
         self.queried_preds = set([])
         self.reported_counts = {}
-        from multiprocessing import Lock
         self.queried_preds = set([])
         self.queried_preds_lock = Lock()
 
     def set_up_polling(self,interval):
-        """Setup polling of stats from switches."""
+        """Setup polling of stats from switches every `interval` seconds. If
+        interval is None, the application needs to call pull_stats directly."""
         if interval:
-            print "do stuff"
+            self.qt = threading.Thread(target=self.query_thread, args=(interval,))
+            self.qt.daemon = True
+            self.qt.start()
+
+    def query_thread(self, interval):
+        """Thread that calls pull_stats every `interval` seconds."""
+        time.sleep(interval)
+        while True:
+            self.pull_stats()
+            time.sleep(interval)
 
     def init_countbucket(self, pkt):
         """When a packet from a previously unseen grouping arrives, set up new
