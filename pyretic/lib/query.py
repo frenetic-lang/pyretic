@@ -100,34 +100,54 @@ class counts(DynamicPolicy):
     :type group_by: string list
     """
     def __init__(self, interval=None, group_by=[]):
-        self.callbacks = []
+        self.set_up_policy(group_by)
+        self.set_up_stats()
+        self.set_up_polling(interval)
+
+    def set_up_policy(self, group_by):
+        """Setup policy structure and basic callbacks."""
         self.bucket_policies = []
-        self.seen_preds = []
-        self.queried_preds = []
         self.groupby_filter = LimitFilter(1,group_by)
         self.fb = FwdBucket() # fb sees first packet of each new grouping
         self.fb.register_callback(self.groupby_filter.update_policy)
         self.fb.register_callback(self.init_countbucket)
         super(counts,self).__init__(self.groupby_filter >> self.fb)
 
+    def set_up_stats(self):
+        """Setup for pulling stats and related book-keeping."""
+        self.callbacks = []
+        self.bucket_dict = {}
+        self.queried_preds = set([])
+        self.reported_counts = {}
+        from multiprocessing import Lock
+        self.queried_preds = set([])
+        self.queried_preds_lock = Lock()
+
+    def set_up_polling(self,interval):
+        """Setup polling of stats from switches."""
+        if interval:
+            print "do stuff"
+
     def init_countbucket(self, pkt):
-        """When a packet from a previously unseen group arrives, set up new
+        """When a packet from a previously unseen grouping arrives, set up new
         count buckets for the same.
         """
         pred = self.groupby_filter.get_pred_from_pkt(pkt)
         cb = CountBucket()
         cb.register_callback(self.collect_pred(pred))
         self.bucket_policies.append(pred >> cb)
-        self.seen_preds.append(pred)
+        self.bucket_dict[pred] = cb
         self.policy = ((self.groupby_filter >> self.fb) +
                        union(self.bucket_policies))
 
     def collect_pred(self, pred):
         """Return a callback function specific to each grouping predicate."""
         def collect(pkt_byte_counts):
-            if pred in self.queried_preds:
-                self.returned_counts[pred] = pkt_byte_counts
-                self.queried_preds.remove(pred)
+            with self.queried_preds_lock:
+                if pred in self.queried_preds:
+                    self.returned_counts[pred] = pkt_byte_counts
+                    self.queried_preds.remove(pred)
+            # Check if all queried buckets have returned
             if not self.queried_preds:
                 for f in self.callbacks:
                     f(self.returned_counts)
@@ -137,10 +157,12 @@ class counts(DynamicPolicy):
         self.callbacks.append(fn)
 
     def pull_stats(self):
-        print "to do"
-
-    def collect_buckets(self):
-        print "to do"
+        """Pulls statistics from the switches corresponding to all groupings."""
+        with self.queried_preds_lock:
+            self.queried_preds = set(copy.deepcopy(self.bucket_dict.keys()))
+            self.reported_counts = {}
+        for pred in self.queried_preds:
+            self.bucket_dict[pred].pull_stats()
 
     def __repr__(self):
         return "counts\n%s" % repr(self.policy)
