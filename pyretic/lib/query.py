@@ -146,6 +146,10 @@ class counts(DynamicPolicy):
         cb.register_callback(self.collect_pred(pred))
         self.bucket_policies.append(pred >> cb)
         self.bucket_dict[pred] = cb
+        # Send the current packet to the new countbucket
+        cb.eval(pkt)
+        cb.apply()
+        # In future, send all packets of this grouping directly to this bucket
         self.policy = ((self.groupby_filter >> self.fb) +
                        union(self.bucket_policies))
 
@@ -154,13 +158,18 @@ class counts(DynamicPolicy):
         def collect(pkt_byte_counts):
             with self.queried_preds_lock:
                 if pred in self.queried_preds:
-                    self.reported_counts[pred] = pkt_byte_counts
+                    self.reported_counts[pred.map] = pkt_byte_counts
                     self.queried_preds.remove(pred)
-            # Check if all queried buckets have returned
-            if not self.queried_preds:
-                for f in self.callbacks:
-                    f(self.reported_counts)
+            self.call_callbacks()
         return collect
+
+    def call_callbacks(self):
+        """Check if all queried buckets have returned, and if so, call the
+        callbacks.
+        """
+        if not self.queried_preds:
+            for f in self.callbacks:
+                f(self.reported_counts)
 
     def register_callback(self, fn):
         self.callbacks.append(fn)
@@ -172,6 +181,8 @@ class counts(DynamicPolicy):
             self.reported_counts = {}
             for pred in self.queried_preds:
                 self.bucket_dict[pred].pull_stats()
+        # call callbacks in case no preds were queried in the first place
+        self.call_callbacks()
 
     def __repr__(self):
         return "counts\n%s" % repr(self.policy)
