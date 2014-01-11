@@ -42,7 +42,7 @@ from datetime import datetime
 
 def packet_count_printer(counts):
     print "----counts------"
-    print datetime.now().time().isoformat(), ':', counts
+    print counts
 
 def packet_counts():
   q = count_packets(1,['srcip','dstip'])
@@ -51,7 +51,7 @@ def packet_counts():
 
 def byte_count_printer(n):
     print "----bytes------"
-    print datetime.now().time().isoformat(), ':', n
+    print n
 
 def byte_counts():
   q = count_bytes(1,['srcip','dstip'])
@@ -65,7 +65,12 @@ def proactive_counts():
 
 def proactive_counts_printer(counts):
     print "----proactive counts----"
-    print datetime.now().time().isoformat(), ':', counts
+    print datetime.now().time().isoformat()
+    if counts:
+        for pred, pkt_byte_count in counts.iteritems():
+            print pred, ':', pkt_byte_count
+    else:
+        print '{}'
 
 ### Main ###
 

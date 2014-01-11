@@ -176,11 +176,15 @@ class counts(DynamicPolicy):
 
     def pull_stats(self):
         """Pulls statistics from the switches corresponding to all groupings."""
+        buckets_list = []
         with self.queried_preds_lock:
             self.queried_preds = set(copy.deepcopy(self.bucket_dict.keys()))
             self.reported_counts = {}
             for pred in self.queried_preds:
-                self.bucket_dict[pred].pull_stats()
+                buckets_list.append(self.bucket_dict[pred])
+        # Calling pull_stats while holding the lock creates a potential deadlock
+        for bucket in buckets_list:
+            bucket.pull_stats()
         # call callbacks in case no preds were queried in the first place
         self.call_callbacks()
 
