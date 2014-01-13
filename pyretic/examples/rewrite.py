@@ -31,7 +31,12 @@
 ################################################################################
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
-# mininet:  mininet.sh --topo clique,4,4 (or other single subnet)              #
+# mininet:  mininet.sh --topo single,3                                         #
+# test:     pingall and check for following connectivity pattern               #
+#           h1 -> h2 h3                                                        # 
+#           h2 -> X h3                                                         #
+#           h3 -> X h2                                                         #
+#           all hosts should also be able to ping 10.0.0.11                    #
 ################################################################################
 
 from pyretic.lib.corelib import *
