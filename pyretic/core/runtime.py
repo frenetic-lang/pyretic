@@ -381,7 +381,7 @@ class Runtime(object):
             :rtype: Classifier
             """
             specialized_rules = []
-            default_vlan_match = match(vlan_id=0x0000, vlan_pcp=0)
+            default_vlan_match = match(vlan_id=0xffff)
             for rule in classifier.rules:
                 if ( ( isinstance(rule.match, match) and
                        not 'vlan_id' in rule.match.map ) or
@@ -860,7 +860,14 @@ class Runtime(object):
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
-        classifier = vlan_specialize(classifier)
+
+        # TODO(ngsrinivas): As of OVS 1.9, vlan_specialize seems unnecessary to
+        # keep track of rules that match packets without a VLAN, to the best of
+        # my knowledge. I'm retaining this here just in case there are VLAN rule
+        # installation issues later on. Can be removed in the future if there
+        # are no obvious issues.
+
+        # classifier = vlan_specialize(classifier)
 
         # Get diffs of rules to install from the old (versioned) classifier. The
         # bookkeeping and removing of bucket actions happens at the end of the

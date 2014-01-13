@@ -781,8 +781,6 @@ class CountBucket(Query):
             import copy
             f = copy.copy(flow_stat['match'])
             f['switch'] = s
-            if not 'vlan_pcp' in f:
-                f['vlan_pcp'] = 0
             fme = self.match_entry(f,flow_stat['priority'],flow_stat['cookie'])
             if fme in self.matches.keys():
                 return fme
