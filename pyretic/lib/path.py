@@ -38,31 +38,73 @@ class CharacterGenerator:
     filter_to_token = {}
     token_to_filter = {}
     
-    def __init__(self):
-        self.filter_to_token = CharacterGenerator.filter_to_token
-        self.token_to_filter = CharacterGenerator.token_to_filter
-        self.token = CharacterGenerator.token
-
-    def get_token(self, pol):
-        if pol in self.filter_to_token:
-            token = self.filter_to_token[pol]
-            return token
+    @classmethod
+    def get_token(cls, pol):
+        if pol in cls.filter_to_token:
+            return cls.filter_to_token[pol]
         else:
-            new_token = self.__new_token__()
-            self.filter_to_token[pol] = new_token
-            self.token_to_filter[new_token] = pol
+            new_token = cls.__new_token__()
+            cls.filter_to_token[pol] = new_token
+            cls.token_to_filter[new_token] = pol
             return new_token
 
-    def __new_token__(self):
-        self.token += 1
-        return self.token
+    @classmethod
+    def get_char_from_token(cls, tok):
+        try:
+            return chr(tok)
+        except:
+            return unichr(tok)
+
+    @classmethod
+    def char_in_lexer_language(cls, chr):
+        return chr in ['*','+','|','{','}','(',')','-','^','.','&','?']
+
+    @classmethod
+    def __new_token__(cls):
+        cls.token += 1
+        char = cls.get_char_from_token(cls.token)
+        if cls.char_in_lexer_language(char):
+            return cls.__new_token__()
+        return cls.token
+
 
 class path(Query):
     """A way to query packets or traffic volumes satisfying regular expressions
     denoting paths of located packets.
+
+    :param a: path atom used to construct this path element
+    :type atom: atom
     """
-    def __init__(self):
-        print "to do, still."
+    def __init__(self, a=None, expr=None):
+        if a:
+            assert isinstance(a, atom)
+            self.atom = a
+            self.expr = CharacterGenerator.get_char_from_token(self.atom.token)
+        elif expr:
+            assert isinstance(expr, str)
+            self.expr = expr
+        else:
+            raise RuntimeError
+
+    def __xor__(self, other):
+        """Implementation of the path concatenation operator ('^')"""
+        assert isinstance(other, path)
+        return path(expr=(self.expr + other.expr))
+
+    def __or__(self, other):
+        """Implementation of the path alternation operator ('|')"""
+        assert isinstance(other, path)
+        return path(expr=('(' + self.expr + ')|(' + other.expr + ')'))
+
+    def __pos__(self):
+        """Implementation of the Kleene star operator.
+
+        TODO(ngsrinivas): It just looks wrong to use '+' instead of '*', but
+        unfortunately there is no unary (prefix or postfix) '*' operator in
+        python.
+        """
+        return path(expr=('(' + self.expr + ')*'))
+
 
 class atom(path, Filter):
     """A single atomic match in a path expression.
@@ -71,56 +113,24 @@ class atom(path, Filter):
     :type match: Filter
     """
     def __init__(self, m):
-        if isinstance(m, Filter):
-            self.policy = m
-        else:
-            raise TypeError
-        super(atom, self).__init__()
-        self._token = None
-
-    @property
-    def token(self):
-        """ Generates a token with its policy. This property is only used in the
-        context of using this object as a `path` instance, not an `atom`
-        instance.
-        
-        The token property cannot be set from outside this method.
-        """
-        if not self._token:
-            cg = CharacterGenerator()
-            self._token = cg.get_token(self.policy)
-        return self._token
+        assert isinstance(m, Filter)
+        self.policy = m
+        self.token = CharacterGenerator.get_token(m)
+        super(atom, self).__init__(a=self)
 
     def __and__(self, other):
-        if isinstance(other, atom):
-            self.policy = self.policy & other.policy
-            assert isinstance(self.policy, Filter)
-            return self
-        else:
-            raise TypeError
+        assert isinstance(other, atom)
+        return atom(self.policy & other.policy)
 
-    def __or__(self, other):
+    def __add__(self, other):
         # This won't actually work because the '+' operation results in an
         # object of type parallel, which is not a Filter.
-        if isinstance(other, atom):
-            self.policy = self.policy + other.policy
-            assert isinstance(self.policy, Filter)
-            return self
-        else:
-            raise TypeError
+        assert isinstance(other, atom)
+        return atom(self.policy + other.policy)
 
     def __sub__(self, other):
-        if isinstance(other, atom):
-            self.policy = (~other.policy) & self.policy
-            assert isinstance(self.policy, Filter)
-            return self
-        else:
-            raise TypeError
+        assert isinstance(other, atom)
+        return atom((~other.policy) & self.policy)
 
     def __invert__(self):
-        negated = ~(self.policy)
-        if isinstance(negated, Filter):
-            return atom(negated)
-        else:
-            raise TypeError
-
+        return atom(~(self.policy))
