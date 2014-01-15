@@ -28,6 +28,13 @@
 
 from pyretic.core.language import Filter, match, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
+import subprocess
+import pyretic.vendor
+import pydot
+
+#############################################################################
+### Basic classes for generating path atoms and creating path expressions ###
+#############################################################################
 
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
@@ -134,3 +141,118 @@ class atom(path, Filter):
 
     def __invert__(self):
         return atom(~(self.policy))
+
+#############################################################################
+###        Utilities to get data into ml-ulex, and out into DFA           ###
+#############################################################################
+
+class dfa_utils:
+
+    @classmethod
+    def get_lexer_input(cls, re_list):
+        """Return a string formatted such that ml-ulex could take it as input for
+        generating a scanner.
+
+        :param re_list: list of regular expressions in ml-ulex format.
+        :type re_list: str list
+        """
+        lex_input = ''
+        expr_num = 0
+        for r in re_list:
+            lex_input += (r + ' => ( T.expr_' + str(expr_num) + ' );')
+            lex_input += '\n'
+            expr_num += 1
+        return lex_input
+
+    @classmethod
+    def write_string(cls, string, filename):
+        """Write the provided input string into a file.
+
+        :param string: string input to be written into temporary file.
+        :type string: str
+        :param filename: name of file to be written into
+        :type filename: str
+        """
+        try:
+            f = open(filename, 'w')
+            f.write(string)
+            f.close()
+        except:
+            print error
+            print "There was an error in writing the input to file!"
+
+    @classmethod
+    def run_ml_ulex(cls, inp_file):
+        try:
+            output = subprocess.check_output(["ml-ulex", "--dot", inp_file])
+        except subprocess.CalledProcessError:
+            print "ERROR: There was an error in running ml-ulex!"
+        return output
+
+    @classmethod
+    def sort_states(cls, states_list):
+        get_index = lambda s: int(s.get_name()[1:])
+        cmpfunc = lambda x, y: cmp(get_index(x), get_index(y))
+        return sorted(states_list, cmpfunc)
+
+    @classmethod
+    def print_dfa(cls, g):
+        """Print the extracted DFA from the dot file.
+
+        :param g: graph object extracted from pydot.
+        :type g: Graph (pydot class)
+        """
+        output = "States:\n"
+        states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
+        for node in cls.sort_states(states_list):
+            output += node.get_name()
+            if node.get_shape() == '"doublecircle"':
+                output += ': accepting state for expression '
+                token_line = node.get_label().split('/')[1].split('"')[0]
+                output += token_line
+            output += "\n"
+        output += "\nTransitions:"
+        for edge in g.get_edge_list():
+            src = edge.get_source()
+            dst = edge.get_destination()
+            label = edge.get_label()
+            output += (src + ' --> ' + label + ' --> ' + dst + '\n')
+        print output
+        return output
+
+    @classmethod
+    def get_num_states(cls, g):
+        states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
+        return len(states_list)
+
+    @classmethod
+    def get_num_transitions(cls, g):
+        return len(g.get_edge_list())
+
+    @classmethod
+    def get_num_accepting_states(cls, g):
+        states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
+        num = 0
+        for node in cls.sort_states(states_list):
+            if node.get_shape() == '"doublecircle"':
+                num += 1
+        return num
+
+    @classmethod
+    def regexes_to_dfa(cls, re_list, tmp_ml_ulex_file):
+        lexer_str = cls.get_lexer_input(re_list)
+        cls.write_string(lexer_str, tmp_ml_ulex_file)
+        ml_ulex_out = cls.run_ml_ulex(tmp_ml_ulex_file)
+        tmp_dot  = tmp_ml_ulex_file + ".dot"
+        return pydot.graph_from_dot_file(tmp_dot)
+
+    @classmethod
+    def intersection_is_null(cls, re1, re2, tmp_file):
+        """Determine if the intersection of two regular expressions is null.
+
+        :param re1, re2: regular expressions in string format
+        :type re1, re2: str
+        """
+        re = ['(' + re1 + ') & (' + re2 + ')']
+        return (cls.get_num_states(cls.regexes_to_dfa(re, tmp_file)) == 1)
+

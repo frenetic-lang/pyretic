@@ -159,7 +159,43 @@ def test_slightly_complicated_expr_1():
     assert p.expr == ('(' + a1.expr + a4.expr + ')|(' + a2.expr +
                       a3.expr + ')')
 
+### Simple tests on dfa_utils ### 
 
+### These are some very basic sanity checks, but it's best to confirm
+### correctness by visually inspecting the DFA from ml-ulex for these lists of
+### regexes, and ensuring the printed DFA from du.print_dfa is consistent.
+
+du = dfa_utils
+
+def test_dfa_const_1():
+    re_list = ['ab', 'cd']
+    tmp_file = '/tmp/my_regexes.txt'
+    dfa = du.regexes_to_dfa(re_list, tmp_file) 
+    assert dfa # i.e., we get the dfa without errors.
+    assert du.get_num_states(dfa) == 5
+    assert du.get_num_transitions(dfa) == 4
+    assert du.get_num_accepting_states(dfa) == 2
+
+def test_dfa_const_2():
+    re_list = ['ab',
+               'a|b',
+               'abb*',
+               'cd | ef',
+               '((ac)|(bd))*e',
+               '\ufc66ab']
+    tmp_file = '/tmp/my_regexes.txt'
+    dfa = du.regexes_to_dfa(re_list, tmp_file) 
+    assert dfa
+    assert du.get_num_states(dfa) == 15
+    assert du.get_num_transitions(dfa) == 19
+    assert du.get_num_accepting_states(dfa) == 8
+
+def test_regex_intersection():
+    tmp = '/tmp/my_regexes_int.txt'
+    assert not du.intersection_is_null('ab*', 'a*b', tmp)
+    assert du.intersection_is_null('ab', 'cd', tmp)
+    assert not du.intersection_is_null('ab|cd', 'ef|a*b*', tmp)
+    
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
 
@@ -184,6 +220,10 @@ if __name__ == "__main__":
     test_path_kleene_closure()
 
     test_slightly_complicated_expr_1()
+
+    test_dfa_const_1()
+    test_dfa_const_2()
+    test_regex_intersection()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
