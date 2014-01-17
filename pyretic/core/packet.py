@@ -385,11 +385,11 @@ class VlanPcp(object):
 
         if not vlan.vlan in pkt:
             pkt.protocols.insert(1, vlan.vlan(ethertype=pkt.protocols[0].ethertype))
-            pkt.protocols[0].ethertype = VLAN
 
         gen = (protocol for protocol in pkt.protocols if protocol.__class__ == vlan.vlan)
         vl = gen.next()
         vl.pcp = pyr['vlan_pcp']
+        pkt.protocols[0].ethertype = VLAN
 
         return pyr
 
@@ -408,11 +408,11 @@ class VlanID(object):
 
         if not vlan.vlan in pkt:
             pkt.protocols.insert(1, vlan.vlan(ethertype=pkt.protocols[0].ethertype))
-            pkt.protocols[0].ethertype = VLAN
 
         gen = (protocol for protocol in pkt.protocols if protocol.__class__ == vlan.vlan)
         vl = gen.next()
         vl.vid = pyr['vlan_id']
+        pkt.protocols[0].ethertype = VLAN
 
         return pyr
 
