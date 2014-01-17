@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import Filter, match, Query, FwdBucket, CountBucket
+from pyretic.core.language import Filter, drop, match, modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
 import subprocess
 import pyretic.vendor
@@ -63,8 +63,14 @@ class CharacterGenerator:
             return unichr(tok)
 
     @classmethod
+    def get_token_from_char(cls, char):
+        return ord(char)
+
+    @classmethod
     def char_in_lexer_language(cls, chr):
-        return chr in ['*','+','|','{','}','(',')','-','^','.','&','?']
+        return chr in ['*','+','|','{','}','(',
+                       ')','-','^','.','&','?',
+                       '"',"'",'%']
 
     @classmethod
     def __new_token__(cls):
@@ -93,6 +99,9 @@ class path(Query):
         else:
             raise RuntimeError
 
+    def __repr__(self):
+        return self.expr + ' ' + str(id(self))
+
     def __xor__(self, other):
         """Implementation of the path concatenation operator ('^')"""
         assert isinstance(other, path)
@@ -111,6 +120,75 @@ class path(Query):
         python.
         """
         return path(expr=('(' + self.expr + ')*'))
+
+    @classmethod
+    def clear(cls):
+        try:
+            cls.re_list = []
+            cls.paths_list = []
+            cls.path_to_bucket = {}
+        except:
+            pass
+
+    @classmethod
+    def finalize(cls, p):
+        """Add a path into the set of final path queries that will be
+        compiled. This is explicitly needed since at the highest level there is
+        no AST for the paths.
+
+        :param p: path to be finalized for querying (and hence compilation).
+        :type p: path
+        """
+        try:
+            cls.re_list.append(p.expr)
+            cls.paths_list.append([p])
+            cls.path_to_bucket[p] = FwdBucket() ### XXX generalize later.
+        except:
+            cls.re_list = [p.expr]
+            cls.paths_list = [[p]]
+            cls.path_to_bucket = {p: FwdBucket()} ### XXX generalize later.
+
+    @classmethod
+    def compile(cls):
+        """Generates tagging and counting policy fragments to use with the
+        returned general network policy.
+        """
+        du = dfa_utils
+        cg = CharacterGenerator
+        dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
+
+        def set_tag(val):
+            return modify({'vlan_id': int(val), 'vlan_pcp': 0})
+
+        def match_tag(val):
+            if int(val) == 0:
+                val = 0xffff
+            return match({'vlan_id': int(val), 'vlan_pcp': 0})
+
+        tagging_policy = drop
+        counting_policy = drop
+        edge_list = du.get_edges(dfa)
+
+        for edge in edge_list:
+            # generate tagging fragment
+            src = du.get_state_id(du.get_edge_src(edge, dfa))
+            dst = du.get_state_id(du.get_edge_dst(edge, dfa))
+            token = cg.get_token_from_char(du.get_edge_label(edge))
+            transit_match = cg.token_to_filter[token]
+            tagging_policy += ((match_tag(src) & transit_match) >>
+                               set_tag(dst))
+
+            # generate counting fragment, if accepting state.
+            dst_state = du.get_edge_dst(edge, dfa)
+            if du.is_accepting(dst_state):
+                accepted_token = du.get_accepted_token(dst_state)
+                paths = cls.paths_list[accepted_token]
+                for p in paths:
+                    bucket = cls.path_to_bucket[p]
+                    counting_policy += ((match_tag(src) & transit_match) >>
+                                        bucket)
+
+        return [tagging_policy, counting_policy]
 
 
 class atom(path, Filter):
@@ -206,10 +284,9 @@ class dfa_utils:
         states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
         for node in cls.sort_states(states_list):
             output += node.get_name()
-            if node.get_shape() == '"doublecircle"':
+            if cls.is_accepting(node):
                 output += ': accepting state for expression '
-                token_line = node.get_label().split('/')[1].split('"')[0]
-                output += token_line
+                output += str(cls.get_accepted_token(node))
             output += "\n"
         output += "\nTransitions:"
         for edge in g.get_edge_list():
@@ -221,20 +298,59 @@ class dfa_utils:
         return output
 
     @classmethod
+    def get_state_id(cls, s):
+        return (s.get_name())[1:]
+
+    @classmethod
+    def get_states(cls, g):
+        return [n for n in g.get_node_list() if n.get_name() != 'graph']
+
+    @classmethod
+    def get_edge_src(cls, e, g):
+        """Get the source node object of an edge.
+
+        :param e: edge object
+        :type e: Edge
+        :param g: graph object
+        :type g: Graph
+        """
+        return g.get_node(e.get_source())[0]
+
+    @classmethod
+    def get_edge_dst(cls, e, g):
+        return g.get_node(e.get_destination())[0]
+
+    @classmethod
+    def get_edge_label(cls, e):
+        return e.get_label()[1:-1]
+
+    @classmethod
+    def get_edges(cls, g):
+        return g.get_edge_list()
+
+    @classmethod
     def get_num_states(cls, g):
-        states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
-        return len(states_list)
+        return len(cls.get_states(g))
 
     @classmethod
     def get_num_transitions(cls, g):
         return len(g.get_edge_list())
 
     @classmethod
+    def is_accepting(cls, s):
+        return s.get_shape() == '"doublecircle"'
+
+    @classmethod
+    def get_accepted_token(cls, s):
+        assert cls.is_accepting(s)
+        return int(s.get_label().split('/')[1].split('"')[0])
+
+    @classmethod
     def get_num_accepting_states(cls, g):
-        states_list = [n for n in g.get_node_list() if n.get_name() != 'graph']
+        states_list = cls.get_states(g)
         num = 0
         for node in cls.sort_states(states_list):
-            if node.get_shape() == '"doublecircle"':
+            if cls.is_accepting(node):
                 num += 1
         return num
 
@@ -255,4 +371,3 @@ class dfa_utils:
         """
         re = ['(' + re1 + ') & (' + re2 + ')']
         return (cls.get_num_states(cls.regexes_to_dfa(re, tmp_file)) == 1)
-

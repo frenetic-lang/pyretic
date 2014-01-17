@@ -195,7 +195,70 @@ def test_regex_intersection():
     assert not du.intersection_is_null('ab*', 'a*b', tmp)
     assert du.intersection_is_null('ab', 'cd', tmp)
     assert not du.intersection_is_null('ab|cd', 'ef|a*b*', tmp)
-    
+
+### Test path finalization and compilation ###
+
+def test_path_finalize_1():
+    path.clear()
+    a1 = atom(match(srcip=ip2))
+    a2 = atom(match(switch=2))
+    p = a1 ^ a2
+    path.finalize(p)
+    assert path.re_list and path.paths_list and path.path_to_bucket
+    assert path.re_list == [p.expr]
+    assert path.paths_list == [[p]]
+    assert isinstance(path.path_to_bucket[p], Query)
+
+def test_path_finalize_2():
+    path.clear()
+    a1 = atom(match(srcip=ip2))
+    a2 = atom(match(switch=2))
+    p1 = a1 ^ a2
+    p2 = a1 | a2
+    path.finalize(p1)
+    path.finalize(p2)
+    assert path.re_list == [p1.expr, p2.expr]
+    assert path.paths_list == [ [p1], [p2] ]
+    for p in path.path_to_bucket:
+        assert isinstance(path.path_to_bucket[p], Query)
+
+def test_path_compile_1():
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    path.finalize(a1)
+    [tags, counts] = path.compile()
+    # Note: this test depends on state numbers, which eventually get changed
+    # into tags. So it's not implementation detail-independent. Also, it relies
+    # on the fact that vlan is used for packet tagging.
+    ref_tags = ((match(vlan_id=0xffff, vlan_pcp=0) & match(srcip=ip1))
+                >> modify(vlan_id=1, vlan_pcp=0))
+    ref_counts = ((match(vlan_id=0xffff, vlan_pcp=0) & match(srcip=ip1)) >>
+                  FwdBucket())
+    [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
+    assert tags._classifier
+    assert counts._classifier
+    assert tags._classifier == ref_tags._classifier
+    assert counts._classifier == ref_counts._classifier
+
+def test_path_compile_2():
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(dstip=ip2))
+    path.finalize(a1 ^ a2)
+    [tags, counts] = path.compile()
+    # Note: Caveats in test_path_compile_1 apply.
+    ref_tags = (((match(vlan_id=0xffff, vlan_pcp=0) & match(srcip=ip1))
+                 >> modify(vlan_id=1, vlan_pcp=0)) +
+                ((match(vlan_id=1, vlan_pcp=0) & match(dstip=ip2))
+                 >> modify(vlan_id=2, vlan_pcp=0)))
+    ref_counts = ((match(vlan_id=1, vlan_pcp=0) & match(dstip=ip2)) >>
+                  FwdBucket())
+    [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
+    assert tags._classifier
+    assert counts._classifier
+    assert tags._classifier == ref_tags._classifier
+    assert counts._classifier == ref_counts._classifier
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
 
@@ -224,6 +287,11 @@ if __name__ == "__main__":
     test_dfa_const_1()
     test_dfa_const_2()
     test_regex_intersection()
+
+    test_path_finalize_1()
+    test_path_finalize_2()
+    test_path_compile_1()
+    test_path_compile_2()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
