@@ -184,10 +184,14 @@ class Runtime(object):
                 for policy in self.dynamic_sub_pols:
                     policy.set_network(self.network)
 
-                if self.network_triggered_policy_update:
-                    self.update_dynamic_sub_pols()
-                    self.update_switch_classifiers()
-                    self.network_triggered_policy_update = False
+                # FIXME(joshreich) :-)
+                # This is a temporary fix. We need to specialize the check below
+                # instead of removing it completely, but will let @joshreich
+                # take care of it. -- ngsrinivas
+                # if self.network_triggered_policy_update:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+                self.network_triggered_policy_update = False
 
             self.in_network_update = False
 
