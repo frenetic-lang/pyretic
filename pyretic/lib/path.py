@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import Filter, drop, match, modify, Query, FwdBucket, CountBucket
+from pyretic.core.language import identity, Filter, drop, match, modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
 import subprocess
 import pyretic.vendor
@@ -98,6 +98,7 @@ class path(Query):
             self.expr = expr
         else:
             raise RuntimeError
+        super(path, self).__init__()
 
     def __repr__(self):
         return self.expr + ' ' + str(id(self))
@@ -139,17 +140,23 @@ class path(Query):
         :param p: path to be finalized for querying (and hence compilation).
         :type p: path
         """
+        def register_callbacks(bucket, callbacks):
+            for f in callbacks:
+                bucket.register_callback(f)
+
+        fb = FwdBucket() ### XXX generalize later to other buckets.
+        register_callbacks(fb, p.callbacks)
         try:
             cls.re_list.append(p.expr)
             cls.paths_list.append([p])
-            cls.path_to_bucket[p] = FwdBucket() ### XXX generalize later.
+            cls.path_to_bucket[p] = fb
         except:
             cls.re_list = [p.expr]
             cls.paths_list = [[p]]
-            cls.path_to_bucket = {p: FwdBucket()} ### XXX generalize later.
+            cls.path_to_bucket = {p: fb}
 
     @classmethod
-    def compile(cls):
+    def get_policy_fragments(cls):
         """Generates tagging and counting policy fragments to use with the
         returned general network policy.
         """
@@ -166,6 +173,7 @@ class path(Query):
             return match({'vlan_id': int(val), 'vlan_pcp': 0})
 
         tagging_policy = drop
+        untagged_packets = identity
         counting_policy = drop
         edge_list = du.get_edges(dfa)
 
@@ -175,8 +183,9 @@ class path(Query):
             dst = du.get_state_id(du.get_edge_dst(edge, dfa))
             token = cg.get_token_from_char(du.get_edge_label(edge))
             transit_match = cg.token_to_filter[token]
-            tagging_policy += ((match_tag(src) & transit_match) >>
-                               set_tag(dst))
+            tagging_match = match_tag(src) & transit_match
+            tagging_policy += (tagging_match >> set_tag(dst))
+            untagged_packets = untagged_packets & ~tagging_match
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -188,8 +197,25 @@ class path(Query):
                     counting_policy += ((match_tag(src) & transit_match) >>
                                         bucket)
 
+        # preserve untagged packets as is for forwarding.
+        tagging_policy += untagged_packets
         return [tagging_policy, counting_policy]
 
+    @classmethod
+    def compile(cls, path_pols):
+        """Stitch together the "single packet policy" and "path policy" and
+        return the globally effective network policy.
+
+        :param path_pols: a list of path queries
+        :type path_pols: path list
+        :param single_pkt_pol: main forwarding (single pkt) policy set by
+        application
+        :type single_pkt_pol: Policy
+        """
+        for p in path_pols:
+            cls.finalize(p)
+        [tagging_policy, counting_policy] = cls.get_policy_fragments()
+        return [tagging_policy, counting_policy]
 
 class atom(path, Filter):
     """A single atomic match in a path expression.

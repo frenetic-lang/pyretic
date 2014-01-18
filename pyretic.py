@@ -121,6 +121,10 @@ def main():
         sys.exit(1)
 
     main = module.main
+    try:
+        path_main = module.path_main
+    except:
+        path_main = None
     kwargs = { k : v for [k,v] in [ i.lstrip('--').split('=') for i in kwargs_to_pass ]}
 
     sys.setrecursionlimit(1500) #INCREASE THIS IF "maximum recursion depth exceeded"
@@ -160,7 +164,7 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(log_level)
     
-    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity)
+    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()

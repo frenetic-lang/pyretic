@@ -57,12 +57,18 @@ class Runtime(object):
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
     """
-    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
+    def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
+                 verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+        if path_main:
+            from pyretic.lib.path import path
+            path_policies = path_main(**kwargs)
+            [tagging_pol, counting_pol] = path.compile(path_policies)
+            self.policy = ((tagging_pol >> self.policy) + counting_pol)
         self.mode = mode
         self.backend = backend
         self.backend.runtime = self
@@ -213,8 +219,8 @@ class Runtime(object):
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
-                                              "policy="+repr(self.policy),
-                                              "classifier="+repr(classifier)))
+                                              "policy=\n"+repr(self.policy),
+                                              "classifier=\n"+repr(classifier)))
             self.install_classifier(classifier)
 
 
