@@ -181,7 +181,7 @@ class Filter(Policy):
         :rtype: Difference
         """
         if isinstance(pol,Filter):
-            return difference([self, pol])
+            return difference(self, pol)
         else:
             raise TypeError
 
