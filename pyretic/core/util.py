@@ -73,7 +73,8 @@ class frozendict(object):
     def remove(self, ks):
         d = self._dict.copy()
         for k in ks:
-            del d[k]
+            if k in d:
+                del d[k]
         return self.__class__(d)
         
     def pop(self, *ks):
