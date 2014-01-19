@@ -31,7 +31,7 @@
 # -------------------------------------------------------------------          #
 # mininet: mininet.sh --topo=chain,2,2                                         #
 # pyretic: pyretic.py pyretic.examples.path_query -m p0                        #
-# test:    h1 ping h3 should produce packets at the controller from s3.        #
+# test:    h1 ping h2 should produce packets at the controller from s2.        #
 ################################################################################
 
 from pyretic.lib.corelib import *
@@ -53,7 +53,7 @@ def query_callback(pkt):
 
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
-    a2 = atom(match(switch=2,srcip=ip2))
+    a2 = atom(match(switch=2,dstip=ip2))
     p = a1 ^ a2
     p.register_callback(query_callback)
     return p

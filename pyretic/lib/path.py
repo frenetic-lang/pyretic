@@ -165,12 +165,12 @@ class path(Query):
         dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
 
         def set_tag(val):
-            return modify({'vlan_id': int(val), 'vlan_pcp': 0})
+            return modify({'vlan_id': int(val)})
 
         def match_tag(val):
             if int(val) == 0:
-                val = 0xffff
-            return match({'vlan_id': int(val), 'vlan_pcp': 0})
+                return identity
+            return match({'vlan_id': int(val)})
 
         tagging_policy = drop
         untagged_packets = identity
