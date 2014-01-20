@@ -29,9 +29,9 @@
 ################################################################################
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
-# mininet: mininet.sh --topo=chain,2,2                                         #
+# mininet: mininet.sh --topo=chain,3,3                                         #
 # pyretic: pyretic.py pyretic.examples.path_query -m p0                        #
-# test:    h1 ping h2 should produce packets at the controller from s2.        #
+# test:    h1 ping h3 should produce packets at the controller from s3.        #
 ################################################################################
 
 from pyretic.lib.corelib import *
@@ -44,27 +44,42 @@ from datetime import datetime
 
 ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
+ip3 = IPAddr('10.0.0.3')
 
-def query_callback(pkt):
-    print '**************'
-    print 'Got a packet satisfying path query!'
-    print pkt
-    print '**************'
+static_fwding_chain_2_2 = (
+    (match(srcip=ip1, dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                                     (match(switch=2) >> fwd(2)))) +
+    (match(srcip=ip2, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                                     (match(switch=2) >> fwd(1)))))
+
+def query_callback(test_num):
+    def actual_callback(pkt):
+        print '**************'
+        print 'Test', test_num, ' -- got a packet satisfying path query!'
+        print pkt
+        print '**************'
+    return actual_callback
 
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
-    a2 = atom(match(switch=2,dstip=ip2))
+    a2 = atom(match(switch=3,dstip=ip3))
     p = a1 ^ a2
-    p.register_callback(query_callback)
-    return p
+    p.register_callback(query_callback(1))
+    return [p]
 
+def path_test_2():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=3))
+    p = a1 ^ a2
+    p.register_callback(query_callback(2))
+    return [p]
+
+def path_test_3():
+    return path_test_1() + path_test_2()
+
+# type: unit -> path list
 def path_main():
-    return [path_test_1()]
+    return path_test_3()
 
 def main():
-    return (
-        (match(srcip=ip1, dstip=ip2) >> ((match(switch=1) >> fwd(1)) + 
-                                         (match(switch=2) >> fwd(2)))) +
-        (match(srcip=ip2, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                                         (match(switch=2) >> fwd(1))))
-        )
+    return mac_learner()
