@@ -751,7 +751,7 @@ class Runtime(object):
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
-        classifier = vlan_specialize(classifier)
+        # classifier = vlan_specialize(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
@@ -816,15 +816,11 @@ class Runtime(object):
                 return IP(val)
             else:
                 return val
-        try:
-            vlan_id = packet['vlan_id']
-            vlan_pcp = packet['vlan_pcp']
-            extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
-        except KeyError:
-            extended_values = util.frozendict()       
-        pyretic_packet = Packet(extended_values)
-        d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
+
+        pyretic_packet = Packet(util.frozendict())
+        d = { h : convert(h,v) for (h,v) in packet.items() }
         return pyretic_packet.modifymany(d)
+
     def pyretic2concrete(self,packet):
         concrete_packet = {}
         headers         = {}
@@ -849,11 +845,7 @@ class Runtime(object):
                 headers[header] = val
             except:
                 pass
-        extended_values = extended_values_from(packet)
-        if extended_values:
-            vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
-            concrete_packet['vlan_id'] = vlan_id
-            concrete_packet['vlan_pcp'] = vlan_pcp
+
         concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
 
@@ -1172,3 +1164,57 @@ class ConcreteNetwork(Network):
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         self.debug_log.debug(self.next_topo)
         self.queue_update(self.get_update_no())
+
+################################################################################
+# Virtual Fields
+################################################################################
+class virtual_field:
+    def __init__(self, name, values, type="string"):
+        self.name   = name
+        self.values = values
+        # We need a None value as well
+        self.cardinality = len(values) + 1
+        self.type   = type
+        virtual_field.fields[name] = self
+
+    def index(self,key):
+        try:
+            return self.values.index(key) + 1
+        except ValueError as e:
+            if key == None:
+                return 0
+            raise e
+
+    @classmethod
+    def compress(cls,fields):
+        available_of_fields = { 'vlan_id': 0x1000, 'vlan_pcp': 0x7 }
+        virtual_fields = virtual_field.fields
+        vf_names       = virtual_fields.keys()
+
+        def vhs_to_num(fields):
+            vheaders = dict(filter(lambda a: a[0] in vf_names, fields.iteritems()))
+            # If we there are no virtual_fields specified we wouldn't want to match on them at all
+            # Just return -1 so that calling function knows that the predicate doesn't have any virtual
+            # fields on it
+            if len(vheaders) == 0: return -1
+            for n in vf_names:
+                if n not in vheaders:
+                    vheaders[n] = None
+            ret,temp = 0,1
+            for n,vf in virtual_fields.iteritems():
+                ret *= temp
+                ret += vf.index(vheaders[n])
+                temp = vf.cardinality
+
+            return ret
+        return vhs_to_num(fields)
+
+    @classmethod
+    def map_to_vlan(cls,num):
+        if num == -1: return {}
+        return {
+           "vlan_id" : 0b000111111111111 & num,
+           "vlan_pcp": 0b111000000000000 & num
+        }
+
+virtual_field.fields = {}
