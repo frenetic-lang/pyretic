@@ -1032,7 +1032,11 @@ class Runtime(object):
         try:
             vlan_id = packet['vlan_id']
             vlan_pcp = packet['vlan_pcp']
-            extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
+            # ngsrinivas: Hack for allowing vlan + pcp values to propagate
+            # directly to the controller from the network.
+            # extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
+            extended_values = util.frozendict({'vlan_id': vlan_id,
+                                               'vlan_pcp': vlan_pcp})
         except KeyError:
             extended_values = util.frozendict()       
         pyretic_packet = Packet(extended_values)
@@ -1064,7 +1068,11 @@ class Runtime(object):
                 pass
         extended_values = extended_values_from(packet)
         if extended_values:
-            vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
+            # ngsrinivas: Hack for allowing VLANs to propagate directly from
+            # application into the network.
+            # vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
+            vlan_id = extended_values['vlan_id']
+            vlan_pcp = extended_values['vlan_pcp']
             concrete_packet['vlan_id'] = vlan_id
             concrete_packet['vlan_pcp'] = vlan_pcp
         concrete_packet['raw'] = get_packet_processor().pack(headers)
@@ -1247,7 +1255,8 @@ class Runtime(object):
 def extended_values_from(packet):
     extended_values = {}
     for k, v in packet.header.items():
-        if k not in basic_headers + content_headers + location_headers and v:
+        if ((k not in basic_headers + content_headers + location_headers) and
+            (not v is None)):
             extended_values[k] = v
     return util.frozendict(extended_values)
 
