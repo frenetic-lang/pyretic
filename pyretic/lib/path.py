@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, Filter, drop, match, modify, Query, FwdBucket, CountBucket
+from pyretic.core.language import identity, egress_network, Filter, drop, match, modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
 import subprocess
 import pyretic.vendor
@@ -199,7 +199,11 @@ class path(Query):
 
         # preserve untagged packets as is for forwarding.
         tagging_policy += untagged_packets
-        return [tagging_policy, counting_policy]
+
+        # remove all tags before passing on to hosts.
+        untagging_policy = ((egress_network() >> modify(vlan_id=None)) +
+                            (~egress_network()))
+        return [tagging_policy, untagging_policy, counting_policy]
 
     @classmethod
     def compile(cls, path_pols):
@@ -214,8 +218,7 @@ class path(Query):
         """
         for p in path_pols:
             cls.finalize(p)
-        [tagging_policy, counting_policy] = cls.get_policy_fragments()
-        return [tagging_policy, counting_policy]
+        return cls.get_policy_fragments()
 
 class atom(path, Filter):
     """A single atomic match in a path expression.
