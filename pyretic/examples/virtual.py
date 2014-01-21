@@ -2,7 +2,7 @@ from pyretic.lib.std import *
 from pyretic.modules.mac_learner import *
 from pyretic.modules.hub import *
 from pyretic.core.runtime import virtual_field
-from pyretic.core.language import egress_network
+from pyretic.core.language import egress_network, ingress_network
 
 
 virtual_field(name="acl",values=["permit","deny","inspect"],type="string")
@@ -14,7 +14,7 @@ def main():
     routing_policy  = (match(acl="inspect") >> hub) + (match(acl="permit") >> mac_learner())
 
     untagging_policy = ((egress_network()  >> modify(vlan_id=None, vlan_pcp=None)) +(~egress_network()))
+    tagging_policy   = ((ingress_network()  >> modify(vlan_id=0, vlan_pcp=0)) +(~ingress_network()))
 
-    policy = firewall_policy >> routing_policy >> untagging_policy
-
+    policy = tagging_policy >> firewall_policy >> routing_policy >> untagging_policy
     return policy

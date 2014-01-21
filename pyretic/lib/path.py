@@ -337,7 +337,7 @@ class path(Query):
         dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
         
         # initialize virtual fields
-        virtual_field(name="path_tag", values=range(1, du.get_num_states(dfa)),
+        virtual_field(name="path_tag", values=range(0, du.get_num_states(dfa)),
                       type="integer")
 
         def set_tag(val):
