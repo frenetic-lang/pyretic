@@ -1038,7 +1038,11 @@ class Runtime(object):
             extended_values = util.frozendict({'vlan_id': vlan_id,
                                                'vlan_pcp': vlan_pcp})
         except KeyError:
-            extended_values = util.frozendict()       
+            # ngsrinivas: Hack for allowing packets without VLAN tags on them to
+            # be matched. This should continue to work for policies that don't
+            # have VLAN matches on them.
+            extended_values = util.frozendict({'vlan_id': 0xffff,
+                                               'vlan_pcp': 0})
         pyretic_packet = Packet(extended_values)
         d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
         return pyretic_packet.modifymany(d)
