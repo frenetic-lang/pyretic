@@ -44,16 +44,62 @@ class CharacterGenerator:
     token = 32 # start with printable ASCII for visual inspection ;)
     filter_to_token = {}
     token_to_filter = {}
-    
+    token_to_tokens = {}
+
+    @classmethod
+    def has_nonempty_intersection(cls, p1, p2):
+        """Return True if policies p1, p2 have an intesection which is
+        drop. Works by generating the classifiers for the intersection of the
+        policies, and checking if there are anything other than drop rules.
+        """
+        def get_classifier(p):
+            if p._classifier:
+                return p._classifier
+            return p.generate_classifier()
+
+        int_class = get_classifier(p1 & p2)
+        for rule in int_class:
+            if rule.action != drop:
+                return True
+        return False
+
+    @classmethod
+    def add_new_filter(cls, new_filter):
+        def add_new_token(pol):
+            new_token = cls.__new_token__()
+            cls.filter_to_token[pol] = new_token
+            cls.token_to_filter[new_token] = pol
+            return new_token
+
+        # The algorithm below ensures that matches are disjoint before adding
+        # them. Basically, each character that is present in the path
+        # expressions represents a mutually exclusive packet match.
+        diff_list = drop
+        new_intersecting_tokens = []
+        for existing_filter in cls.token_to_filter.values():
+            if cls.has_nonempty_intersection(existing_filter, new_filter):
+                tok = cls.filter_to_token[existing_filter]
+                del cls.filter_to_token[existing_filter]
+                del cls.token_to_filter[tok]
+                new_tok1 = add_new_token(existing_filter & ~new_filter)
+                new_tok2 = add_new_token(existing_filter & new_filter)
+                new_intersecting_tokens.append(new_tok2)
+                cls.token_to_tokens[tok] = [new_tok1, new_tok2]
+                diff_list = diff_list | existing_filter
+        # add the new_filter itself, differenced by all the intersecting parts.
+        new_disjoint_token = add_new_token(new_filter & ~diff_list)
+        # a new token to be returned for the new policy, is actually a set of
+        # the constituent disjoint parts.
+        new_token = cls.__new_token__()
+        cls.token_to_tokens[new_token] = new_intersecting_tokens + new_disjoint_token
+        return new_token
+
     @classmethod
     def get_token(cls, pol):
         if pol in cls.filter_to_token:
             return cls.filter_to_token[pol]
         else:
-            new_token = cls.__new_token__()
-            cls.filter_to_token[pol] = new_token
-            cls.token_to_filter[new_token] = pol
-            return new_token
+            return cls.add_new_filter(pol)
 
     @classmethod
     def get_char_from_token(cls, tok):
