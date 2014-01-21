@@ -1342,3 +1342,13 @@ class egress_network(DynamicFilter):
 
     def __repr__(self):
         return "egress_network"
+
+def virtual_field_tagging():
+    return ((
+        ingress_network() >> modify(vlan_id=0, vlan_pcp=0))+
+        (~ingress_network()))
+
+def virtual_field_untagging():
+    return ((
+        egress_network() >> modify(vlan_id=None, vlan_pcp=None))+
+        (~egress_network()))
