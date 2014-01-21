@@ -1457,7 +1457,7 @@ class virtual_field:
             # If we there are no virtual_fields specified we wouldn't want to match on them at all
             # Just return -1 so that calling function knows that the predicate doesn't have any virtual
             # fields on it
-            if len(vheaders) == 0: return -1
+            # if len(vheaders) == 0: return -1
             for n in vf_names:
                 if n not in vheaders:
                     vheaders[n] = None
