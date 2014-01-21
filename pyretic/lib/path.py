@@ -47,6 +47,13 @@ class CharacterGenerator:
     token_to_tokens = {}
 
     @classmethod
+    def clear(cls):
+        cls.token = 32
+        cls.filter_to_token = {}
+        cls.token_to_filter = {}
+        cls.token_to_tokens = {}
+
+    @classmethod
     def has_nonempty_intersection(cls, p1, p2):
         """Return True if policies p1, p2 have an intesection which is
         drop. Works by generating the classifiers for the intersection of the
@@ -58,8 +65,8 @@ class CharacterGenerator:
             return p.generate_classifier()
 
         int_class = get_classifier(p1 & p2)
-        for rule in int_class:
-            if rule.action != drop:
+        for rule in int_class.rules:
+            if not drop in rule.actions:
                 return True
         return False
 
@@ -79,20 +86,65 @@ class CharacterGenerator:
         for existing_filter in cls.token_to_filter.values():
             if cls.has_nonempty_intersection(existing_filter, new_filter):
                 tok = cls.filter_to_token[existing_filter]
-                del cls.filter_to_token[existing_filter]
-                del cls.token_to_filter[tok]
-                new_tok1 = add_new_token(existing_filter & ~new_filter)
-                new_tok2 = add_new_token(existing_filter & new_filter)
-                new_intersecting_tokens.append(new_tok2)
-                cls.token_to_tokens[tok] = [new_tok1, new_tok2]
-                diff_list = diff_list | existing_filter
+                if cls.has_nonempty_intersection(existing_filter, ~new_filter):
+                    # do actions below only if the existing filter has some
+                    # intersection with, but is not completely contained in, the
+                    # new filter.
+                    del cls.filter_to_token[existing_filter]
+                    del cls.token_to_filter[tok]
+                    new_tok1 = add_new_token(existing_filter & ~new_filter)
+                    new_tok2 = add_new_token(existing_filter & new_filter)
+                    cls.token_to_tokens[tok] = [new_tok1, new_tok2]
+                    new_intersecting_tokens.append(new_tok2)
+                else:
+                    # i.e., if existing filter is completely contained in new one.
+                    new_intersecting_tokens.append(tok)
+                # add existing_filter into list of policies to be subtracted as
+                # long as there is some intersection.
+                if diff_list == drop:
+                    diff_list = existing_filter
+                else:
+                    diff_list = diff_list | existing_filter
         # add the new_filter itself, differenced by all the intersecting parts.
-        new_disjoint_token = add_new_token(new_filter & ~diff_list)
-        # a new token to be returned for the new policy, is actually a set of
-        # the constituent disjoint parts.
-        new_token = cls.__new_token__()
-        cls.token_to_tokens[new_token] = new_intersecting_tokens + new_disjoint_token
+        if diff_list != drop: # i.e., if there was intersection with existing filters
+            new_token = cls.__new_token__()
+            new_disjoint_token = []
+            if cls.has_nonempty_intersection(new_filter, ~diff_list):
+                # i.e., if the intersections didn't completely make up the new filter
+                new_disjoint_token.append(add_new_token(new_filter & ~diff_list))
+            cls.token_to_tokens[new_token] = new_intersecting_tokens + new_disjoint_token
+        else:
+            # i.e., if there was no intersection at all with existing filters
+            new_token = add_new_token(new_filter)
         return new_token
+
+    @classmethod
+    def get_filter_from_token(cls, tok):
+        if tok in cls.token_to_filter:
+            return cls.token_to_filter[tok]
+        elif tok in cls.token_to_tokens:
+            toklist = cls.token_to_tokens[tok]
+            tok0 = toklist[0]
+            output_filter = cls.get_filter_from_token(tok0)
+            for new_tok in toklist[1:]:
+                output_filter = output_filter | cls.get_filter_from_token(new_tok)
+            return output_filter
+        else:
+            raise TypeError
+
+    @classmethod
+    def get_filter_from_edge_label(cls, edge_label):
+        """Recursive search in token_to_tokens, or just direct return from
+        token_to_filter, for any token.
+        """
+        tok0 = cls.get_token_from_char(edge_label[0])
+        assert tok0 in cls.token_to_filter
+        output_filter = cls.token_to_filter[tok0]
+        for char in edge_label[1:]:
+            tok = cls.get_token_from_char(char)
+            assert tok in cls.token_to_filter
+            output_filter = output_filter | cls.token_to_filter[tok]
+        return output_filter
 
     @classmethod
     def get_token(cls, pol):
@@ -113,10 +165,10 @@ class CharacterGenerator:
         return ord(char)
 
     @classmethod
-    def char_in_lexer_language(cls, chr):
-        return chr in ['*','+','|','{','}','(',
+    def char_in_lexer_language(cls, char):
+        return char in ['*','+','|','{','}','(',
                        ')','-','^','.','&','?',
-                       '"',"'",'%']
+                       '"',"'",'%','$',',','/']
 
     @classmethod
     def __new_token__(cls):
@@ -125,6 +177,26 @@ class CharacterGenerator:
         if cls.char_in_lexer_language(char):
             return cls.__new_token__()
         return cls.token
+
+    @classmethod
+    def get_terminal_expression(cls, expr):
+        def get_terminal_expr_for_char(c):
+            tok = cls.get_token_from_char(c)
+            if not tok in cls.token_to_tokens:
+                assert tok in cls.token_to_filter or cls.char_in_lexer_language(c)
+                return c
+            else:
+                terminal_expr = '('
+                for tok2 in cls.token_to_tokens[tok]:
+                    c2 = cls.get_char_from_token(tok2)
+                    terminal_expr += get_terminal_expr_for_char(c2) + '|'
+                terminal_expr = terminal_expr[:-1] + ')'
+                return terminal_expr
+
+        new_expr = ''
+        for c in expr:
+            new_expr += get_terminal_expr_for_char(c)
+        return new_expr
 
 
 class path(Query):
@@ -192,12 +264,13 @@ class path(Query):
 
         fb = FwdBucket() ### XXX generalize later to other buckets.
         register_callbacks(fb, p.callbacks)
+        expr = CharacterGenerator.get_terminal_expression(p.expr)
         try:
-            cls.re_list.append(p.expr)
+            cls.re_list.append(expr)
             cls.paths_list.append([p])
             cls.path_to_bucket[p] = fb
         except:
-            cls.re_list = [p.expr]
+            cls.re_list = [expr]
             cls.paths_list = [[p]]
             cls.path_to_bucket = {p: fb}
 
@@ -215,7 +288,7 @@ class path(Query):
 
         def match_tag(val):
             if int(val) == 0:
-                return identity
+                return match({'vlan_id': 0xffff, 'vlan_pcp': 0})
             return match({'vlan_id': int(val), 'vlan_pcp': 0})
 
         tagging_policy = drop
@@ -227,8 +300,10 @@ class path(Query):
             # generate tagging fragment
             src = du.get_state_id(du.get_edge_src(edge, dfa))
             dst = du.get_state_id(du.get_edge_dst(edge, dfa))
-            token = cg.get_token_from_char(du.get_edge_label(edge))
-            transit_match = cg.token_to_filter[token]
+            edge_label = du.get_edge_label(edge)
+            if len(edge_label) > 1: # character class
+                edge_label = edge_label[1:-1] # strip off '[' and ']'
+            transit_match = cg.get_filter_from_edge_label(edge_label)
             tagging_match = match_tag(src) & transit_match
             tagging_policy += (tagging_match >> set_tag(dst))
             untagged_packets = untagged_packets & ~tagging_match
@@ -446,4 +521,6 @@ class dfa_utils:
         :type re1, re2: str
         """
         re = ['(' + re1 + ') & (' + re2 + ')']
+        # XXX this will need to be changed to accommodate for the possibility
+        # that the initial state is also an accepting state
         return (cls.get_num_states(cls.regexes_to_dfa(re, tmp_file)) == 1)
