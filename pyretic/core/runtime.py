@@ -846,6 +846,7 @@ class Runtime(object):
             except:
                 pass
 
+        concrete_packet = dict(concrete_packet.items() + virtual_field.expand(headers).items())
         concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
 
@@ -1185,9 +1186,16 @@ class virtual_field:
                 return 0
             raise e
 
+    def value(self,index):
+        try:
+            return self.values[index-1]
+        except ValueError as e:
+            if index == 0:
+                return None
+            raise e
+
     @classmethod
     def compress(cls,fields):
-        available_of_fields = { 'vlan_id': 0x1000, 'vlan_pcp': 0x7 }
         virtual_fields = virtual_field.fields
         vf_names       = virtual_fields.keys()
 
@@ -1208,6 +1216,29 @@ class virtual_field:
 
             return ret
         return vhs_to_num(fields)
+
+    @classmethod
+    def expand(cls,fields):
+        if 'vlan_id' not in fields:
+            return {}
+
+        virtual_fields = virtual_field.fields
+        vf_names       = virtual_fields.keys()
+        num = fields['vlan_pcp'] << 12 + fields['vlan_id']
+
+        def num_to_vhs(num):
+            # If we there are no virtual_fields specified we wouldn't want to match on them at all
+            # Just return -1 so that calling function knows that the predicate doesn't have any virtual
+            # fields on it
+            vfs = {}
+            tmp = num
+            for n,vf in reversed(virtual_fields.items()):
+                val    = tmp % vf.cardinality
+                tmp    = tmp / vf.cardinality
+                vfs[n] = vf.value(val)
+
+            return vfs
+        return num_to_vhs(num)
 
     @classmethod
     def map_to_vlan(cls,num):
