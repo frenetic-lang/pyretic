@@ -242,12 +242,53 @@ class path(Query):
 
     @classmethod
     def clear(cls):
-        try:
-            cls.re_list = []
-            cls.paths_list = []
-            cls.path_to_bucket = {}
-        except:
-            pass
+        cls.re_list = []
+        cls.paths_list = []
+        cls.path_to_bucket = {}
+
+    @classmethod
+    def append_re_without_intersection(cls, new_re, p):
+        du = dfa_utils
+        i = 0
+        diff_re_list = []
+        length = len(cls.re_list)
+        for i in range(0, length):
+            existing_re = cls.re_list[i]
+            if du.re_equals(existing_re, new_re):
+                cls.paths_list[i] += p
+                return False
+            elif du.re_belongs_to(existing_re, new_re):
+                cls.paths_list[i] += p
+                diff_re_list += existing_re
+            elif du.re_has_nonempty_intersection(existing_re, new_re):
+                # separate out the intersecting and non-intersecting parts
+                # non-intersecting part first:
+                cls.re_list[i] = '(' + existing_re + ') & ~(' + new_re + ')'
+                # create a new expression for the intersecting part:
+                intersection_re = '(' + existing_re + ') & (' + new_re + ')'
+                cls.re_list.append(intersection_re)
+                cls.paths_list.append(cls.paths_list[i] + [p])
+                diff_re_list += existing_re
+            # Finally, we do nothing if there is no intersection at all.
+            i += 1
+        # So far we've handled intersecting parts with existing res. Now deal
+        # with the intersecting parts of the new re.
+        new_nonintersecting_re = new_re
+        if diff_re_list:
+            all_intersecting_parts = reduce(lambda x,y: x + '|' + y, diff_re_list)
+            if not du.re_belongs_to(new_re, all_intersecting_parts):
+                # there's some part of the new expression that's not covered by
+                # any of the existing expressions.
+                new_nonintersecting_re = ('(' + new_re + ') & ~(' +
+                                          all_intersecting_parts + ')')
+            else:
+                # the new expression was already covered by (parts) of existing
+                # expressions, and we've already added path references for those.
+                return False
+        # add just the non-overlapping parts of the new re to the re_list.
+        cls.re_list.append(new_nonintersecting_re)
+        cls.paths_list.append([p])
+        return True
 
     @classmethod
     def finalize(cls, p):
@@ -262,17 +303,21 @@ class path(Query):
             for f in callbacks:
                 bucket.register_callback(f)
 
+        # ensure finalization structures exist
+        try:
+            if cls.re_list and cls.paths_list and cls.path_to_bucket:
+                pass
+        except:
+            cls.re_list = [] # str list
+            cls.paths_list = [] # path list list
+            cls.path_to_bucket = {} # dict path: bucket
+
+        # modify finalization structures to keep track of newly added expression
         fb = FwdBucket() ### XXX generalize later to other buckets.
         register_callbacks(fb, p.callbacks)
         expr = CharacterGenerator.get_terminal_expression(p.expr)
-        try:
-            cls.re_list.append(expr)
-            cls.paths_list.append([p])
-            cls.path_to_bucket[p] = fb
-        except:
-            cls.re_list = [expr]
-            cls.paths_list = [[p]]
-            cls.path_to_bucket = {p: fb}
+        cls.append_re_without_intersection(expr, p)
+        cls.path_to_bucket[p] = fb
 
     @classmethod
     def get_policy_fragments(cls):
@@ -514,13 +559,33 @@ class dfa_utils:
         return pydot.graph_from_dot_file(tmp_dot)
 
     @classmethod
-    def intersection_is_null(cls, re1, re2, tmp_file):
+    def intersection_is_null(cls, re1, re2, tmp_file='/tmp/pyretic-regexes-int.txt'):
         """Determine if the intersection of two regular expressions is null.
 
         :param re1, re2: regular expressions in string format
         :type re1, re2: str
         """
         re = ['(' + re1 + ') & (' + re2 + ')']
-        # XXX this will need to be changed to accommodate for the possibility
-        # that the initial state is also an accepting state
-        return (cls.get_num_states(cls.regexes_to_dfa(re, tmp_file)) == 1)
+        dfa = cls.regexes_to_dfa(re, tmp_file)
+        return (cls.get_num_states(dfa) == 1 and
+                cls.get_num_accepting_states(dfa) == 0)
+
+    @classmethod
+    def re_equals(cls, re1, re2):
+        """Determine if two regular expressions are equal."""
+        nre1 = '~(' + re1 + ')'
+        nre2 = '~(' + re2 + ')'
+        return (cls.intersection_is_null(re1, nre2) and
+                cls.intersection_is_null(nre1, re2))
+
+    @classmethod
+    def re_belongs_to(cls, re1, re2):
+        """Return True if re1 is a subset of re2 (including equals), and False
+        otherwise.
+        """
+        nre2 = '~(' + re2 + ')'
+        return cls.intersection_is_null(re1, nre2)
+
+    @classmethod
+    def re_has_nonempty_intersection(cls, re1, re2):
+        return not cls.intersection_is_null(re1, re2)
