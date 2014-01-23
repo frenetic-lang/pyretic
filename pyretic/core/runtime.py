@@ -609,14 +609,12 @@ class Runtime(object):
                     elif pred == true:
                         return {}
                     elif isinstance(pred, match):
-                        _map = pred.translate_virtual_fields()
-                        return { k:v for (k,v) in _map.items() }
+                        return { k:v for (k,v) in pred.map.iteritems() }
                 def concretize_action(a):
                     if a == Controller:
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
-                        _map = a.translate_virtual_fields()
-                        return { k:v for (k,v) in _map.items() }
+                        return { k:v for (k,v) in a.map.iteritems() }
                     else: # default
                         return a
                 m = concretize_match(rule.match)

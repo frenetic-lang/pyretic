@@ -288,7 +288,6 @@ class Controller(Singleton):
     def __repr__(self):
         return "Controller"
     
-
 class match(Filter):
     """
     Match on all specified fields.
@@ -298,8 +297,9 @@ class match(Filter):
     :param **kwargs: field matches in keyword-argument format
     """
     def __init__(self, *args, **kwargs):
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
+        #TODO(Josh, Cole): Why this check is here?
+        #if len(args) == 0 and len(kwargs) == 0:
+        #    raise TypeError
         self.map = util.frozendict(dict(*args, **kwargs))
         self._classifier = self.generate_classifier()
         super(match,self).__init__()
@@ -312,43 +312,16 @@ class match(Filter):
         :type pkt: Packet
         :rtype: set Packet
         """
-        _map = self.translate_virtual_fields()
-
-        for field, pattern in _map.iteritems():
-            try:
-                v = pkt[field]
-                if pattern is None or pattern != v:
-                    return set()
-            except:
-                if pattern is not None:
-                    return set()
-        return {pkt}
-
-    def translate_virtual_fields(self):
-        from pyretic.core.runtime import virtual_field
-        _map = {}
-        _vf  = {}
-
-        for field, pattern in self.map.iteritems():
-            if field in compilable_headers:
-                _map[field] = pattern
-            else:
-                _vf[field] = pattern
-
-        _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
-        return util.frozendict(**_map)
+        return _match(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        r1 = Rule(self,[identity])
-        r2 = Rule(identity,[drop])
-        return Classifier([r1, r2])
+        return _match(**self.map).generate_classifier()
 
     def __eq__(self, other):
         return ( (isinstance(other, match) and self.map == other.map)
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
-
         def _intersect_ip(ipfx, opfx):
             most_specific = None
             if (IPv4Network(ipfx) in IPv4Network(opfx)):
@@ -423,6 +396,44 @@ class match(Filter):
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
 
+class _match(match):
+    def __init__(self, *args, **kwargs):
+        super(_match,self).__init__(*args, **kwargs)
+
+        self.map = self.translate_virtual_fields()
+
+    def generate_classifier(self):
+        r1 = Rule(self,[identity])
+        r2 = Rule(identity,[drop])
+        return Classifier([r1, r2])
+
+    def eval(self,pkt):
+        for field, pattern in self.map.iteritems():
+            try:
+                v = pkt[field]
+                if pattern is None or pattern != v:
+                    return set()
+            except:
+                if pattern is not None:
+                    return set()
+        return {pkt}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map.update(
+          virtual_field.map_to_vlan(
+            virtual_field.compress(_vf)))
+
+        return util.frozendict(**_map)
 
 class modify(Policy):
     """
@@ -433,8 +444,9 @@ class modify(Policy):
     """
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
+        #TODO(Josh, Cole): why this check is here?
+        #if len(args) == 0 and len(kwargs) == 0:
+        #    raise TypeError
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
             reduce(lambda acc, f:
@@ -452,35 +464,10 @@ class modify(Policy):
         :type pkt: Packet
         :rtype: set Packet
         """
-        _map = self.translate_virtual_fields()
-        return {pkt.modifymany(_map)}
-
-    def translate_virtual_fields(self):
-        from pyretic.core.runtime import virtual_field
-        _map = {}
-        _vf  = {}
-
-        # TODO(Omid): refactor hack for policies invoking both VLANs and virtual
-        # fields. Goal is to allow VLANs to take precedence when their value is
-        # None.
-        allow_vf = True
-        if ('vlan_id' in self.map and 'vlan_pcp' in self.map and
-            not self.map['vlan_id'] and not self.map['vlan_pcp']):
-            allow_vf = False
-
-        for field, pattern in self.map.iteritems():
-            if field in compilable_headers:
-                _map[field] = pattern
-            else:
-                _vf[field] = pattern
-
-        if allow_vf:
-            _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
-        return util.frozendict(**_map)
+        return _modify(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        r = Rule(identity,[self])
-        return Classifier([r])
+        return _modify(**self.map).generate_classifier()
 
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
@@ -489,6 +476,35 @@ class modify(Policy):
         return ( isinstance(other, modify)
            and (self.map == other.map) )
 
+class _modify(modify):
+    def __init__(self, *args, **kwargs):
+        super(_modify,self).__init__(*args, **kwargs)
+        # Translate virtual-fields
+        self.map = self.translate_virtual_fields()
+
+    def generate_classifier(self):
+        r = Rule(identity,[self])
+        return Classifier([r])
+
+    def eval(self,pkt):
+        return {pkt.modifymany(self.map)}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map.update(
+          virtual_field.map_to_vlan(
+            virtual_field.compress(_vf)))
+
+        return _map
 
 # FIXME: Srinivas =).
 class Query(Filter):
@@ -1369,5 +1385,5 @@ def virtual_field_untagging():
         vf_matches[name] = None
 
     return ((
-        egress_network() >> modify(vlan_id=None, vlan_pcp=None, **vf_matches))+
+        egress_network() >> _modify(vlan_id=None, vlan_pcp=None))+
         (~egress_network()))

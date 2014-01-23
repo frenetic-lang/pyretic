@@ -110,7 +110,7 @@ def path_test_4():
 
 # type: unit -> path list
 def path_main():
-    return path_test_3()
+    return path_test_2()
 
 def main():
     return mac_learner()
