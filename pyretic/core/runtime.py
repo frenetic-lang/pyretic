@@ -325,12 +325,10 @@ class Runtime(object):
                             specialized_rules.append(Rule(rule.match & match(protocol=proto), rule.actions))
                     else:
                         specialized_rules.append(rule)
-
                 else:
                     specialized_rules.append(rule)
 
             return Classifier(specialized_rules)
-
 
         def bookkeep_buckets(classifier):
             """Whenever rules are associated with counting buckets,
@@ -460,13 +458,20 @@ class Runtime(object):
                 priority[s] -= 1
             return tuple_rules
 
-        ### UPDATE LOGIC
 
+        def optimize(classifier):
+            """ Optimize the classifier by removing extra rules """
+
+            classifier = classifier.optimize()
+            return classifier
+
+        ### UPDATE LOGIC
         def nuclear_install(classifier):
             switch_attrs_tuples = self.network.topology.nodes(data=True)
             switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
             switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
+            classifier = optimize(classifier)
             classifier = concretize(classifier)
             classifier = portize(classifier,switch_to_attrs)
             new_rules = prioritize(classifier,switches)
@@ -502,6 +507,7 @@ class Runtime(object):
                 switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
                 switches = switch_to_attrs.keys()
                 classifier = switchify(classifier,switches)
+                classifier = optimize(classifier)
                 classifier = concretize(classifier)
                 classifier = portize(classifier,switch_to_attrs)
                 new_rules = prioritize(classifier,switches)
