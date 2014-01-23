@@ -208,7 +208,7 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, expr=None):
+    def __init__(self, a=None, expr=None, bucket=FwdBucket):
         if a:
             assert isinstance(a, atom)
             self.atom = a
@@ -219,6 +219,11 @@ class path(Query):
         else:
             raise RuntimeError
         super(path, self).__init__()
+        self.bucket_instance = bucket() # instantiate the bucket type provided
+        self.register_callback = self.bucket_instance.register_callback
+
+    def get_bucket(self):
+        return self.bucket_instance
 
     def __repr__(self):
         return '[path expr: ' + self.expr + ' id: ' + str(id(self)) + ']'
@@ -302,10 +307,6 @@ class path(Query):
         :param p: path to be finalized for querying (and hence compilation).
         :type p: path
         """
-        def register_callbacks(bucket, callbacks):
-            for f in callbacks:
-                bucket.register_callback(f)
-
         # ensure finalization structures exist
         try:
             if cls.re_list and cls.paths_list and cls.path_to_bucket:
@@ -316,11 +317,9 @@ class path(Query):
             cls.path_to_bucket = {} # dict path: bucket
 
         # modify finalization structures to keep track of newly added expression
-        fb = FwdBucket() ### XXX generalize later to other buckets.
-        register_callbacks(fb, p.callbacks)
         expr = CharacterGenerator.get_terminal_expression(p.expr)
         cls.append_re_without_intersection(expr, p)
-        cls.path_to_bucket[p] = fb
+        cls.path_to_bucket[p] = p.bucket_instance
 
     @classmethod
     def get_policy_fragments(cls):

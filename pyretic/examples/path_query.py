@@ -38,6 +38,7 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
+from pyretic.lib.query import counts
 
 import time
 from datetime import datetime
@@ -77,9 +78,17 @@ def path_test_2():
 def path_test_3():
     return path_test_1() + path_test_2()
 
+def path_test_4():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=3))
+    p = a1 ^ a2
+    p.bucket_instance = counts(interval=5)
+    p.register_callback(query_callback(4))
+    return [p]
+
 # type: unit -> path list
 def path_main():
-    return path_test_3()
+    return path_test_4()
 
 def main():
     return mac_learner()
