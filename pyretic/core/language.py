@@ -312,8 +312,9 @@ class match(Filter):
         :type pkt: Packet
         :rtype: set Packet
         """
+        _map = self.translate_virtual_fields()
 
-        for field, pattern in self.map.iteritems():
+        for field, pattern in _map.iteritems():
             try:
                 v = pkt[field]
                 if pattern is None or pattern != v:
@@ -322,6 +323,20 @@ class match(Filter):
                 if pattern is not None:
                     return set()
         return {pkt}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map = dict(virtual_field.map_to_vlan(virtual_field.compress(_vf)).items() + _map.items())
+        return util.frozendict(**_map)
 
     def generate_classifier(self):
         r1 = Rule(self,[identity])
@@ -437,13 +452,25 @@ class modify(Policy):
         :type pkt: Packet
         :rtype: set Packet
         """
-        return {pkt.modifymany(self.map)}
+        _map = self.translate_virtual_fields()
+        return {pkt.modifymany(_map)}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map = dict(virtual_field.map_to_vlan(virtual_field.compress(_vf)).items() + _map.items())
+        return util.frozendict(**_map)
 
     def generate_classifier(self):
-        if self.has_virtual_headers:
-            r = Rule(identity,[Controller])
-        else:
-            r = Rule(identity,[self])
+        r = Rule(identity,[self])
         return Classifier([r])
 
     def __repr__(self):

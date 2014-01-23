@@ -28,6 +28,7 @@
 
 from pyretic.core.language import identity, egress_network, Filter, drop, match, modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
+from pyretic.core.runtime import virtual_field
 import subprocess
 import pyretic.vendor
 import pydot
@@ -334,14 +335,18 @@ class path(Query):
         du = dfa_utils
         cg = CharacterGenerator
         dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
+        
+        # initialize virtual fields
+        virtual_field(name="path_tag", values=range(1, du.get_num_states(dfa)),
+                      type="integer")
 
         def set_tag(val):
-            return modify({'vlan_id': int(val), 'vlan_pcp': 0})
+            return modify(path_tag=int(val))
 
         def match_tag(val):
             if int(val) == 0:
-                return match({'vlan_id': 0xffff, 'vlan_pcp': 0})
-            return match({'vlan_id': int(val), 'vlan_pcp': 0})
+                return match(path_tag=None)
+            return match(path_tag=int(val))
 
         tagging_policy = drop
         untagged_packets = identity
@@ -375,7 +380,7 @@ class path(Query):
 
         # remove all tags before passing on to hosts.
         untagging_policy = ((egress_network() >>
-                             modify(vlan_id=None,vlan_pcp=None)) +
+                             modify(path_tag=None)) +
                             (~egress_network()))
         return [tagging_policy, untagging_policy, counting_policy]
 

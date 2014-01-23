@@ -107,7 +107,7 @@ class Classifier(object):
     # Helper function for rshift: given a test b and an action p, return a test
     # b' such that p >> b == b' >> p.
     def _commute_test(self, act, pkts):
-        from pyretic.core.language import match, modify, drop, identity, Controller, CountBucket, DerivedPolicy
+        from pyretic.core.language import modify, drop, identity, Controller, CountBucket, DerivedPolicy, match
         while isinstance(act, DerivedPolicy):
             act = act.policy
         if act == identity:
