@@ -36,19 +36,21 @@ import pydot
 ### Basic classes for generating path atoms and creating path expressions ###
 #############################################################################
 
+TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
+
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
     predicates. `get_token` returns the same token value as before if a policy
     already seen (and hence recorded in its map) is provided to it.
     """
-    token = 32 # start with printable ASCII for visual inspection ;)
+    token = TOKEN_START_VALUE
     filter_to_token = {}
     token_to_filter = {}
     token_to_tokens = {}
 
     @classmethod
     def clear(cls):
-        cls.token = 32
+        cls.token = TOKEN_START_VALUE
         cls.filter_to_token = {}
         cls.token_to_filter = {}
         cls.token_to_tokens = {}
@@ -168,7 +170,7 @@ class CharacterGenerator:
     def char_in_lexer_language(cls, char):
         return char in ['*','+','|','{','}','(',
                        ')','-','^','.','&','?',
-                       '"',"'",'%','$',',','/']
+                       '"',"'",'%','$',',','/',"\\"]
 
     @classmethod
     def __new_token__(cls):
@@ -518,7 +520,39 @@ class dfa_utils:
 
     @classmethod
     def get_edge_label(cls, e):
-        return e.get_label()[1:-1]
+
+        def get_chars_in_range(low, high):
+            chars = ''
+            cg = CharacterGenerator
+            for t in range(ord(low), ord(high)):
+                chars += cg.get_char_from_token(t)
+            return chars
+
+        def get_enumerated_labels(label):
+            """Get enumerated labels from a character class representation, with
+            potential abbreviations of ranges.
+            """
+            label_sets = label.split('-')
+            num_ranges = len(label_sets)
+            if num_ranges == 1:
+                return label
+            else:
+                enumerated_label = ''
+                num_ranges = len(label_sets)
+                for i in range(0, num_ranges):
+                    if len(label_sets[i]) == 0:
+                        raise RuntimeError # expect valid character classes.
+                    enumerated_label += label_sets[i][:-1]
+                    if i < (num_ranges-1):
+                        enumerated_label += (get_chars_in_range(
+                                label_sets[i][-1],
+                                label_sets[i+1][0]))
+                    else:
+                        # last character isn't part of any more ranges.
+                        enumerated_label += label_sets[i][-1]
+                return enumerated_label
+
+        return get_enumerated_labels(e.get_label()[1:-1])
 
     @classmethod
     def get_edges(cls, g):
@@ -567,8 +601,7 @@ class dfa_utils:
         """
         re = ['(' + re1 + ') & (' + re2 + ')']
         dfa = cls.regexes_to_dfa(re, tmp_file)
-        return (cls.get_num_states(dfa) == 1 and
-                cls.get_num_accepting_states(dfa) == 0)
+        return (cls.get_num_accepting_states(dfa) == 0)
 
     @classmethod
     def re_equals(cls, re1, re2):
