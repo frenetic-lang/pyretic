@@ -208,7 +208,7 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, expr=None, bucket=FwdBucket):
+    def __init__(self, a=None, expr=None):
         if a:
             assert isinstance(a, atom)
             self.atom = a
@@ -219,11 +219,16 @@ class path(Query):
         else:
             raise RuntimeError
         super(path, self).__init__()
-        self.bucket_instance = bucket() # instantiate the bucket type provided
-        self.register_callback = self.bucket_instance.register_callback
+        self.bucket_instance = FwdBucket() # default bucket type
 
     def get_bucket(self):
         return self.bucket_instance
+
+    def set_bucket(self, bucket_instance):
+        self.bucket_instance = bucket_instance
+
+    def register_callback(self, f):
+        self.bucket_instance.register_callback(f)
 
     def __repr__(self):
         return '[path expr: ' + self.expr + ' id: ' + str(id(self)) + ']'

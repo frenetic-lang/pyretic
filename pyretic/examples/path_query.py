@@ -39,6 +39,7 @@ from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
 from pyretic.lib.query import counts
+import threading
 
 import time
 from datetime import datetime
@@ -53,10 +54,19 @@ static_fwding_chain_2_2 = (
     (match(srcip=ip2, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
                                      (match(switch=2) >> fwd(1)))))
 
+def query_func(bucket, interval):
+    while True:
+        output = str(datetime.now())
+        output += " Pulling stats for bucket " + repr(bucket)
+        # output += bucket.get_matches()
+        print output
+        bucket.pull_stats()
+        time.sleep(interval)
+
 def query_callback(test_num):
     def actual_callback(pkt):
         print '**************'
-        print 'Test', test_num, ' -- got a packet satisfying path query!'
+        print 'Test', test_num, ' -- got a callback from installed path query!'
         print pkt
         print '**************'
     return actual_callback
@@ -82,8 +92,12 @@ def path_test_4():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
     p = a1 ^ a2
-    p.bucket_instance = counts(interval=5)
+    cb = CountBucket()
+    p.set_bucket(cb)
     p.register_callback(query_callback(4))
+    query_thread = threading.Thread(target=query_func, args=(cb,2.5))
+    query_thread.daemon = True
+    query_thread.start()
     return [p]
 
 # type: unit -> path list
