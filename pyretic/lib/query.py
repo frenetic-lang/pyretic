@@ -53,7 +53,7 @@ class LimitFilter(DynamicFilter):
             return match([(field,pkt[field]) for field in self.group_by])
         else:              # OTHERWISE, MATCH ON ALL AVAILABLE GROUP_BY
             return match([(field,pkt[field])
-                              for field in pkt.available_group_by()])
+                              for field in pkt.available_fields()])
 
     def update_policy(self,pkt):
         pred = self.get_pred_from_pkt(pkt)
