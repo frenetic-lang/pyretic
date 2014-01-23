@@ -609,12 +609,14 @@ class Runtime(object):
                     elif pred == true:
                         return {}
                     elif isinstance(pred, match):
-                        return { k:v for (k,v) in pred.map.items() }
+                        _map = pred.translate_virtual_fields()
+                        return { k:v for (k,v) in _map.items() }
                 def concretize_action(a):
                     if a == Controller:
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
-                        return { k:v for (k,v) in a.map.items() }
+                        _map = a.translate_virtual_fields()
+                        return { k:v for (k,v) in _map.items() }
                     else: # default
                         return a
                 m = concretize_match(rule.match)
@@ -920,6 +922,8 @@ class Runtime(object):
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
+        for rule in new_rules:
+            print rule
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
@@ -1469,7 +1473,7 @@ class virtual_field:
             # If we there are no virtual_fields specified we wouldn't want to match on them at all
             # Just return -1 so that calling function knows that the predicate doesn't have any virtual
             # fields on it
-            # if len(vheaders) == 0: return -1
+            if len(vheaders) == 0: return -1
             for n in vf_names:
                 if n not in vheaders:
                     vheaders[n] = None
