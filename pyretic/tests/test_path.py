@@ -36,6 +36,8 @@ import pytest
 
 ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
+ip3 = IPAddr('10.0.0.3')
+ip4 = IPAddr('10.0.0.4')
 cg = CharacterGenerator
 
 ### Character generator basic sanity checks ###
@@ -260,6 +262,71 @@ def test_path_finalize_2():
     for p in path.path_to_bucket:
         assert isinstance(path.path_to_bucket[p], Query)
 
+def test_path_finalize_3():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    p1 = a1 ^ a2
+    p2 = a1 ^ a2
+    path.finalize(p1)
+    path.finalize(p2)
+    assert len(path.re_list) == 1 # re_list only has non-overlapping expressions
+    assert path.re_list == [p1.expr]
+    assert path.paths_list == [ [p1, p2] ]
+
+def test_path_finalize_4():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    a3 = atom(match(srcip=ip3))
+    a4 = atom(match(srcip=ip4))
+    p1 = a1 ^ a2
+    p2 = (a1 ^ a2) | (a3 ^ a4)
+    path.finalize(p1)
+    path.finalize(p2)
+    assert len(path.re_list) == 2
+    assert path.re_list[0] == p1.expr
+    assert path.re_list[1] != p2.expr
+    assert path.paths_list == [ [p1, p2], [p2] ]
+
+def test_path_finalize_5():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    a3 = atom(match(srcip=ip3))
+    a4 = atom(match(srcip=ip4))
+    p1 = (a1 ^ a2) | a3
+    p2 = a2 ^ a4
+    p3 = a3 | (a2 ^ a4)
+    path.finalize(p1)
+    path.finalize(p2)
+    path.finalize(p3)
+    assert len(path.re_list) == 3
+    assert path.re_list[1] == p2.expr
+    assert path.re_list[2] != p3.expr and path.re_list[0] != p1.expr
+    assert path.paths_list == [ [p1], [p2, p3], [p1, p3] ]
+
+def test_path_finalize_6():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    a3 = atom(match(srcip=ip3))
+    a4 = atom(match(srcip=ip4))
+    p1 = (a1 ^ a2) | a3
+    p2 = a2 ^ a4
+    p3 = a3 | (a2 ^ a3)
+    path.finalize(p1)
+    path.finalize(p2)
+    path.finalize(p3)
+    assert len(path.re_list) == 4
+    assert path.re_list[1] == p2.expr
+    assert path.re_list[2] != p3.expr and path.re_list[0] != p1.expr
+    assert path.paths_list == [ [p1], [p2], [p1, p3], [p3] ]
+
 def test_path_compile_1():
     path.clear()
     cg.clear()
@@ -343,6 +410,11 @@ if __name__ == "__main__":
 
     test_path_finalize_1()
     test_path_finalize_2()
+    test_path_finalize_3()
+    test_path_finalize_4()
+    test_path_finalize_5()
+    test_path_finalize_6()
+
     test_path_compile_1()
     test_path_compile_2()
 

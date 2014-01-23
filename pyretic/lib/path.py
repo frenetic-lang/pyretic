@@ -221,7 +221,7 @@ class path(Query):
         super(path, self).__init__()
 
     def __repr__(self):
-        return self.expr + ' ' + str(id(self))
+        return '[path expr: ' + self.expr + ' id: ' + str(id(self)) + ']'
 
     def __xor__(self, other):
         """Implementation of the path concatenation operator ('^')"""
@@ -257,11 +257,11 @@ class path(Query):
         for i in range(0, length):
             existing_re = cls.re_list[i]
             if du.re_equals(existing_re, new_re):
-                cls.paths_list[i] += p
+                cls.paths_list[i] += [p]
                 return False
             elif du.re_belongs_to(existing_re, new_re):
-                cls.paths_list[i] += p
-                diff_re_list += existing_re
+                cls.paths_list[i] += [p]
+                diff_re_list.append(existing_re)
             elif du.re_has_nonempty_intersection(existing_re, new_re):
                 # separate out the intersecting and non-intersecting parts
                 # non-intersecting part first:
@@ -270,14 +270,15 @@ class path(Query):
                 intersection_re = '(' + existing_re + ') & (' + new_re + ')'
                 cls.re_list.append(intersection_re)
                 cls.paths_list.append(cls.paths_list[i] + [p])
-                diff_re_list += existing_re
+                diff_re_list.append(existing_re)
             # Finally, we do nothing if there is no intersection at all.
             i += 1
         # So far we've handled intersecting parts with existing res. Now deal
         # with the intersecting parts of the new re.
         new_nonintersecting_re = new_re
         if diff_re_list:
-            all_intersecting_parts = reduce(lambda x,y: x + '|' + y, diff_re_list)
+            all_intersecting_parts = reduce(lambda x,y: x + '|' + y,
+                                            diff_re_list)
             if not du.re_belongs_to(new_re, all_intersecting_parts):
                 # there's some part of the new expression that's not covered by
                 # any of the existing expressions.
