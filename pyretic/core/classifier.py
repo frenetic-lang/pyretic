@@ -96,7 +96,6 @@ class Classifier(object):
     ### PARALLEL COMPOSITION
             
     def __add__(c1, c2):
-
         def _cross(r1,r2):
             from pyretic.core.language import drop
             intersection = r1.match.intersect(r2.match)
@@ -111,146 +110,168 @@ class Classifier(object):
             else:
                 return None
 
+        # start with an empty set of rules for the output classifier
         new_rules = []
+        # JOSH - this check shouldn't be needed (I think)
         if c2 is None:
             return None
+        # then cross all pairs of rules in the first and second classifiers
         for r1 in c1.rules:
             for r2 in c2.rules:
                 crossed_r = _cross(r1,r2)
                 if crossed_r:
                     new_rules.append(crossed_r)
+        # then append all the rules in the first classifier
         for r1 in c1.rules:
             new_rules.append(r1)
+        # followed by all the rules in the first classifier
+        # (it doesn't matter whether c1 or c2 goes first)
         for r2 in c2.rules:
             new_rules.append(r2)
-        c = Classifier(new_rules)
-        return c.optimize()
+
+        # create a new classifier from the output
+        # and optimize it
+        c3 = Classifier(new_rules)
+        c3 = c3.optimize()
+        return c3
 
 
     ### SEQUENTIAL COMPOSITION
 
     def __rshift__(c1, c2):
         from pyretic.core.language import modify, drop, identity, Controller, CountBucket, DerivedPolicy
-        def _sequence_rule_classifier(r1, c2):
-            def _sequence_actions_classifier(acts, c2):
-                def _sequence_action_classifier(act, c2):
-                    # given a test b and an action p, return a test
-                    # b' such that p >> b == b' >> p.
-                    def _commute_test(act, pkts):
-                        while isinstance(act, DerivedPolicy):
-                            act = act.policy
-                        if act == identity:
-                            return pkts
-                        elif act == drop:
-                            return drop
-                        elif act == Controller or isinstance(act, CountBucket):
-                            return identity
-                        elif isinstance(act, modify):
-                            new_match_dict = {}
-                            if pkts == identity:
-                                return identity
-                            elif pkts == drop:
-                                return drop
-                            for f, v in pkts.map.iteritems():
-                                if f in act.map and act.map[f] == v:
-                                    continue
-                                elif f in act.map and act.map[f] != v:
-                                    return drop
-                                else:
-                                    new_match_dict[f] = v
-                            if len(new_match_dict) == 0:
-                                return identity
-                            return match(**new_match_dict)
-                        else:
-                            # TODO (cole) use compile error.
-                            # TODO (cole) what actions are allowable?
-                            raise TypeError
-
-                    # sequentially compose actions.  a1 must be a
-                    # single action.  Returns a list of actions.
-                    def _sequence_actions(a1, as2):
-                        while isinstance(a1, DerivedPolicy):
-                            a1 = a1.policy
-                        # TODO: be uniform about returning copied or modified objects.
-                        new_actions = []
-                        if a1 == drop:
-                            return [drop]
-                        elif a1 == identity:
-                            return as2
-                        elif a1 == Controller or isinstance(a1, CountBucket):
-                            return [a1]
-                        elif isinstance(a1, modify):
-                            for a2 in as2:
-                                while isinstance(a2, DerivedPolicy):
-                                    a2 = a2.policy
-                                new_a1 = modify(**a1.map.copy())
-                                if a2 == drop:
-                                    new_actions.append(drop)
-                                elif a2 == Controller or isinstance(a2, CountBucket): 
-                                    new_actions.append(a2)
-                                elif a2 == identity:
-                                    new_actions.append(new_a1)
-                                elif isinstance(a2, modify):
-                                    new_a1.map.update(a2.map)
-                                    new_actions.append(new_a1)
-                                elif isinstance(a2, fwd):
-                                    new_a1.map['outport'] = a2.outport
-                                    new_actions.append(new_a1)
-                                else:
-                                    raise TypeError
-                            return new_actions
-                        else:
-                            raise TypeError
-                    # END _commute_test and _sequence_actions
-
-                    new_rules = []
-                    for r2 in c2.rules:
-                        pkts = _commute_test(act, r2.match)
+        def _sequence_actions_classifier(acts, c2):
+            def _sequence_action_classifier(act, c2):
+                # given a test b and an action p, return a test
+                # b' such that p >> b == b' >> p.
+                def _commute_test(act, pkts):
+                    while isinstance(act, DerivedPolicy):
+                        act = act.policy
+                    if act == identity:
+                        return pkts
+                    elif act == drop:
+                        return drop
+                    elif act == Controller or isinstance(act, CountBucket):
+                        return identity
+                    elif isinstance(act, modify):
+                        new_match_dict = {}
                         if pkts == identity:
-                            acts = _sequence_actions(act, r2.actions)
-                            new_rules += [Rule(identity, acts)]
-                            break
+                            return identity
                         elif pkts == drop:
-                            continue
-                        else:
-                            acts = _sequence_actions(act, r2.actions)
-                            new_rules += [Rule(pkts, acts)]
-
-                    if new_rules == []:
-                        return Classifier([Rule(identity, [drop])])
+                            return drop
+                        for f, v in pkts.map.iteritems():
+                            if f in act.map and act.map[f] == v:
+                                continue
+                            elif f in act.map and act.map[f] != v:
+                                return drop
+                            else:
+                                new_match_dict[f] = v
+                        if len(new_match_dict) == 0:
+                            return identity
+                        return match(**new_match_dict)
                     else:
-                        return Classifier(new_rules)
-                # END _sequence_action_classifier
+                        # TODO (cole) use compile error.
+                        # TODO (cole) what actions are allowable?
+                        raise TypeError
 
-                empty_classifier = Classifier([Rule(identity, [drop])])
+                # sequentially compose actions.  a1 must be a
+                # single action.  Returns a list of actions.
+                def _sequence_actions(a1, as2):
+                    while isinstance(a1, DerivedPolicy):
+                        a1 = a1.policy
+                    # TODO: be uniform about returning copied or modified objects.
+                    new_actions = []
+                    if a1 == drop:
+                        return [drop]
+                    elif a1 == identity:
+                        return as2
+                    elif a1 == Controller or isinstance(a1, CountBucket):
+                        return [a1]
+                    elif isinstance(a1, modify):
+                        for a2 in as2:
+                            while isinstance(a2, DerivedPolicy):
+                                a2 = a2.policy
+                            new_a1 = modify(**a1.map.copy())
+                            if a2 == drop:
+                                new_actions.append(drop)
+                            elif a2 == Controller or isinstance(a2, CountBucket): 
+                                new_actions.append(a2)
+                            elif a2 == identity:
+                                new_actions.append(new_a1)
+                            elif isinstance(a2, modify):
+                                new_a1.map.update(a2.map)
+                                new_actions.append(new_a1)
+                            elif isinstance(a2, fwd):
+                                new_a1.map['outport'] = a2.outport
+                                new_actions.append(new_a1)
+                            else:
+                                raise TypeError
+                        return new_actions
+                    else:
+                        raise TypeError
+                # END _commute_test and _sequence_actions
 
-                # IF THERE ARE NO ACTIONS
-                if acts == []:
-                    # Treat the empty list of actions as drop.
-                    return empty_classifier
+                new_rules = []
+                for r2 in c2.rules:
+                    pkts = _commute_test(act, r2.match)
+                    if pkts == identity:
+                        acts = _sequence_actions(act, r2.actions)
+                        new_rules += [Rule(identity, acts)]
+                        break
+                    elif pkts == drop:
+                        continue
+                    else:
+                        acts = _sequence_actions(act, r2.actions)
+                        new_rules += [Rule(pkts, acts)]
 
-                # OTHERWISE FOR EACH ACTION
+                if new_rules == []:
+                    return Classifier([Rule(identity, [drop])])
+                else:
+                    return Classifier(new_rules)
+            # END _sequence_action_classifier
+
+            empty_classifier = Classifier([Rule(identity, [drop])])
+
+            if acts == []:
+                # Treat the empty list of actions as drop.
+                return empty_classifier
+            else:
                 acc = empty_classifier
                 for act in acts:
-                    # TAKE THE PARALLEL COMPOSITION OF THE CURRENT CLASSIFIER
-                    # AND THE SEQUENCING OF C2 W/ RESPECT TO ACT
                     acc = acc + _sequence_action_classifier(act, c2)
                 return acc
-            # END _sequence_actions_classifier
+        # END _sequence_actions_classifier
 
-            c2_seqd = _sequence_actions_classifier(r1.actions, c2)
-            for r2 in c2_seqd.rules:
-                r2.match = r2.match.intersect(r1.match)
-            c2_seqd.rules = [r2 for r2 in c2_seqd.rules if r2.match != drop]
-            return c2_seqd.optimize()
-        # END _sequence_rule_classifier
 
+        # core __rshift__ logic begins here.
+        # start with an empty set of rules for the output classifier
+        # then for each rule in the first classifier (self)
         new_rules = []
         for r1 in c1.rules:
-            c3 = _sequence_rule_classifier(r1, c2)
-            new_rules = new_rules + c3.rules
-        rv = Classifier(new_rules)
-        return rv.optimize()
+            # sequence the actions in second classifier c2 w/ respect to r1
+            c2_seqd = _sequence_actions_classifier(r1.actions, c2)
+
+            # for each rule in the sequenced c2, 
+            # intersect the rule's match with r1's match
+            for r2 in c2_seqd.rules:
+                r2.match = r2.match.intersect(r1.match)
+            
+            # filter out rules that cannot match any packet
+            filtered_rules = [r2 for r2 in c2_seqd.rules if r2.match != drop]
+            
+            # and make a new Classifier, so we can optimize it
+            c_tmp = Classifier(filtered_rules)
+            c_tmp = c_tmp.optimize()
+
+            # append the optimized rules
+            new_rules = new_rules + c_tmp.rules
+
+        # when all rules in c1 and c2 have been crossed
+        # create a new classifier from the output
+        # and optimize it
+        c3 = Classifier(new_rules)
+        c3 = c3.optimize()
+        return c3
 
 
     ### SHADOW OPTIMIZATION
