@@ -80,28 +80,35 @@ class Classifier(object):
         """Based on syntactic equality of policies."""
         return not (self == other)
 
-    def __add__(self,c2):
+    def _cross(self,r1,r2):
         from pyretic.core.language import drop
+        intersection = r1.match.intersect(r2.match)
+        if intersection != drop:
+            # TODO (josh) logic for detecting when sets of actions can't be combined
+            # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
+            actions = r1.actions + r2.actions
+            actions = filter(lambda a: a != drop,actions)
+            if len(actions) == 0:
+                actions = [drop]
+            return Rule(intersection, actions)
+        else:
+            return None
+            
+    def __add__(self, c2):
+        new_rules = []
         c1 = self
         if c2 is None:
             return None
-        c = Classifier([])
-        # TODO (cole): make classifiers iterable
         for r1 in c1.rules:
             for r2 in c2.rules:
-                intersection = r1.match.intersect(r2.match)
-                if intersection != drop:
-                    # TODO (josh) logic for detecting when sets of actions can't be combined
-                    # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
-                    actions = r1.actions + r2.actions
-                    actions = filter(lambda a: a != drop,actions)
-                    if len(actions) == 0:
-                        actions = [drop]
-                    c.rules.append(Rule(intersection, actions))
+                crossed_r = self._cross(r1,r2)
+                if crossed_r:
+                    new_rules.append(crossed_r)
         for r1 in c1.rules:
-            c.rules.append(r1)
+            new_rules.append(r1)
         for r2 in c2.rules:
-            c.rules.append(r2)
+            new_rules.append(r2)
+        c = Classifier(new_rules)
         return c.optimize()
 
     # Helper function for rshift: given a test b and an action p, return a test
