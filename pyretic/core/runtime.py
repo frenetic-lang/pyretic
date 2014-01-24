@@ -609,7 +609,9 @@ class Runtime(object):
                     elif pred == true:
                         return {}
                     elif isinstance(pred, match):
+                        print "old match:", pred.map
                         _map = pred.translate_virtual_fields()
+                        print "new match:", _map
                         return { k:v for (k,v) in _map.items() }
                 def concretize_action(a):
                     if a == Controller:
