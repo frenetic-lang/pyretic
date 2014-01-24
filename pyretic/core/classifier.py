@@ -225,9 +225,10 @@ class Classifier(object):
         return c2.optimize()
 
     def __rshift__(self, c2):
+        c1 = self
         new_rules = []
-        for rule in self.rules:
-            c3 = self._sequence_rule_classifier(rule, c2)
+        for r1 in c1.rules:
+            c3 = self._sequence_rule_classifier(r1, c2)
             new_rules = new_rules + c3.rules
         rv = Classifier(new_rules)
         return rv.optimize()
