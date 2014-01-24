@@ -44,6 +44,8 @@ from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
 
+NO_CACHE=False
+
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
 tagging_headers = ["vlan_id", "vlan_pcp"]
@@ -83,6 +85,7 @@ class Policy(object):
 
         :rtype: Classifier
         """
+        if NO_CACHE: self.generate_classifier()
         return self._classifier
 
     def __add__(self, pol):
@@ -207,6 +210,7 @@ class Singleton(Filter):
 
         :rtype: Classifier
         """
+        if NO_CACHE: self.generate_classifier()
         if self.__class__._classifier is None:
             self.__class__._classifier = self.generate_classifier()
         return self.__class__._classifier
@@ -687,6 +691,7 @@ class CombinatorPolicy(Policy):
 
         :rtype: Classifier
         """
+        if NO_CACHE: self.generate_classifier()
         if not self._classifier:
             self._classifier = self.generate_classifier()
         return self._classifier
@@ -936,6 +941,7 @@ class DerivedPolicy(Policy):
 
         :rtype: Classifier
         """
+        if NO_CACHE: self.policy.compile()
         if not self._classifier:
             self._classifier = self.policy.compile()
         return self._classifier
