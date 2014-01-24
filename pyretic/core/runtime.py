@@ -615,7 +615,9 @@ class Runtime(object):
                     if a == Controller:
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
+                        print "old action:", a.map
                         _map = a.translate_virtual_fields()
+                        print "new action:", _map
                         return { k:v for (k,v) in _map.items() }
                     else: # default
                         return a
@@ -922,8 +924,6 @@ class Runtime(object):
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
-        for rule in new_rules:
-            print rule
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
@@ -1474,6 +1474,7 @@ class virtual_field:
             # Just return -1 so that calling function knows that the predicate doesn't have any virtual
             # fields on it
             if len(vheaders) == 0: return -1
+
             for n in vf_names:
                 if n not in vheaders:
                     vheaders[n] = None

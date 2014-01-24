@@ -335,7 +335,7 @@ class match(Filter):
             else:
                 _vf[field] = pattern
 
-        _map = dict(virtual_field.map_to_vlan(virtual_field.compress(_vf)).items() + _map.items())
+        _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
         return util.frozendict(**_map)
 
     def generate_classifier(self):
@@ -466,7 +466,7 @@ class modify(Policy):
             else:
                 _vf[field] = pattern
 
-        _map = dict(virtual_field.map_to_vlan(virtual_field.compress(_vf)).items() + _map.items())
+        _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
         return util.frozendict(**_map)
 
     def generate_classifier(self):
@@ -1344,8 +1344,13 @@ class egress_network(DynamicFilter):
         return "egress_network"
 
 def virtual_field_tagging():
+    from pyretic.core.runtime import virtual_field
+    vf_matches = {}
+    for name in virtual_field.fields.keys():
+        vf_matches[name] = None
+        
     return ((
-        ingress_network() >> modify(vlan_id=0, vlan_pcp=0))+
+        ingress_network() >> modify(**vf_matches))+
         (~ingress_network()))
 
 def virtual_field_untagging():
