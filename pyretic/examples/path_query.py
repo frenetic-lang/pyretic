@@ -54,6 +54,14 @@ static_fwding_chain_2_2 = (
     (match(srcip=ip2, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
                                      (match(switch=2) >> fwd(1)))))
 
+static_fwding_chain_3_3 = (
+    (match(srcip=ip1, dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                                     (match(switch=2) >> fwd(2)) +
+                                     (match(switch=3) >> fwd(2)))) +
+    (match(srcip=ip3, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                                     (match(switch=2) >> fwd(1)) +
+                                     (match(switch=3) >> fwd(1)))))
+
 def query_func(bucket, interval):
     while True:
         output = str(datetime.now())
@@ -102,7 +110,8 @@ def path_test_4():
 
 # type: unit -> path list
 def path_main():
-    return path_test_1()
+    return path_test_2()
 
 def main():
     return mac_learner()
+#    return static_fwding_chain_3_3
