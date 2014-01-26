@@ -1,5 +1,6 @@
 
 from collections import deque
+import copy
 
 ###############################################################################
 # Classifiers
@@ -57,7 +58,7 @@ class Classifier(object):
     """
 
     def __init__(self, new_rules=list()):
-        import types, copy
+        import types
         if isinstance(new_rules, types.GeneratorType):
             self.rules = deque([r for r in new_rules])
         elif isinstance(new_rules,list):
@@ -124,19 +125,15 @@ class Classifier(object):
     ### NEGATE ###
     def __invert__(self):
         from pyretic.core.language import drop, identity
-        c = Classifier([])
-        if len(c) > 0:
-            raise RuntimeError
-        for r in self.rules:
-            assert len(r.actions) == 1
-            action = r.actions[0]
-            if action == identity:
-                r2 = Rule(r.match,[drop])
-            elif action == drop:
-                r2 = Rule(r.match,[identity])
+        c = copy.copy(self)
+        for r in c.rules:
+            assert len(set(r.actions)) == 1
+            if r.actions[0] == identity:
+                r.actions = [drop]
+            elif r.actions[0] == drop:
+                r.actions = [identity]
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
-            c.append(r2)
         return c
 
 
