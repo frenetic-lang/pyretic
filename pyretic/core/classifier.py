@@ -149,14 +149,10 @@ class Classifier(object):
                 crossed_r = _cross(r1,r2)
                 if crossed_r:
                     c3.append(crossed_r)
-        # then append all the rules in the first classifier
-        for r1 in c1.rules:
-            c3.append(r1)
-        # followed by all the rules in the first classifier
+        # then append all the rules in the original classifiers
         # (it doesn't matter whether c1 or c2 goes first)
-        for r2 in c2.rules:
-            c3.append(r2)
-
+        c3.append(c1)
+        c3.append(c2)
         # and optimize the classifier
         c3 = c3.optimize()
         return c3
@@ -249,23 +245,17 @@ class Classifier(object):
                     else:
                         acts = _sequence_actions(act, r2.actions)
                         c3.append(Rule(pkts, acts))
-
                 if len(c3) == 0:
                     c3.append(Rule(identity, [drop]))
                 return c3
 
             # END _sequence_action_classifier
 
-            empty_classifier = Classifier([Rule(identity, [drop])])
+            c3 = Classifier([Rule(identity, [drop])])
+            for act in acts:
+                c3 = c3 + _sequence_action_classifier(act, c2)
+            return c3
 
-            if len(acts) > 0:
-                acc = empty_classifier
-                for act in acts:
-                    acc = acc + _sequence_action_classifier(act, c2)
-                return acc
-            else:
-                # Treat the empty list of actions as drop.
-                return empty_classifier
         # END _sequence_actions_classifier
 
 
@@ -283,10 +273,8 @@ class Classifier(object):
                 r2.match = r2.match.intersect(r1.match)
             
             # filter out rules that cannot match any packet
-            filtered_rules = deque([r2 for r2 in c2_seqd.rules if r2.match != drop])
-            
-            # and make a new Classifier, so we can optimize it
-            c_tmp = Classifier(filtered_rules)
+            c_tmp = Classifier(r2 for r2 in c2_seqd.rules 
+                               if r2.match != drop)
             c_tmp = c_tmp.optimize()
 
             # append the optimized rules
