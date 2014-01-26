@@ -144,7 +144,7 @@ class Classifier(object):
     ### SEQUENTIAL COMPOSITION
 
     def __rshift__(c1, c2):
-        from pyretic.core.language import modify, drop, identity, Controller, CountBucket, DerivedPolicy
+        from pyretic.core.language import match, modify, drop, identity, Controller, CountBucket, DerivedPolicy
         def _sequence_actions_classifier(acts, c2):
             def _sequence_action_classifier(act, c2):
                 # given a test b and an action p, return a test
