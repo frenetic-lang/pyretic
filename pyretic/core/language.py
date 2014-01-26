@@ -730,9 +730,9 @@ class negate(CombinatorPolicy,Filter):
         for r in inner_classifier.rules:
             action = r.actions[0]
             if action == identity:
-                classifier.rules.append(Rule(r.match,[drop]))
+                classifier.append(Rule(r.match,[drop]))
             elif action == drop:
-                classifier.rules.append(Rule(r.match,[identity]))
+                classifier.append(Rule(r.match,[identity]))
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return classifier

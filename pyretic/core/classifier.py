@@ -97,6 +97,25 @@ class Classifier(object):
                 return pkts
         raise TypeError('Classifier is not total.')
 
+    def prepend(self, item):
+        if isinstance(item, Rule):
+            self.rules.appendleft(item)
+        elif isinstance(item, Classifier):
+            self.rules.extendleft(item.rules)
+        else:
+            raise TypeError            
+
+    def append(self, item):
+        if isinstance(item, Rule):
+            self.rules.append(item)
+        elif isinstance(item, Classifier):
+            self.rules.extend(item.rules)
+        else:
+            raise TypeError
+
+    def remove_last_rule(self):
+        self.rules.pop()
+
 
     ### PARALLEL COMPOSITION
             
@@ -116,7 +135,7 @@ class Classifier(object):
                 return None
 
         # start with an empty set of rules for the output classifier
-        new_rules = deque()
+        c3 = Classifier()
         # JOSH - this check shouldn't be needed (I think)
         if c2 is None:
             return None
@@ -125,18 +144,16 @@ class Classifier(object):
             for r2 in c2.rules:
                 crossed_r = _cross(r1,r2)
                 if crossed_r:
-                    new_rules.append(crossed_r)
+                    c3.append(crossed_r)
         # then append all the rules in the first classifier
         for r1 in c1.rules:
-            new_rules.append(r1)
+            c3.append(r1)
         # followed by all the rules in the first classifier
         # (it doesn't matter whether c1 or c2 goes first)
         for r2 in c2.rules:
-            new_rules.append(r2)
+            c3.append(r2)
 
-        # create a new classifier from the output
-        # and optimize it
-        c3 = Classifier(new_rules)
+        # and optimize the classifier
         c3 = c3.optimize()
         return c3
 
@@ -216,23 +233,23 @@ class Classifier(object):
                         raise TypeError
                 # END _commute_test and _sequence_actions
 
-                new_rules = deque()
+                c3 = Classifier()
                 for r2 in c2.rules:
                     pkts = _commute_test(act, r2.match)
                     if pkts == identity:
                         acts = _sequence_actions(act, r2.actions)
-                        new_rules.append(Rule(identity, acts))
+                        c3.append(Rule(identity, acts))
                         break
                     elif pkts == drop:
                         continue
                     else:
                         acts = _sequence_actions(act, r2.actions)
-                        new_rules.append(Rule(pkts, acts))
+                        c3.append(Rule(pkts, acts))
 
-                if len(new_rules) > 0:
-                    return Classifier(new_rules)
-                else:
-                    return Classifier([Rule(identity, [drop])])
+                if len(c3) == 0:
+                    c3.append(Rule(identity, [drop]))
+                return c3
+
             # END _sequence_action_classifier
 
             empty_classifier = Classifier([Rule(identity, [drop])])
@@ -251,7 +268,7 @@ class Classifier(object):
         # core __rshift__ logic begins here.
         # start with an empty set of rules for the output classifier
         # then for each rule in the first classifier (self)
-        new_rules = deque()
+        c3 = Classifier()
         for r1 in c1.rules:
             # sequence the actions in second classifier c2 w/ respect to r1
             c2_seqd = _sequence_actions_classifier(r1.actions, c2)
@@ -269,12 +286,10 @@ class Classifier(object):
             c_tmp = c_tmp.optimize()
 
             # append the optimized rules
-            new_rules.extend(c_tmp.rules)
+            c3.append(c_tmp)
 
         # when all rules in c1 and c2 have been crossed
-        # create a new classifier from the output
-        # and optimize it
-        c3 = Classifier(new_rules)
+        # optimize c3
         c3 = c3.optimize()
         return c3
 
