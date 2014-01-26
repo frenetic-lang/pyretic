@@ -121,6 +121,25 @@ class Classifier(object):
         return Classifier(copied_rules)
 
 
+    ### NEGATE ###
+    def __invert__(self):
+        from pyretic.core.language import drop, identity
+        c = Classifier([])
+        if len(c) > 0:
+            raise RuntimeError
+        for r in self.rules:
+            assert len(r.actions) == 1
+            action = r.actions[0]
+            if action == identity:
+                r2 = Rule(r.match,[drop])
+            elif action == drop:
+                r2 = Rule(r.match,[identity])
+            else:
+                raise TypeError  # TODO MAKE A CompileError TYPE
+            c.append(r2)
+        return c
+
+
     ### PARALLEL COMPOSITION
             
     def __add__(c1, c2):

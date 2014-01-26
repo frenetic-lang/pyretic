@@ -729,16 +729,7 @@ class negate(CombinatorPolicy,Filter):
 
     def generate_classifier(self):
         inner_classifier = self.policies[0].compile()
-        classifier = Classifier()
-        for r in inner_classifier.rules:
-            action = r.actions[0]
-            if action == identity:
-                classifier.append(Rule(r.match,[drop]))
-            elif action == drop:
-                classifier.append(Rule(r.match,[identity]))
-            else:
-                raise TypeError  # TODO MAKE A CompileError TYPE
-        return classifier
+        return ~inner_classifier
 
 
 class parallel(CombinatorPolicy):
