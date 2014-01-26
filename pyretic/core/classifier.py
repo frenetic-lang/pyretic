@@ -286,7 +286,7 @@ class Classifier(object):
 
     def remove_shadowed_exact_single(self):
         # Eliminate every rule exactly matched by some higher priority rule
-        opt_c = Classifier([])
+        opt_c = Classifier()
         for r in self.rules:
             if not reduce(lambda acc, new_r: acc or
                           new_r.match == r.match,
@@ -297,7 +297,7 @@ class Classifier(object):
 
     def remove_shadowed_cover_single(self):
         # Eliminate every rule completely covered by some higher priority rule
-        opt_c = Classifier([])
+        opt_c = Classifier()
         for r in self.rules:
             if not reduce(lambda acc, new_r: acc or
                           new_r.match.covers(r.match),

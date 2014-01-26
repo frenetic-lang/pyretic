@@ -726,7 +726,7 @@ class negate(CombinatorPolicy,Filter):
 
     def generate_classifier(self):
         inner_classifier = self.policies[0].compile()
-        classifier = Classifier([])
+        classifier = Classifier()
         for r in inner_classifier.rules:
             action = r.actions[0]
             if action == identity:
