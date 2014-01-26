@@ -1,3 +1,6 @@
+
+from collections import deque
+
 ###############################################################################
 # Classifiers
 # an intermediate representation for proactive compilation.
@@ -53,12 +56,14 @@ class Classifier(object):
     tables.
     """
 
-    def __init__(self, new_rules=[]):
-        import types
+    def __init__(self, new_rules=deque()):
+        import types, copy
         if isinstance(new_rules, types.GeneratorType):
-            self.rules = [r for r in new_rules]
+            self.rules = deque([r for r in new_rules])
         elif isinstance(new_rules,list):
-            self.rules = new_rules
+            self.rules = deque(new_rules)
+        elif isinstance(new_rules,deque):
+            self.rules = copy.copy(new_rules)
         else:
             raise TypeError
 
@@ -111,7 +116,7 @@ class Classifier(object):
                 return None
 
         # start with an empty set of rules for the output classifier
-        new_rules = []
+        new_rules = deque()
         # JOSH - this check shouldn't be needed (I think)
         if c2 is None:
             return None
@@ -211,42 +216,42 @@ class Classifier(object):
                         raise TypeError
                 # END _commute_test and _sequence_actions
 
-                new_rules = []
+                new_rules = deque()
                 for r2 in c2.rules:
                     pkts = _commute_test(act, r2.match)
                     if pkts == identity:
                         acts = _sequence_actions(act, r2.actions)
-                        new_rules += [Rule(identity, acts)]
+                        new_rules.append(Rule(identity, acts))
                         break
                     elif pkts == drop:
                         continue
                     else:
                         acts = _sequence_actions(act, r2.actions)
-                        new_rules += [Rule(pkts, acts)]
+                        new_rules.append(Rule(pkts, acts))
 
-                if new_rules == []:
-                    return Classifier([Rule(identity, [drop])])
-                else:
+                if len(new_rules) > 0:
                     return Classifier(new_rules)
+                else:
+                    return Classifier([Rule(identity, [drop])])
             # END _sequence_action_classifier
 
             empty_classifier = Classifier([Rule(identity, [drop])])
 
-            if acts == []:
-                # Treat the empty list of actions as drop.
-                return empty_classifier
-            else:
+            if len(acts) > 0:
                 acc = empty_classifier
                 for act in acts:
                     acc = acc + _sequence_action_classifier(act, c2)
                 return acc
+            else:
+                # Treat the empty list of actions as drop.
+                return empty_classifier
         # END _sequence_actions_classifier
 
 
         # core __rshift__ logic begins here.
         # start with an empty set of rules for the output classifier
         # then for each rule in the first classifier (self)
-        new_rules = []
+        new_rules = deque()
         for r1 in c1.rules:
             # sequence the actions in second classifier c2 w/ respect to r1
             c2_seqd = _sequence_actions_classifier(r1.actions, c2)
@@ -257,14 +262,14 @@ class Classifier(object):
                 r2.match = r2.match.intersect(r1.match)
             
             # filter out rules that cannot match any packet
-            filtered_rules = [r2 for r2 in c2_seqd.rules if r2.match != drop]
+            filtered_rules = deque([r2 for r2 in c2_seqd.rules if r2.match != drop])
             
             # and make a new Classifier, so we can optimize it
             c_tmp = Classifier(filtered_rules)
             c_tmp = c_tmp.optimize()
 
             # append the optimized rules
-            new_rules = new_rules + c_tmp.rules
+            new_rules.extend(c_tmp.rules)
 
         # when all rules in c1 and c2 have been crossed
         # create a new classifier from the output
