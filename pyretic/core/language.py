@@ -85,7 +85,8 @@ class Policy(object):
 
         :rtype: Classifier
         """
-        if NO_CACHE: self.generate_classifier()
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         return self._classifier
 
     def __add__(self, pol):
@@ -210,7 +211,8 @@ class Singleton(Filter):
 
         :rtype: Classifier
         """
-        if NO_CACHE: self.generate_classifier()
+        if NO_CACHE: 
+            self.__class__._classifier = self.generate_classifier()
         if self.__class__._classifier is None:
             self.__class__._classifier = self.generate_classifier()
         return self.__class__._classifier
@@ -691,7 +693,8 @@ class CombinatorPolicy(Policy):
 
         :rtype: Classifier
         """
-        if NO_CACHE: self.generate_classifier()
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         if not self._classifier:
             self._classifier = self.generate_classifier()
         return self._classifier
@@ -941,10 +944,14 @@ class DerivedPolicy(Policy):
 
         :rtype: Classifier
         """
-        if NO_CACHE: self.policy.compile()
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         if not self._classifier:
-            self._classifier = self.policy.compile()
+            self._classifier = self.generate_classifier()
         return self._classifier
+
+    def generate_classifier(self):
+        return self.policy.compile()
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)
