@@ -2,7 +2,7 @@
 Pyretic
 =======
 
-The Pyretic platfrom - language & runtime system.
+The Pyretic platform - language & runtime system.
 See http://frenetic-lang.org/pyretic/ for more info.
 
 top-level structure:
