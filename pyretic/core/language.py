@@ -460,13 +460,22 @@ class modify(Policy):
         _map = {}
         _vf  = {}
 
+        # TODO(Omid): refactor hack for policies invoking both VLANs and virtual
+        # fields. Goal is to allow VLANs to take precedence when their value is
+        # None.
+        allow_vf = True
+        if ('vlan_id' in self.map and 'vlan_pcp' in self.map and
+            not self.map['vlan_id'] and not self.map['vlan_pcp']):
+            allow_vf = False
+
         for field, pattern in self.map.iteritems():
             if field in compilable_headers:
                 _map[field] = pattern
             else:
                 _vf[field] = pattern
 
-        _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
+        if allow_vf:
+            _map.update(virtual_field.map_to_vlan(virtual_field.compress(_vf)))
         return util.frozendict(**_map)
 
     def generate_classifier(self):
@@ -1354,6 +1363,11 @@ def virtual_field_tagging():
         (~ingress_network()))
 
 def virtual_field_untagging():
+    from pyretic.core.runtime import virtual_field
+    vf_matches = {}
+    for name in virtual_field.fields.keys():
+        vf_matches[name] = None
+
     return ((
-        egress_network() >> modify(vlan_id=None, vlan_pcp=None))+
+        egress_network() >> modify(vlan_id=None, vlan_pcp=None, **vf_matches))+
         (~egress_network()))
