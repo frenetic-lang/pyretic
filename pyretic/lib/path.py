@@ -137,7 +137,7 @@ class CharacterGenerator:
             raise TypeError
 
     @classmethod
-    def get_filter_from_edge_label(cls, edge_label):
+    def get_filter_from_edge_label(cls, edge_label, negated):
         """Recursive search in token_to_tokens, or just direct return from
         token_to_filter, for any token.
         """
@@ -148,7 +148,10 @@ class CharacterGenerator:
             tok = cls.get_token_from_char(char)
             assert tok in cls.token_to_filter
             output_filter = output_filter | cls.token_to_filter[tok]
-        return output_filter
+        if not negated:
+            return output_filter
+        else:
+            return ~output_filter
 
     @classmethod
     def get_token(cls, pol):
@@ -357,10 +360,8 @@ class path(Query):
             # generate tagging fragment
             src = du.get_state_id(du.get_edge_src(edge, dfa))
             dst = du.get_state_id(du.get_edge_dst(edge, dfa))
-            edge_label = du.get_edge_label(edge)
-            if len(edge_label) > 1: # character class
-                edge_label = edge_label[1:-1] # strip off '[' and ']'
-            transit_match = cg.get_filter_from_edge_label(edge_label)
+            [edge_label, negated] = du.get_edge_label(edge)
+            transit_match = cg.get_filter_from_edge_label(edge_label, negated)
             tagging_match = match_tag(src) & transit_match
             tagging_policy += (tagging_match >> set_tag(dst))
             untagged_packets = untagged_packets & ~tagging_match
@@ -598,7 +599,7 @@ class dfa_utils:
             label_sets = label.split('-')
             num_ranges = len(label_sets)
             if num_ranges == 1:
-                return label
+                enumerated_label = label
             else:
                 enumerated_label = ''
                 num_ranges = len(label_sets)
@@ -613,7 +614,12 @@ class dfa_utils:
                     else:
                         # last character isn't part of any more ranges.
                         enumerated_label += label_sets[i][-1]
-                return enumerated_label
+            if len(enumerated_label) > 2 and enumerated_label[0] == '[':
+                enumerated_label = enumerated_label[1:-1]
+            negated = (enumerated_label[0] == '^')
+            if negated:
+                enumerated_label = enumerated_label[1:]
+            return [enumerated_label, negated]
 
         return get_enumerated_labels(e.get_label()[1:-1])
 
