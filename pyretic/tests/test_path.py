@@ -172,7 +172,7 @@ def test_path_alternation():
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
     assert isinstance(p, path)
-    assert p.expr == ('(' + a1.expr + ')|(' + a2.expr + ')')
+    assert p.expr == ('((' + a1.expr + ')|(' + a2.expr + '))')
 
 def test_path_kleene_closure():
     cg.clear()
@@ -194,8 +194,8 @@ def test_slightly_complicated_expr_1():
     a4 = atom(match(dstip=ip1))
     p = (a1 ^ a4) | (a2 ^ a3)
     assert isinstance(p, path)
-    assert p.expr == ('(' + a1.expr + a4.expr + ')|(' + a2.expr +
-                      a3.expr + ')')
+    assert p.expr == ('((' + a1.expr + a4.expr + ')|(' + a2.expr +
+                      a3.expr + '))')
 
 ### Simple tests on dfa_utils ### 
 

@@ -26,8 +26,10 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, egress_network, Filter, drop, match, modify, Query, FwdBucket, CountBucket
+from pyretic.core.language import identity, egress_network, Filter, drop, match
+from pyretic.core.language import modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
+
 import subprocess
 import pyretic.vendor
 import pydot
@@ -170,7 +172,8 @@ class CharacterGenerator:
     def char_in_lexer_language(cls, char):
         return char in ['*','+','|','{','}','(',
                        ')','-','^','.','&','?',
-                       '"',"'",'%','$',',','/',"\\"]
+                       '"',"'",'%','$',',','/',"\\",
+                        '=','>','<']
 
     @classmethod
     def __new_token__(cls):
@@ -208,7 +211,7 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, expr=None):
+    def __init__(self, a=None, expr=None, paths=None):
         if a:
             assert isinstance(a, atom)
             self.atom = a
@@ -216,6 +219,8 @@ class path(Query):
         elif expr:
             assert isinstance(expr, str)
             self.expr = expr
+        elif paths:
+            self.paths = paths
         else:
             raise RuntimeError
         super(path, self).__init__()
@@ -236,12 +241,12 @@ class path(Query):
     def __xor__(self, other):
         """Implementation of the path concatenation operator ('^')"""
         assert isinstance(other, path)
-        return path(expr=(self.expr + other.expr))
+        return path_concat([self, other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
         assert isinstance(other, path)
-        return path(expr=('(' + self.expr + ')|(' + other.expr + ')'))
+        return path_alternate([self, other])
 
     def __pos__(self):
         """Implementation of the Kleene star operator.
@@ -250,7 +255,7 @@ class path(Query):
         unfortunately there is no unary (prefix or postfix) '*' operator in
         python.
         """
-        return path(expr=('(' + self.expr + ')*'))
+        return path_star(self)
 
     @classmethod
     def clear(cls):
@@ -422,6 +427,59 @@ class atom(path, Filter):
 
     def __invert__(self):
         return atom(~(self.policy))
+
+
+class path_alternate(path):
+    """ Alternation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_alternate, self).__init__(paths=paths_list)
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        paths = self.paths
+        if len(paths) > 1:
+            expr = reduce(lambda x, y: x + '|(' + y.expr + ')', paths[1:],
+                          '(' + paths[0].expr + ')')
+            expr = '(' + expr + ')'
+        elif len(paths) == 1:
+            expr = paths[0]
+        else:
+            expr = ''
+        return expr
+
+class path_star(path):
+    """ Kleene star on a path. """
+    def __init__(self, p):
+        self.__check_type(p)
+        super(path_star, self).__init__(paths=[p])
+
+    def __check_type(self, p):
+        assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        expr = '(' + self.paths[0].expr + ')*'
+        return expr
+
+class path_concat(path):
+    """ Concatenation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_concat, self).__init__(paths=paths_list)
+
+    @property
+    def expr(self):
+        return reduce(lambda x, y: x + y.expr, self.paths, '')
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
 
 #############################################################################
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
