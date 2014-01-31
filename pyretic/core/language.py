@@ -1205,7 +1205,7 @@ def add_query_sub_pols(acc, policy):
     from pyretic.lib.query import packets
     if ( isinstance(policy,Query) or
          isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
-        return add | {policy}
+        return acc | {policy}
     else:
         return acc
 
