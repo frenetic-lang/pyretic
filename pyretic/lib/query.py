@@ -99,20 +99,25 @@ class AggregateFwdBucket(FwdBucket):
         FwdBucket.__init__(self)
         self.interval = interval
         self.group_by = group_by
+        self.running = True
         if group_by:
             self.aggregate = {}
         else:
             self.aggregate = 0
         
         def report_count(callbacks,aggregate,interval):
-            while(True):
+            while self.running:
                 for callback in callbacks:
                     callback(aggregate)
                 time.sleep(interval)
 
-        self.query_thread = Thread(target=report_count,args=(self.callbacks,self.aggregate,self.interval))
+        self.query_thread = Thread(target=report_count,args=
+                                   (self.callbacks,self.aggregate,self.interval))
         self.query_thread.daemon = True
         self.query_thread.start()
+
+    def stop(self):
+        self.running = False
 
     def aggregator(self,aggregate,pkt):
         raise NotImplementedError
