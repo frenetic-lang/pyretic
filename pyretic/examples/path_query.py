@@ -100,9 +100,16 @@ def path_test_4():
     query_thread.start()
     return [p]
 
+def path_test_5():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=3))
+    p = (a1 ^ a2)  | (a2 ^ a1)
+    p.register_callback(query_callback(5))
+    return [p]
+
 # type: unit -> path list
 def path_main():
-    return path_test_4()
+    return path_test_5()
 
 def main():
     return mac_learner()
