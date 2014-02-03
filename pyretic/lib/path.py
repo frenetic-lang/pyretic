@@ -344,7 +344,10 @@ class path(Query):
         dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
 
         def set_tag(val):
-            return modify({'vlan_id': int(val), 'vlan_pcp': 0})
+            if int(val) != 0:
+                return modify({'vlan_id': int(val), 'vlan_pcp': 0})
+            else:
+                return modify({'vlan_id': None, 'vlan_pcp': None})
 
         def match_tag(val):
             if int(val) == 0:
