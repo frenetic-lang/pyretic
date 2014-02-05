@@ -259,7 +259,7 @@ class path(Query):
     """
     def __init__(self, a=None, expr=None, paths=None):
         if a:
-            assert isinstance(a, atom)
+            assert isinstance(a, abstract_atom)
             self.atom = a
             self.expr = CharacterGenerator.get_char_from_token(self.atom.token)
         elif expr:
@@ -457,7 +457,7 @@ class abstract_atom(path, Filter):
     def __init__(self, m):
         assert isinstance(m, Filter)
         self.policy = m
-        super(atom, self).__init__(a=self)
+        super(abstract_atom, self).__init__(a=self)
 
     def __and__(self, other):
         assert isinstance(other, atom)
@@ -480,9 +480,9 @@ class abstract_atom(path, Filter):
 class atom(abstract_atom):
     """A concrete "ingress" match atom."""
     def __init__(self, m):
-        super(atom, self).__init__(m)
         self.token = CharacterGenerator.get_token(m, toktype="ingress",
                                                   nonoverlapping_filters=True)
+        super(atom, self).__init__(m)
 
 
 class path_alternate(path):
