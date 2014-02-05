@@ -446,6 +446,7 @@ class path(Query):
             cls.finalize(p)
         return cls.get_policy_fragments()
 
+
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class
     where the token isn't initialized.
@@ -474,6 +475,7 @@ class abstract_atom(path, Filter):
 
     def __invert__(self):
         return atom(~(self.policy))
+
 
 class atom(abstract_atom):
     """A concrete "ingress" match atom."""
@@ -506,6 +508,7 @@ class path_alternate(path):
             expr = ''
         return expr
 
+
 class path_star(path):
     """ Kleene star on a path. """
     def __init__(self, p):
@@ -519,6 +522,7 @@ class path_star(path):
     def expr(self):
         expr = '(' + self.paths[0].expr + ')*'
         return expr
+
 
 class path_concat(path):
     """ Concatenation of paths. """
@@ -534,6 +538,7 @@ class path_concat(path):
         for p in paths:
             assert isinstance(p, path)
 
+
 class egress_atom(abstract_atom):
     """An atom that denotes a match on a packet after the forwarding decision
     has been made. It can always be substituted by a normal ("ingress") atom at
@@ -544,7 +549,8 @@ class egress_atom(abstract_atom):
     def __init__(self, m):
         super(egress_atom, self).__init__(m)
         self.token = CharacterGenerator.get_token(pol, toktype="egress",
-                                                  nonoverlapping_filters=False)
+                                                  nonoverlapping_filters=True)
+
 
 class drop_atom(abstract_atom):
     """An atom that matches on packets that were dropped by the forwarding
