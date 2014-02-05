@@ -92,7 +92,7 @@ def test_CG_policy_equality():
     cg.clear()
     m = match(srcip=ip1)
     tok = cg.get_token(m)
-    assert cg.token_to_filter[tok] == m
+    assert cg.get_filter_from_token(tok) == m
 
 ### Basic checks on creating and manipulating path atoms ###
 

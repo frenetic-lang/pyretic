@@ -46,16 +46,21 @@ class CharacterGenerator:
     already seen (and hence recorded in its map) is provided to it.
     """
     token = TOKEN_START_VALUE
-    filter_to_token = {}
-    token_to_filter = {}
-    token_to_tokens = {}
+    default_toktype = "ingress"
+    toktypes = [default_toktype]
+    filter_to_token = {} # toktype -> (filter -> token)
+    token_to_filter = {} # toktype -> (token -> filter)
+    token_to_tokens = {} # toktype -> (token -> token list)
+    token_to_toktype = {} # token -> toktype
 
     @classmethod
     def clear(cls):
         cls.token = TOKEN_START_VALUE
-        cls.filter_to_token = {}
-        cls.token_to_filter = {}
-        cls.token_to_tokens = {}
+        cls.toktypes = [cls.default_toktype]
+        cls.filter_to_token = {cls.default_toktype: {}}
+        cls.token_to_filter = {cls.default_toktype: {}}
+        cls.token_to_tokens = {cls.default_toktype: {}}
+        cls.token_to_toktype = {}
 
     @classmethod
     def has_nonempty_intersection(cls, p1, p2):
@@ -75,30 +80,42 @@ class CharacterGenerator:
         return False
 
     @classmethod
-    def add_new_filter(cls, new_filter):
-        def add_new_token(pol):
-            new_token = cls.__new_token__()
-            cls.filter_to_token[pol] = new_token
-            cls.token_to_filter[new_token] = pol
-            return new_token
+    def __ensure_toktype(cls, toktype):
+        if not toktype in cls.toktypes:
+            cls.toktypes.append(toktype)
+            cls.filter_to_token[toktype] = {}
+            cls.token_to_filter[toktype] = {}
 
+    @classmethod
+    def __add_new_token(cls, pol, toktype):
+        new_token = cls.__new_token__()
+        cls.__ensure_toktype(toktype)
+        cls.filter_to_token[toktype][pol] = new_token
+        cls.token_to_filter[toktype][new_token] = pol
+        cls.token_to_toktype[new_token] = toktype
+        return new_token
+
+    @classmethod
+    def __add_new_filter(cls, new_filter, toktype):
         # The algorithm below ensures that matches are disjoint before adding
         # them. Basically, each character that is present in the path
         # expressions represents a mutually exclusive packet match.
         diff_list = drop
         new_intersecting_tokens = []
-        for existing_filter in cls.token_to_filter.values():
+        for existing_filter in cls.token_to_filter[toktype].values():
             if cls.has_nonempty_intersection(existing_filter, new_filter):
-                tok = cls.filter_to_token[existing_filter]
+                tok = cls.filter_to_token[toktype][existing_filter]
                 if cls.has_nonempty_intersection(existing_filter, ~new_filter):
                     # do actions below only if the existing filter has some
                     # intersection with, but is not completely contained in, the
                     # new filter.
-                    del cls.filter_to_token[existing_filter]
-                    del cls.token_to_filter[tok]
-                    new_tok1 = add_new_token(existing_filter & ~new_filter)
-                    new_tok2 = add_new_token(existing_filter & new_filter)
-                    cls.token_to_tokens[tok] = [new_tok1, new_tok2]
+                    del cls.filter_to_token[toktype][existing_filter]
+                    del cls.token_to_filter[toktype][tok]
+                    new_tok1 = cls.__add_new_token(existing_filter &
+                                                   ~new_filter, toktype)
+                    new_tok2 = cls.__add_new_token(existing_filter &
+                                                   new_filter, toktype)
+                    cls.token_to_tokens[toktype][tok] = [new_tok1, new_tok2]
                     new_intersecting_tokens.append(new_tok2)
                 else:
                     # i.e., if existing filter is completely contained in new one.
@@ -115,23 +132,30 @@ class CharacterGenerator:
             new_disjoint_token = []
             if cls.has_nonempty_intersection(new_filter, ~diff_list):
                 # i.e., if the intersections didn't completely make up the new filter
-                new_disjoint_token.append(add_new_token(new_filter & ~diff_list))
-            cls.token_to_tokens[new_token] = new_intersecting_tokens + new_disjoint_token
+                new_disjoint_token.append(cls.__add_new_token(new_filter &
+                                                              ~diff_list,
+                                                              toktype))
+            cls.token_to_tokens[toktype][new_token] = (new_intersecting_tokens +
+                                                       new_disjoint_token)
+            cls.token_to_toktype[new_token] = toktype
         else:
             # i.e., if there was no intersection at all with existing filters
-            new_token = add_new_token(new_filter)
+            new_token = cls.__add_new_token(new_filter, toktype)
         return new_token
 
     @classmethod
-    def get_filter_from_token(cls, tok):
-        if tok in cls.token_to_filter:
-            return cls.token_to_filter[tok]
-        elif tok in cls.token_to_tokens:
-            toklist = cls.token_to_tokens[tok]
+    def get_filter_from_token(cls, tok, toktype=None):
+        if not toktype:
+            toktype = cls.default_toktype
+        if tok in cls.token_to_filter[toktype]:
+            return cls.token_to_filter[toktype][tok]
+        elif tok in cls.token_to_tokens[toktype]:
+            toklist = cls.token_to_tokens[toktype][tok]
             tok0 = toklist[0]
-            output_filter = cls.get_filter_from_token(tok0)
+            output_filter = cls.get_filter_from_token(tok0, toktype)
             for new_tok in toklist[1:]:
-                output_filter = output_filter | cls.get_filter_from_token(new_tok)
+                output_filter = (output_filter |
+                                 cls.get_filter_from_token(new_tok, toktype))
             return output_filter
         else:
             raise TypeError
@@ -141,24 +165,36 @@ class CharacterGenerator:
         """Recursive search in token_to_tokens, or just direct return from
         token_to_filter, for any token.
         """
+        def get_single_token_filter(tok):
+            """ Grab filter for the given token from whichever toktype class it
+            might be part of.
+            """
+            assert tok in cls.token_to_toktype
+            toktype = cls.token_to_toktype[tok]
+            assert tok in cls.token_to_filter[toktype]
+            return cls.token_to_filter[toktype][tok]
+
         tok0 = cls.get_token_from_char(edge_label[0])
-        assert tok0 in cls.token_to_filter
-        output_filter = cls.token_to_filter[tok0]
+        output_filter = get_single_token_filter(tok0)
         for char in edge_label[1:]:
             tok = cls.get_token_from_char(char)
-            assert tok in cls.token_to_filter
-            output_filter = output_filter | cls.token_to_filter[tok]
+            output_filter = output_filter | get_single_token_filter(tok)
         if not negated:
             return output_filter
         else:
             return ~output_filter
 
     @classmethod
-    def get_token(cls, pol):
-        if pol in cls.filter_to_token:
-            return cls.filter_to_token[pol]
+    def get_token(cls, pol, toktype=None, nonoverlapping_filters=True):
+        if not toktype:
+            toktype = cls.default_toktype
+        if nonoverlapping_filters:
+            if pol in cls.filter_to_token[toktype]:
+                return cls.filter_to_token[toktype][pol]
+            else:
+                return cls.__add_new_filter(pol, toktype)
         else:
-            return cls.add_new_filter(pol)
+            return cls.__add_new_token(pol, toktype)
 
     @classmethod
     def get_char_from_token(cls, tok):
@@ -188,14 +224,21 @@ class CharacterGenerator:
 
     @classmethod
     def get_terminal_expression(cls, expr):
+        """Get an expression of token characters corresponding only to
+        non-overlapping filters from a given expression.
+        """
         def get_terminal_expr_for_char(c):
+            if cls.char_in_lexer_language(c):
+                return c
             tok = cls.get_token_from_char(c)
-            if not tok in cls.token_to_tokens:
-                assert tok in cls.token_to_filter or cls.char_in_lexer_language(c)
+            assert tok in cls.token_to_toktype
+            toktype = cls.token_to_toktype[tok]
+            if not tok in cls.token_to_tokens[toktype]:
+                assert tok in cls.token_to_filter[toktype]
                 return c
             else:
                 terminal_expr = '('
-                for tok2 in cls.token_to_tokens[tok]:
+                for tok2 in cls.token_to_tokens[toktype][tok]:
                     c2 = cls.get_char_from_token(tok2)
                     terminal_expr += get_terminal_expr_for_char(c2) + '|'
                 terminal_expr = terminal_expr[:-1] + ')'
@@ -483,6 +526,15 @@ class path_concat(path):
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
+
+class end_path(atom):
+    """ An atom that denotes the end of the packet's trajectory in the
+    network. Think of it as the "$" modifier to denote a match at the end of the
+    text in regular expressions.
+    """
+    def __init__(self):
+        ### XXX change filter later on.
+        super(end_path, self).__init__(egress_network)
 
 
 #############################################################################
