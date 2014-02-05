@@ -446,8 +446,9 @@ class path(Query):
             cls.finalize(p)
         return cls.get_policy_fragments()
 
-class atom(path, Filter):
-    """A single atomic match in a path expression.
+class abstract_atom(path, Filter):
+    """A single atomic match in a path expression. This is an abstract class
+    where the token isn't initialized.
     
     :param m: a Filter (or match) object used to initialize the path atom.
     :type match: Filter
@@ -455,7 +456,6 @@ class atom(path, Filter):
     def __init__(self, m):
         assert isinstance(m, Filter)
         self.policy = m
-        self.token = CharacterGenerator.get_token(m)
         super(atom, self).__init__(a=self)
 
     def __and__(self, other):
@@ -474,6 +474,13 @@ class atom(path, Filter):
 
     def __invert__(self):
         return atom(~(self.policy))
+
+class atom(abstract_atom):
+    """A concrete "ingress" match atom."""
+    def __init__(self, m):
+        super(atom, self).__init__(m)
+        self.token = CharacterGenerator.get_token(m, toktype="ingress",
+                                                  nonoverlapping_filters=True)
 
 
 class path_alternate(path):
@@ -527,14 +534,26 @@ class path_concat(path):
         for p in paths:
             assert isinstance(p, path)
 
-class end_path(atom):
-    """ An atom that denotes the end of the packet's trajectory in the
-    network. Think of it as the "$" modifier to denote a match at the end of the
-    text in regular expressions.
+class egress_atom(abstract_atom):
+    """An atom that denotes a match on a packet after the forwarding decision
+    has been made. It can always be substituted by a normal ("ingress") atom at
+    the next hop, unless the packet is egressing the network. Hence, it may be
+    noted that this is only necessary (apart from expressive power, of course)
+    to match on packets that egress the network.
     """
-    def __init__(self):
-        ### XXX change filter later on.
-        super(end_path, self).__init__(egress_network)
+    def __init__(self, m):
+        super(egress_atom, self).__init__(m)
+        self.token = CharacterGenerator.get_token(pol, toktype="egress",
+                                                  nonoverlapping_filters=False)
+
+class drop_atom(abstract_atom):
+    """An atom that matches on packets that were dropped by the forwarding
+    policy.
+    """
+    def __init__(self, m):
+        super(drop_atom, self).__init__(m)
+        self.token = CharacterGenerator.get_token(pol, toktype="drop",
+                                                  nonoverlapping_filters=True)
 
 
 #############################################################################
