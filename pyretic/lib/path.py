@@ -547,9 +547,9 @@ class egress_atom(abstract_atom):
     to match on packets that egress the network.
     """
     def __init__(self, m):
-        super(egress_atom, self).__init__(m)
         self.token = CharacterGenerator.get_token(pol, toktype="egress",
                                                   nonoverlapping_filters=True)
+        super(egress_atom, self).__init__(m)
 
 
 class drop_atom(abstract_atom):
@@ -557,9 +557,9 @@ class drop_atom(abstract_atom):
     policy.
     """
     def __init__(self, m):
-        super(drop_atom, self).__init__(m)
         self.token = CharacterGenerator.get_token(pol, toktype="drop",
                                                   nonoverlapping_filters=True)
+        super(drop_atom, self).__init__(m)
 
 
 #############################################################################
