@@ -374,6 +374,30 @@ def test_path_compile_2():
     # assert tags._classifier == ref_tags._classifier
     # assert counts._classifier == ref_counts._classifier
 
+### Unit test class-based token generation using the various atom types ###
+
+def test_CG_token_equivalence_classes_1():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1")
+    tok2 = cg.get_token(m, toktype="test2")
+    assert tok1 != tok2
+
+def test_CG_token_equivalence_classes_2():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1", nonoverlapping_filters=False)
+    tok2 = cg.get_token(m, toktype="test1", nonoverlapping_filters=False)
+    assert tok1 != tok2
+
+def test_CG_token_equivalence_classes_3():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1")
+    tok2 = cg.get_token(m, toktype="test1")
+    assert tok1 == tok2
+
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
 
@@ -417,6 +441,10 @@ if __name__ == "__main__":
 
     test_path_compile_1()
     test_path_compile_2()
+
+    test_CG_token_equivalence_classes_1()
+    test_CG_token_equivalence_classes_2()
+    test_CG_token_equivalence_classes_3()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

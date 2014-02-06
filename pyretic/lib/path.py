@@ -196,6 +196,7 @@ class CharacterGenerator:
     def get_token(cls, pol, toktype=None, nonoverlapping_filters=True):
         if not toktype:
             toktype = cls.default_toktype
+        cls.__ensure_toktype(toktype)
         if nonoverlapping_filters:
             if pol in cls.filter_to_token[toktype]:
                 return cls.filter_to_token[toktype][pol]
@@ -484,7 +485,7 @@ class path(Query):
         [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
         return ((tagging >> fwding >> untagging) + # critical path
                 (counting) + # capture when match at ingress
-                (fwding >> endpath) + # capture at end of path
+                (fwding >> egress_network() >> endpath) + # capture at end of path
                 (~fwding >> dropping)) # capture when dropped
 
 
@@ -603,8 +604,7 @@ class drop_atom(abstract_atom):
         super(drop_atom, self).__init__(m)
 
 class end_path(abstract_atom):
-    def __init__(self):
-        m = egress_network
+    def __init__(self, m):
         self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
                                                   nonoverlapping_filters=False)
         super(end_path, self).__init__(m)
