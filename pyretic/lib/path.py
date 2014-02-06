@@ -68,21 +68,48 @@ class CharacterGenerator:
         cls.token_to_toktype = {}
 
     @classmethod
+    def get_classifier(cls, p):
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        # Hackety hack
+        if p._classifier:
+            return p._classifier
+        try:
+            return p.generate_classifier()
+        except:
+            p.compile()
+            return p._classifier
+
+    @classmethod
     def has_nonempty_intersection(cls, p1, p2):
         """Return True if policies p1, p2 have an intesection which is
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-        def get_classifier(p):
-            if p._classifier:
-                return p._classifier
-            return p.generate_classifier()
-
-        int_class = get_classifier(p1 & p2)
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        int_class = cls.get_classifier(p1 & p2)
         for rule in int_class.rules:
             if not drop in rule.actions:
                 return True
         return False
+
+    @classmethod
+    def get_dropped_packets(cls, p):
+        """For an arbitrary policy p, return the set of packets (as a filter
+        policy) that are dropped by it.
+        """
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        pol_classifier = cls.get_classifier(p)
+        matched_packets = drop
+        for rule in pol_classifier.rules:
+            fwd_actions = filter(lambda a: (isinstance(a, modify)
+                                         and a['outport'] != OFPP_CONTROLLER),
+                              rule.actions)
+            if len(fwd_actions) > 0:
+                matched_packets += rule.match
+        return identity & ~matched_packets
 
     @classmethod
     def __ensure_toktype(cls, toktype):
@@ -489,11 +516,13 @@ class path(Query):
         """
 
         [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
+        dropped_by_fwding = CharacterGenerator.get_dropped_packets(fwding)
         return ((tagging >> fwding >> untagging) + # critical path
                 (counting) + # capture when match at ingress
                 (tagging >> fwding >> egress_network() >> endpath) + # capture
                 # at end of the packet's path in the network
-                (tagging >> ~fwding >> dropping)) # capture when dropped
+                (tagging >> dropped_by_fwding >> dropping)) # capture when
+                                                            # dropped
 
 
 class abstract_atom(path, Filter):
