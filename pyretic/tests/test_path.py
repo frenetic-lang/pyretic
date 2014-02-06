@@ -450,6 +450,64 @@ def test_drop_compilation():
     assert dropping == ((match({'vlan_id':0xffff, 'vlan_pcp':0}) &
                          match(srcip=ip1)) >> p.bucket_instance)
 
+def test_multiple_atomtype_compilation_1():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = end_path(match(dstip=ip2))
+    p = a1 ^ a2
+    [tagging,_,counting,endpath,_] = path.compile([p])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
+                                          vlan_pcp=0)))
+    assert counting == drop
+    assert endpath == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+                       p.bucket_instance)
+
+def test_multiple_atomtype_compilation_2():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = drop_atom(match(dstip=ip2))
+    p = a1 ^ a2
+    [tagging,_,counting,_,dropping] = path.compile([p])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
+                                          vlan_pcp=0)))
+    assert counting == drop
+    assert dropping == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+                        p.bucket_instance)
+
+def test_multiple_atomtype_compilation_3():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = drop_atom(match(dstip=ip2))
+    a3 = end_path(match(srcip=ip3))
+    a4 = atom(match(srcip=ip4))
+    p1 = a1 ^ a2
+    p2 = a1 ^ a3
+    p3 = a1 ^ a4
+    [tagging,_,counting,endpath,dropping] = path.compile([p1, p2, p3])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (match(srcip=ip4,vlan_id=1, vlan_pcp=0) >>
+                        modify(vlan_id=4, vlan_pcp=0)) +
+                       (identity &
+                        (~match(srcip=ip1, vlan_id=0xffff,vlan_pcp=0)) &
+                        (~match(srcip=ip4, vlan_id=1, vlan_pcp=0))))
+    assert counting == (match(srcip=ip4, vlan_id=1, vlan_pcp=0) >>
+                        p3.bucket_instance)
+    assert endpath  == (match(srcip=ip3, vlan_id=1, vlan_pcp=0) >>
+                        p2.bucket_instance)
+    assert dropping == (match(dstip=ip2, vlan_id=1, vlan_pcp=0) >>
+                        p1.bucket_instance)
+
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
@@ -505,6 +563,9 @@ if __name__ == "__main__":
     test_endpath_drop_finalization()
     test_endpath_compilation()
     test_drop_compilation()
+    test_multiple_atomtype_compilation_1()
+    test_multiple_atomtype_compilation_2()
+    test_multiple_atomtype_compilation_3()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
