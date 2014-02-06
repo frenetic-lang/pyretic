@@ -331,7 +331,7 @@ def test_path_compile_1():
     path.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    [tags, untagging, counts] = path.compile([a1])
+    [tags, untagging, counts, _, _] = path.compile([a1])
     # Note: this test depends on state numbers, which eventually get changed
     # into tags. So it's not implementation detail-independent. Also, it relies
     # on the fact that vlan is used for packet tagging.
@@ -350,7 +350,7 @@ def test_path_compile_2():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    [tags, untagging, counts] = path.compile([a1 ^ a2])
+    [tags, untagging, counts, _, _] = path.compile([a1 ^ a2])
     # Note: Caveats in test_path_compile_1 apply.
     # This is the simplified policy, but not the actual policy that's
     # returned. This is because of an intersection between the two matches that
