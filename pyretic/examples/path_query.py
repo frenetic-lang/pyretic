@@ -119,7 +119,7 @@ def path_test_7():
 
 # type: unit -> path list
 def path_main():
-    return path_test_7()
+    return path_test_1()
 
 def main():
     return mac_learner()

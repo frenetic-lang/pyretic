@@ -53,9 +53,9 @@ class CharacterGenerator:
     token = TOKEN_START_VALUE
     default_toktype = TOK_INGRESS
     toktypes = [default_toktype]
-    filter_to_token = {} # toktype -> (filter -> token)
-    token_to_filter = {} # toktype -> (token -> filter)
-    token_to_tokens = {} # toktype -> (token -> token list)
+    filter_to_token = {default_toktype: {}} # toktype -> (filter -> token)
+    token_to_filter = {default_toktype: {}} # toktype -> (token -> filter)
+    token_to_tokens = {default_toktype: {}} # toktype -> (token -> token list)
     token_to_toktype = {} # token -> toktype
 
     @classmethod
