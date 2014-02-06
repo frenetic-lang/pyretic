@@ -39,6 +39,11 @@ import pydot
 #############################################################################
 
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
+# token type definitions
+TOK_INGRESS = "ingress"
+TOK_EGRESS = "egress"
+TOK_DROP = "drop"
+TOK_END_PATH = "end_path"
 
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
@@ -46,7 +51,7 @@ class CharacterGenerator:
     already seen (and hence recorded in its map) is provided to it.
     """
     token = TOKEN_START_VALUE
-    default_toktype = "ingress"
+    default_toktype = TOK_INGRESS
     toktypes = [default_toktype]
     filter_to_token = {} # toktype -> (filter -> token)
     token_to_filter = {} # toktype -> (token -> filter)
@@ -169,20 +174,23 @@ class CharacterGenerator:
             """ Grab filter for the given token from whichever toktype class it
             might be part of.
             """
-            assert tok in cls.token_to_toktype
-            toktype = cls.token_to_toktype[tok]
+            toktype = cls.get_toktype(tok)
             assert tok in cls.token_to_filter[toktype]
-            return cls.token_to_filter[toktype][tok]
+            return [toktype, cls.token_to_filter[toktype][tok]]
 
-        tok0 = cls.get_token_from_char(edge_label[0])
-        output_filter = get_single_token_filter(tok0)
-        for char in edge_label[1:]:
+        output_filter_map = {}
+        for char in edge_label:
             tok = cls.get_token_from_char(char)
-            output_filter = output_filter | get_single_token_filter(tok)
+            [toktype, output_filter] = get_single_token_filter(tok)
+            if toktype in output_filter_map:
+                output_filter_map[toktype] = (output_filter_map[toktype] |
+                                              output_filter)
+            else:
+                output_filter_map[toktype] = output_filter
         if not negated:
-            return output_filter
+            return output_filter_map
         else:
-            return ~output_filter
+            return {t: ~output_filter_map[t] for t in output_filter_map.keys()}
 
     @classmethod
     def get_token(cls, pol, toktype=None, nonoverlapping_filters=True):
@@ -208,6 +216,11 @@ class CharacterGenerator:
         return ord(char)
 
     @classmethod
+    def get_toktype(cls, tok):
+        assert tok in cls.token_to_toktype
+        return cls.token_to_toktype[tok]
+
+    @classmethod
     def char_in_lexer_language(cls, char):
         return char in ['*','+','|','{','}','(',
                        ')','-','^','.','&','?',
@@ -231,8 +244,7 @@ class CharacterGenerator:
             if cls.char_in_lexer_language(c):
                 return c
             tok = cls.get_token_from_char(c)
-            assert tok in cls.token_to_toktype
-            toktype = cls.token_to_toktype[tok]
+            toktype = cls.get_toktype(tok)
             if not tok in cls.token_to_tokens[toktype]:
                 assert tok in cls.token_to_filter[toktype]
                 return c
@@ -407,7 +419,9 @@ class path(Query):
             src = du.get_state_id(du.get_edge_src(edge, dfa))
             dst = du.get_state_id(du.get_edge_dst(edge, dfa))
             [edge_label, negated] = du.get_edge_label(edge)
-            transit_match = cg.get_filter_from_edge_label(edge_label, negated)
+            transit_match_map = cg.get_filter_from_edge_label(edge_label,
+                                                              negated)
+            transit_match = transit_match_map[TOK_INGRESS]
             tagging_match = match_tag(src) & transit_match
             tagging_policy += (tagging_match >> set_tag(dst))
             untagged_packets = untagged_packets & ~tagging_match
@@ -480,7 +494,7 @@ class abstract_atom(path, Filter):
 class atom(abstract_atom):
     """A concrete "ingress" match atom."""
     def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype="ingress",
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
                                                   nonoverlapping_filters=True)
         super(atom, self).__init__(m)
 
@@ -547,7 +561,7 @@ class egress_atom(abstract_atom):
     to match on packets that egress the network.
     """
     def __init__(self, m):
-        self.token = CharacterGenerator.get_token(pol, toktype="egress",
+        self.token = CharacterGenerator.get_token(pol, toktype=TOK_EGRESS,
                                                   nonoverlapping_filters=True)
         super(egress_atom, self).__init__(m)
 
@@ -557,9 +571,16 @@ class drop_atom(abstract_atom):
     policy.
     """
     def __init__(self, m):
-        self.token = CharacterGenerator.get_token(pol, toktype="drop",
+        self.token = CharacterGenerator.get_token(pol, toktype=TOK_DROP,
                                                   nonoverlapping_filters=True)
         super(drop_atom, self).__init__(m)
+
+class end_path(abstract_atom):
+    def __init__(self):
+        self.token = CharacterGenerator.get_token(egress_network,
+                                                  toktype=TOK_END_PATH,
+                                                  nonoverlapping_filters=False)
+        super(end_path, self).__init__(egress_network)
 
 
 #############################################################################
