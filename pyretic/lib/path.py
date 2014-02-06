@@ -90,6 +90,7 @@ class CharacterGenerator:
             cls.toktypes.append(toktype)
             cls.filter_to_token[toktype] = {}
             cls.token_to_filter[toktype] = {}
+            cls.token_to_tokens[toktype] = {}
 
     @classmethod
     def __add_new_token(cls, pol, toktype):
@@ -416,8 +417,6 @@ class path(Query):
         # policies involving packet/count capture (parallelly composed)
         toktypes = [TOK_INGRESS, TOK_END_PATH, TOK_DROP]
         capture_policy = {}
-        for toktype in toktypes:
-            capture_policy[toktype] = drop
 
         edge_list = du.get_edges(dfa)
         for edge in edge_list:
@@ -443,9 +442,12 @@ class path(Query):
                     for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
                         if toktype in transit_match_map:
                             transit_match = transit_match_map[toktype]
-                            capture_policy[toktype] += ((match_tag(src) &
-                                                         transit_match) >>
-                                                        bucket)
+                            capture_fragment = ((match_tag(src) & transit_match)
+                                                >> bucket)
+                            if toktype in capture_policy:
+                                capture_policy[toktype] += capture_fragment
+                            else:
+                                capture_policy[toktype] = capture_fragment
 
         # preserve untagged packets as is for forwarding.
         tagging_policy += untagged_packets
@@ -454,6 +456,10 @@ class path(Query):
         untagging_policy = ((egress_network() >>
                              modify(vlan_id=None,vlan_pcp=None)) +
                             (~egress_network()))
+
+        for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
+            if not toktype in capture_policy:
+                capture_policy[toktype] = drop
 
         return [tagging_policy,
                 untagging_policy,

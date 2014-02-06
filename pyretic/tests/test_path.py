@@ -421,6 +421,36 @@ def test_drop_atom():
     assert a1.token != a2.token
     assert a2.token == a3.token
 
+### Basic compilation for end_path and drop atoms ###
+
+def test_endpath_drop_finalization():
+    cg.clear()
+    path.clear()
+    p1 = end_path(match(srcip=ip1))
+    p2 = drop_atom(match(srcip=ip1))
+    path.finalize(p1)
+    path.finalize(p2)
+    assert path.re_list and path.paths_list and path.path_to_bucket
+    assert path.re_list == [p1.expr, p2.expr]
+    assert path.paths_list == [ [p1], [p2] ]
+
+def test_endpath_compilation():
+    cg.clear()
+    path.clear()
+    p = end_path(match(srcip=ip1))
+    [_,_,_,endpath,_] = path.compile([p])
+    assert endpath == ((match({'vlan_id': 0xffff, 'vlan_pcp': 0}) &
+                        match(srcip=ip1)) >> p.bucket_instance)
+
+def test_drop_compilation():
+    cg.clear()
+    path.clear()
+    p = drop_atom(match(srcip=ip1))
+    [_,_,_,_,dropping] = path.compile([p])
+    assert dropping == ((match({'vlan_id':0xffff, 'vlan_pcp':0}) &
+                         match(srcip=ip1)) >> p.bucket_instance)
+
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
 
@@ -471,6 +501,10 @@ if __name__ == "__main__":
 
     test_end_path()
     test_drop_atom()
+
+    test_endpath_drop_finalization()
+    test_endpath_compilation()
+    test_drop_compilation()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
