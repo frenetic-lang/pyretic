@@ -397,6 +397,29 @@ def test_CG_token_equivalence_classes_3():
     tok2 = cg.get_token(m, toktype="test1")
     assert tok1 == tok2
 
+### Initialize end_path and drop_atom classes and ensure they get tokens ###
+
+def test_end_path():
+    cg.clear()
+    m = match(srcip=ip1)
+    a1 = atom(m)
+    a2 = end_path(m)
+    a3 = atom(m)
+    a4 = end_path(m)
+    assert a1.token and a2.token and a3.token
+    assert a1.token == a3.token
+    assert a1.token != a2.token
+    assert a2.token == a4.token
+
+def test_drop_atom():
+    cg.clear()
+    m = match(srcip=ip1)
+    a1 = atom(m)
+    a2 = drop_atom(m)
+    a3 = drop_atom(m)
+    assert a1.token and a2.token
+    assert a1.token != a2.token
+    assert a2.token == a3.token
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
@@ -445,6 +468,9 @@ if __name__ == "__main__":
     test_CG_token_equivalence_classes_1()
     test_CG_token_equivalence_classes_2()
     test_CG_token_equivalence_classes_3()
+
+    test_end_path()
+    test_drop_atom()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

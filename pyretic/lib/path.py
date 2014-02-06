@@ -606,7 +606,7 @@ class drop_atom(abstract_atom):
 class end_path(abstract_atom):
     def __init__(self, m):
         self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
-                                                  nonoverlapping_filters=False)
+                                                  nonoverlapping_filters=True)
         super(end_path, self).__init__(m)
 
 
