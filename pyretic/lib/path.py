@@ -409,11 +409,16 @@ class path(Query):
                 return match({'vlan_id': 0xffff, 'vlan_pcp': 0})
             return match({'vlan_id': int(val), 'vlan_pcp': 0})
 
+        # policies to apply on packet in the critical path
         tagging_policy = drop
         untagged_packets = identity
-        counting_policy = drop
-        edge_list = du.get_edges(dfa)
+        # policies involving packet/count capture (parallelly composed)
+        toktypes = [TOK_INGRESS, TOK_END_PATH, TOK_DROP]
+        capture_policy = {}
+        for toktype in toktypes:
+            capture_policy[toktype] = drop
 
+        edge_list = du.get_edges(dfa)
         for edge in edge_list:
             # generate tagging fragment
             src = du.get_state_id(du.get_edge_src(edge, dfa))
@@ -421,10 +426,11 @@ class path(Query):
             [edge_label, negated] = du.get_edge_label(edge)
             transit_match_map = cg.get_filter_from_edge_label(edge_label,
                                                               negated)
-            transit_match = transit_match_map[TOK_INGRESS]
-            tagging_match = match_tag(src) & transit_match
-            tagging_policy += (tagging_match >> set_tag(dst))
-            untagged_packets = untagged_packets & ~tagging_match
+            if TOK_INGRESS in transit_match_map:
+                transit_match = transit_match_map[TOK_INGRESS]
+                tagging_match = match_tag(src) & transit_match
+                tagging_policy += (tagging_match >> set_tag(dst))
+                untagged_packets = untagged_packets & ~tagging_match
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -433,8 +439,12 @@ class path(Query):
                 paths = cls.paths_list[accepted_token]
                 for p in paths:
                     bucket = cls.path_to_bucket[p]
-                    counting_policy += ((match_tag(src) & transit_match) >>
-                                        bucket)
+                    for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
+                        if toktype in transit_match_map:
+                            transit_match = transit_match_map[toktype]
+                            capture_policy[toktype] += ((match_tag(src) &
+                                                         transit_match) >>
+                                                        bucket)
 
         # preserve untagged packets as is for forwarding.
         tagging_policy += untagged_packets
@@ -443,12 +453,17 @@ class path(Query):
         untagging_policy = ((egress_network() >>
                              modify(vlan_id=None,vlan_pcp=None)) +
                             (~egress_network()))
-        return [tagging_policy, untagging_policy, counting_policy]
+
+        return [tagging_policy,
+                untagging_policy,
+                capture_policy[TOK_INGRESS],
+                capture_policy[TOK_END_PATH],
+                capture_policy[TOK_DROP]]
 
     @classmethod
     def compile(cls, path_pols):
-        """Stitch together the "single packet policy" and "path policy" and
-        return the globally effective network policy.
+        """Finalize all the paths in the given list of path policies, and return
+        a bunch of policy fragments to be used with the forwarding policy later.
 
         :param path_pols: a list of path queries
         :type path_pols: path list
@@ -459,6 +474,18 @@ class path(Query):
         for p in path_pols:
             cls.finalize(p)
         return cls.get_policy_fragments()
+
+    @classmethod
+    def stitch(cls, fwding, path_pol_fragments):
+        """Stitch together the "single packet policy" and "path policy" and
+        return the globally effective network policy.
+        """
+
+        [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
+        return ((tagging >> fwding >> untagging) + # critical path
+                (counting) + # capture when match at ingress
+                (fwding >> endpath) + # capture at end of path
+                (~fwding >> dropping)) # capture when dropped
 
 
 class abstract_atom(path, Filter):
@@ -561,7 +588,7 @@ class egress_atom(abstract_atom):
     to match on packets that egress the network.
     """
     def __init__(self, m):
-        self.token = CharacterGenerator.get_token(pol, toktype=TOK_EGRESS,
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
                                                   nonoverlapping_filters=True)
         super(egress_atom, self).__init__(m)
 
@@ -571,16 +598,16 @@ class drop_atom(abstract_atom):
     policy.
     """
     def __init__(self, m):
-        self.token = CharacterGenerator.get_token(pol, toktype=TOK_DROP,
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
                                                   nonoverlapping_filters=True)
         super(drop_atom, self).__init__(m)
 
 class end_path(abstract_atom):
     def __init__(self):
-        self.token = CharacterGenerator.get_token(egress_network,
-                                                  toktype=TOK_END_PATH,
+        m = egress_network
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
                                                   nonoverlapping_filters=False)
-        super(end_path, self).__init__(egress_network)
+        super(end_path, self).__init__(m)
 
 
 #############################################################################
