@@ -491,8 +491,9 @@ class path(Query):
         [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
         return ((tagging >> fwding >> untagging) + # critical path
                 (counting) + # capture when match at ingress
-                (fwding >> egress_network() >> endpath) + # capture at end of path
-                (~fwding >> dropping)) # capture when dropped
+                (tagging >> fwding >> egress_network() >> endpath) + # capture
+                # at end of the packet's path in the network
+                (tagging >> ~fwding >> dropping)) # capture when dropped
 
 
 class abstract_atom(path, Filter):
