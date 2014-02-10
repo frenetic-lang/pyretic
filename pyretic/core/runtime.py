@@ -121,6 +121,10 @@ class Runtime(object):
         """
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
+            print "+++++++++++++++++++++++++++++++++"
+            print "Got a pyretic packet to handle:"
+            print pyretic_pkt
+            print "+++++++++++++++++++++++++++++++++"
 
             # find the queries, if any in the policy, that will be evaluated
             queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)

@@ -109,7 +109,7 @@ class CharacterGenerator:
                               rule.actions)
             if len(fwd_actions) > 0:
                 matched_packets += rule.match
-        return identity & ~matched_packets
+        return ~matched_packets
 
     @classmethod
     def __ensure_toktype(cls, toktype):
@@ -516,12 +516,25 @@ class path(Query):
         """
 
         [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
-        dropped_by_fwding = CharacterGenerator.get_dropped_packets(fwding)
+
+        # TODO(ngsrinivas) There has to be a way of constructing the "dropped by
+        # forwarding" policy while only relying on the structure of the
+        # forwarding policy. Any technique which goes through its classifier is
+        # necessarily incorrect -- unless it re-constructs the stitched policy
+        # each time the policy is re-installed on the network. There are
+        # (arguably minor) problems with this latter approach as well,
+        # however. In particular, information about the path policies and
+        # distinct handling of single packet and path policies will percolate
+        # into multiple places in the runtime.
+
+        # dropped_by_fwding = CharacterGenerator.get_dropped_packets(fwding)
+
         return ((tagging >> fwding >> untagging) + # critical path
                 (counting) + # capture when match at ingress
-                (tagging >> fwding >> egress_network() >> endpath) + # capture
+                (tagging >> fwding >> egress_network() >> endpath)) # capture
                 # at end of the packet's path in the network
-                (tagging >> dropped_by_fwding >> dropping)) # capture when
+                # TODO(ngsrinivas): drop atoms are not stitched in as of now
+                # + (tagging >> dropped_by_fwding >> dropping)) # capture when
                                                             # dropped
 
 

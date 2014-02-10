@@ -66,6 +66,7 @@ def query_func(bucket, interval):
 def query_callback(test_num):
     def actual_callback(pkt):
         print '**************'
+        print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
         print pkt
         print '**************'
@@ -117,9 +118,32 @@ def path_test_7():
     p.register_callback(query_callback(7))
     return [p]
 
+def path_test_8():
+    p = atom(ingress_network())
+    p.register_callback(query_callback(8))
+    return [p]
+
+def path_test_9():
+    p = atom(match(srcip=ip1)) ^ end_path(identity)
+    p.register_callback(query_callback(9))
+    return [p]
+
+def path_test_10():
+    """ TODO(ngsrinivas): Defunct test as of now -- drop atoms are not stitched
+    into the main policy.
+    """
+    p = atom(match(srcip=ip1)) ^ drop_atom(identity)
+    p.register_callback(query_callback(10))
+    return [p]
+
+def path_test_11():
+    p = end_path(identity)
+    p.register_callback(query_callback(11))
+    return [p]
+
 # type: unit -> path list
 def path_main():
-    return path_test_1()
+    return path_test_11()
 
 def main():
     return mac_learner()
