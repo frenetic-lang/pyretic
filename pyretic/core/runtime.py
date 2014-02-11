@@ -121,10 +121,6 @@ class Runtime(object):
         """
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-            print "+++++++++++++++++++++++++++++++++"
-            print "Got a pyretic packet to handle:"
-            print pyretic_pkt
-            print "+++++++++++++++++++++++++++++++++"
 
             # find the queries, if any in the policy, that will be evaluated
             queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
@@ -1082,8 +1078,13 @@ class Runtime(object):
             # vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
             vlan_id = extended_values['vlan_id']
             vlan_pcp = extended_values['vlan_pcp']
-            concrete_packet['vlan_id'] = vlan_id
-            concrete_packet['vlan_pcp'] = vlan_pcp
+            if vlan_id != 0xffff:
+                concrete_packet['vlan_id'] = vlan_id
+                concrete_packet['vlan_pcp'] = vlan_pcp
+            else:
+                # do stuff to remove the vlan from headers
+                del headers['vlan_id']
+                del headers['vlan_pcp']
         concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
 
