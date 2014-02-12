@@ -64,11 +64,12 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+
         if path_main:
             from pyretic.lib.path import path
             path_policies = path_main(**kwargs)
-            [tagging_pol, untagging_pol, counting_pol] = path.compile(path_policies)
-            self.policy = ((tagging_pol >> self.policy) + counting_pol)
+            policy_fragments = path.compile(path_policies)
+            self.policy = path.stitch(self.policy, policy_fragments)
 
         # Virtual field composition
         self.policy = virtual_field_tagging() >> self.policy >> virtual_field_untagging()

@@ -74,6 +74,7 @@ def query_func(bucket, interval):
 def query_callback(test_num):
     def actual_callback(pkt):
         print '**************'
+        print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
         print pkt
         print '**************'
@@ -106,6 +107,46 @@ def path_test_4():
     query_thread = threading.Thread(target=query_func, args=(cb,2.5))
     query_thread.daemon = True
     query_thread.start()
+    return [p]
+
+def path_test_5():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=3))
+    p = (a1 ^ a2)  | (a2 ^ a1)
+    p.register_callback(query_callback(5))
+    return [p]
+
+def path_test_6():
+    p = +atom(identity)
+    p.register_callback(query_callback(6))
+    return [p]
+
+def path_test_7():
+    p = atom(match(switch=1)) ^ +atom(identity)
+    p.register_callback(query_callback(7))
+    return [p]
+
+def path_test_8():
+    p = atom(ingress_network())
+    p.register_callback(query_callback(8))
+    return [p]
+
+def path_test_9():
+    p = atom(match(srcip=ip1)) ^ end_path(identity)
+    p.register_callback(query_callback(9))
+    return [p]
+
+def path_test_10():
+    """ TODO(ngsrinivas): Defunct test as of now -- drop atoms are not stitched
+    into the main policy.
+    """
+    p = atom(match(srcip=ip1)) ^ drop_atom(identity)
+    p.register_callback(query_callback(10))
+    return [p]
+
+def path_test_11():
+    p = end_path(identity)
+    p.register_callback(query_callback(11))
     return [p]
 
 # type: unit -> path list

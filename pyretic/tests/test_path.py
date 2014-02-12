@@ -92,7 +92,7 @@ def test_CG_policy_equality():
     cg.clear()
     m = match(srcip=ip1)
     tok = cg.get_token(m)
-    assert cg.token_to_filter[tok] == m
+    assert cg.get_filter_from_token(tok) == m
 
 ### Basic checks on creating and manipulating path atoms ###
 
@@ -172,7 +172,7 @@ def test_path_alternation():
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
     assert isinstance(p, path)
-    assert p.expr == ('(' + a1.expr + ')|(' + a2.expr + ')')
+    assert p.expr == ('((' + a1.expr + ')|(' + a2.expr + '))')
 
 def test_path_kleene_closure():
     cg.clear()
@@ -194,8 +194,8 @@ def test_slightly_complicated_expr_1():
     a4 = atom(match(dstip=ip1))
     p = (a1 ^ a4) | (a2 ^ a3)
     assert isinstance(p, path)
-    assert p.expr == ('(' + a1.expr + a4.expr + ')|(' + a2.expr +
-                      a3.expr + ')')
+    assert p.expr == ('((' + a1.expr + a4.expr + ')|(' + a2.expr +
+                      a3.expr + '))')
 
 ### Simple tests on dfa_utils ### 
 
@@ -331,7 +331,7 @@ def test_path_compile_1():
     path.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    [tags, untagging, counts] = path.compile([a1])
+    [tags, untagging, counts, _, _] = path.compile([a1])
     # Note: this test depends on state numbers, which eventually get changed
     # into tags. So it's not implementation detail-independent. Also, it relies
     # on the fact that vlan is used for packet tagging.
@@ -350,7 +350,7 @@ def test_path_compile_2():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    [tags, untagging, counts] = path.compile([a1 ^ a2])
+    [tags, untagging, counts, _, _] = path.compile([a1 ^ a2])
     # Note: Caveats in test_path_compile_1 apply.
     # This is the simplified policy, but not the actual policy that's
     # returned. This is because of an intersection between the two matches that
@@ -373,6 +373,141 @@ def test_path_compile_2():
     # equivalence", but unfortunately this isn't netkat ;)
     # assert tags._classifier == ref_tags._classifier
     # assert counts._classifier == ref_counts._classifier
+
+### Unit test class-based token generation using the various atom types ###
+
+def test_CG_token_equivalence_classes_1():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1")
+    tok2 = cg.get_token(m, toktype="test2")
+    assert tok1 != tok2
+
+def test_CG_token_equivalence_classes_2():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1", nonoverlapping_filters=False)
+    tok2 = cg.get_token(m, toktype="test1", nonoverlapping_filters=False)
+    assert tok1 != tok2
+
+def test_CG_token_equivalence_classes_3():
+    cg.clear()
+    m = match(srcip=ip1)
+    tok1 = cg.get_token(m, toktype="test1")
+    tok2 = cg.get_token(m, toktype="test1")
+    assert tok1 == tok2
+
+### Initialize end_path and drop_atom classes and ensure they get tokens ###
+
+def test_end_path():
+    cg.clear()
+    m = match(srcip=ip1)
+    a1 = atom(m)
+    a2 = end_path(m)
+    a3 = atom(m)
+    a4 = end_path(m)
+    assert a1.token and a2.token and a3.token
+    assert a1.token == a3.token
+    assert a1.token != a2.token
+    assert a2.token == a4.token
+
+def test_drop_atom():
+    cg.clear()
+    m = match(srcip=ip1)
+    a1 = atom(m)
+    a2 = drop_atom(m)
+    a3 = drop_atom(m)
+    assert a1.token and a2.token
+    assert a1.token != a2.token
+    assert a2.token == a3.token
+
+### Basic compilation for end_path and drop atoms ###
+
+def test_endpath_drop_finalization():
+    cg.clear()
+    path.clear()
+    p1 = end_path(match(srcip=ip1))
+    p2 = drop_atom(match(srcip=ip1))
+    path.finalize(p1)
+    path.finalize(p2)
+    assert path.re_list and path.paths_list and path.path_to_bucket
+    assert path.re_list == [p1.expr, p2.expr]
+    assert path.paths_list == [ [p1], [p2] ]
+
+def test_endpath_compilation():
+    cg.clear()
+    path.clear()
+    p = end_path(match(srcip=ip1))
+    [_,_,_,endpath,_] = path.compile([p])
+    assert endpath == ((match({'vlan_id': 0xffff, 'vlan_pcp': 0}) &
+                        match(srcip=ip1)) >> p.bucket_instance)
+
+def test_drop_compilation():
+    cg.clear()
+    path.clear()
+    p = drop_atom(match(srcip=ip1))
+    [_,_,_,_,dropping] = path.compile([p])
+    assert dropping == ((match({'vlan_id':0xffff, 'vlan_pcp':0}) &
+                         match(srcip=ip1)) >> p.bucket_instance)
+
+def test_multiple_atomtype_compilation_1():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = end_path(match(dstip=ip2))
+    p = a1 ^ a2
+    [tagging,_,counting,endpath,_] = path.compile([p])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
+                                          vlan_pcp=0)))
+    assert counting == drop
+    assert endpath == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+                       p.bucket_instance)
+
+def test_multiple_atomtype_compilation_2():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = drop_atom(match(dstip=ip2))
+    p = a1 ^ a2
+    [tagging,_,counting,_,dropping] = path.compile([p])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
+                                          vlan_pcp=0)))
+    assert counting == drop
+    assert dropping == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+                        p.bucket_instance)
+
+def test_multiple_atomtype_compilation_3():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = drop_atom(match(dstip=ip2))
+    a3 = end_path(match(srcip=ip3))
+    a4 = atom(match(srcip=ip4))
+    p1 = a1 ^ a2
+    p2 = a1 ^ a3
+    p3 = a1 ^ a4
+    [tagging,_,counting,endpath,dropping] = path.compile([p1, p2, p3])
+    assert tagging == (drop +
+                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
+                        modify(vlan_id=1, vlan_pcp=0)) +
+                       (match(srcip=ip4,vlan_id=1, vlan_pcp=0) >>
+                        modify(vlan_id=4, vlan_pcp=0)) +
+                       (identity &
+                        (~match(srcip=ip1, vlan_id=0xffff,vlan_pcp=0)) &
+                        (~match(srcip=ip4, vlan_id=1, vlan_pcp=0))))
+    assert counting == (match(srcip=ip4, vlan_id=1, vlan_pcp=0) >>
+                        p3.bucket_instance)
+    assert endpath  == (match(srcip=ip3, vlan_id=1, vlan_pcp=0) >>
+                        p2.bucket_instance)
+    assert dropping == (match(dstip=ip2, vlan_id=1, vlan_pcp=0) >>
+                        p1.bucket_instance)
+
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
@@ -417,6 +552,20 @@ if __name__ == "__main__":
 
     test_path_compile_1()
     test_path_compile_2()
+
+    test_CG_token_equivalence_classes_1()
+    test_CG_token_equivalence_classes_2()
+    test_CG_token_equivalence_classes_3()
+
+    test_end_path()
+    test_drop_atom()
+
+    test_endpath_drop_finalization()
+    test_endpath_compilation()
+    test_drop_compilation()
+    test_multiple_atomtype_compilation_1()
+    test_multiple_atomtype_compilation_2()
+    test_multiple_atomtype_compilation_3()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

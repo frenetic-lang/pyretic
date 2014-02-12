@@ -26,9 +26,11 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, egress_network, Filter, drop, match, modify, Query, FwdBucket, CountBucket
+from pyretic.core.language import identity, egress_network, Filter, drop, match
+from pyretic.core.language import modify, Query, FwdBucket, CountBucket
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
+
 import subprocess
 import pyretic.vendor
 import pydot
@@ -38,6 +40,11 @@ import pydot
 #############################################################################
 
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
+# token type definitions
+TOK_INGRESS = "ingress"
+TOK_EGRESS = "egress"
+TOK_DROP = "drop"
+TOK_END_PATH = "end_path"
 
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
@@ -45,16 +52,34 @@ class CharacterGenerator:
     already seen (and hence recorded in its map) is provided to it.
     """
     token = TOKEN_START_VALUE
-    filter_to_token = {}
-    token_to_filter = {}
-    token_to_tokens = {}
+    default_toktype = TOK_INGRESS
+    toktypes = [default_toktype]
+    filter_to_token = {default_toktype: {}} # toktype -> (filter -> token)
+    token_to_filter = {default_toktype: {}} # toktype -> (token -> filter)
+    token_to_tokens = {default_toktype: {}} # toktype -> (token -> token list)
+    token_to_toktype = {} # token -> toktype
 
     @classmethod
     def clear(cls):
         cls.token = TOKEN_START_VALUE
-        cls.filter_to_token = {}
-        cls.token_to_filter = {}
-        cls.token_to_tokens = {}
+        cls.toktypes = [cls.default_toktype]
+        cls.filter_to_token = {cls.default_toktype: {}}
+        cls.token_to_filter = {cls.default_toktype: {}}
+        cls.token_to_tokens = {cls.default_toktype: {}}
+        cls.token_to_toktype = {}
+
+    @classmethod
+    def get_classifier(cls, p):
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        # Hackety hack
+        if p._classifier:
+            return p._classifier
+        try:
+            return p.generate_classifier()
+        except:
+            p.compile()
+            return p._classifier
 
     @classmethod
     def has_nonempty_intersection(cls, p1, p2):
@@ -62,42 +87,69 @@ class CharacterGenerator:
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-        def get_classifier(p):
-            if p._classifier:
-                return p._classifier
-            return p.generate_classifier()
-
-        int_class = get_classifier(p1 & p2)
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        int_class = cls.get_classifier(p1 & p2)
         for rule in int_class.rules:
             if not drop in rule.actions:
                 return True
         return False
 
     @classmethod
-    def add_new_filter(cls, new_filter):
-        def add_new_token(pol):
-            new_token = cls.__new_token__()
-            cls.filter_to_token[pol] = new_token
-            cls.token_to_filter[new_token] = pol
-            return new_token
+    def get_dropped_packets(cls, p):
+        """For an arbitrary policy p, return the set of packets (as a filter
+        policy) that are dropped by it.
+        """
+        # TODO(ngsrinivas): this function should probably reside in
+        # classifier.py
+        pol_classifier = cls.get_classifier(p)
+        matched_packets = drop
+        for rule in pol_classifier.rules:
+            fwd_actions = filter(lambda a: (isinstance(a, modify)
+                                         and a['outport'] != OFPP_CONTROLLER),
+                              rule.actions)
+            if len(fwd_actions) > 0:
+                matched_packets += rule.match
+        return ~matched_packets
 
+    @classmethod
+    def __ensure_toktype(cls, toktype):
+        if not toktype in cls.toktypes:
+            cls.toktypes.append(toktype)
+            cls.filter_to_token[toktype] = {}
+            cls.token_to_filter[toktype] = {}
+            cls.token_to_tokens[toktype] = {}
+
+    @classmethod
+    def __add_new_token(cls, pol, toktype):
+        new_token = cls.__new_token__()
+        cls.__ensure_toktype(toktype)
+        cls.filter_to_token[toktype][pol] = new_token
+        cls.token_to_filter[toktype][new_token] = pol
+        cls.token_to_toktype[new_token] = toktype
+        return new_token
+
+    @classmethod
+    def __add_new_filter(cls, new_filter, toktype):
         # The algorithm below ensures that matches are disjoint before adding
         # them. Basically, each character that is present in the path
         # expressions represents a mutually exclusive packet match.
         diff_list = drop
         new_intersecting_tokens = []
-        for existing_filter in cls.token_to_filter.values():
+        for existing_filter in cls.token_to_filter[toktype].values():
             if cls.has_nonempty_intersection(existing_filter, new_filter):
-                tok = cls.filter_to_token[existing_filter]
+                tok = cls.filter_to_token[toktype][existing_filter]
                 if cls.has_nonempty_intersection(existing_filter, ~new_filter):
                     # do actions below only if the existing filter has some
                     # intersection with, but is not completely contained in, the
                     # new filter.
-                    del cls.filter_to_token[existing_filter]
-                    del cls.token_to_filter[tok]
-                    new_tok1 = add_new_token(existing_filter & ~new_filter)
-                    new_tok2 = add_new_token(existing_filter & new_filter)
-                    cls.token_to_tokens[tok] = [new_tok1, new_tok2]
+                    del cls.filter_to_token[toktype][existing_filter]
+                    del cls.token_to_filter[toktype][tok]
+                    new_tok1 = cls.__add_new_token(existing_filter &
+                                                   ~new_filter, toktype)
+                    new_tok2 = cls.__add_new_token(existing_filter &
+                                                   new_filter, toktype)
+                    cls.token_to_tokens[toktype][tok] = [new_tok1, new_tok2]
                     new_intersecting_tokens.append(new_tok2)
                 else:
                     # i.e., if existing filter is completely contained in new one.
@@ -114,47 +166,73 @@ class CharacterGenerator:
             new_disjoint_token = []
             if cls.has_nonempty_intersection(new_filter, ~diff_list):
                 # i.e., if the intersections didn't completely make up the new filter
-                new_disjoint_token.append(add_new_token(new_filter & ~diff_list))
-            cls.token_to_tokens[new_token] = new_intersecting_tokens + new_disjoint_token
+                new_disjoint_token.append(cls.__add_new_token(new_filter &
+                                                              ~diff_list,
+                                                              toktype))
+            cls.token_to_tokens[toktype][new_token] = (new_intersecting_tokens +
+                                                       new_disjoint_token)
+            cls.token_to_toktype[new_token] = toktype
         else:
             # i.e., if there was no intersection at all with existing filters
-            new_token = add_new_token(new_filter)
+            new_token = cls.__add_new_token(new_filter, toktype)
         return new_token
 
     @classmethod
-    def get_filter_from_token(cls, tok):
-        if tok in cls.token_to_filter:
-            return cls.token_to_filter[tok]
-        elif tok in cls.token_to_tokens:
-            toklist = cls.token_to_tokens[tok]
+    def get_filter_from_token(cls, tok, toktype=None):
+        if not toktype:
+            toktype = cls.default_toktype
+        if tok in cls.token_to_filter[toktype]:
+            return cls.token_to_filter[toktype][tok]
+        elif tok in cls.token_to_tokens[toktype]:
+            toklist = cls.token_to_tokens[toktype][tok]
             tok0 = toklist[0]
-            output_filter = cls.get_filter_from_token(tok0)
+            output_filter = cls.get_filter_from_token(tok0, toktype)
             for new_tok in toklist[1:]:
-                output_filter = output_filter | cls.get_filter_from_token(new_tok)
+                output_filter = (output_filter |
+                                 cls.get_filter_from_token(new_tok, toktype))
             return output_filter
         else:
             raise TypeError
 
     @classmethod
-    def get_filter_from_edge_label(cls, edge_label):
+    def get_filter_from_edge_label(cls, edge_label, negated):
         """Recursive search in token_to_tokens, or just direct return from
         token_to_filter, for any token.
         """
-        tok0 = cls.get_token_from_char(edge_label[0])
-        assert tok0 in cls.token_to_filter
-        output_filter = cls.token_to_filter[tok0]
-        for char in edge_label[1:]:
+        def get_single_token_filter(tok):
+            """ Grab filter for the given token from whichever toktype class it
+            might be part of.
+            """
+            toktype = cls.get_toktype(tok)
+            assert tok in cls.token_to_filter[toktype]
+            return [toktype, cls.token_to_filter[toktype][tok]]
+
+        output_filter_map = {}
+        for char in edge_label:
             tok = cls.get_token_from_char(char)
-            assert tok in cls.token_to_filter
-            output_filter = output_filter | cls.token_to_filter[tok]
-        return output_filter
+            [toktype, output_filter] = get_single_token_filter(tok)
+            if toktype in output_filter_map:
+                output_filter_map[toktype] = (output_filter_map[toktype] |
+                                              output_filter)
+            else:
+                output_filter_map[toktype] = output_filter
+        if not negated:
+            return output_filter_map
+        else:
+            return {t: ~output_filter_map[t] for t in output_filter_map.keys()}
 
     @classmethod
-    def get_token(cls, pol):
-        if pol in cls.filter_to_token:
-            return cls.filter_to_token[pol]
+    def get_token(cls, pol, toktype=None, nonoverlapping_filters=True):
+        if not toktype:
+            toktype = cls.default_toktype
+        cls.__ensure_toktype(toktype)
+        if nonoverlapping_filters:
+            if pol in cls.filter_to_token[toktype]:
+                return cls.filter_to_token[toktype][pol]
+            else:
+                return cls.__add_new_filter(pol, toktype)
         else:
-            return cls.add_new_filter(pol)
+            return cls.__add_new_token(pol, toktype)
 
     @classmethod
     def get_char_from_token(cls, tok):
@@ -168,10 +246,16 @@ class CharacterGenerator:
         return ord(char)
 
     @classmethod
+    def get_toktype(cls, tok):
+        assert tok in cls.token_to_toktype
+        return cls.token_to_toktype[tok]
+
+    @classmethod
     def char_in_lexer_language(cls, char):
         return char in ['*','+','|','{','}','(',
                        ')','-','^','.','&','?',
-                       '"',"'",'%','$',',','/',"\\"]
+                       '"',"'",'%','$',',','/',"\\",
+                        '=','>','<']
 
     @classmethod
     def __new_token__(cls):
@@ -183,14 +267,20 @@ class CharacterGenerator:
 
     @classmethod
     def get_terminal_expression(cls, expr):
+        """Get an expression of token characters corresponding only to
+        non-overlapping filters from a given expression.
+        """
         def get_terminal_expr_for_char(c):
+            if cls.char_in_lexer_language(c):
+                return c
             tok = cls.get_token_from_char(c)
-            if not tok in cls.token_to_tokens:
-                assert tok in cls.token_to_filter or cls.char_in_lexer_language(c)
+            toktype = cls.get_toktype(tok)
+            if not tok in cls.token_to_tokens[toktype]:
+                assert tok in cls.token_to_filter[toktype]
                 return c
             else:
                 terminal_expr = '('
-                for tok2 in cls.token_to_tokens[tok]:
+                for tok2 in cls.token_to_tokens[toktype][tok]:
                     c2 = cls.get_char_from_token(tok2)
                     terminal_expr += get_terminal_expr_for_char(c2) + '|'
                 terminal_expr = terminal_expr[:-1] + ')'
@@ -209,14 +299,16 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, expr=None):
+    def __init__(self, a=None, expr=None, paths=None):
         if a:
-            assert isinstance(a, atom)
+            assert isinstance(a, abstract_atom)
             self.atom = a
             self.expr = CharacterGenerator.get_char_from_token(self.atom.token)
         elif expr:
             assert isinstance(expr, str)
             self.expr = expr
+        elif paths:
+            self.paths = paths
         else:
             raise RuntimeError
         super(path, self).__init__()
@@ -237,12 +329,12 @@ class path(Query):
     def __xor__(self, other):
         """Implementation of the path concatenation operator ('^')"""
         assert isinstance(other, path)
-        return path(expr=(self.expr + other.expr))
+        return path_concat([self, other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
         assert isinstance(other, path)
-        return path(expr=('(' + self.expr + ')|(' + other.expr + ')'))
+        return path_alternate([self, other])
 
     def __pos__(self):
         """Implementation of the Kleene star operator.
@@ -251,7 +343,7 @@ class path(Query):
         unfortunately there is no unary (prefix or postfix) '*' operator in
         python.
         """
-        return path(expr=('(' + self.expr + ')*'))
+        return path_star(self)
 
     @classmethod
     def clear(cls):
@@ -341,29 +433,36 @@ class path(Query):
                       type="integer")
 
         def set_tag(val):
-            return modify(path_tag=int(val))
+            if val:
+                return modify(path_tag=int(val))
+            else:
+                return modify(path_tag=None)
 
         def match_tag(val):
             if int(val) == 0:
                 return match(path_tag=None)
             return match(path_tag=int(val))
 
+        # policies to apply on packet in the critical path
         tagging_policy = drop
         untagged_packets = identity
-        counting_policy = drop
-        edge_list = du.get_edges(dfa)
+        # policies involving packet/count capture (parallelly composed)
+        toktypes = [TOK_INGRESS, TOK_END_PATH, TOK_DROP]
+        capture_policy = {}
 
+        edge_list = du.get_edges(dfa)
         for edge in edge_list:
             # generate tagging fragment
             src = du.get_state_id(du.get_edge_src(edge, dfa))
             dst = du.get_state_id(du.get_edge_dst(edge, dfa))
-            edge_label = du.get_edge_label(edge)
-            if len(edge_label) > 1: # character class
-                edge_label = edge_label[1:-1] # strip off '[' and ']'
-            transit_match = cg.get_filter_from_edge_label(edge_label)
-            tagging_match = match_tag(src) & transit_match
-            tagging_policy += (tagging_match >> set_tag(dst))
-            untagged_packets = untagged_packets & ~tagging_match
+            [edge_label, negated] = du.get_edge_label(edge)
+            transit_match_map = cg.get_filter_from_edge_label(edge_label,
+                                                              negated)
+            if TOK_INGRESS in transit_match_map:
+                transit_match = transit_match_map[TOK_INGRESS]
+                tagging_match = match_tag(src) & transit_match
+                tagging_policy += (tagging_match >> set_tag(dst))
+                untagged_packets = untagged_packets & ~tagging_match
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -372,8 +471,15 @@ class path(Query):
                 paths = cls.paths_list[accepted_token]
                 for p in paths:
                     bucket = cls.path_to_bucket[p]
-                    counting_policy += ((match_tag(src) & transit_match) >>
-                                        bucket)
+                    for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
+                        if toktype in transit_match_map:
+                            transit_match = transit_match_map[toktype]
+                            capture_fragment = ((match_tag(src) & transit_match)
+                                                >> bucket)
+                            if toktype in capture_policy:
+                                capture_policy[toktype] += capture_fragment
+                            else:
+                                capture_policy[toktype] = capture_fragment
 
         # preserve untagged packets as is for forwarding.
         tagging_policy += untagged_packets
@@ -382,12 +488,21 @@ class path(Query):
         untagging_policy = ((egress_network() >>
                              modify(path_tag=None)) +
                             (~egress_network()))
-        return [tagging_policy, untagging_policy, counting_policy]
+
+        for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
+            if not toktype in capture_policy:
+                capture_policy[toktype] = drop
+
+        return [tagging_policy,
+                untagging_policy,
+                capture_policy[TOK_INGRESS],
+                capture_policy[TOK_END_PATH],
+                capture_policy[TOK_DROP]]
 
     @classmethod
     def compile(cls, path_pols):
-        """Stitch together the "single packet policy" and "path policy" and
-        return the globally effective network policy.
+        """Finalize all the paths in the given list of path policies, and return
+        a bunch of policy fragments to be used with the forwarding policy later.
 
         :param path_pols: a list of path queries
         :type path_pols: path list
@@ -399,8 +514,38 @@ class path(Query):
             cls.finalize(p)
         return cls.get_policy_fragments()
 
-class atom(path, Filter):
-    """A single atomic match in a path expression.
+    @classmethod
+    def stitch(cls, fwding, path_pol_fragments):
+        """Stitch together the "single packet policy" and "path policy" and
+        return the globally effective network policy.
+        """
+
+        [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
+
+        # TODO(ngsrinivas) There has to be a way of constructing the "dropped by
+        # forwarding" policy while only relying on the structure of the
+        # forwarding policy. Any technique which goes through its classifier is
+        # necessarily incorrect -- unless it re-constructs the stitched policy
+        # each time the policy is re-installed on the network. There are
+        # (arguably minor) problems with this latter approach as well,
+        # however. In particular, information about the path policies and
+        # distinct handling of single packet and path policies will percolate
+        # into multiple places in the runtime.
+
+        # dropped_by_fwding = CharacterGenerator.get_dropped_packets(fwding)
+
+        return ((tagging >> fwding) + # critical path
+                (counting) + # capture when match at ingress
+                (tagging >> fwding >> egress_network() >> endpath)) # capture
+                # at end of the packet's path in the network
+                # TODO(ngsrinivas): drop atoms are not stitched in as of now
+                # + (tagging >> dropped_by_fwding >> dropping)) # capture when
+                                                            # dropped
+
+
+class abstract_atom(path, Filter):
+    """A single atomic match in a path expression. This is an abstract class
+    where the token isn't initialized.
     
     :param m: a Filter (or match) object used to initialize the path atom.
     :type match: Filter
@@ -408,8 +553,7 @@ class atom(path, Filter):
     def __init__(self, m):
         assert isinstance(m, Filter)
         self.policy = m
-        self.token = CharacterGenerator.get_token(m)
-        super(atom, self).__init__(a=self)
+        super(abstract_atom, self).__init__(a=self)
 
     def __and__(self, other):
         assert isinstance(other, atom)
@@ -427,6 +571,98 @@ class atom(path, Filter):
 
     def __invert__(self):
         return atom(~(self.policy))
+
+
+class atom(abstract_atom):
+    """A concrete "ingress" match atom."""
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
+                                                  nonoverlapping_filters=True)
+        super(atom, self).__init__(m)
+
+
+class path_alternate(path):
+    """ Alternation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_alternate, self).__init__(paths=paths_list)
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        paths = self.paths
+        if len(paths) > 1:
+            expr = reduce(lambda x, y: x + '|(' + y.expr + ')', paths[1:],
+                          '(' + paths[0].expr + ')')
+            expr = '(' + expr + ')'
+        elif len(paths) == 1:
+            expr = paths[0]
+        else:
+            expr = ''
+        return expr
+
+
+class path_star(path):
+    """ Kleene star on a path. """
+    def __init__(self, p):
+        self.__check_type(p)
+        super(path_star, self).__init__(paths=[p])
+
+    def __check_type(self, p):
+        assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        expr = '(' + self.paths[0].expr + ')*'
+        return expr
+
+
+class path_concat(path):
+    """ Concatenation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_concat, self).__init__(paths=paths_list)
+
+    @property
+    def expr(self):
+        return reduce(lambda x, y: x + y.expr, self.paths, '')
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+
+class egress_atom(abstract_atom):
+    """An atom that denotes a match on a packet after the forwarding decision
+    has been made. It can always be substituted by a normal ("ingress") atom at
+    the next hop, unless the packet is egressing the network. Hence, it may be
+    noted that this is only necessary (apart from expressive power, of course)
+    to match on packets that egress the network.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
+                                                  nonoverlapping_filters=True)
+        super(egress_atom, self).__init__(m)
+
+
+class drop_atom(abstract_atom):
+    """An atom that matches on packets that were dropped by the forwarding
+    policy.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
+                                                  nonoverlapping_filters=True)
+        super(drop_atom, self).__init__(m)
+
+class end_path(abstract_atom):
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
+                                                  nonoverlapping_filters=True)
+        super(end_path, self).__init__(m)
+
 
 #############################################################################
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
@@ -545,7 +781,7 @@ class dfa_utils:
             label_sets = label.split('-')
             num_ranges = len(label_sets)
             if num_ranges == 1:
-                return label
+                enumerated_label = label
             else:
                 enumerated_label = ''
                 num_ranges = len(label_sets)
@@ -560,7 +796,12 @@ class dfa_utils:
                     else:
                         # last character isn't part of any more ranges.
                         enumerated_label += label_sets[i][-1]
-                return enumerated_label
+            if len(enumerated_label) > 2 and enumerated_label[0] == '[':
+                enumerated_label = enumerated_label[1:-1]
+            negated = (enumerated_label[0] == '^')
+            if negated:
+                enumerated_label = enumerated_label[1:]
+            return [enumerated_label, negated]
 
         return get_enumerated_labels(e.get_label()[1:-1])
 
