@@ -49,18 +49,23 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
 static_fwding_chain_2_2 = (
-    (match(srcip=ip1, dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                                     (match(switch=2) >> fwd(2)))) +
-    (match(srcip=ip2, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                                     (match(switch=2) >> fwd(1)))))
+    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                          (match(switch=2) >> fwd(1)))) +
+    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(2))))
+    )
 
 static_fwding_chain_3_3 = (
-    (match(srcip=ip1, dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                                     (match(switch=2) >> fwd(2)) +
-                                     (match(switch=3) >> fwd(2)))) +
-    (match(srcip=ip3, dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                                     (match(switch=2) >> fwd(1)) +
-                                     (match(switch=3) >> fwd(1)))))
+    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                          (match(switch=2) >> fwd(1)) +
+                          (match(switch=3) >> fwd(1)))) +
+    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(3)) +
+                          (match(switch=3) >> fwd(1)))) +
+    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(2))))
+    )
 
 def query_func(bucket, interval):
     while True:
@@ -151,7 +156,7 @@ def path_test_11():
 
 # type: unit -> path list
 def path_main():
-    return path_test_2()
+    return path_test_3()
 
 def main():
     return mac_learner()
