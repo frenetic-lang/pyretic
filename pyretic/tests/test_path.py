@@ -335,10 +335,10 @@ def test_path_compile_1():
     # Note: this test depends on state numbers, which eventually get changed
     # into tags. So it's not implementation detail-independent. Also, it relies
     # on the fact that vlan is used for packet tagging.
-    ref_tags = (((match(srcip=ip1, vlan_id=0xffff, vlan_pcp=0))
-                >> modify(vlan_id=1, vlan_pcp=0)) +
-                (~match(srcip=ip1, vlan_id=0xffff, vlan_pcp=0)))
-    ref_counts = (match(srcip=ip1, vlan_id=0xffff, vlan_pcp=0) >> FwdBucket())
+    ref_tags = (((match(srcip=ip1, path_tag=None))
+                >> modify(path_tag=1)) +
+                (~match(srcip=ip1, path_tag=None)))
+    ref_counts = (match(srcip=ip1, path_tag=None) >> FwdBucket())
     [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
     assert tags._classifier
     assert counts._classifier
@@ -356,13 +356,13 @@ def test_path_compile_2():
     # returned. This is because of an intersection between the two matches that
     # doesn't actually happen in the DFA (but it's hard to predict that before
     # constructing the DFA ;))
-    ref_tags = ((match(srcip=ip1, vlan_id=0xffff, vlan_pcp=0)
-                 >> modify(vlan_id=1, vlan_pcp=0)) +
-                ((match(vlan_id=1, vlan_pcp=0) & match(dstip=ip2))
-                 >> modify(vlan_id=2, vlan_pcp=0)) +
-                ( ~match(srcip=ip1, vlan_id=0xffff, vlan_pcp=0) +
-                   ~match(vlan_id=1,vlan_pcp=0,dstip=ip2) ))
-    ref_counts = ((match(vlan_id=1, vlan_pcp=0) & match(dstip=ip2)) >>
+    ref_tags = ((match(srcip=ip1, path_tag=None)
+                 >> modify(path_tag=1)) +
+                ((match(path_tag=1) & match(dstip=ip2))
+                 >> modify(path_tag=2)) +
+                ( ~match(srcip=ip1, path_tag=None) +
+                   ~match(path_tag=1,dstip=ip2) ))
+    ref_counts = ((match(path_tag=1) & match(dstip=ip2)) >>
                   FwdBucket())
     [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
 
@@ -439,7 +439,7 @@ def test_endpath_compilation():
     path.clear()
     p = end_path(match(srcip=ip1))
     [_,_,_,endpath,_] = path.compile([p])
-    assert endpath == ((match({'vlan_id': 0xffff, 'vlan_pcp': 0}) &
+    assert endpath == ((match({'path_tag': None}) &
                         match(srcip=ip1)) >> p.bucket_instance)
 
 def test_drop_compilation():
@@ -447,7 +447,7 @@ def test_drop_compilation():
     path.clear()
     p = drop_atom(match(srcip=ip1))
     [_,_,_,_,dropping] = path.compile([p])
-    assert dropping == ((match({'vlan_id':0xffff, 'vlan_pcp':0}) &
+    assert dropping == ((match({'path_tag': None}) &
                          match(srcip=ip1)) >> p.bucket_instance)
 
 def test_multiple_atomtype_compilation_1():
@@ -458,12 +458,11 @@ def test_multiple_atomtype_compilation_1():
     p = a1 ^ a2
     [tagging,_,counting,endpath,_] = path.compile([p])
     assert tagging == (drop +
-                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
-                        modify(vlan_id=1, vlan_pcp=0)) +
-                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
-                                          vlan_pcp=0)))
+                       (match(srcip=ip1,path_tag=None) >>
+                        modify(path_tag=1)) +
+                       (identity & ~match(srcip=ip1, path_tag=None)))
     assert counting == drop
-    assert endpath == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+    assert endpath == (match(path_tag=1,dstip=ip2) >>
                        p.bucket_instance)
 
 def test_multiple_atomtype_compilation_2():
@@ -474,12 +473,11 @@ def test_multiple_atomtype_compilation_2():
     p = a1 ^ a2
     [tagging,_,counting,_,dropping] = path.compile([p])
     assert tagging == (drop +
-                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
-                        modify(vlan_id=1, vlan_pcp=0)) +
-                       (identity & ~match(srcip=ip1, vlan_id=0xffff,
-                                          vlan_pcp=0)))
+                       (match(srcip=ip1,path_tag=None) >>
+                        modify(path_tag=1)) +
+                       (identity & ~match(srcip=ip1, path_tag=None)))
     assert counting == drop
-    assert dropping == (match(vlan_id=1,vlan_pcp=0,dstip=ip2) >>
+    assert dropping == (match(path_tag=1,dstip=ip2) >>
                         p.bucket_instance)
 
 def test_multiple_atomtype_compilation_3():
@@ -494,18 +492,18 @@ def test_multiple_atomtype_compilation_3():
     p3 = a1 ^ a4
     [tagging,_,counting,endpath,dropping] = path.compile([p1, p2, p3])
     assert tagging == (drop +
-                       (match(srcip=ip1,vlan_id=0xffff,vlan_pcp=0) >>
-                        modify(vlan_id=1, vlan_pcp=0)) +
-                       (match(srcip=ip4,vlan_id=1, vlan_pcp=0) >>
-                        modify(vlan_id=4, vlan_pcp=0)) +
+                       (match(srcip=ip1,path_tag=None) >>
+                        modify(path_tag=1)) +
+                       (match(srcip=ip4,path_tag=1) >>
+                        modify(path_tag=4)) +
                        (identity &
-                        (~match(srcip=ip1, vlan_id=0xffff,vlan_pcp=0)) &
-                        (~match(srcip=ip4, vlan_id=1, vlan_pcp=0))))
-    assert counting == (match(srcip=ip4, vlan_id=1, vlan_pcp=0) >>
+                        (~match(srcip=ip1, path_tag=None)) &
+                        (~match(srcip=ip4, path_tag=1))))
+    assert counting == (match(srcip=ip4, path_tag=1) >>
                         p3.bucket_instance)
-    assert endpath  == (match(srcip=ip3, vlan_id=1, vlan_pcp=0) >>
+    assert endpath  == (match(srcip=ip3, path_tag=1) >>
                         p2.bucket_instance)
-    assert dropping == (match(dstip=ip2, vlan_id=1, vlan_pcp=0) >>
+    assert dropping == (match(dstip=ip2, path_tag=1) >>
                         p1.bucket_instance)
 
 
