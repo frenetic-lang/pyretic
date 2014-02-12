@@ -433,15 +433,16 @@ class path(Query):
                       type="integer")
 
         def set_tag(val):
-            if val:
-                return modify(path_tag=int(val))
-            else:
+            if int(val) == 0:
                 return modify(path_tag=None)
+            else:
+                return modify(path_tag=int(val))
 
         def match_tag(val):
             if int(val) == 0:
                 return match(path_tag=None)
-            return match(path_tag=int(val))
+            else:
+                return match(path_tag=int(val))
 
         # policies to apply on packet in the critical path
         tagging_policy = drop
