@@ -1218,6 +1218,25 @@ class Runtime(object):
                     bucket.handle_flow_removed(rule_match, priority, version, f)
                 del self.global_outstanding_deletes[match_entry]
 
+################################################################################
+# Topology Transfer Function
+################################################################################
+    def topo_transfer_policy(self):
+        switch_edges = self.network.topology.edges(data=True)
+        pol = drop
+        for (s1, s2, ports) in switch_edges:
+            p1 = ports[s1]
+            p2 = ports[s2]
+            link_transfer_policy = ((match(switch=s1,outport=p1) >>
+                                     modify(switch=s2,inport=p2)) +
+                                    (match(switch=s2,outport=p2) >>
+                                     modify(switch=s1,inport=p1)))
+            if pol == drop:
+                pol = link_transfer_policy
+            else:
+                pol += link_transfer_policy
+        return pol
+
 ##########################
 # VIRTUAL HEADER SUPPORT 
 ##########################
