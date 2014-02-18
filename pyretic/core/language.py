@@ -570,6 +570,42 @@ class FwdBucket(Query):
         return isinstance(other, FwdBucket)
 
 
+class PathBucket(FwdBucket):
+    """
+    Class for registering callbacks on individual packets sent to controller,
+    but in addition to the packet, the entire trajectory of the packet is also
+    provided to the callbacks.
+    """
+    def __init__(self):
+        super(PathBucket, self).__init__()
+        self.runtime_topology_policy_fun = None
+        self.runtime_fwding_policy_fun = None
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                self.log.info('In PathBucket apply(): packet is:\n' + str(pkt))
+                paths = self.get_trajectories(pkt)
+                for callback in self.callbacks:
+                    callback(pkt, paths)
+            self.bucket.clear()
+
+    def set_topology_policy_fun(self, topo_pol_fun):
+        self.runtime_topology_policy_fun = topo_pol_fun
+
+    def set_fwding_policy_fun(self, fwding_pol_fun):
+        self.runtime_fwding_policy_fun = fwding_pol_fun
+
+    def get_trajectories(self, pkt):
+        # Two aspects to take care of
+        # 1. network policy evaluation should only care about data plane packets
+        # i.e., skip queries, controller policies.
+        # 2. there might be multiple packet trajectories coming out from a
+        # single packet.
+        print "Need some more work before printing full trajectory/trajectories."
+        return None
+
+
 class CountBucket(Query):
     """
     Class for registering callbacks on counts of packets sent to

@@ -526,6 +526,11 @@ class Runtime(object):
                                 assert (act in
                                         self.global_outstanding_deletes[rule_key])
 
+            def update_runtime_topo_fwding_functions(bucket):
+                if isinstance(bucket, PathBucket):
+                    bucket.set_topology_policy_fun(self.get_topology_policy)
+                    bucket.set_fwding_policy_fun(self.get_fwding_policy)
+
             with self.update_buckets_lock:
                 """The start_update and finish_update functions per bucket guard
                 against inconsistent state in a single bucket, and the global
@@ -546,6 +551,8 @@ class Runtime(object):
                         self.pull_existing_stats_for_bucket(x)),
                     bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
+                map(lambda x: update_runtime_topo_fwding_functions(x),
+                    bucket_list.values())
         
         def remove_buckets(diff_lists):
             """
@@ -1219,9 +1226,9 @@ class Runtime(object):
                 del self.global_outstanding_deletes[match_entry]
 
 ################################################################################
-# Topology Transfer Function
+# Topology Transfer and Full Policy Functions
 ################################################################################
-    def topo_transfer_policy(self):
+    def get_topology_policy(self):
         switch_edges = self.network.topology.edges(data=True)
         pol = drop
         for (s1, s2, ports) in switch_edges:
@@ -1236,6 +1243,9 @@ class Runtime(object):
             else:
                 pol += link_transfer_policy
         return pol
+
+    def get_fwding_policy(self):
+        return self.policy
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
