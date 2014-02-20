@@ -85,6 +85,24 @@ def query_callback(test_num):
         print '**************'
     return actual_callback
 
+def path_callback(test_num):
+    def actual_callback(pkt, paths):
+        print '**************'
+        print datetime.now()
+        print 'Test', test_num, ' -- got a callback from installed path query!'
+        print pkt
+        print 'Got', len(paths), 'path(s) from the callback.'
+        path_index = 1
+        for path in paths:
+            print '-----'
+            print 'Printing path', path_index
+            path_index += 1
+            for p in path:
+                print p
+            print '-----'
+        print '**************'
+    return actual_callback
+
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
     a2 = atom(match(switch=3,dstip=ip3))
@@ -154,9 +172,16 @@ def path_test_11():
     p.register_callback(query_callback(11))
     return [p]
 
+def path_test_12():
+    p = atom(match(switch=1))
+    pb = PathBucket()
+    p.set_bucket(pb)
+    p.register_callback(path_callback(12))
+    return [p]
+
 # type: unit -> path list
 def path_main():
-    return path_test_3()
+    return path_test_12()
 
 def main():
     return mac_learner()
