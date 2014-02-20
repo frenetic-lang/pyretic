@@ -392,7 +392,32 @@ class Runtime(object):
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != identity,rule.actions))
                               for rule in classifier.rules)
-                
+
+        def remove_path_buckets(classifier):
+            """
+            Removes "path buckets" from the action list. Also hooks up runtime
+            functions to the path bucket objects to query for latest policy and
+            topology transfer functions.
+
+            :param classifier: the input classifier
+            :type classifier: Classifier
+            :returns the output classifier.
+            :rtype: Classifier
+            """
+            new_rules = []
+            for rule in classifier.rules:
+                new_acts = []
+                for act in rule.actions:
+                    if isinstance(act, PathBucket):
+                        act.set_topology_policy_fun(self.get_topology_policy)
+                        act.set_fwding_policy_fun(self.get_fwding_policy)
+                        act.set_egress_policy_fun(self.get_egress_policy)
+                        new_acts.append(Controller)
+                    else:
+                        new_acts.append(act)
+                new_rules.append(Rule(rule.match, new_acts))
+            return Classifier(new_rules)
+
         def controllerify(classifier):
             """
             Replaces each rule whose actions includes a send to controller action
@@ -526,11 +551,6 @@ class Runtime(object):
                                 assert (act in
                                         self.global_outstanding_deletes[rule_key])
 
-            def update_runtime_topo_fwding_functions(bucket):
-                if isinstance(bucket, PathBucket):
-                    bucket.set_topology_policy_fun(self.get_topology_policy)
-                    bucket.set_fwding_policy_fun(self.get_fwding_policy)
-
             with self.update_buckets_lock:
                 """The start_update and finish_update functions per bucket guard
                 against inconsistent state in a single bucket, and the global
@@ -550,8 +570,6 @@ class Runtime(object):
                 map(lambda x: x.add_pull_existing_stats(
                         self.pull_existing_stats_for_bucket(x)),
                     bucket_list.values())
-                # map(lambda x: update_runtime_topo_fwding_functions(x),
-                # bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
         
         def remove_buckets(diff_lists):
@@ -912,6 +930,7 @@ class Runtime(object):
         classifier = remove_drop(classifier)
         #classifier = send_drops_to_controller(classifier)
         classifier = remove_identity(classifier)
+        classifier = remove_path_buckets(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
 
@@ -1235,13 +1254,25 @@ class Runtime(object):
             p1 = ports[s1]
             p2 = ports[s2]
             link_transfer_policy = ((match(switch=s1,outport=p1) >>
-                                     modify(switch=s2,inport=p2)) +
+                                     modify(switch=s2,inport=p2,outport=None)) +
                                     (match(switch=s2,outport=p2) >>
-                                     modify(switch=s1,inport=p1)))
+                                     modify(switch=s1,inport=p1,outport=None)))
             if pol == drop:
                 pol = link_transfer_policy
             else:
                 pol += link_transfer_policy
+        return pol
+
+    def get_egress_policy(self):
+        pol = drop
+        for p in self.network.topology.egress_locations():
+            sw_no = p.switch
+            port_no = p.port_no
+            egress_match = match(switch=sw_no,outport=port_no)
+            if pol == drop:
+                pol = egress_match
+            else:
+                pol += egress_match
         return pol
 
     def get_fwding_policy(self):

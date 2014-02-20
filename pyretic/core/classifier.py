@@ -107,14 +107,17 @@ class Classifier(object):
     # Helper function for rshift: given a test b and an action p, return a test
     # b' such that p >> b == b' >> p.
     def _commute_test(self, act, pkts):
-        from pyretic.core.language import modify, drop, identity, Controller, CountBucket, DerivedPolicy, match
+        from pyretic.core.language import (modify, drop, identity, Controller,
+                                           CountBucket, DerivedPolicy, match,
+                                           PathBucket)
         while isinstance(act, DerivedPolicy):
             act = act.policy
         if act == identity:
             return pkts
         elif act == drop:
             return drop
-        elif act == Controller or isinstance(act, CountBucket):
+        elif (act == Controller or isinstance(act, CountBucket) or
+              isinstance(act, PathBucket)):
             return identity
         elif isinstance(act, modify):
             new_match_dict = {}
@@ -140,7 +143,9 @@ class Classifier(object):
     # Helper function for rshift: sequentially compose actions.  a1 must be a
     # single action.  Returns a list of actions.
     def _sequence_actions(self, a1, as2):
-        from pyretic.core.language import modify, drop, identity, Controller, CountBucket, DerivedPolicy
+        from pyretic.core.language import (modify, drop, identity, Controller,
+                                           CountBucket, DerivedPolicy,
+                                           PathBucket)
         while isinstance(a1, DerivedPolicy):
             a1 = a1.policy
         # TODO: be uniform about returning copied or modified objects.
@@ -149,7 +154,8 @@ class Classifier(object):
             return [drop]
         elif a1 == identity:
             return as2
-        elif a1 == Controller or isinstance(a1, CountBucket):
+        elif (a1 == Controller or isinstance(a1, CountBucket) or
+              isinstance(a1, PathBucket)):
             return [a1]
         elif isinstance(a1, modify):
             for a2 in as2:
@@ -158,7 +164,8 @@ class Classifier(object):
                 new_a1 = modify(**a1.map.copy())
                 if a2 == drop:
                     new_actions.append(drop)
-                elif a2 == Controller or isinstance(a2, CountBucket): 
+                elif (a2 == Controller or isinstance(a2, CountBucket) or
+                      isinstance(a2, PathBucket)):
                     new_actions.append(a2)
                 elif a2 == identity:
                     new_actions.append(new_a1)

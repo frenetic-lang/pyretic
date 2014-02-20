@@ -580,6 +580,10 @@ class PathBucket(FwdBucket):
         super(PathBucket, self).__init__()
         self.runtime_topology_policy_fun = None
         self.runtime_fwding_policy_fun = None
+        self.runtime_egress_policy_fun = None
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity,[self])])
 
     def apply(self):
         with self.bucket_lock:
@@ -595,6 +599,9 @@ class PathBucket(FwdBucket):
 
     def set_fwding_policy_fun(self, fwding_pol_fun):
         self.runtime_fwding_policy_fun = fwding_pol_fun
+
+    def set_egress_policy_fun(self, egress_pol_fun):
+        self.runtime_egress_policy_fun = egress_pol_fun
 
     def get_trajectories(self, pkt):
         from pyretic.core.language_tools import ast_map, default_mapper
@@ -621,7 +628,7 @@ class PathBucket(FwdBucket):
             pkts_moved = (fwding >> topo).eval(pkt)
             full_paths = []
             for p in pkts_moved:
-                suffix_paths = produce_paths(p, topo, fwding, egress)
+                suffix_paths = packet_paths(p, topo, fwding, egress)
                 for sp in suffix_paths:
                     full_paths.append([pkt] + sp)
 
@@ -632,11 +639,12 @@ class PathBucket(FwdBucket):
 
             return full_paths
 
-        if self.runtime_topology_policy_fun and self.runtime_fwding_policy_fun:
+        if (self.runtime_topology_policy_fun and self.runtime_fwding_policy_fun
+            and self.runtime_egress_policy_fun):
             topo = self.runtime_topology_policy_fun()
             fwding = ast_map(data_plane_mapper,
                              self.runtime_fwding_policy_fun())
-            egress = egress_network()
+            egress = self.runtime_egress_policy_fun()
             return packet_paths(pkt, topo, fwding, egress)
         else:
             return []
