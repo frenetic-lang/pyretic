@@ -550,9 +550,9 @@ class Runtime(object):
                 map(lambda x: x.add_pull_existing_stats(
                         self.pull_existing_stats_for_bucket(x)),
                     bucket_list.values())
+                # map(lambda x: update_runtime_topo_fwding_functions(x),
+                # bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
-                map(lambda x: update_runtime_topo_fwding_functions(x),
-                    bucket_list.values())
         
         def remove_buckets(diff_lists):
             """

@@ -597,13 +597,49 @@ class PathBucket(FwdBucket):
         self.runtime_fwding_policy_fun = fwding_pol_fun
 
     def get_trajectories(self, pkt):
-        # Two aspects to take care of
-        # 1. network policy evaluation should only care about data plane packets
-        # i.e., skip queries, controller policies.
-        # 2. there might be multiple packet trajectories coming out from a
-        # single packet.
-        print "Need some more work before printing full trajectory/trajectories."
-        return None
+        from pyretic.core.language_tools import ast_map, default_mapper
+
+        def data_plane_mapper(parent, children):
+            if isinstance(parent, Query):
+                return drop
+            else:
+                return default_mapper(parent, children)
+
+        def packet_paths(pkt, topo, fwding, egress):
+            """Takes a packet, a topology policy, a forwarding policy, and a
+            filter to detect network egress, and returns a list of "packet
+            paths". A "packet path" is just an ordered list of located packets
+            denoting the trajectory of the input packet at switch ingresses,
+            except for the last element of the packet path which denotes packet
+            state at network egress.
+            """
+            at_egress = egress.eval(pkt)
+            if len(at_egress) == 1: # the pkt is already at network egress
+                return [pkt]
+
+            # Move packet one hop, then recursively enumerate paths.
+            pkts_moved = (fwding >> topo).eval(pkt)
+            full_paths = []
+            for p in pkts_moved:
+                suffix_paths = produce_paths(p, topo, fwding, egress)
+                for sp in suffix_paths:
+                    full_paths.append([pkt] + sp)
+
+            # Move packet one hop, then terminate paths if necessary
+            pkts_egressed = (fwding >> egress).eval(pkt)
+            for p in pkts_egressed:
+                full_paths.append([pkt, p])
+
+            return full_paths
+
+        if self.runtime_topology_policy_fun and self.runtime_fwding_policy_fun:
+            topo = self.runtime_topology_policy_fun()
+            fwding = ast_map(data_plane_mapper,
+                             self.runtime_fwding_policy_fun())
+            egress = egress_network()
+            return packet_paths(pkt, topo, fwding, egress)
+        else:
+            return []
 
 
 class CountBucket(Query):
