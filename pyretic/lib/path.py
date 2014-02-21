@@ -45,6 +45,7 @@ TOK_INGRESS = "ingress"
 TOK_EGRESS = "egress"
 TOK_DROP = "drop"
 TOK_END_PATH = "end_path"
+TOK_HOOK = "ingress_hook"
 
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
@@ -582,6 +583,76 @@ class atom(abstract_atom):
         super(atom, self).__init__(m)
 
 
+class egress_atom(abstract_atom):
+    """An atom that denotes a match on a packet after the forwarding decision
+    has been made. It can always be substituted by a normal ("ingress") atom at
+    the next hop, unless the packet is egressing the network. Hence, it may be
+    noted that this is only necessary (apart from expressive power, of course)
+    to match on packets that egress the network.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
+                                                  nonoverlapping_filters=True)
+        super(egress_atom, self).__init__(m)
+
+
+class drop_atom(abstract_atom):
+    """An atom that matches on packets that were dropped by the forwarding
+    policy.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
+                                                  nonoverlapping_filters=True)
+        super(drop_atom, self).__init__(m)
+
+class end_path(abstract_atom):
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
+                                                  nonoverlapping_filters=True)
+        super(end_path, self).__init__(m)
+
+
+class hook(abstract_atom):
+    """A hook is essentially like an atom, but has a notion of "grouping"
+    associated with it. Whenever a packet arrives into this hook, we group them
+    by the values of the fields specified in the groupby=... argument of the
+    constructor.
+    """
+    def __init__(self, m, groupby=[]):
+        assert groupby and len(groupby) > 0
+        self.groupby = groupby
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
+                                                  nonoverlapping_filters=True)
+        self.groupby_token = CharacterGenerator.get_token(identity,
+                                                          toktype=TOK_HOOK,
+                                                          nonoverlapping_filters=False)
+        super(hook, self).__init__(m)
+        char = CharacterGenerator.get_char_from_token
+        self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
+
+    def __and__(self, other):
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook(self.policy & other.policy, self.groupby)
+
+    def __add__(self, other):
+        # This won't actually work because the '+' operation results in an
+        # object of type parallel, which is not a Filter.
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook(self.policy + other.policy, self.groupby)
+
+    def __sub__(self, other):
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook((~other.policy) & self.policy, self.groupby)
+
+    def __invert__(self):
+        return hook(~(self.policy), self.groupby)
+
+
+### Path combinator classes ###
+
 class path_alternate(path):
     """ Alternation of paths. """
     def __init__(self, paths_list):
@@ -600,7 +671,7 @@ class path_alternate(path):
                           '(' + paths[0].expr + ')')
             expr = '(' + expr + ')'
         elif len(paths) == 1:
-            expr = paths[0]
+            expr = paths[0].expr
         else:
             expr = ''
         return expr
@@ -635,34 +706,6 @@ class path_concat(path):
         for p in paths:
             assert isinstance(p, path)
 
-
-class egress_atom(abstract_atom):
-    """An atom that denotes a match on a packet after the forwarding decision
-    has been made. It can always be substituted by a normal ("ingress") atom at
-    the next hop, unless the packet is egressing the network. Hence, it may be
-    noted that this is only necessary (apart from expressive power, of course)
-    to match on packets that egress the network.
-    """
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
-                                                  nonoverlapping_filters=True)
-        super(egress_atom, self).__init__(m)
-
-
-class drop_atom(abstract_atom):
-    """An atom that matches on packets that were dropped by the forwarding
-    policy.
-    """
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
-                                                  nonoverlapping_filters=True)
-        super(drop_atom, self).__init__(m)
-
-class end_path(abstract_atom):
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
-                                                  nonoverlapping_filters=True)
-        super(end_path, self).__init__(m)
 
 
 #############################################################################
