@@ -557,21 +557,21 @@ class abstract_atom(path, Filter):
         super(abstract_atom, self).__init__(a=self)
 
     def __and__(self, other):
-        assert isinstance(other, atom)
-        return atom(self.policy & other.policy)
+        assert isinstance(other, type(self))
+        return type(self)(self.policy & other.policy)
 
     def __add__(self, other):
         # This won't actually work because the '+' operation results in an
         # object of type parallel, which is not a Filter.
-        assert isinstance(other, atom)
-        return atom(self.policy + other.policy)
+        assert isinstance(other, type(self))
+        return type(self)(self.policy + other.policy)
 
     def __sub__(self, other):
-        assert isinstance(other, atom)
-        return atom((~other.policy) & self.policy)
+        assert isinstance(other, type(self))
+        return type(self)((~other.policy) & self.policy)
 
     def __invert__(self):
-        return atom(~(self.policy))
+        return type(self)(~(self.policy))
 
 
 class atom(abstract_atom):
