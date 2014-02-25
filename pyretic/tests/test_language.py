@@ -30,6 +30,7 @@
 ################################################################################
 
 from pyretic.core.language import *
+from pyretic.core.packet import *
 from pyretic.lib.std import *
 
 import pytest

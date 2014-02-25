@@ -1,0 +1,13 @@
+{
+   "OFPStatsReply": {
+      "body": {
+         "OFPAggregateStatsReply": {
+            "byte_count": 574, 
+            "flow_count": 6, 
+            "packet_count": 7
+         }
+      }, 
+      "flags": 0, 
+      "type": 2
+   }
+}

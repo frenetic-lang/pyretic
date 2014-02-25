@@ -32,6 +32,7 @@
 # SETUP                                                                        #
 # -------------------------------------------------------------------          #
 # mininet:  mininet.sh --topo simple_prefix                                    #
+# test:     pingall and check for full connectivity                            #
 ################################################################################
 
 from pyretic.lib.corelib import *

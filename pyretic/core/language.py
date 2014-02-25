@@ -39,6 +39,7 @@ from bitarray import bitarray
 
 from pyretic.core import util
 from pyretic.core.network import *
+from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
@@ -73,13 +74,16 @@ class Policy(object):
         """
         raise NotImplementedError
 
+    def invalidate_classifier(self):
+        self._classifier = None
+
     def compile(self):
         """
         Produce a Classifier for this policy
 
         :rtype: Classifier
         """
-        raise NotImplementedError
+        return self._classifier
 
     def __add__(self, pol):
         """
@@ -177,7 +181,7 @@ class Filter(Policy):
         :rtype: Difference
         """
         if isinstance(pol,Filter):
-            return difference([self, pol])
+            return difference(self, pol)
         else:
             raise TypeError
 
@@ -192,14 +196,97 @@ class Filter(Policy):
         return negate([self])
 
 
-def _intersect_ip(ipfx, opfx):
-    most_specific = None
-    if (IPv4Network(ipfx) in IPv4Network(opfx)):
-        most_specific = ipfx
-    elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
-        most_specific = opfx
-    return most_specific
+class Singleton(Filter):
+    """Abstract policy from which Singletons descend"""
 
+    _classifier = None
+
+    def compile(self):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        if self.__class__._classifier is None:
+            self.__class__._classifier = self.generate_classifier()
+        return self.__class__._classifier
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity, [self])])
+
+
+@singleton
+class identity(Singleton):
+    """The identity policy, leaves all packets unchanged."""
+    def eval(self, pkt):
+        """
+        evaluate this policy on a single packet
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        return {pkt}
+
+    def intersect(self, other):
+        return other
+
+    def covers(self, other):
+        return True
+
+    def __eq__(self, other):
+        return ( id(self) == id(other)
+            or ( isinstance(other, match) and len(other.map) == 0) )
+
+    def __repr__(self):
+        return "identity"
+
+passthrough = identity   # Imperative alias
+true = identity          # Logic alias
+all_packets = identity   # Matching alias
+
+
+@singleton
+class drop(Singleton):
+    """The drop policy, produces the empty set of packets."""
+    def eval(self, pkt):
+        """
+        evaluate this policy on a single packet
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        return set()
+
+    def intersect(self, other):
+        return self
+
+    def covers(self, other):
+        return False
+
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def __repr__(self):
+        return "drop"
+
+none = drop
+false = drop             # Logic alias
+no_packets = drop        # Matching alias
+
+
+@singleton
+class Controller(Singleton):
+    def eval(self, pkt):
+        return set()
+
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def __repr__(self):
+        return "Controller"
+    
 
 class match(Filter):
     """
@@ -213,6 +300,7 @@ class match(Filter):
         if len(args) == 0 and len(kwargs) == 0:
             raise TypeError
         self.map = util.frozendict(dict(*args, **kwargs))
+        self._classifier = self.generate_classifier()
         super(match,self).__init__()
 
     def eval(self, pkt):
@@ -234,12 +322,7 @@ class match(Filter):
                     return set()
         return {pkt}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         r1 = Rule(self,[identity])
         r2 = Rule(identity,[drop])
         return Classifier([r1, r2])
@@ -249,6 +332,15 @@ class match(Filter):
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
+
+        def _intersect_ip(ipfx, opfx):
+            most_specific = None
+            if (IPv4Network(ipfx) in IPv4Network(opfx)):
+                most_specific = ipfx
+            elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
+                most_specific = opfx
+            return most_specific
+
         if pol == identity:
             return self
         elif pol == drop:
@@ -315,82 +407,6 @@ class match(Filter):
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
 
-@singleton
-class identity(Filter):
-    """The identity policy, leaves all packets unchanged."""
-    def eval(self, pkt):
-        """
-        evaluate this policy on a single packet
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return {pkt}
-
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        return Classifier([Rule(identity, [identity])])
-
-    def intersect(self, other):
-        return other
-
-    def covers(self, other):
-        return True
-
-    def __eq__(self, other):
-        return ( id(self) == id(other)
-            or ( isinstance(other, match) and len(other.map) == 0) )
-
-    def __repr__(self):
-        return "identity"
-
-passthrough = identity   # Imperative alias
-true = identity          # Logic alias
-all_packets = identity   # Matching alias
-
-
-@singleton
-class drop(Filter):
-    """The drop policy, produces the empty set of packets."""
-    def eval(self, pkt):
-        """
-        evaluate this policy on a single packet
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return set()
-
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        return Classifier([Rule(identity, [drop])])
-
-    def intersect(self, other):
-        return self
-
-    def covers(self, other):
-        return False
-
-    def __eq__(self, other):
-        return id(self) == id(other)
-
-    def __repr__(self):
-        return "drop"
-
-none = drop
-false = drop             # Logic alias
-no_packets = drop        # Matching alias
-
 
 class modify(Policy):
     """
@@ -406,9 +422,10 @@ class modify(Policy):
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
             reduce(lambda acc, f:
-                   acc and (f in compilable_headers),
+                       acc and (f in compilable_headers),
                    self.map.keys(),
                    True)
+        self._classifier = self.generate_classifier()
         super(modify,self).__init__()
 
     def eval(self, pkt):
@@ -421,12 +438,7 @@ class modify(Policy):
         """
         return {pkt.modifymany(self.map)}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         if self.has_virtual_headers:
             r = Rule(identity,[Controller])
         else:
@@ -440,22 +452,6 @@ class modify(Policy):
         return ( isinstance(other, modify)
            and (self.map == other.map) )
 
-@singleton
-class Controller(Policy):
-    def eval(self, pkt):
-        return set()
-    
-    def compile(self):
-        r = Rule(identity, [Controller])
-        self._classifier = Classifier([r])
-        return self._classifier
-
-    def __eq__(self, other):
-        return id(self) == id(other)
-
-    def __repr__(self):
-        return "Controller"
-    
 
 # FIXME: Srinivas =).
 class Query(Filter):
@@ -496,13 +492,12 @@ class FwdBucket(Query):
     Class for registering callbacks on individual packets sent to
     the controller.
     """
-    def compile(self):
-        """Produce a Classifier for this policy
+    def __init__(self):
+        self._classifier = self.generate_classifier()
+        super(FwdBucket,self).__init__()
 
-        :rtype: Classifier
-        """
-        r = Rule(identity,[Controller])
-        return Classifier([r])
+    def generate_classifier(self):
+        return Classifier([Rule(identity,[Controller])])
 
     def apply(self):
         with self.bucket_lock:
@@ -536,6 +531,7 @@ class CountBucket(Query):
         self.byte_count_persistent = 0
         self.in_update_cv = Condition()
         self.in_update = False
+        self._classifier = self.generate_classifier()
         
     def __repr__(self):
         return "CountBucket"
@@ -550,14 +546,8 @@ class CountBucket(Query):
         """
         return set()
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
-        r = Rule(identity,[self])
-        return Classifier([r])
+    def generate_classifier(self):
+        return Classifier([Rule(identity,[self])])
 
     def apply(self):
         with self.bucket_lock:
@@ -688,7 +678,18 @@ class CombinatorPolicy(Policy):
     ### init : List Policy -> unit
     def __init__(self, policies=[]):
         self.policies = list(policies)
+        self._classifier = None
         super(CombinatorPolicy,self).__init__()
+
+    def compile(self):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        if not self._classifier:
+            self._classifier = self.generate_classifier()
+        return self._classifier
 
     def __repr__(self):
         return "%s:\n%s" % (self.name(),util.repr_plus(self.policies))
@@ -718,12 +719,7 @@ class negate(CombinatorPolicy,Filter):
         else:
             return {pkt}
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         inner_classifier = self.policies[0].compile()
         classifier = Classifier([])
         for r in inner_classifier.rules:
@@ -778,12 +774,7 @@ class parallel(CombinatorPolicy):
             output |= policy.eval(pkt)
         return output
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
             return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
@@ -874,18 +865,13 @@ class sequential(CombinatorPolicy):
             prev_output = output
         return output
 
-    def compile(self):
-        """
-        Produce a Classifier for this policy
-
-        :rtype: Classifier
-        """
+    def generate_classifier(self):
         assert(len(self.policies) > 0)
         classifiers = map(lambda p: p.compile(),self.policies)
         for c in classifiers:
             assert(c is not None)
         return reduce(lambda acc, c: acc >> c, classifiers)
-
+        
 
 class intersection(sequential,Filter):
     """
@@ -931,6 +917,7 @@ class DerivedPolicy(Policy):
     """
     def __init__(self, policy=identity):
         self.policy = policy
+        self._classifier = None
         super(DerivedPolicy,self).__init__()
 
     def eval(self, pkt):
@@ -949,7 +936,9 @@ class DerivedPolicy(Policy):
 
         :rtype: Classifier
         """
-        return self.policy.compile()
+        if not self._classifier:
+            self._classifier = self.policy.compile()
+        return self._classifier
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)
@@ -1051,6 +1040,7 @@ class DynamicPolicy(DerivedPolicy):
     def __init__(self,policy=drop):
         self._policy = policy
         self.notify = None
+        self._classifier = None
         super(DerivedPolicy,self).__init__()
 
     def set_network(self, network):
@@ -1064,7 +1054,7 @@ class DynamicPolicy(DerivedPolicy):
 
     def changed(self):
         if self.notify:
-            self.notify()
+            self.notify(self)
 
     @property
     def policy(self):
@@ -1161,342 +1151,3 @@ class egress_network(DynamicFilter):
 
     def __repr__(self):
         return "egress_network"
-
-
-###############################################################################
-# Class hierarchy syntax tree traversal
-
-def ast_fold(fun, acc, policy):
-    import pyretic.lib.query as query
-    if (  policy == identity or
-          policy == drop or
-          isinstance(policy,match) or
-          isinstance(policy,modify) or
-          policy == Controller or
-          isinstance(policy,Query)):
-        return fun(acc,policy)
-    elif (isinstance(policy,negate) or
-          isinstance(policy,parallel) or
-          isinstance(policy,union) or
-          isinstance(policy,sequential) or
-          isinstance(policy,intersection)):
-        acc = fun(acc,policy)
-        for sub_policy in policy.policies:
-            acc = ast_fold(fun,acc,sub_policy)
-        return acc
-    elif (isinstance(policy,difference) or
-          isinstance(policy,if_) or
-          isinstance(policy,fwd) or
-          isinstance(policy,xfwd) or
-          isinstance(policy,DynamicPolicy) or
-          isinstance(policy,query.packets)):
-        acc = fun(acc,policy)
-        return ast_fold(fun,acc,policy.policy)
-    else:
-        raise NotImplementedError
-    
-def add_dynamic_sub_pols(acc, policy):
-    if isinstance(policy,DynamicPolicy):
-        return acc | {policy}
-    else:
-        return acc
-
-def add_query_sub_pols(acc, policy):
-    from pyretic.lib.query import packets
-    if ( isinstance(policy,Query) or
-         isinstance(policy,packets)) : ### TODO remove this hack once packets is refactored 
-        return add | {policy}
-    else:
-        return acc
-
-def queries_in_eval(acc, policy):
-    res,pkts = acc
-    if policy == drop:
-        acc = (res,set())
-    elif policy == identity:
-        pass
-    elif (isinstance(policy,match) or 
-          isinstance(policy,modify) or 
-          isinstance(policy,negate)):
-        new_pkts = set()
-        for pkt in pkts:
-            new_pkts |= policy.eval(pkt)
-        acc = (res,new_pkts)
-    elif isinstance(policy,Query):
-        acc = (res | {policy}, set())
-    elif isinstance(policy,DerivedPolicy):
-        acc = queries_in_eval(acc,policy.policy)
-    elif isinstance(policy,parallel):
-        parallel_res = set()
-        parallel_pkts = set()
-        for sub_pol in policy.policies:
-            new_res,new_pkts = queries_in_eval((res,pkts),sub_pol)
-            parallel_res |= new_res
-            parallel_pkts |= new_pkts
-        acc = (parallel_res,parallel_pkts)
-    elif isinstance(policy,sequential):
-        for sub_pol in policy.policies:
-            acc = queries_in_eval(acc,sub_pol)
-            if not acc[1]:
-                break
-    return acc
-
-
-
-###############################################################################
-# Classifiers
-# an intermediate representation for proactive compilation.
-
-class Rule(object):
-    """
-    A rule contains a filter and the parallel composition of zero or more
-    Pyretic actions.
-    """
-
-    # Matches m should be of the match class.  Actions acts should be a list of
-    # either modify, identity, or drop policies.
-    def __init__(self,m,acts):
-        self.match = m
-        self.actions = acts
-
-    def __str__(self):
-        return str(self.match) + '\n  -> ' + str(self.actions)
-
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        """Based on syntactic equality of policies."""
-        return ( id(self) == id(other)
-            or ( self.match == other.match
-                 and self.actions == other.actions ) )
-
-    def __ne__(self, other):
-        """Based on syntactic equality of policies."""
-        return not (self == other)
-
-    def eval(self, in_pkt):
-        """
-        If this rule matches the packet, then return the union of the sets
-        of packets produced by the actions.  Otherwise, return None.
-        """
-        filtered_pkt = self.match.eval(in_pkt)
-        if len(filtered_pkt) == 0:
-            return None
-        rv = set()
-        for pkt in filtered_pkt:
-            for act in self.actions:
-                rv |= act.eval(pkt)
-        return rv
-
-
-class Classifier(object):
-    """
-    A classifier contains a list of rules, where the order of the list implies
-    the relative priorities of the rules.  Semantically, classifiers are
-    functions from packets to sets of packets, similar to OpenFlow flow
-    tables.
-    """
-
-    def __init__(self, new_rules=[]):
-        import types
-        if isinstance(new_rules, types.GeneratorType):
-            self.rules = [r for r in new_rules]
-        elif isinstance(new_rules,list):
-            self.rules = new_rules
-        else:
-            raise TypeError
-
-    def __len__(self):
-        return len(self.rules)
-
-    def __str__(self):
-        return '\n '.join(map(str,self.rules))
-
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        """Based on syntactic equality of policies."""
-        return ( id(self) == id(other)
-            or ( self.rules == other.rules ) )
-
-    def __ne__(self, other):
-        """Based on syntactic equality of policies."""
-        return not (self == other)
-
-    def __add__(self,c2):
-        c1 = self
-        if c2 is None:
-            return None
-        c = Classifier([])
-        # TODO (cole): make classifiers iterable
-        for r1 in c1.rules:
-            for r2 in c2.rules:
-                intersection = r1.match.intersect(r2.match)
-                if intersection != drop:
-                    # TODO (josh) logic for detecting when sets of actions can't be combined
-                    # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
-                    actions = r1.actions + r2.actions
-                    actions = filter(lambda a: a != drop,actions)
-                    if len(actions) == 0:
-                        actions = [drop]
-                    c.rules.append(Rule(intersection, actions))
-        for r1 in c1.rules:
-            c.rules.append(r1)
-        for r2 in c2.rules:
-            c.rules.append(r2)
-        return c.optimize()
-
-    # Helper function for rshift: given a test b and an action p, return a test
-    # b' such that p >> b == b' >> p.
-    def _commute_test(self, act, pkts):
-        while isinstance(act, DerivedPolicy):
-            act = act.policy
-        if act == identity:
-            return pkts
-        elif act == drop:
-            return drop
-        elif act == Controller or isinstance(act, CountBucket):
-            return identity
-        elif isinstance(act, modify):
-            new_match_dict = {}
-            if pkts == identity:
-                return identity
-            elif pkts == drop:
-                return drop
-            for f, v in pkts.map.iteritems():
-                if f in act.map and act.map[f] == v:
-                    continue
-                elif f in act.map and act.map[f] != v:
-                    return drop
-                else:
-                    new_match_dict[f] = v
-            if len(new_match_dict) == 0:
-                return identity
-            return match(**new_match_dict)
-        else:
-            # TODO (cole) use compile error.
-            # TODO (cole) what actions are allowable?
-            raise TypeError
-
-    # Helper function for rshift: sequentially compose actions.  a1 must be a
-    # single action.  Returns a list of actions.
-    def _sequence_actions(self, a1, as2):
-        while isinstance(a1, DerivedPolicy):
-            a1 = a1.policy
-        # TODO: be uniform about returning copied or modified objects.
-        new_actions = []
-        if a1 == drop:
-            return [drop]
-        elif a1 == identity:
-            return as2
-        elif a1 == Controller or isinstance(a1, CountBucket):
-            return [a1]
-        elif isinstance(a1, modify):
-            for a2 in as2:
-                while isinstance(a2, DerivedPolicy):
-                    a2 = a2.policy
-                new_a1 = modify(**a1.map.copy())
-                if a2 == drop:
-                    new_actions.append(drop)
-                elif a2 == Controller or isinstance(a2, CountBucket): 
-                    new_actions.append(a2)
-                elif a2 == identity:
-                    new_actions.append(new_a1)
-                elif isinstance(a2, modify):
-                    new_a1.map.update(a2.map)
-                    new_actions.append(new_a1)
-                elif isinstance(a2, fwd):
-                    new_a1.map['outport'] = a2.outport
-                    new_actions.append(new_a1)
-                else:
-                    raise TypeError
-            return new_actions
-        else:
-            raise TypeError
-
-    # Returns a classifier.
-    def _sequence_action_classifier(self, act, c):
-        # TODO (cole): make classifiers easier to use w.r.t. adding/removing
-        # rules.
-        if len(c.rules) == 0:
-            return Classifier([Rule(identity, [drop])])
-        new_rules = []
-        for rule in c.rules:
-            pkts = self._commute_test(act, rule.match)
-            if pkts == identity:
-                acts = self._sequence_actions(act, rule.actions)
-                new_rules += [Rule(identity, acts)]
-                break
-            elif pkts == drop:
-                continue
-            else:
-                acts = self._sequence_actions(act, rule.actions)
-                new_rules += [Rule(pkts, acts)]
-        if new_rules == []:
-            return Classifier([Rule(identity, [drop])])
-        else:
-            return Classifier(new_rules)
-                
-    def _sequence_actions_classifier(self, acts, c):
-        empty_classifier = Classifier([Rule(identity, [drop])])
-        if acts == []:
-            # Treat the empty list of actions as drop.
-            return empty_classifier
-        acc = empty_classifier
-        for act in acts:
-            acc = acc + self._sequence_action_classifier(act, c)
-        return acc
-
-    def _sequence_rule_classifier(self, r, c):
-        c2 = self._sequence_actions_classifier(r.actions, c)
-        for rule in c2.rules:
-            rule.match = rule.match.intersect(r.match)
-        c2.rules = [r2 for r2 in c2.rules if r2.match != drop]
-        return c2.optimize()
-
-    def __rshift__(self, c2):
-        new_rules = []
-        for rule in self.rules:
-            c3 = self._sequence_rule_classifier(rule, c2)
-            new_rules = new_rules + c3.rules
-        rv = Classifier(new_rules)
-        return rv.optimize()
-
-    def optimize(self):
-        return self.remove_shadowed_cover_single()
-
-    def remove_shadowed_exact_single(self):
-        # Eliminate every rule exactly matched by some higher priority rule
-        opt_c = Classifier([])
-        for r in self.rules:
-            if not reduce(lambda acc, new_r: acc or
-                          new_r.match == r.match,
-                          opt_c.rules,
-                          False):
-                opt_c.rules.append(r)
-        return opt_c
-
-    def remove_shadowed_cover_single(self):
-        # Eliminate every rule completely covered by some higher priority rule
-        opt_c = Classifier([])
-        for r in self.rules:
-            if not reduce(lambda acc, new_r: acc or
-                          new_r.match.covers(r.match),
-                          opt_c.rules,
-                          False):
-                opt_c.rules.append(r)
-        return opt_c
-
-    def eval(self, in_pkt):
-        """
-        Evaluate against each rule in the classifier, starting with the
-        highest priority.  Return the set of packets resulting from applying
-        the actions of the first rule that matches.
-        """
-        for rule in self.rules:
-            pkts = rule.eval(in_pkt)
-            if pkts is not None:
-                return pkts
-        raise TypeError('Classifier is not total.')

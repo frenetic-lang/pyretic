@@ -34,6 +34,7 @@ import networkx as nx
 
 from pyretic.core.network import *
 from pyretic.core.language import *
+from pyretic.core.packet import *
 
 
 

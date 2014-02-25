@@ -1,4 +1,3 @@
-
 ################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
@@ -29,8 +28,12 @@
 ################################################################################
 
 import pyretic.core.util as util
+
 from pyretic.core.language import *
+from pyretic.core.language_tools import *
 from pyretic.core.network import *
+from pyretic.core.packet import *
+
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
@@ -70,7 +73,10 @@ class Runtime(object):
         self.extended_values_lock = RLock()
         self.dynamic_sub_pols = set()
         self.update_dynamic_sub_pols()
-        self.in_update_network = False
+        self.in_network_update = False
+        self.in_bucket_apply = False
+        self.network_triggered_policy_update = False
+        self.bucket_triggered_policy_update = False
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
         self.manager = Manager()
@@ -108,14 +114,23 @@ class Runtime(object):
             output = self.policy.eval(pyretic_pkt)
 
             # apply the queries whose buckets have received new packets
+            self.in_bucket_apply = True
             for q in queries:
                 q.apply()
-
+            self.in_bucket_apply = False
+            
+            # if the query changed the policy, update the controller and switch state
+            if self.bucket_triggered_policy_update:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+                self.bucket_triggered_policy_update = False
+                    
         # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
         map(self.send_packet,concrete_output)
 
         # if in reactive mode and no packets are forwarded to buckets, install microflow
+        # Note: lack of forwarding to bucket implies no bucket-trigger update could have occured
         if self.mode == 'reactive0' and not queries:
             self.reactive0_install(pyretic_pkt,output)
 
@@ -124,60 +139,81 @@ class Runtime(object):
 # DYNAMICS  
 #############
 
-    def handle_policy_change(self):
+    def handle_policy_change(self,sub_pol):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         some sub-policy in self.policy changes.
         """
-        if self.in_update_network:
-            return
-
         with self.policy_lock:
-            self.update_dynamic_sub_pols()
-            classifier = None
-            if self.mode == 'proactive0' or self.mode == 'proactive1':
-                classifier = self.policy.compile()
 
-        self.update_switches(classifier)
-          
+            # tag stale classifiers as invalid
+            map(lambda p: p.invalidate_classifier(), 
+                on_recompile_path(set(),id(sub_pol),self.policy))
+
+            # if change was driven by a network update, flag
+            if self.in_network_update:
+                self.network_triggered_policy_update = True
+
+            # if this change driven by a bucket side-effect, flag
+            elif self.in_bucket_apply:
+                self.bucket_triggered_policy_update = True
+
+            # otherwise, update controller and switches accordingly
+            else:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+
+
     def handle_network_change(self):
         """
         Updates runtime behavior (both interpreter and switch classifiers)
         when the concrete network topology changes.
         """
         with self.network_lock:
-            if self.network.topology != self.prev_network.topology:
-                self.in_update_network = True
-                self.prev_network = self.network.copy()
 
-                with self.policy_lock:
-                    for policy in self.dynamic_sub_pols:
-                        policy.set_network(self.network)
-                    self.update_dynamic_sub_pols()
-                    classifier = None
-                    if self.mode == 'proactive0' or self.mode == 'proactive1':
-                        classifier = self.policy.compile()
+            # if the topology hasn't changed, ignore
+            if self.network.topology == self.prev_network.topology:
+                return
 
-                    self.update_switches(classifier)
+            # otherwise copy the network object
+            self.in_network_update = True
+            self.prev_network = self.network.copy()
 
-                self.in_update_network = False
+            # update the policy w/ the new network object
+            with self.policy_lock:
+                for policy in self.dynamic_sub_pols:
+                    policy.set_network(self.network)
 
-    def update_switches(self,classifier):
+                # FIXME(joshreich) :-)
+                # This is a temporary fix. We need to specialize the check below
+                # instead of removing it completely, but will let @joshreich
+                # take care of it. -- ngsrinivas
+                # if self.network_triggered_policy_update:
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+                self.network_triggered_policy_update = False
+
+            self.in_network_update = False
+
+    
+    def update_switch_classifiers(self):
         """
-        Updates switch tables based on input classifier
-
-        :param classifier: the input classifier
-        :type classifier: Classifier
+        Updates switch classifiers
         """
+        classifier = None
+        
         if self.mode == 'reactive0':
             self.clear_all() 
+
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
+            classifier = self.policy.compile()
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
                                               "policy="+repr(self.policy),
                                               "classifier="+repr(classifier)))
             self.install_classifier(classifier)
+
 
     def update_dynamic_sub_pols(self):
         """
@@ -767,7 +803,12 @@ class Runtime(object):
 # PACKET MARSHALLING/UNMARSHALLING 
 ####################################
 
-    def concrete2pyretic(self,packet):
+    def concrete2pyretic(self,raw_pkt):
+        packet = get_packet_processor().unpack(raw_pkt['raw'])
+        packet['raw'] = raw_pkt['raw']
+        packet['switch'] = raw_pkt['switch']
+        packet['inport'] = raw_pkt['inport']
+
         def convert(h,val):
             if h in ['srcmac','dstmac']:
                 return MAC(val)
@@ -784,12 +825,14 @@ class Runtime(object):
         pyretic_packet = Packet(extended_values)
         d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
         return pyretic_packet.modifymany(d)
-
     def pyretic2concrete(self,packet):
         concrete_packet = {}
+        headers         = {}
+
         for header in ['switch','inport','outport']:
             try:
                 concrete_packet[header] = packet[header]
+                headers[header]         = packet[header]
                 packet = packet.pop(header)
             except:
                 pass
@@ -799,13 +842,20 @@ class Runtime(object):
                 concrete_packet[header] = val
             except:
                 pass
+        for header in packet.header:
+            try:
+                if header in ['switch', 'inport', 'outport']: next
+                val = packet[header]
+                headers[header] = val
+            except:
+                pass
         extended_values = extended_values_from(packet)
         if extended_values:
             vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
             concrete_packet['vlan_id'] = vlan_id
             concrete_packet['vlan_pcp'] = vlan_pcp
+        concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
-
 
 #######################
 # TO OPENFLOW         
