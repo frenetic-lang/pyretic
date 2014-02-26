@@ -174,99 +174,90 @@ class Classifier(object):
 
     def __rshift__(c1, c2):
         from pyretic.core.language import match, modify, drop, identity, Controller, CountBucket, DerivedPolicy
-        def _sequence_actions_classifier(acts, c2):
-            def _sequence_action_classifier(act, c2):
-                # given a test b and an action p, return a test
-                # b' such that p >> b == b' >> p.
-                def _commute_test(act, pkts):
-                    while isinstance(act, DerivedPolicy):
-                        act = act.policy
-                    if act == identity:
-                        return pkts
-                    elif act == drop:
-                        return drop
-                    elif act == Controller or isinstance(act, CountBucket):
-                        return identity
-                    elif isinstance(act, modify):
-                        new_match_dict = {}
-                        if pkts == identity:
-                            return identity
-                        elif pkts == drop:
-                            return drop
-                        for f, v in pkts.map.iteritems():
-                            if f in act.map and act.map[f] == v:
-                                continue
-                            elif f in act.map and act.map[f] != v:
-                                return drop
-                            else:
-                                new_match_dict[f] = v
-                        if len(new_match_dict) == 0:
-                            return identity
-                        return match(**new_match_dict)
-                    else:
-                        # TODO (cole) use compile error.
-                        # TODO (cole) what actions are allowable?
-                        raise TypeError
-
-                # sequentially compose actions.  a1 must be a
-                # single action.  Returns a list of actions.
-                def _sequence_actions(a1, as2):
-                    while isinstance(a1, DerivedPolicy):
-                        a1 = a1.policy
-                    # TODO: be uniform about returning copied or modified objects.
-                    new_actions = []
-                    if a1 == drop:
-                        return [drop]
-                    elif a1 == identity:
-                        return as2
-                    elif a1 == Controller or isinstance(a1, CountBucket):
-                        return [a1]
-                    elif isinstance(a1, modify):
-                        for a2 in as2:
-                            while isinstance(a2, DerivedPolicy):
-                                a2 = a2.policy
-                            new_a1 = modify(**a1.map.copy())
-                            if a2 == drop:
-                                new_actions.append(drop)
-                            elif a2 == Controller or isinstance(a2, CountBucket): 
-                                new_actions.append(a2)
-                            elif a2 == identity:
-                                new_actions.append(new_a1)
-                            elif isinstance(a2, modify):
-                                new_a1.map.update(a2.map)
-                                new_actions.append(new_a1)
-                            else:
-                                raise TypeError
-                        return new_actions
-                    else:
-                        raise TypeError
-                # END _commute_test and _sequence_actions
-
-                c3 = Classifier()
-                for r2 in c2.rules:
-                    pkts = _commute_test(act, r2.match)
+        def _sequence_action_classifier(act, c2):
+            # given a test b and an action p, return a test
+            # b' such that p >> b == b' >> p.
+            def _commute_test(act, pkts):
+                while isinstance(act, DerivedPolicy):
+                    act = act.policy
+                if act == identity:
+                    return pkts
+                elif act == drop:
+                    return drop
+                elif act == Controller or isinstance(act, CountBucket):
+                    return identity
+                elif isinstance(act, modify):
+                    new_match_dict = {}
                     if pkts == identity:
-                        acts = _sequence_actions(act, r2.actions)
-                        c3.append(Rule(identity, acts))
-                        break
+                        return identity
                     elif pkts == drop:
-                        continue
-                    else:
-                        acts = _sequence_actions(act, r2.actions)
-                        c3.append(Rule(pkts, acts))
-                if len(c3) == 0:
-                    c3.append(Rule(identity, [drop]))
-                return c3
+                        return drop
+                    for f, v in pkts.map.iteritems():
+                        if f in act.map and act.map[f] == v:
+                            continue
+                        elif f in act.map and act.map[f] != v:
+                            return drop
+                        else:
+                            new_match_dict[f] = v
+                    if len(new_match_dict) == 0:
+                        return identity
+                    return match(**new_match_dict)
+                else:
+                    # TODO (cole) use compile error.
+                    # TODO (cole) what actions are allowable?
+                    raise TypeError
 
-            # END _sequence_action_classifier
+            # sequentially compose actions.  a1 must be a
+            # single action.  Returns a list of actions.
+            def _sequence_actions(a1, as2):
+                while isinstance(a1, DerivedPolicy):
+                    a1 = a1.policy
+                # TODO: be uniform about returning copied or modified objects.
+                new_actions = []
+                if a1 == drop:
+                    return [drop]
+                elif a1 == identity:
+                    return as2
+                elif a1 == Controller or isinstance(a1, CountBucket):
+                    return [a1]
+                elif isinstance(a1, modify):
+                    for a2 in as2:
+                        while isinstance(a2, DerivedPolicy):
+                            a2 = a2.policy
+                        new_a1 = modify(**a1.map.copy())
+                        if a2 == drop:
+                            new_actions.append(drop)
+                        elif a2 == Controller or isinstance(a2, CountBucket): 
+                            new_actions.append(a2)
+                        elif a2 == identity:
+                            new_actions.append(new_a1)
+                        elif isinstance(a2, modify):
+                            new_a1.map.update(a2.map)
+                            new_actions.append(new_a1)
+                        else:
+                            raise TypeError
+                    return new_actions
+                else:
+                    raise TypeError
+            # END _commute_test and _sequence_actions
 
-            c3 = Classifier([Rule(identity, [drop])])
-            for act in acts:
-                c3 = c3 + _sequence_action_classifier(act, c2)
+            c3 = Classifier()
+            for r2 in c2.rules:
+                pkts = _commute_test(act, r2.match)
+                if pkts == identity:
+                    acts = _sequence_actions(act, r2.actions)
+                    c3.append(Rule(identity, acts))
+                    break
+                elif pkts == drop:
+                    continue
+                else:
+                    acts = _sequence_actions(act, r2.actions)
+                    c3.append(Rule(pkts, acts))
+            if len(c3) == 0:
+                c3.append(Rule(identity, [drop]))
             return c3
 
-        # END _sequence_actions_classifier
-
+        # END _sequence_action_classifier
 
         # core __rshift__ logic begins here.
         # start with an empty set of rules for the output classifier
@@ -274,7 +265,9 @@ class Classifier(object):
         c3 = Classifier()
         for r1 in c1.rules:
             # sequence the actions in second classifier c2 w/ respect to r1
-            c2_seqd = _sequence_actions_classifier(r1.actions, c2)
+            c2_seqd = Classifier([Rule(identity, [drop])])
+            for act in r1.actions:
+                c2_seqd = c2_seqd + _sequence_action_classifier(act, c2)
 
             # for each rule in the sequenced c2, 
             # intersect the rule's match with r1's match
