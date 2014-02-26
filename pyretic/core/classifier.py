@@ -13,7 +13,7 @@ class Rule(object):
     """
 
     # Matches m should be of the match class.  Actions acts should be a set of
-    # modify, identity, drop, and/or Controller/CountBucket/FwdBucket policies.
+    # modify, identity, and/or Controller/CountBucket/FwdBucket policies.
     # Actions is Rule are semantically meant to run in parallel
     # unlike OpenFlow rules.
     def __init__(self,m,acts):
@@ -126,14 +126,13 @@ class Classifier(object):
 
     ### NEGATE ###
     def __invert__(self):
-        from pyretic.core.language import drop, identity
+        from pyretic.core.language import identity
         c = copy.copy(self)
         for r in c.rules:
-            assert len(r.actions) == 1
-            if r.actions == {identity}:
-                r.actions = {drop}
-            elif r.actions == {drop}:
+            if len(r.actions) == 0:
                 r.actions = {identity}
+            elif r.actions == {identity}:
+                r.actions = set()
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return c
@@ -149,8 +148,6 @@ class Classifier(object):
                 # TODO (josh) logic for detecting when sets of actions can't be combined
                 # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
                 actions = r1.actions | r2.actions
-                if len(actions) > 1:
-                    actions.discard(drop)
                 return Rule(intersection, actions)
             else:
                 return None
@@ -166,7 +163,7 @@ class Classifier(object):
                     c3.append(crossed_r)
         # if the classifier is empty, add a drop-all rule
         if len(c3) == 0:
-            c3.append(Rule(identity,{drop}))
+            c3.append(Rule(identity,set()))
         # and optimize the classifier
         else:
             c3 = c3.optimize()
@@ -184,8 +181,6 @@ class Classifier(object):
                 act = act.policy
             if act == identity:
                 return pkts
-            elif act == drop:
-                return drop
             elif act == Controller or isinstance(act, CountBucket):
                 return identity
             elif isinstance(act, modify):
@@ -224,9 +219,7 @@ class Classifier(object):
                 for a2 in as2:
                     while isinstance(a2, DerivedPolicy):
                         a2 = a2.policy
-                    if a2 == drop:
-                        new_actions.add(drop)
-                    elif a2 == Controller or isinstance(a2, CountBucket): 
+                    if a2 == Controller or isinstance(a2, CountBucket): 
                         new_actions.add(a2)
                     elif a2 == identity:
                         new_actions.add(a1)
@@ -276,7 +269,7 @@ class Classifier(object):
         # then for each rule in the first classifier (self)
         c3 = Classifier()
         for r1 in c1.rules:
-            if r1.actions == {drop}:
+            if len(r1.actions) == 0:
                 c3.append(r1)
             else:
                 for r2 in c2.rules:

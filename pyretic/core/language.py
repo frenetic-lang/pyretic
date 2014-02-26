@@ -265,6 +265,9 @@ class drop(Singleton):
         """
         return set()
 
+    def generate_classifier(self):
+        return Classifier([Rule(identity,set())])
+
     def intersect(self, other):
         return self
 
@@ -330,7 +333,7 @@ class match(Filter):
 
     def generate_classifier(self):
         r1 = Rule(self,{identity})
-        r2 = Rule(identity,{drop})
+        r2 = Rule(identity,set())
         return Classifier([r1, r2])
 
     def __eq__(self, other):

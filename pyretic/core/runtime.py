@@ -330,19 +330,6 @@ class Runtime(object):
 
         ### CLASSIFIER TRANSFORMS 
 
-        def remove_drop(classifier):
-            """
-            Removes drop policies from the action list.
-            
-            :param classifier: the input classifer
-            :type classifier: Classifier
-            :returns: the output classifier
-            :rtype: Classifier
-            """
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: a != drop,rule.actions))
-                              for rule in classifier.rules)
-
         def remove_identity(classifier):
             """
             Removes identity policies from the action list.
@@ -746,7 +733,6 @@ class Runtime(object):
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
-        classifier = remove_drop(classifier)
         #classifier = send_drops_to_controller(classifier)
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
