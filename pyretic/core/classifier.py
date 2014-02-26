@@ -235,9 +235,6 @@ class Classifier(object):
                             elif isinstance(a2, modify):
                                 new_a1.map.update(a2.map)
                                 new_actions.append(new_a1)
-                            elif isinstance(a2, fwd):
-                                new_a1.map['outport'] = a2.outport
-                                new_actions.append(new_a1)
                             else:
                                 raise TypeError
                         return new_actions
