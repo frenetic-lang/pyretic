@@ -213,7 +213,7 @@ class Classifier(object):
             if a1 == Controller or isinstance(a1, CountBucket):
                 return {a1}
             elif a1 == identity:
-                return as2
+                return copy.copy(as2)
             elif isinstance(a1, modify):
                 new_actions = set()
                 for a2 in as2:
