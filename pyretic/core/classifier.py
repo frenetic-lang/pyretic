@@ -56,14 +56,14 @@ class Classifier(object):
     tables.
     """
 
-    def __init__(self, new_rules=deque()):
+    def __init__(self, new_rules=list()):
         import types, copy
         if isinstance(new_rules, types.GeneratorType):
             self.rules = deque([r for r in new_rules])
         elif isinstance(new_rules,list):
             self.rules = deque(new_rules)
         elif isinstance(new_rules,deque):
-            self.rules = copy.copy(new_rules)
+            self.rules = new_rules
         else:
             raise TypeError
 
