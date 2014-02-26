@@ -218,7 +218,7 @@ class Singleton(Filter):
         return self.__class__._classifier
 
     def generate_classifier(self):
-        return Classifier([Rule(identity, [self])])
+        return Classifier([Rule(identity, {self})])
 
 
 @singleton
@@ -329,8 +329,8 @@ class match(Filter):
         return {pkt}
 
     def generate_classifier(self):
-        r1 = Rule(self,[identity])
-        r2 = Rule(identity,[drop])
+        r1 = Rule(self,{identity})
+        r2 = Rule(identity,{drop})
         return Classifier([r1, r2])
 
     def __eq__(self, other):
@@ -446,9 +446,9 @@ class modify(Policy):
 
     def generate_classifier(self):
         if self.has_virtual_headers:
-            r = Rule(identity,[Controller])
+            r = Rule(identity,{Controller})
         else:
-            r = Rule(identity,[self])
+            r = Rule(identity,{self})
         return Classifier([r])
 
     def __repr__(self):
@@ -503,7 +503,7 @@ class FwdBucket(Query):
         super(FwdBucket,self).__init__()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,[Controller])])
+        return Classifier([Rule(identity,{Controller})])
 
     def apply(self):
         with self.bucket_lock:
@@ -553,7 +553,7 @@ class CountBucket(Query):
         return set()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,[self])])
+        return Classifier([Rule(identity,{self})])
 
     def apply(self):
         with self.bucket_lock:

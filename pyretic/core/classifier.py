@@ -12,8 +12,10 @@ class Rule(object):
     Pyretic actions.
     """
 
-    # Matches m should be of the match class.  Actions acts should be a list of
-    # either modify, identity, or drop policies.
+    # Matches m should be of the match class.  Actions acts should be a set of
+    # modify, identity, drop, and/or Controller/CountBucket/FwdBucket policies.
+    # Actions is Rule are semantically meant to run in parallel
+    # unlike OpenFlow rules.
     def __init__(self,m,acts):
         self.match = m
         self.actions = acts
@@ -127,11 +129,11 @@ class Classifier(object):
         from pyretic.core.language import drop, identity
         c = copy.copy(self)
         for r in c.rules:
-            assert len(set(r.actions)) == 1
-            if r.actions[0] == identity:
-                r.actions = [drop]
-            elif r.actions[0] == drop:
-                r.actions = [identity]
+            assert len(r.actions) == 1
+            if r.actions == {identity}:
+                r.actions = {drop}
+            elif r.actions == {drop}:
+                r.actions = {identity}
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
         return c
@@ -146,10 +148,9 @@ class Classifier(object):
             if intersection != drop:
                 # TODO (josh) logic for detecting when sets of actions can't be combined
                 # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
-                actions = r1.actions + r2.actions
-                actions = filter(lambda a: a != drop,actions)
-                if len(actions) == 0:
-                    actions = [drop]
+                actions = r1.actions | r2.actions
+                if len(actions) > 1:
+                    actions.discard(drop)
                 return Rule(intersection, actions)
             else:
                 return None
@@ -165,7 +166,7 @@ class Classifier(object):
                     c3.append(crossed_r)
         # if the classifier is empty, add a drop-all rule
         if len(c3) == 0:
-            c3.append(Rule(identity,[drop]))
+            c3.append(Rule(identity,{drop}))
         # and optimize the classifier
         else:
             c3 = c3.optimize()
@@ -214,27 +215,27 @@ class Classifier(object):
             while isinstance(a1, DerivedPolicy):
                 a1 = a1.policy
             # TODO: be uniform about returning copied or modified objects.
-            new_actions = []
             if a1 == drop:
-                return [drop]
+                return {drop}
             elif a1 == Controller or isinstance(a1, CountBucket):
-                return [a1]
+                return {a1}
             elif a1 == identity:
                 return as2
             elif isinstance(a1, modify):
+                new_actions = set()
                 for a2 in as2:
                     while isinstance(a2, DerivedPolicy):
                         a2 = a2.policy
                     if a2 == drop:
-                        new_actions.append(drop)
+                        new_actions.add(drop)
                     elif a2 == Controller or isinstance(a2, CountBucket): 
-                        new_actions.append(a2)
+                        new_actions.add(a2)
                     elif a2 == identity:
-                        new_actions.append(a1)
+                        new_actions.add(a1)
                     elif isinstance(a2, modify):
                         new_a1 = modify(**a1.map.copy())
                         new_a1.map.update(a2.map)
-                        new_actions.append(new_a1)
+                        new_actions.add(new_a1)
                     else:
                         raise TypeError
                 return new_actions
@@ -246,7 +247,7 @@ class Classifier(object):
         def _cross_act(r1,act,r2):
             m = r1.match.intersect(_commute_test(act, r2.match))
             actions = _sequence_actions(act,r2.actions)
-            if actions == [drop]:
+            if actions == {drop}:
                 return Classifier([Rule(r1.match,actions)])
             elif m == drop:
                 return None
