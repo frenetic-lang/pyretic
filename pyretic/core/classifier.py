@@ -145,8 +145,6 @@ class Classifier(object):
         def _cross(r1,r2):
             intersection = r1.match.intersect(r2.match)
             if intersection != drop:
-                # TODO (josh) logic for detecting when sets of actions can't be combined
-                # e.g., [modify(dstip='10.0.0.1'),fwd(1)] + [modify(srcip='10.0.0.2'),fwd(2)]
                 actions = r1.actions | r2.actions
                 return Rule(intersection, actions)
             else:
@@ -200,8 +198,6 @@ class Classifier(object):
                     return identity
                 return match(**new_match_dict)
             else:
-                # TODO (cole) use compile error.
-                # TODO (cole) what actions are allowable?
                 raise TypeError
 
         # sequentially compose actions.  a1 must be a

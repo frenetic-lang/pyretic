@@ -330,6 +330,9 @@ class Runtime(object):
 
         ### CLASSIFIER TRANSFORMS 
 
+        # TODO (josh) logic for detecting action sets that can't be compiled
+        # e.g., {modify(dstip='10.0.0.1',outport=1),modify(srcip='10.0.0.2',outport=2)]
+
         def remove_identity(classifier):
             """
             Removes identity policies from the action list.
@@ -339,8 +342,6 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            # DISCUSS (cole): convert identity to inport rather
-            # than drop?
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != identity,rule.actions))
                               for rule in classifier.rules)
