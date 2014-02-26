@@ -165,10 +165,6 @@ class Classifier(object):
                 crossed_r = _cross(r1,r2)
                 if crossed_r:
                     c3.append(crossed_r)
-        # then append all the rules in the original classifiers
-        # (it doesn't matter whether c1 or c2 goes first)
-        c3.append(c1)
-        c3.append(c2)
         # and optimize the classifier
         c3 = c3.optimize()
         return c3
