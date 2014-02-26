@@ -99,10 +99,6 @@ class Classifier(object):
                     if len(actions) == 0:
                         actions = [drop]
                     c.rules.append(Rule(intersection, actions))
-        for r1 in c1.rules:
-            c.rules.append(r1)
-        for r2 in c2.rules:
-            c.rules.append(r2)
         return c.optimize()
 
     # Helper function for rshift: given a test b and an action p, return a test
