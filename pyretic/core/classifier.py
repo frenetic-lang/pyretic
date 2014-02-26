@@ -215,9 +215,7 @@ class Classifier(object):
             while isinstance(a1, DerivedPolicy):
                 a1 = a1.policy
             # TODO: be uniform about returning copied or modified objects.
-            if a1 == drop:
-                return {drop}
-            elif a1 == Controller or isinstance(a1, CountBucket):
+            if a1 == Controller or isinstance(a1, CountBucket):
                 return {a1}
             elif a1 == identity:
                 return as2
@@ -247,9 +245,7 @@ class Classifier(object):
         def _cross_act(r1,act,r2):
             m = r1.match.intersect(_commute_test(act, r2.match))
             actions = _sequence_actions(act,r2.actions)
-            if actions == {drop}:
-                return Classifier([Rule(r1.match,actions)])
-            elif m == drop:
+            if m == drop:
                 return None
             else:
                 return Classifier([Rule(m,actions)])
