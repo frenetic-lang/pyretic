@@ -116,6 +116,10 @@ class Classifier(object):
     def remove_last_rule(self):
         self.rules.pop()
 
+    def __copy__(self):
+        copied_rules = map(copy.copy,self.rules)
+        return Classifier(copied_rules)
+
 
     ### PARALLEL COMPOSITION
             
