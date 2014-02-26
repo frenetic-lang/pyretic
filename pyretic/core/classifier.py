@@ -140,8 +140,8 @@ class Classifier(object):
     ### PARALLEL COMPOSITION
             
     def __add__(c1, c2):
+        from pyretic.core.language import drop, identity
         def _cross(r1,r2):
-            from pyretic.core.language import drop
             intersection = r1.match.intersect(r2.match)
             if intersection != drop:
                 # TODO (josh) logic for detecting when sets of actions can't be combined
@@ -156,17 +156,19 @@ class Classifier(object):
 
         # start with an empty set of rules for the output classifier
         c3 = Classifier()
-        # JOSH - this check shouldn't be needed (I think)
-        if c2 is None:
-            return None
+        assert(not (c1 is None and c2 is None))
         # then cross all pairs of rules in the first and second classifiers
         for r1 in c1.rules:
             for r2 in c2.rules:
                 crossed_r = _cross(r1,r2)
                 if crossed_r:
                     c3.append(crossed_r)
+        # if the classifier is empty, add a drop-all rule
+        if len(c3) == 0:
+            c3.append(Rule(identity,[drop]))
         # and optimize the classifier
-        c3 = c3.optimize()
+        else:
+            c3 = c3.optimize()
         return c3
 
 
