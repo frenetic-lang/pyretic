@@ -280,10 +280,13 @@ class Classifier(object):
         # then for each rule in the first classifier (self)
         c3 = Classifier()
         for r1 in c1.rules:
-            for r2 in c2.rules:
-                c_tmp = _cross(r1,r2)
-                if not c_tmp is None:
-                    c3.append(c_tmp)
+            if r1.actions == {drop}:
+                c3.append(r1)
+            else:
+                for r2 in c2.rules:
+                    c_tmp = _cross(r1,r2)
+                    if not c_tmp is None:
+                        c3.append(c_tmp)
         # when all rules in c1 and c2 have been crossed
         # optimize c3
         c3 = c3.optimize()
