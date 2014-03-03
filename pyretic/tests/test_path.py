@@ -166,13 +166,29 @@ def test_path_concatenation():
     assert isinstance(p, path)
     assert p.expr == (a1.expr + a2.expr)
 
-def test_path_alternation():
+def test_path_alternation_1():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
     assert isinstance(p, path)
-    assert p.expr == ('((' + a1.expr + ')|(' + a2.expr + '))')
+    # This assertion below is not true anymore: a1 | a2 is a new atomic filter
+    # with the policy filter a1.policy | a2.policy. This does introduce a kink
+    # in the denotational semantics for the '|' operator w.r.t. the path
+    # expression, since '|' is simultaneously the filter union as well as path
+    # alternation, with the former taking precedence when used with atoms.
+    # assert p.expr == ('((' + a1.expr + ')|(' + a2.expr + '))')
+    assert p.expr != ('((' + a1.expr + ')|(' + a2.expr + '))')
+
+def test_path_alternation_2():
+    cg.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    p1 = a1 ^ a2
+    p2 = a2 ^ a1
+    p = p1 | p2
+    assert isinstance(p, path)
+    assert p.expr == ('((' + p1.expr + ')|(' + p2.expr + '))')
 
 def test_path_kleene_closure():
     cg.clear()
@@ -257,7 +273,7 @@ def test_path_finalize_2():
     p2 = a1 | a2
     path.finalize(p1)
     path.finalize(p2)
-    assert path.re_list == [p1.expr, p2.expr]
+    assert path.re_list == [p1.expr, '(' + a1.expr + '|' + a2.expr + ')']
     assert path.paths_list == [ [p1], [p2] ]
     for p in path.path_to_bucket:
         assert isinstance(path.path_to_bucket[p], Query)
@@ -532,7 +548,8 @@ if __name__ == "__main__":
     test_path_creation_1()
     test_path_creation_2()
     test_path_concatenation()
-    test_path_alternation()
+    test_path_alternation_1()
+    test_path_alternation_2()
     test_path_kleene_closure()
 
     test_slightly_complicated_expr_1()

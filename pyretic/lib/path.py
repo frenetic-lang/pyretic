@@ -561,11 +561,14 @@ class abstract_atom(path, Filter):
         assert isinstance(other, type(self))
         return type(self)(self.policy & other.policy)
 
-    def __add__(self, other):
-        # This won't actually work because the '+' operation results in an
-        # object of type parallel, which is not a Filter.
-        assert isinstance(other, type(self))
-        return type(self)(self.policy + other.policy)
+    def __or__(self, other):
+        if isinstance(other, abstract_atom):
+            assert isinstance(other, type(self))
+            return type(self)(self.policy | other.policy)
+        elif isinstance(other, path):
+            return super(abstract_atom, self).__or__(other)
+        else:
+            raise TypeError
 
     def __sub__(self, other):
         assert isinstance(other, type(self))
@@ -635,12 +638,10 @@ class hook(abstract_atom):
         assert self.groupby == other.groupby
         return hook(self.policy & other.policy, self.groupby)
 
-    def __add__(self, other):
-        # This won't actually work because the '+' operation results in an
-        # object of type parallel, which is not a Filter.
+    def __or__(self, other):
         assert isinstance(other, hook)
         assert self.groupby == other.groupby
-        return hook(self.policy + other.policy, self.groupby)
+        return hook(self.policy | other.policy, self.groupby)
 
     def __sub__(self, other):
         assert isinstance(other, hook)
