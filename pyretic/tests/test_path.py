@@ -126,6 +126,12 @@ def test_atom_difference():
     a2 = atom(match(switch=1))
     assert (a2 - a1).policy == (~match(switch=1,srcip=ip1) & match(switch=1))
 
+def test_atom_or():
+    cg.clear()
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=2))
+    assert (a1 | a2).policy == (match(switch=1) | match(switch=2))
+
 # TODO(ngsrinivas): skipping test_atom_add (i.e., '+' operator on the atom
 # object), since this will result in a TypeError (match + match is a `parallel`
 # type, not a `Filter` type).
@@ -347,7 +353,10 @@ def test_path_compile_1():
     path.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    [tags, untagging, counts, _, _] = path.compile([a1])
+    frags = path.compile([a1])
+    tags = frags.get_tagging()
+    untagging = frags.get_untagging()
+    counts = frags.get_counting()
     # Note: this test depends on state numbers, which eventually get changed
     # into tags. So it's not implementation detail-independent. Also, it relies
     # on the fact that vlan is used for packet tagging.
@@ -366,7 +375,10 @@ def test_path_compile_2():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    [tags, untagging, counts, _, _] = path.compile([a1 ^ a2])
+    frags = path.compile([a1 ^ a2])
+    tags = frags.get_tagging()
+    untagging = frags.get_untagging()
+    counts = frags.get_counting()
     # Note: Caveats in test_path_compile_1 apply.
     # This is the simplified policy, but not the actual policy that's
     # returned. This is because of an intersection between the two matches that
@@ -454,7 +466,7 @@ def test_endpath_compilation():
     cg.clear()
     path.clear()
     p = end_path(match(srcip=ip1))
-    [_,_,_,endpath,_] = path.compile([p])
+    endpath = path.compile([p]).get_endpath()
     assert endpath == ((match({'path_tag': None}) &
                         match(srcip=ip1)) >> p.bucket_instance)
 
@@ -462,7 +474,7 @@ def test_drop_compilation():
     cg.clear()
     path.clear()
     p = drop_atom(match(srcip=ip1))
-    [_,_,_,_,dropping] = path.compile([p])
+    dropping = path.compile([p]).get_dropping()
     assert dropping == ((match({'path_tag': None}) &
                          match(srcip=ip1)) >> p.bucket_instance)
 
@@ -472,7 +484,10 @@ def test_multiple_atomtype_compilation_1():
     a1 = atom(match(srcip=ip1))
     a2 = end_path(match(dstip=ip2))
     p = a1 ^ a2
-    [tagging,_,counting,endpath,_] = path.compile([p])
+    frags = path.compile([p])
+    tagging = frags.get_tagging()
+    counting = frags.get_counting()
+    endpath = frags.get_endpath()
     assert tagging == (drop +
                        (match(srcip=ip1,path_tag=None) >>
                         modify(path_tag=1)) +
@@ -487,7 +502,10 @@ def test_multiple_atomtype_compilation_2():
     a1 = atom(match(srcip=ip1))
     a2 = drop_atom(match(dstip=ip2))
     p = a1 ^ a2
-    [tagging,_,counting,_,dropping] = path.compile([p])
+    frags = path.compile([p])
+    tagging = frags.get_tagging()
+    counting = frags.get_counting()
+    dropping = frags.get_dropping()
     assert tagging == (drop +
                        (match(srcip=ip1,path_tag=None) >>
                         modify(path_tag=1)) +
@@ -506,7 +524,11 @@ def test_multiple_atomtype_compilation_3():
     p1 = a1 ^ a2
     p2 = a1 ^ a3
     p3 = a1 ^ a4
-    [tagging,_,counting,endpath,dropping] = path.compile([p1, p2, p3])
+    frags = path.compile([p1, p2, p3])
+    tagging = frags.get_tagging()
+    counting = frags.get_counting()
+    endpath = frags.get_endpath()
+    dropping = frags.get_dropping()
     assert tagging == (drop +
                        (match(srcip=ip1,path_tag=None) >>
                         modify(path_tag=1)) +
@@ -541,6 +563,7 @@ if __name__ == "__main__":
     test_atom_and_2()
     test_atom_negate()
     test_atom_difference()
+    test_atom_or()
 
     test_atom_token_generation_1()
     test_atom_token_generation_2()

@@ -58,6 +58,7 @@ class CharacterGenerator:
     filter_to_token = {default_toktype: {}} # toktype -> (filter -> token)
     token_to_filter = {default_toktype: {}} # toktype -> (token -> filter)
     token_to_tokens = {default_toktype: {}} # toktype -> (token -> token list)
+    token_to_atom = {default_toktype: {}} # toktype -> (token -> atom)
     token_to_toktype = {} # token -> toktype
 
     @classmethod
@@ -67,6 +68,7 @@ class CharacterGenerator:
         cls.filter_to_token = {cls.default_toktype: {}}
         cls.token_to_filter = {cls.default_toktype: {}}
         cls.token_to_tokens = {cls.default_toktype: {}}
+        cls.token_to_atom = {cls.default_toktype: {}}
         cls.token_to_toktype = {}
 
     @classmethod
@@ -120,6 +122,7 @@ class CharacterGenerator:
             cls.filter_to_token[toktype] = {}
             cls.token_to_filter[toktype] = {}
             cls.token_to_tokens[toktype] = {}
+            cls.token_to_atom[toktype] = {}
 
     @classmethod
     def __add_new_token(cls, pol, toktype):
@@ -220,6 +223,10 @@ class CharacterGenerator:
         if not negated:
             return output_filter_map
         else:
+            # This can't be! With the way we generate tokens and regular
+            # expressions, there is never a case where a DFA edge matches a
+            # negated set of characters.
+            assert RuntimeError
             return {t: ~output_filter_map[t] for t in output_filter_map.keys()}
 
     @classmethod
@@ -292,6 +299,17 @@ class CharacterGenerator:
             new_expr += get_terminal_expr_for_char(c)
         return new_expr
 
+    @classmethod
+    def set_token_to_atom(cls, tok, at, toktype):
+        """Update cls.token_to_atom to map a token to an atom."""
+        if tok in cls.token_to_atom[toktype]:
+            cls.token_to_atom[toktype][tok] += [at]
+        else:
+            cls.token_to_atom[toktype][tok] = [at]
+
+    @classmethod
+    def get_atoms_from_token(cls, tok, toktype):
+        return cls.token_to_atom[toktype][tok]
 
 class path(Query):
     """A way to query packets or traffic volumes satisfying regular expressions
@@ -420,6 +438,51 @@ class path(Query):
         cls.append_re_without_intersection(expr, p)
         cls.path_to_bucket[p] = p.bucket_instance
 
+    class policy_frags:
+        def __init__(self):
+            self.tagging = drop
+            self.untagging = drop
+            self.counting = drop
+            self.endpath = drop
+            self.dropping = drop
+            self.hooks = drop
+
+        def set_tagging(self, pol):
+            self.tagging = pol
+
+        def set_untagging(self, pol):
+            self.untagging = pol
+
+        def set_counting(self, pol):
+            self.counting = pol
+
+        def set_endpath(self, pol):
+            self.endpath = pol
+
+        def set_dropping(self, pol):
+            self.dropping = pol
+
+        def set_hooks(self, pol):
+            self.hooks = pol
+
+        def get_tagging(self):
+            return self.tagging
+
+        def get_untagging(self):
+            return self.untagging
+
+        def get_counting(self):
+            return self.counting
+
+        def get_endpath(self):
+            return self.endpath
+
+        def get_dropping(self):
+            return self.dropping
+
+        def get_hooks(self):
+            return self.hooks
+
     @classmethod
     def get_policy_fragments(cls):
         """Generates tagging and counting policy fragments to use with the
@@ -445,12 +508,27 @@ class path(Query):
             else:
                 return match(path_tag=int(val))
 
+        def build_hook_state(hooks_map, tag, hook_atoms):
+            if tag in hooks_map:
+                hooks_map[tag] += hook_atoms
+            else:
+                hooks_map[tag] = hook_atoms
+
+        def get_hooks_callback(hooks_map):
+            def actual_callback(pkt):
+                print "In the hooks callback. Here's my tags to hooks state:"
+                print hooks_map
+            return actual_callback
+
         # policies to apply on packet in the critical path
         tagging_policy = drop
         untagged_packets = identity
         # policies involving packet/count capture (parallelly composed)
-        toktypes = [TOK_INGRESS, TOK_END_PATH, TOK_DROP]
         capture_policy = {}
+        # hook policy to capture packets whose grouping must be known
+        hooks_policy = drop
+        hooks_bucket = FwdBucket()
+        hooks_map = {} # tag -> [hooks]
 
         edge_list = du.get_edges(dfa)
         for edge in edge_list:
@@ -465,6 +543,13 @@ class path(Query):
                 tagging_match = match_tag(src) & transit_match
                 tagging_policy += (tagging_match >> set_tag(dst))
                 untagged_packets = untagged_packets & ~tagging_match
+
+            # generate hooking fragment for data plane grouping
+            if TOK_HOOK in transit_match_map:
+                if not negated:
+                    hook_atoms = cg.get_atoms_from_token(edge_label, negated)
+                    build_hook_state(hooks_map, src, hook_atoms)
+                    hooks_policy = match_tag(src)
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -495,11 +580,18 @@ class path(Query):
             if not toktype in capture_policy:
                 capture_policy[toktype] = drop
 
-        return [tagging_policy,
-                untagging_policy,
-                capture_policy[TOK_INGRESS],
-                capture_policy[TOK_END_PATH],
-                capture_policy[TOK_DROP]]
+        hooks_policy = hooks_policy >> hooks_bucket
+        hooks_bucket.register_callback(get_hooks_callback(hooks_map))
+
+        frags = path.policy_frags()
+        frags.set_tagging(tagging_policy)
+        frags.set_untagging(untagging_policy)
+        frags.set_counting(capture_policy[TOK_INGRESS])
+        frags.set_endpath(capture_policy[TOK_END_PATH])
+        frags.set_dropping(capture_policy[TOK_DROP])
+        frags.set_hooks(hooks_policy)
+
+        return frags
 
     @classmethod
     def compile(cls, path_pols):
@@ -521,8 +613,13 @@ class path(Query):
         """Stitch together the "single packet policy" and "path policy" and
         return the globally effective network policy.
         """
-
-        [tagging, untagging, counting, endpath, dropping] = path_pol_fragments
+        frags = path_pol_fragments
+        tagging = frags.get_tagging()
+        untagging = frags.get_untagging()
+        counting = frags.get_counting()
+        endpath = frags.get_endpath()
+        dropping = frags.get_dropping()
+        hooks = frags.get_hooks()
 
         # TODO(ngsrinivas) There has to be a way of constructing the "dropped by
         # forwarding" policy while only relying on the structure of the
@@ -538,8 +635,8 @@ class path(Query):
 
         return ((tagging >> fwding) + # critical path
                 (counting) + # capture when match at ingress
-                (tagging >> fwding >> egress_network() >> endpath)) # capture
-                # at end of the packet's path in the network
+                (tagging >> fwding >> egress_network() >> endpath) + # endpath
+                (tagging >> hooks)) # grouping inference
                 # TODO(ngsrinivas): drop atoms are not stitched in as of now
                 # + (tagging >> dropped_by_fwding >> dropping)) # capture when
                                                             # dropped
@@ -629,6 +726,7 @@ class hook(abstract_atom):
         self.groupby_token = CharacterGenerator.get_token(identity,
                                                           toktype=TOK_HOOK,
                                                           nonoverlapping_filters=False)
+        CharacterGenerator.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
         super(hook, self).__init__(m)
         char = CharacterGenerator.get_char_from_token
         self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
