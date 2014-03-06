@@ -28,6 +28,8 @@
 
 from pyretic.core.language import identity, egress_network, Filter, drop, match
 from pyretic.core.language import modify, Query, FwdBucket, CountBucket
+from pyretic.core.language import PathBucket
+
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
 
@@ -508,16 +510,23 @@ class path(Query):
             else:
                 return match(path_tag=int(val))
 
-        def build_hook_state(hooks_map, tag, hook_atoms):
-            if tag in hooks_map:
-                hooks_map[tag] += hook_atoms
-            else:
-                hooks_map[tag] = hook_atoms
+        def get_hook_atoms(edge_label):
+            hook_atoms = []
+            for c in edge_label:
+                tok = cg.get_token_from_char(c)
+                if tok in cg.token_to_atom[TOK_HOOK]:
+                    hook_atoms.append(cg.token_to_atom[TOK_HOOK][tok])
+            return hook_atoms
 
         def get_hooks_callback(hooks_map):
-            def actual_callback(pkt):
+            def actual_callback(pkt, paths):
                 print "In the hooks callback. Here's my tags to hooks state:"
                 print hooks_map
+                print "Here's the switch on the packet:", pkt['switch']
+                # print "I got this packet:"
+                # print pkt
+                # print "I got these paths:"
+                # print paths
             return actual_callback
 
         # policies to apply on packet in the critical path
@@ -527,8 +536,14 @@ class path(Query):
         capture_policy = {}
         # hook policy to capture packets whose grouping must be known
         hooks_policy = drop
-        hooks_bucket = FwdBucket()
+        hooks_bucket = PathBucket()
         hooks_map = {} # tag -> [hooks]
+
+        def build_hook_state(tag, hook_atoms):
+            if tag in hooks_map:
+                hooks_map[tag] += hook_atoms
+            else:
+                hooks_map[tag] = hook_atoms
 
         edge_list = du.get_edges(dfa)
         for edge in edge_list:
@@ -547,9 +562,9 @@ class path(Query):
             # generate hooking fragment for data plane grouping
             if TOK_HOOK in transit_match_map:
                 if not negated:
-                    hook_atoms = cg.get_atoms_from_token(edge_label, negated)
-                    build_hook_state(hooks_map, src, hook_atoms)
-                    hooks_policy = match_tag(src)
+                    hook_atoms = get_hook_atoms(edge_label)
+                    build_hook_state(src, hook_atoms)
+                    hooks_policy += match_tag(src)
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -721,14 +736,14 @@ class hook(abstract_atom):
     def __init__(self, m, groupby=[]):
         assert groupby and len(groupby) > 0
         self.groupby = groupby
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
-                                                  nonoverlapping_filters=True)
-        self.groupby_token = CharacterGenerator.get_token(identity,
-                                                          toktype=TOK_HOOK,
-                                                          nonoverlapping_filters=False)
-        CharacterGenerator.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
+        cg = CharacterGenerator
+        self.token = cg.get_token(m, toktype=TOK_INGRESS,
+                                  nonoverlapping_filters=True)
+        self.groupby_token = cg.get_token(identity, toktype=TOK_HOOK,
+                                          nonoverlapping_filters=False)
+        cg.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
         super(hook, self).__init__(m)
-        char = CharacterGenerator.get_char_from_token
+        char = cg.get_char_from_token
         self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
 
     def __and__(self, other):
