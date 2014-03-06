@@ -544,6 +544,27 @@ def test_multiple_atomtype_compilation_3():
     assert dropping == (match(dstip=ip2, path_tag=1) >>
                         p1.bucket_instance)
 
+def test_hook_compilation_1():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    h2 = hook(match(srcip=ip2), ['srcip'])
+    a3 = atom(match(srcip=ip3))
+    p = a1 ^ h2 ^ a3
+    hooks = path.compile([p]).get_hooks()
+    assert hooks == match(path_tag=2) >> FwdBucket()
+
+def test_hook_compilation_2():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    h2 = hook(match(srcip=ip2), ['srcip'])
+    h3 = hook(match(srcip=ip3), ['dstip'])
+    p = a1 ^ h2 ^ h3
+    hooks = path.compile([p]).get_hooks()
+    assert hooks == ((match(path_tag=4) + match(path_tag=2))
+                     >> FwdBucket())
+
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
@@ -604,6 +625,9 @@ if __name__ == "__main__":
     test_multiple_atomtype_compilation_1()
     test_multiple_atomtype_compilation_2()
     test_multiple_atomtype_compilation_3()
+
+    test_hook_compilation_1()
+    test_hook_compilation_2()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

@@ -564,7 +564,10 @@ class path(Query):
                 if not negated:
                     hook_atoms = get_hook_atoms(edge_label)
                     build_hook_state(src, hook_atoms)
-                    hooks_policy += match_tag(src)
+                    if hooks_policy != drop:
+                        hooks_policy += match_tag(src)
+                    else:
+                        hooks_policy = match_tag(src)
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
