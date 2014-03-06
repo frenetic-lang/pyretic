@@ -185,9 +185,17 @@ def path_test_13():
     p.register_callback(query_callback(13))
     return [p]
 
+def path_test_14():
+    p = (atom(match(switch=1)) ^ atom(match(switch=2)) ^ atom(match(switch=3)))
+    p.register_callback(query_callback(14))
+    return [p]
+
+def path_test_15():
+    return path_test_13() + path_test_14()
+
 # type: unit -> path list
 def path_main():
-    return path_test_13()
+    return path_test_15()
 
 def main():
     return mac_learner()
