@@ -134,7 +134,10 @@ class Runtime(object):
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
             for q in queries:
-                q.apply()
+                if isinstance(q, PathBucket):
+                    q.apply(pyretic_pkt)
+                else:
+                    q.apply()
             self.in_bucket_apply = False
             
             # if the query changed the policy, update the controller and switch state

@@ -576,18 +576,24 @@ class PathBucket(FwdBucket):
     but in addition to the packet, the entire trajectory of the packet is also
     provided to the callbacks.
     """
-    def __init__(self):
+    def __init__(self, require_original_pkt=False):
         super(PathBucket, self).__init__()
         self.runtime_topology_policy_fun = None
         self.runtime_fwding_policy_fun = None
         self.runtime_egress_policy_fun = None
+        self.require_original_pkt = require_original_pkt
 
     def generate_classifier(self):
         return Classifier([Rule(identity,[self])])
 
-    def apply(self):
+    def apply(self, original_pkt=None):
         with self.bucket_lock:
-            for pkt in self.bucket:
+            packet_set = set()
+            if self.require_original_pkt and original_pkt:
+                packet_set.add(original_pkt)
+            else:
+                packet_set = self.bucket
+            for pkt in packet_set:
                 self.log.info('In PathBucket apply(): packet is:\n' + str(pkt))
                 paths = self.get_trajectories(pkt)
                 for callback in self.callbacks:

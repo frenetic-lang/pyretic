@@ -311,7 +311,10 @@ class CharacterGenerator:
 
     @classmethod
     def get_atoms_from_token(cls, tok, toktype):
-        return cls.token_to_atom[toktype][tok]
+        if tok in cls.token_to_atom[toktype]:
+            return cls.token_to_atom[toktype][tok]
+        else:
+            return []
 
 class path(Query):
     """A way to query packets or traffic volumes satisfying regular expressions
@@ -486,6 +489,20 @@ class path(Query):
             return self.hooks
 
     @classmethod
+    def set_tag(cls, val):
+        if int(val) == 0:
+            return modify(path_tag=None)
+        else:
+            return modify(path_tag=int(val))
+
+    @classmethod
+    def match_tag(cls, val):
+        if int(val) == 0:
+            return match(path_tag=None)
+        else:
+            return match(path_tag=int(val))
+
+    @classmethod
     def get_policy_fragments(cls):
         """Generates tagging and counting policy fragments to use with the
         returned general network policy.
@@ -498,36 +515,18 @@ class path(Query):
         virtual_field(name="path_tag", values=range(0, du.get_num_states(dfa)),
                       type="integer")
 
-        def set_tag(val):
-            if int(val) == 0:
-                return modify(path_tag=None)
-            else:
-                return modify(path_tag=int(val))
-
-        def match_tag(val):
-            if int(val) == 0:
-                return match(path_tag=None)
-            else:
-                return match(path_tag=int(val))
-
         def get_hook_atoms(edge_label):
             hook_atoms = []
             for c in edge_label:
                 tok = cg.get_token_from_char(c)
-                if tok in cg.token_to_atom[TOK_HOOK]:
-                    hook_atoms.append(cg.token_to_atom[TOK_HOOK][tok])
+                hook_atoms += cg.get_atoms_from_token(tok, TOK_HOOK)
             return hook_atoms
 
-        def get_hooks_callback(hooks_map):
-            def actual_callback(pkt, paths):
-                print "In the hooks callback. Here's my tags to hooks state:"
-                print hooks_map
-                print "Here's the switch on the packet:", pkt['switch']
-                # print "I got this packet:"
-                # print pkt
-                # print "I got these paths:"
-                # print paths
-            return actual_callback
+        def build_hook_state(tag, hook_atoms):
+            if tag in hooks_map:
+                hooks_map[tag] += hook_atoms
+            else:
+                hooks_map[tag] = hook_atoms
 
         # policies to apply on packet in the critical path
         tagging_policy = drop
@@ -536,14 +535,8 @@ class path(Query):
         capture_policy = {}
         # hook policy to capture packets whose grouping must be known
         hooks_policy = drop
-        hooks_bucket = PathBucket()
+        hooks_bucket = PathBucket(require_original_pkt=True)
         hooks_map = {} # tag -> [hooks]
-
-        def build_hook_state(tag, hook_atoms):
-            if tag in hooks_map:
-                hooks_map[tag] += hook_atoms
-            else:
-                hooks_map[tag] = hook_atoms
 
         edge_list = du.get_edges(dfa)
         for edge in edge_list:
@@ -555,8 +548,8 @@ class path(Query):
                                                               negated)
             if TOK_INGRESS in transit_match_map:
                 transit_match = transit_match_map[TOK_INGRESS]
-                tagging_match = match_tag(src) & transit_match
-                tagging_policy += (tagging_match >> set_tag(dst))
+                tagging_match = cls.match_tag(src) & transit_match
+                tagging_policy += (tagging_match >> cls.set_tag(dst))
                 untagged_packets = untagged_packets & ~tagging_match
 
             # generate hooking fragment for data plane grouping
@@ -565,9 +558,9 @@ class path(Query):
                     hook_atoms = get_hook_atoms(edge_label)
                     build_hook_state(src, hook_atoms)
                     if hooks_policy != drop:
-                        hooks_policy += match_tag(src)
+                        hooks_policy += cls.match_tag(src)
                     else:
-                        hooks_policy = match_tag(src)
+                        hooks_policy = cls.match_tag(src)
 
             # generate counting fragment, if accepting state.
             dst_state = du.get_edge_dst(edge, dfa)
@@ -579,7 +572,8 @@ class path(Query):
                     for toktype in [TOK_INGRESS, TOK_END_PATH, TOK_DROP]:
                         if toktype in transit_match_map:
                             transit_match = transit_match_map[toktype]
-                            capture_fragment = ((match_tag(src) & transit_match)
+                            capture_fragment = ((cls.match_tag(src) &
+                                                 transit_match)
                                                 >> bucket)
                             if toktype in capture_policy:
                                 capture_policy[toktype] += capture_fragment
@@ -599,7 +593,8 @@ class path(Query):
                 capture_policy[toktype] = drop
 
         hooks_policy = hooks_policy >> hooks_bucket
-        hooks_bucket.register_callback(get_hooks_callback(hooks_map))
+        hooks_bucket.register_callback(cls.set_up_hooks_callback(hooks_map,
+                                                                 tagging_policy))
 
         frags = path.policy_frags()
         frags.set_tagging(tagging_policy)
@@ -658,7 +653,50 @@ class path(Query):
                 # TODO(ngsrinivas): drop atoms are not stitched in as of now
                 # + (tagging >> dropped_by_fwding >> dropping)) # capture when
                                                             # dropped
+    @classmethod
+    def set_up_hooks_callback(cls, hooks_map, tagging):
+        # 1. get path_tag from the packet (not direct as of now)
+        # 2. use tag value and hooks_map to get hook objects
+        # 3. get hook=value list for each path in paths
+        # 4. instantiate a new path
+        # 5. deal with base path changes needed
+        # 6. recompile/update data plane with totally new set of paths
+        def get_path_tag(pkt, hooks_map):
+            """An essentially circular way of getting the path_tag value from a
+            packet, since interpreted mode packets can't access the virtual
+            headers on them through direct key reference."""
+            for tag in hooks_map.keys():
+                pkts = cls.match_tag(tag).eval(pkt)
+                if len(pkts) > 0:
+                    return tag
+            return None
 
+        def get_hook_projection(pkt_path, hooks_map, tagging):
+            """The projection of a packet trajectory in terms of its hooks is
+            just the list of group value assignments for the hooks, whenever it
+            is encountered along the packet trajectory."""
+            groups_list = []
+            for pkt in pkt_path:
+                curr_group = {}
+                tagged_pkt = list(tagging.eval(pkt))[0]
+                tag = get_path_tag(tagged_pkt, hooks_map)
+                if tag in hooks_map:
+                    curr_group = {}
+                    hooks_list = hooks_map[tag]
+                    for h in hooks_list:
+                        curr_group[h] = [pkt[field] for field in h.groupby]
+                    groups_list.append(curr_group)
+            return groups_list
+
+        def actual_callback(pkt, paths):
+            print "Projected list of groups:"
+            for p in paths:
+                proj = get_hook_projection(p, hooks_map, tagging)
+                for p in proj:
+                    for hook in p.keys():
+                        print hook.groupby, '=', p[hook]
+
+        return actual_callback
 
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class

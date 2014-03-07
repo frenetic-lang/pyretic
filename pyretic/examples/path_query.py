@@ -180,18 +180,24 @@ def path_test_12():
     return [p]
 
 def path_test_13():
-    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
-         hook(match(switch=3), ['inport']))
+    p = (atom(match(switch=1)) ^ atom(match(switch=2)) ^ atom(match(switch=3)))
     p.register_callback(query_callback(13))
     return [p]
 
 def path_test_14():
-    p = (atom(match(switch=1)) ^ atom(match(switch=2)) ^ atom(match(switch=3)))
+    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
+         atom(match(switch=3)))
     p.register_callback(query_callback(14))
     return [p]
 
 def path_test_15():
-    return path_test_13() + path_test_14()
+    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
+         hook(match(switch=3), ['srcip','dstip']))
+    p.register_callback(query_callback(15))
+    return [p]
+
+def path_test_16():
+    return path_test_13() + path_test_14() + path_test_15()
 
 # type: unit -> path list
 def path_main():

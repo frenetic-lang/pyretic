@@ -13,11 +13,14 @@ def default_mapper(parent, children):
     """
     import copy
     import pyretic.lib.query as query
+    from pyretic.core.language import _match, _modify
     # Leaf-level policies
     if ( parent == identity or
          parent == drop or
          isinstance(parent,match) or
          isinstance(parent,modify) or
+         isinstance(parent, _match) or
+         isinstance(parent, _modify) or
          parent == Controller):
         return copy.deepcopy(parent)
     # Queries are special: we return the actual instance directly because of
