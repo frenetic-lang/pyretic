@@ -617,9 +617,19 @@ class path(Query):
         application
         :type single_pkt_pol: Policy
         """
-        for p in path_pols:
-            cls.finalize(p)
-        return cls.get_policy_fragments()
+        if path_pols:
+            for p in path_pols:
+                cls.finalize(p)
+            return cls.get_policy_fragments()
+        else:
+            frags = path.policy_frags()
+            frags.set_tagging(identity)
+            frags.set_untagging(identity)
+            frags.set_counting(drop)
+            frags.set_endpath(drop)
+            frags.set_dropping(drop)
+            frags.set_hooks(drop)
+            return frags
 
     @classmethod
     def stitch(cls, fwding, path_pol_fragments):
