@@ -40,6 +40,15 @@ from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
 from pyretic.lib.query import counts
 
+def query_callback(test_num):
+    def actual_callback(pkt):
+        print '**************'
+        print datetime.now()
+        print 'Test', test_num, ' -- got a callback from installed path query!'
+        print pkt
+        print '**************'
+    return actual_callback
+
 ## Test: Loop Forwarding
 def path_test_loop(**kwargs):
     """Path query that checks for loops in forwarding.
@@ -47,14 +56,16 @@ def path_test_loop(**kwargs):
     :param n: number of switches in the topology
     :type n: integer
     """
-    p = []
+    plist = []
     assert 'n' in kwargs
     n = int(kwargs['n'])
     for s in range(1,n+1):
-        p += [atom(match(switch=s)) ^ +(atom(~match(switch=s))) ^
-              atom(match(switch=s))]
-    return []
-#    return p
+        p = (atom(match(switch=s)) ^ +(atom(~match(switch=s))) ^
+             atom(match(switch=s)))
+        p.register_callback(query_callback('loops'))
+        plist += [p]
+    return plist
+    # return []
 
 def loop_fwding(**kwargs):
     """Forwarding policy that creates a loop when packets are sent from h1 to
@@ -67,18 +78,18 @@ def loop_fwding(**kwargs):
     n = int(kwargs['n'])
     ip_prefix = '10.0.0.'
     h1_ip = IP(ip_prefix + str(1))
-    f = ((match(dstip=h1_ip,switch=1) >> fwd(3)) +
-         (match(dstip=h1_ip) & ~match(switch=1)) >> fwd(2))
-    for h in range(2,n):
+    h3_ip = IP(ip_prefix + str(3))
+    f = ((match(dstip=h1_ip) >> match(switch=1) >> (~match(srcip=h3_ip)) >>
+          fwd(3)) +
+         (match(dstip=h1_ip) >> match(switch=1) >> match(srcip=h3_ip) >>
+          fwd(2)) + # explicit loop added between h2 --> h1
+         (match(dstip=h1_ip) >> (~match(switch=1)) >> fwd(2)))
+    for h in range(2,n+1):
         h_ip = IP(ip_prefix + str(h))
-        f += ((match(dstip=h_ip,switch=h) >> fwd(3)) +
-              ((match(dstip=h_ip) & ~match(switch=h) & ~match(switch=1)) >>
-               fwd(2)) +
-              ((match(dstip=h_ip,switch=1)) >> fwd(1)))
-    # So far, we have the right policy. But add an explicit loop to reach h2
-    # from h1:
-    h2_ip = IP(ip_prefix + str(2))
-    f += (match(dstip=h2_ip,srcip=h1_ip,switch=1) >> fwd(2))
+        f += (match(dstip=h_ip) >> ((match(switch=h) >> fwd(3)) +
+                                    (match(switch=1) >> fwd(1)) +
+                                    (((~match(switch=1))&(~match(switch=h))) >>
+                                     fwd(2))))
     return f
 
 ## Test: Traffic Matrix
