@@ -641,5 +641,7 @@ if __name__ == "__main__":
     test_hook_compilation_1()
     test_hook_compilation_2()
 
+    test_empty_paths()
+
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
