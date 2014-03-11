@@ -565,6 +565,18 @@ def test_hook_compilation_2():
     assert hooks == ((match(path_tag=4) + match(path_tag=2))
                      >> FwdBucket())
 
+def test_empty_paths():
+    cg.clear()
+    path.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    p = a1 ^ a2
+    frags = path.compile([])
+    tagging = frags.get_tagging()
+    counting = frags.get_counting()
+    assert tagging == identity
+    assert counting == drop
+
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
