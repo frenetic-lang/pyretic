@@ -15,7 +15,7 @@ def mnCleanup():
 def SetupTopo():
     return CycleTopo(num_hosts, num_hosts)
 
-def pingFlowPairs():
+def pingFlowPairs(net, hosts_src, hosts_dst):
     """ Test connectivity between flow sources and destinations """
     assert len(hosts_src) == len(hosts_dst)
     for i in range(0, len(hosts_src)):
@@ -32,7 +32,7 @@ def getHosts(net):
 
 def getSwitches(net):
     switches = []
-    for i in range(0, num_hosts):
+    for i in range(1, num_hosts+1):
         switches.append(net.getNodeByName('s' + str(i)))
     return switches
 
@@ -45,7 +45,7 @@ def queryTest():
 
     topo = SetupTopo()
     # net = Mininet(topo=topo, host=CPULimitedHost, link=TCLink)
-    net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController)
+    net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController, listenPort=6634)
     net.start()
 
     hosts = getHosts(net)
@@ -56,6 +56,7 @@ def queryTest():
     pingFlowPairs(net, hosts_src, hosts_dst)
 
     print "Starting iperf tests"
+    switches_list = getSwitches(net)
     runIperfTest(net, hosts_src, hosts_dst, switches_list)
 
     CLI(net)
