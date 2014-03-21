@@ -115,12 +115,35 @@ def run_iperf_test(net, hosts_src, hosts_dst, switches_list, test_duration_sec,
     print "Client transfers initiated."
 
 def set_up_overhead_statistics(overheads_file, test_duration_sec, slack):
-    cmd = ("tshark -q -i lo -z io,stat," + str(test_duration_sec) +
+    cmd = ("tshark -q -i lo -z io,stat," + str(slack * test_duration_sec) +
            ",'of.pktin||of.stats_flow_byte_count' -f 'tcp port 6633'")
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
     return p
+
+def set_up_total_traffic(total_traffic_prefix, test_duration_sec, slack,
+                         switches):
+    for s in switches:
+        s_index = s.name[1:]
+        local_ip = "10.0.0." + s_index
+
+        # Traffic that gets counted exactly once into the total traffic
+        cap_filter_once  = "-f 'host " + local_ip + "'"
+        ints_once = ("-i " + s.name + "-eth1 -i " + s.name + "-eth2 -i " + s.name
+                     + "-eth3 ")
+        cmd_once = ("tshark -q " + ints_once + cap_filter_once +
+                    "-z io,stat," + str(slack * test_duration_sec))
+
+        # Traffic that gets counted twice, and needs to be halved before adding
+        # into total traffic volume
+        cap_filter_twice = "-f 'not host " + local_ip + "'"
+        ints_twice = "-i " + s.name + "-eth1 -i " + s.name + "-eth2 "
+        cmd_twice = ("tshark -q " + ints_twice + cap_filter_twice +
+                     "-z io,stat," + str(slack * test_duration_sec))
+
+        # Count and write down into files under total_traffic_prefix
+        print "Work to do here, still"
 
 def query_test():
     """ Main """
@@ -130,7 +153,7 @@ def query_test():
     test_duration_sec = 30
     per_flow_bw = "8M"
     overheads_file = "tshark_output.txt"
-    slack_time = 5 # slack for stopping stats measurement after experiment done
+    slack_factor = 2 # slack for stopping stats measurement after experiment done
     test = "tm"
     testwise_params = {'n': str(num_hosts)}
     c_out = "pyretic-stdout.txt"
@@ -153,7 +176,7 @@ def query_test():
 
     print "Setting up overhead statistics measurements"
     tshark = set_up_overhead_statistics(overheads_file, test_duration_sec,
-                                        slack_time)
+                                        slack_factor)
 
     print "Setting up signal handler for experiment abort"
     signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, net))
