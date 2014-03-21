@@ -132,7 +132,7 @@ def query_test():
     overheads_file = "tshark_output.txt"
     slack_time = 5 # slack for stopping stats measurement after experiment done
     test = "tm"
-    testwise_params = {'n': '5'}
+    testwise_params = {'n': str(num_hosts)}
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"
 
