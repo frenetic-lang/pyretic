@@ -25,17 +25,35 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
                   testwise_params.keys(), " "))
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
                          env=py_env)
-    return c
+    return ([c], [c_outfile, c_errfile])
 
-def finish_up(ctlr, tshark, net):
+def finish_up(ctlr, tshark, switch_stats, net):
+    def close_fds(fds, fd_str):
+        for fd in fds:
+            close(fd)
+        print "Closed", fd_str, "file descriptors"
+
     print "--- Cleaning up after experiment ---"
-    kill_process(ctlr, "controller")
-    kill_process(tshark, "tshark")
+    # controller
+    ([p], fds) = ctlr
+    kill_process(p, "controller")
+    close_fds(fds, "controller")
+    # overhead statistics tshark
+    ([p], fds) = tshark
+    kill_process(p, "tshark overhead statistics collection")
+    close_fds(fds, "overhead statistics")
+    # switch statistics
+    (procs, fds) = switch_stats
+    for p in procs:
+        kill_process(p, "tshark switch statistics collection")
+    close_fds(fds, "switch statistics")
+    # mininet network
     net.stop()
+    print "Killed mininet network"
 
-def get_abort_handler(ctlr, tshark, net):
+def get_abort_handler(ctlr, tshark, switch_stats, net):
     def abort_handler(signum, frame):
-        finish_up(ctlr, tshark, net)
+        finish_up(ctlr, tshark, switch_stats, net)
     return abort_handler
 
 def kill_process(p, process_str):
@@ -120,10 +138,15 @@ def set_up_overhead_statistics(overheads_file, test_duration_sec, slack):
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
-    return p
+    return ([p], [f])
 
-def set_up_total_traffic(total_traffic_prefix, test_duration_sec, slack,
-                         switches):
+def measure_total_traffic(total_traffic_prefix, test_duration_sec, slack,
+                          switches):
+    """ Setup tshark collectors and statistics for the 'total' traffic in the
+    network.
+    """
+    out_fds = []
+    processes = []
     for s in switches:
         s_index = s.name[1:]
         local_ip = "10.0.0." + s_index
@@ -134,6 +157,7 @@ def set_up_total_traffic(total_traffic_prefix, test_duration_sec, slack,
                      + "-eth3 ")
         cmd_once = ("tshark -q " + ints_once + cap_filter_once +
                     "-z io,stat," + str(slack * test_duration_sec))
+        file_once = total_traffic_prefix + '-' + s_index + '-once.txt'
 
         # Traffic that gets counted twice, and needs to be halved before adding
         # into total traffic volume
@@ -141,9 +165,18 @@ def set_up_total_traffic(total_traffic_prefix, test_duration_sec, slack,
         ints_twice = "-i " + s.name + "-eth1 -i " + s.name + "-eth2 "
         cmd_twice = ("tshark -q " + ints_twice + cap_filter_twice +
                      "-z io,stat," + str(slack * test_duration_sec))
+        file_twice = total_traffic_prefix + '-' + s_index + '-twice.txt'
 
-        # Count and write down into files under total_traffic_prefix
-        print "Work to do here, still"
+        # Collect tshark statistics on separate slices of traffic
+        out_fds.append(open(file_once, 'w'))
+        processes.append(subprocess.Popen(shlex.split(cmd_once),
+                                          stdout=out_fds[-1],
+                                          stderr=subprocess.STDOUT))
+        out_fds.append(open(file_twice, 'w'))
+        processes.append(subprocess.Popen(shlex.split(cmd_twice),
+                                          stdout=out_fds[-1],
+                                          stderr=subprocess.STDOUT))
+    return (processes, out_fds)
 
 def query_test():
     """ Main """
@@ -158,6 +191,7 @@ def query_test():
     testwise_params = {'n': str(num_hosts)}
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"
+    total_traffic_prefix = "total-traffic"
 
     # Hack to set pythonpath.
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
@@ -173,17 +207,23 @@ def query_test():
     net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
                   listenPort=listen_port)
     net.start()
+    hosts = get_hosts(net, num_hosts)
+    switches = get_switches(net, num_hosts)
 
     print "Setting up overhead statistics measurements"
     tshark = set_up_overhead_statistics(overheads_file, test_duration_sec,
                                         slack_factor)
 
+    print "Setting up collectors for total traffic"
+    switch_stats = measure_total_traffic(total_traffic_prefix,
+                                         test_duration_sec,
+                                         slack_factor,
+                                         switches)
+
     print "Setting up signal handler for experiment abort"
-    signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, net))
+    signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, switch_stats, net))
 
     print "Setting up workload configuration"
-    hosts = get_hosts(net, num_hosts)
-    switches = get_switches(net, num_hosts)
     hosts_src = hosts
     hosts_dst = hosts[1:] + [hosts[0]]
 
@@ -203,7 +243,7 @@ def query_test():
 
     CLI(net)
 
-    finish_up(ctlr, tshark, net)
+    finish_up(ctlr, tshark, switch_stats, net)
 
 if __name__ == "__main__":
     setLogLevel('info')
