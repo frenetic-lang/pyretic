@@ -106,11 +106,12 @@ def run_iperf_test(net, hosts_src, hosts_dst, switches_list, test_duration_sec,
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
-    for src in hosts_src:
+    for i in range(0, len(hosts_src)):
+        src = hosts_src[i]
         src_client_file = src.name + "-client-udp.txt"
-        src.cmd("iperf -t " + str(test_duration_sec) + " -c " + src.IP() +
-                " -u -p 5002 -i 5 -b " + per_transfer_bandwidth + " > " +
-                src_client_file + "&")
+        src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
+                hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
+                per_transfer_bandwidth + " > " + src_client_file + "&")
     print "Client transfers initiated."
 
 def set_up_overhead_statistics(overheads_file, test_duration_sec, slack):

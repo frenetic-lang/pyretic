@@ -41,13 +41,14 @@ from pyretic.lib.path import *
 from pyretic.lib.query import counts
 import threading
 
-def query_callback(id_str):
+def query_callback(id_str, print_counts=True):
     def actual_callback(pkt):
-        print '**************'
-        print datetime.now()
-        print 'Test', id_str, ' -- got a callback from installed path query!'
-        print pkt
-        print '**************'
+        if print_counts:
+            print '**************'
+            print datetime.now()
+            print 'Test', id_str, ' -- got a callback from installed path query!'
+            print pkt
+            print '**************'
     return actual_callback
 
 def cycle_forwarding_policy(n):
@@ -65,15 +66,17 @@ def cycle_forwarding_policy(n):
                                      fwd(2))))
     return f
 
-def query_func(bucket, interval, id_str):
+def query_func(bucket, interval, id_str, duration):
     """Canonical callback function for a countbucket."""
-    while True:
+    time_elapsed = 0
+    while time_elapsed < duration:
         output = str(datetime.now())
         output += " Pulling stats for bucket " + id_str
         # output += bucket.get_matches()
         print output
         bucket.pull_stats()
         time.sleep(interval)
+        time_elapsed += interval
 
 ## Test: Loop Forwarding
 def path_test_loop(**kwargs):
@@ -112,14 +115,23 @@ def loop_fwding(**kwargs):
 
 ## Test: Traffic Matrix
 def path_test_tm(**kwargs):
-    """ Query that measures the traffic matrix. """
-    default_timeout_value = 10 # poll timeout for traffic matrix counters
+    """ Query that measures the traffic matrix. Command line arguments:
+    :param n: number of switches
+    :param poll: polling time for each traffic matrix count
+    :param duration: time after which to stop polling (useful to limit output
+    when running tests)
+    """
+    default_timeout_value = 10 # default polling interval for counters
+    default_poll_duration = 180 # default elapsed time after which polling stops
 
-    def query_thread_setup(p, timeout, id_str):
+    def query_thread_setup(p, timeout, id_str, duration, print_counts=True):
         cb = CountBucket()
         p.set_bucket(cb)
-        p.register_callback(query_callback(id_str))
-        query_thread = threading.Thread(target=query_func, args=(cb, timeout, id_str))
+        p.register_callback(query_callback(id_str, print_counts))
+        query_thread = threading.Thread(target=query_func, args=(cb,
+                                                                 timeout,
+                                                                 id_str,
+                                                                 duration))
         query_thread.daemon = True
         query_thread.start()
 
@@ -132,18 +144,27 @@ def path_test_tm(**kwargs):
         else:
             return default_timeout_value
 
+    def get_duration(args):
+        if 'poll_duration' in args:
+            return int(args['test_duration'])
+        else:
+            return default_poll_duration
+
     plist = []
     n = int(kwargs['n'])
     timeout = get_timeout(kwargs)
+    duration = get_duration(kwargs)
     for s1 in range(1,n+1):
         for s2 in range(s1+1,n+1):
             p = (atom(ingress_network() & match(switch=s1)) ^
                  end_path(match(switch=s2)))
-            query_thread_setup(p, timeout, create_id_string(s1, s2))
+            id = create_id_string(s1, s2)
+            query_thread_setup(p, timeout, id, duration, s2==(s1+1))
             plist.append(p)
             p = (atom(ingress_network() & match(switch=s2)) ^
                  end_path(match(switch=s1)))
-            query_thread_setup(p, timeout, create_id_string(s2, s1))
+            id = create_id_string(s2, s1)
+            query_thread_setup(p, timeout, id, duration, s2==(s1+1))
             plist.append(p)
     return plist
 
