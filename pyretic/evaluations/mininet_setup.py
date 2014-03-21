@@ -5,19 +5,26 @@ from mininet.log import setLogLevel
 from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
 from extratopos import *
-import subprocess, shlex, time, signal
+import subprocess, shlex, time, signal, os, sys
 from threading import Timer
 
 def mn_cleanup():
     subprocess.call("sudo mn -c", shell=True)
 
-def pyretic_controller(test, testwise_params, c_out, c_err):
+def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
+    # Hackety hack. I don't know of any other way to supply the PYTHONPATH
+    # variable for the pyretic controller!
+    py_env = os.environ.copy()
+    if not "PYTHONPATH" in py_env:
+        py_env["PYTHONPATH"] = pythonpath
+
     cmd = ("pyretic.py -m p0 pyretic.evaluations.eval_path --test=" + test +
            reduce(lambda r, k: r + ("--" + k + "=" + testwise_params[k] + " "),
                   testwise_params.keys(), " "))
-    c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile)
+    c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
+                         env=py_env)
     return c
 
 def finish_up(ctlr, tshark, net):
@@ -127,11 +134,14 @@ def query_test():
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"
 
+    # Hack to set pythonpath.
+    pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
+
     # Actual experiment setup.
     mn_cleanup()
 
     print "Start pyretic controller"
-    ctlr = pyretic_controller(test, testwise_params, c_out, c_err)
+    ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
 
     print "Setting up topology"
     topo = setup_cycle_topo(num_hosts)
