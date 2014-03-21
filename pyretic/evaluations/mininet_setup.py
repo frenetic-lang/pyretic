@@ -15,7 +15,7 @@ def pyretic_controller(test, testwise_params, c_out, c_err):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
     cmd = ("pyretic.py -m p0 pyretic.evaluations.eval_path --test=" + test +
-           reduce(lambda k: "--" + k + "=" + testwise_params[k] + " ",
+           reduce(lambda r, k: r + ("--" + k + "=" + testwise_params[k] + " "),
                   testwise_params.keys(), " "))
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile)
     return c
@@ -131,8 +131,7 @@ def query_test():
     mn_cleanup()
 
     print "Start pyretic controller"
-    # ctlr = pyretic_controller(test, testwise_params, c_out, c_err)
-    ctlr = None
+    ctlr = pyretic_controller(test, testwise_params, c_out, c_err)
 
     print "Setting up topology"
     topo = setup_cycle_topo(num_hosts)
@@ -153,8 +152,8 @@ def query_test():
     hosts_src = hosts
     hosts_dst = hosts[1:] + [hosts[0]]
 
-    print "Testing network connectivity"
-    ping_flow_pairs(net, hosts_src, hosts_dst)
+    # print "Testing network connectivity"
+    # ping_flow_pairs(net, hosts_src, hosts_dst)
 
     print "Setting up switch rules"
     wait_switch_rules_installed(switches)
