@@ -30,7 +30,7 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
 def finish_up(ctlr, tshark, switch_stats, net):
     def close_fds(fds, fd_str):
         for fd in fds:
-            close(fd)
+            fd.close()
         print "Closed", fd_str, "file descriptors"
 
     print "--- Cleaning up after experiment ---"
@@ -157,6 +157,7 @@ def measure_total_traffic(total_traffic_prefix, test_duration_sec, slack,
                      + "-eth3 ")
         cmd_once = ("tshark -q " + ints_once + cap_filter_once +
                     "-z io,stat," + str(slack * test_duration_sec))
+        print "command for traffic counted once", cmd_once
         file_once = total_traffic_prefix + '-' + s_index + '-once.txt'
 
         # Traffic that gets counted twice, and needs to be halved before adding
@@ -165,6 +166,7 @@ def measure_total_traffic(total_traffic_prefix, test_duration_sec, slack,
         ints_twice = "-i " + s.name + "-eth1 -i " + s.name + "-eth2 "
         cmd_twice = ("tshark -q " + ints_twice + cap_filter_twice +
                      "-z io,stat," + str(slack * test_duration_sec))
+        print "command for traffic counted twice", cmd_twice
         file_twice = total_traffic_prefix + '-' + s_index + '-twice.txt'
 
         # Collect tshark statistics on separate slices of traffic
