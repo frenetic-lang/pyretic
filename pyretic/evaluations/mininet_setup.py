@@ -29,7 +29,7 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
 
 def finish_up(ctlr, tshark, net):
     print "--- Cleaning up after experiment ---"
-    # kill_process(cltr, "controller")
+    kill_process(ctlr, "controller")
     kill_process(tshark, "tshark")
     net.stop()
 
@@ -127,6 +127,7 @@ def query_test():
     num_hosts = 5
     listen_port = 6634
     test_duration_sec = 30
+    per_flow_bw = "8M"
     overheads_file = "tshark_output.txt"
     slack_time = 5 # slack for stopping stats measurement after experiment done
     test = "tm"
@@ -169,7 +170,7 @@ def query_test():
     wait_switch_rules_installed(switches)
 
     print "Starting iperf tests"
-    run_iperf_test(net, hosts_src, hosts_dst, switches, test_duration_sec, "1M")
+    run_iperf_test(net, hosts_src, hosts_dst, switches, test_duration_sec, per_flow_bw)
 
     print ("Running iperf transfer tests. This may take a while (" +
            str(test_duration_sec) + " seconds)...")
