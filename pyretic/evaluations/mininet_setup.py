@@ -11,6 +11,30 @@ from threading import Timer
 def mn_cleanup():
     subprocess.call("sudo mn -c", shell=True)
 
+def pyretic_controller(test, testwise_params, c_out, c_err):
+    c_outfile = open(c_out, 'w')
+    c_errfile = open(c_err, 'w')
+    cmd = ("pyretic.py -m p0 pyretic.evaluations.eval_path --test=" + test +
+           reduce(lambda k: "--" + k + "=" + testwise_params[k] + " ",
+                  testwise_params.keys(), " "))
+    c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile)
+    return c
+
+def finish_up(ctlr, tshark, net):
+    print "--- Cleaning up after experiment ---"
+    # kill_process(cltr, "controller")
+    kill_process(tshark, "tshark")
+    net.stop()
+
+def get_abort_handler(ctlr, tshark, net):
+    def abort_handler(signum, frame):
+        finish_up(ctlr, tshark, net)
+    return abort_handler
+
+def kill_process(p, process_str):
+    print "Signaling", process_str, "for experiment completion"
+    p.send_signal(signal.SIGINT)
+
 def setup_cycle_topo(num_hosts):
     return CycleTopo(num_hosts, num_hosts)
 
@@ -90,10 +114,6 @@ def set_up_overhead_statistics(overheads_file, test_duration_sec, slack):
     print "Started tshark process"
     return p
 
-def kill_overhead_statistics(p):
-    print "Signaling tshark for experiment completion"
-    p.send_signal(signal.SIGINT)
-
 def query_test():
     """ Main """
     # Configuring the experiment.
@@ -102,15 +122,30 @@ def query_test():
     test_duration_sec = 30
     overheads_file = "tshark_output.txt"
     slack_time = 5 # slack for stopping stats measurement after experiment done
+    test = "tm"
+    testwise_params = {'n': '5'}
+    c_out = "pyretic-stdout.txt"
+    c_err = "pyretic-stderr.txt"
 
     # Actual experiment setup.
     mn_cleanup()
+
+    print "Start pyretic controller"
+    # ctlr = pyretic_controller(test, testwise_params, c_out, c_err)
+    ctlr = None
 
     print "Setting up topology"
     topo = setup_cycle_topo(num_hosts)
     net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
                   listenPort=listen_port)
     net.start()
+
+    print "Setting up overhead statistics measurements"
+    tshark = set_up_overhead_statistics(overheads_file, test_duration_sec,
+                                        slack_time)
+
+    print "Setting up signal handler for experiment abort"
+    signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, net))
 
     print "Setting up workload configuration"
     hosts = get_hosts(net, num_hosts)
@@ -124,9 +159,6 @@ def query_test():
     print "Setting up switch rules"
     wait_switch_rules_installed(switches)
 
-    print "Setting up overhead statistics measurements"
-    p = set_up_overhead_statistics(overheads_file, test_duration_sec, slack_time)
-
     print "Starting iperf tests"
     run_iperf_test(net, hosts_src, hosts_dst, switches, test_duration_sec, "1M")
 
@@ -135,11 +167,9 @@ def query_test():
     time.sleep(test_duration_sec)
     print "Experiment done!"
 
-    kill_overhead_statistics(p)
-
     CLI(net)
 
-    net.stop()
+    finish_up(ctlr, tshark, net)
 
 if __name__ == "__main__":
     setLogLevel('info')
