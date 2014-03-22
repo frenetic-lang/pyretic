@@ -7,6 +7,7 @@ from mininet.cli import CLI
 from extratopos import *
 import subprocess, shlex, time, signal, os, sys
 from threading import Timer
+import argparse
 
 ################################################################################
 #### Test-case-specific functions
@@ -172,6 +173,7 @@ def ping_flow_pairs(net, hosts_src, hosts_dst):
 ################################################################################
 ### Essentials test setup functions on all test cases
 ################################################################################
+
 def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
@@ -312,6 +314,9 @@ def query_test():
                            }
     test = "waypoint"
 
+    # Get test settings
+    args = parseArgs()
+
     # Hack to set pythonpath.
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
 
@@ -408,6 +413,36 @@ def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net):
 def kill_process(p, process_str):
     print "Signaling", process_str, "for experiment completion"
     p.send_signal(signal.SIGINT)
+
+################################################################################
+### Argument parsing
+################################################################################
+
+def parseArgs():
+    parser = argparse.ArgumentParser(description="Run tests for query evaluations")
+    parser.add_argument("--test_duration_sec", type=int,
+                        help="Duration for running data transfers",
+                        default=30)
+    parser.add_argument("-d", "--controller_debug_mode", action="store_true",
+                        help="Run controller separately for debugging")
+
+    parser.add_argument("-t", "--test", default="waypoint",
+                        choices=['tm', 'waypoint'], help="Test case to run")
+
+    # Test-case-specific options
+
+    # traffic matrix
+    parser.add_argument("-n", "--num_hosts", default=5, type=int,
+                        help="Number of hosts")
+
+    # waypoint
+    parser.add_argument("-v", "--violating_frac", default=0.10, type=float,
+                        help="Traffic fraction violating waypoint constraints")
+    parser.add_argument("-b", "--total_bw", type=int, default=1800000,
+                        help="Total traffic injected into the network per sec")
+
+    args = parser.parse_args()
+    return args
 
 ################################################################################
 ### Call to main function
