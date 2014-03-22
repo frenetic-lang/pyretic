@@ -139,7 +139,8 @@ def setup_waypoint_workload(global_params, testwise_params, hosts):
 
     hosts_src = [hosts[0], hosts[2]]
     hosts_dst = [hosts[1], hosts[3]]
-    per_flow_bw = [str(frac*total_bw), str((1-frac)*total_bw)]
+    per_flow_bw = [str(int(frac*total_bw)), str(int((1-frac)*total_bw))]
+    print "Per flow bandwidth assigned:", per_flow_bw
     return (hosts_src, hosts_dst, per_flow_bw)
 
 def setup_waypoint_full_traffic_measurement(global_params,
@@ -226,7 +227,7 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     # start iperf servers
     for dst in hosts_dst:
         dst_server_file = dst.name + '-' + server_prefix
-        dst.cmd("iperf -u -s -p 5002 -i 5 > " + dst_server_file + " &")
+        dst.cmd("iperf -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
@@ -235,7 +236,7 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
         src_client_file = src.name + '-' + client_prefix
         src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
                 hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
-                per_transfer_bandwidth[i] + " > " + src_client_file + "&")
+                per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file + "&")
     print "Client transfers initiated."
 
 def setup_overhead_statistics(overheads_file, test_duration_sec, slack):
@@ -276,7 +277,7 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
             processes.append(subprocess.Popen(shlex.split(cmd),
                                               stdout=out_fds[-1],
                                               stderr=subprocess.STDOUT))
-        return out_fds, processes
+        return processes, out_fds
 
     (cmd_once,  file_once)  = get_tshark_cmd_file(external_ints,  '-once.txt')
     (cmd_twice, file_twice) = get_tshark_cmd_file(internal_ints, '-twice.txt')
@@ -300,7 +301,7 @@ def query_test():
                       'slack_factor' : slack_factor }
 
     # Global parameters not used elsewhere outside this function
-    controller_debug_mode = True
+    controller_debug_mode = False
     overheads_file = "tshark_output.txt"
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"

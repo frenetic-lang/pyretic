@@ -201,7 +201,8 @@ def path_test_waypoint(**kwargs):
     """ A waypoint query that specifies all packets not going through switch 4,
     designated as a 'firewall' switch.
     """
-    p = (atom(ingress_network()) ^ +atom(~match(switch=4)) ^ end_path(identity))
+    p = (atom(ingress_network()) ^ atom(~match(switch=4)) ^
+         atom(~match(switch=4)) ^ end_path(identity))
     p.register_callback(query_callback("waypoint"))
     return [p]
 
