@@ -152,22 +152,20 @@ def measure_total_traffic(total_traffic_prefix, test_duration_sec, slack,
         local_ip = "10.0.0." + s_index
 
         # Traffic that gets counted exactly once into the total traffic
-        cap_filter_once  = "-f 'host " + local_ip + "'"
+        cap_filter_once  = "-f 'host " + local_ip + "' "
         ints_once = ("-i " + s.name + "-eth1 -i " + s.name + "-eth2 -i " + s.name
                      + "-eth3 ")
         cmd_once = ("tshark -q " + ints_once + cap_filter_once +
                     "-z io,stat," + str(slack * test_duration_sec))
-        print "command for traffic counted once", cmd_once
-        file_once = total_traffic_prefix + '-' + s_index + '-once.txt'
+        file_once = s.name + '-' + total_traffic_prefix + '-once.txt'
 
         # Traffic that gets counted twice, and needs to be halved before adding
         # into total traffic volume
-        cap_filter_twice = "-f 'not host " + local_ip + "'"
+        cap_filter_twice = "-f 'not host " + local_ip + "' "
         ints_twice = "-i " + s.name + "-eth1 -i " + s.name + "-eth2 "
         cmd_twice = ("tshark -q " + ints_twice + cap_filter_twice +
                      "-z io,stat," + str(slack * test_duration_sec))
-        print "command for traffic counted twice", cmd_twice
-        file_twice = total_traffic_prefix + '-' + s_index + '-twice.txt'
+        file_twice = s.name + '-' + total_traffic_prefix + '-twice.txt'
 
         # Collect tshark statistics on separate slices of traffic
         out_fds.append(open(file_once, 'w'))
@@ -222,7 +220,7 @@ def query_test():
                                          slack_factor,
                                          switches)
 
-    print "Setting up signal handler for experiment abort"
+    print "Setting up handlers for graceful experiment abort"
     signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, switch_stats, net))
 
     print "Setting up workload configuration"
@@ -243,7 +241,7 @@ def query_test():
     time.sleep(test_duration_sec)
     print "Experiment done!"
 
-    CLI(net)
+    # CLI(net)
 
     finish_up(ctlr, tshark, switch_stats, net)
 
