@@ -9,53 +9,18 @@ import subprocess, shlex, time, signal, os, sys
 from threading import Timer
 
 ################################################################################
-### Cleanup-related functions
-################################################################################
-
-def mn_cleanup():
-    subprocess.call("sudo mn -c", shell=True)
-
-def finish_up(ctlr, tshark, switch_stats, net):
-    def close_fds(fds, fd_str):
-        for fd in fds:
-            fd.close()
-        print "Closed", fd_str, "file descriptors"
-
-    print "--- Cleaning up after experiment ---"
-    # controller
-    ([p], fds) = ctlr
-    kill_process(p, "controller")
-    close_fds(fds, "controller")
-    # overhead statistics tshark
-    ([p], fds) = tshark
-    kill_process(p, "tshark overhead statistics collection")
-    close_fds(fds, "overhead statistics")
-    # switch statistics
-    (procs, fds) = switch_stats
-    for p in procs:
-        kill_process(p, "tshark switch statistics collection")
-    close_fds(fds, "switch statistics")
-    # mininet network
-    net.stop()
-    print "Killed mininet network"
-
-def get_abort_handler(ctlr, tshark, switch_stats, net):
-    def abort_handler(signum, frame):
-        finish_up(ctlr, tshark, switch_stats, net)
-    return abort_handler
-
-def kill_process(p, process_str):
-    print "Signaling", process_str, "for experiment completion"
-    p.send_signal(signal.SIGINT)
-
-################################################################################
 #### Test-case-specific functions
 ################################################################################
 
 # First, common functions which call the test-case-specific functions:
 def setup_network(test, global_params, testwise_params):
+    """ A function that returns a 3-tuple (network, hosts, switches), based on
+    the test case that's being run.
+    """
     if test == "tm":
         return setup_tm_network(global_params, testwise_params)
+    elif test == "waypoint":
+        return setup_waypoint_network(global_params, testwise_params)
     else:
         print "Unknown test case topology!"
         sys.exit(0)
@@ -63,48 +28,60 @@ def setup_network(test, global_params, testwise_params):
 def setup_full_traffic_measurement(test, global_params, testwise_params,
                                    switches):
     if test == "tm":
-        return setup_tm_full_traffic_measurement(global_params, testwise_params,
+        return setup_tm_full_traffic_measurement(global_params,
+                                                 testwise_params,
                                                  switches)
+    elif test == "waypoint":
+        return setup_waypoint_full_traffic_measurement(global_params,
+                                                       testwise_params,
+                                                       switches)
     else:
         print "Unknown test case traffic measurement call!"
         sys.exit(0)
 
 def setup_workload(test, global_params, testwise_params, hosts):
     if test == "tm":
-        return setup_tm_workload(hosts)
+        return setup_tm_workload(global_params, testwise_params, hosts)
+    elif test == "waypoint":
+        return setup_waypoint_workload(global_params, testwise_params, hosts)
     else:
         print "Unknown test case for workload setup!"
         sys.exit(0)
 
-# 1. Traffic-matrix-specific setup functions
+### Helper functions for getting hosts and switches from a network
+def get_hosts(net, num_hosts):
+    """ Get a list of host objects from the network object """
+    hosts = []
+    for i in range(1, num_hosts+1):
+        hosts.append(net.getNodeByName('h' + str(i)))
+    return hosts
+
+def get_switches(net, num_switches):
+    switches = []
+    for i in range(1, num_switches+1):
+        switches.append(net.getNodeByName('s' + str(i)))
+    return switches
+
+def get_default_net_hosts_switches(topo, listen_port, num_hosts, num_switches):
+    net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
+                  listenPort=listen_port)
+    net.start()
+    hosts = get_hosts(net, num_hosts)
+    switches = get_switches(net, num_switches)
+    return (net, hosts, switches)
+
+### Test 1: traffic matrix
 def setup_tm_network(global_params, testwise_params):
     """ Set up a cycle topology of num_hosts. """
-    def get_hosts(net, num_hosts):
-        """ Get a list of host objects from the network object """
-        hosts = []
-        for i in range(1, num_hosts+1):
-            hosts.append(net.getNodeByName('h' + str(i)))
-        return hosts
-
-    def get_switches(net, num_switches):
-        switches = []
-        for i in range(1, num_switches+1):
-            switches.append(net.getNodeByName('s' + str(i)))
-        return switches
-
     assert 'n' in testwise_params
     assert 'listen_port' in global_params
     num_hosts = int(testwise_params['n'])
     listen_port = int(global_params['listen_port'])
     topo = CycleTopo(num_hosts, num_hosts)
-    net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
-                  listenPort=listen_port)
-    net.start()
-    hosts = get_hosts(net, num_hosts)
-    switches = get_switches(net, num_hosts)
-    return (net, hosts, switches)
+    return get_default_net_hosts_switches(topo, listen_port, num_hosts,
+                                          num_hosts)
 
-def setup_tm_workload(hosts):
+def setup_tm_workload(global_params, testwise_params, hosts):
     hosts_src = hosts
     hosts_dst = hosts[1:] + [hosts[0]]
     per_flow_bw = ["8M"] * len(hosts)
@@ -149,6 +126,50 @@ def setup_tm_full_traffic_measurement(global_params, testwise_params, switches):
                                           stdout=out_fds[-1],
                                           stderr=subprocess.STDOUT))
     return (processes, out_fds)
+
+### Test 2. Detecting violations of waypoint constraints
+class WaypointTopo(Topo):
+    """ A simple topology to check waypoint specifications in the routing."""
+    def __init__(self):
+        Topo.__init__(self)
+        # Switches
+        for i in range(1,5):
+            self.addSwitch('s' + str(i))
+        self.addLink('s1', 's2')
+        self.addLink('s2', 's3')
+        self.addLink('s3', 's4')
+        self.addLink('s4', 's1')
+        # Hosts.
+        for i in range(1,5):
+            self.addHost('h' + str(i))
+        self.addLink('h1', 's1')
+        self.addLink('h2', 's3')
+        self.addLink('h3', 's1')
+        self.addLink('h4', 's3')
+
+def setup_waypoint_network(global_params, testwise_params):
+    assert 'listen_port' in global_params
+    listen_port = global_params['listen_port']
+    topo = WaypointTopo()
+    return get_default_net_hosts_switches(topo, listen_port, 4, 4)
+
+def setup_waypoint_workload(global_params, testwise_params, hosts):
+    assert 'violating_frac' in testwise_params
+    frac = float(testwise_params['violating_frac'])
+
+    total_bw = 18000 # 18 Kilobits per second
+    if 'total_bw' in testwise_params:
+        total_bw = testwise_params['total_bw']
+
+    hosts_src = [hosts[0], hosts[2]]
+    hosts_dst = [hosts[1], hosts[3]]
+    per_flow_bw = [str(frac*total_bw), str((1-frac)*total_bw)]
+    return (hosts_src, hosts_dst, per_flow_bw)
+
+def setup_waypoint_full_traffic_measurement(global_params,
+                                            testwise_params,
+                                            switches):
+    print "Work to do here, still."
 
 ################################################################################
 #### Diagnostics
@@ -262,8 +283,9 @@ def query_test():
     iperf_server_prefix = "server-udp.txt"
 
     # Specification of testwise parameters (in code, for now)
-    full_testwise_params = { "tm" : {'n': '5'} }
-    test = "tm"
+    full_testwise_params = { "tm" : {'n': '5'},
+                             "waypoint": {'violating_frac': '0.10' } }
+    test = "waypoint"
 
     # Hack to set pythonpath.
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
@@ -317,3 +339,43 @@ def query_test():
 if __name__ == "__main__":
     setLogLevel('info')
     query_test()
+
+################################################################################
+### Cleanup-related functions
+################################################################################
+
+def mn_cleanup():
+    subprocess.call("sudo mn -c", shell=True)
+
+def finish_up(ctlr, tshark, switch_stats, net):
+    def close_fds(fds, fd_str):
+        for fd in fds:
+            fd.close()
+        print "Closed", fd_str, "file descriptors"
+
+    print "--- Cleaning up after experiment ---"
+    # controller
+    ([p], fds) = ctlr
+    kill_process(p, "controller")
+    close_fds(fds, "controller")
+    # overhead statistics tshark
+    ([p], fds) = tshark
+    kill_process(p, "tshark overhead statistics collection")
+    close_fds(fds, "overhead statistics")
+    # switch statistics
+    (procs, fds) = switch_stats
+    for p in procs:
+        kill_process(p, "tshark switch statistics collection")
+    close_fds(fds, "switch statistics")
+    # mininet network
+    net.stop()
+    print "Killed mininet network"
+
+def get_abort_handler(ctlr, tshark, switch_stats, net):
+    def abort_handler(signum, frame):
+        finish_up(ctlr, tshark, switch_stats, net)
+    return abort_handler
+
+def kill_process(p, process_str):
+    print "Signaling", process_str, "for experiment completion"
+    p.send_signal(signal.SIGINT)

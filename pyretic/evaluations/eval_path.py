@@ -145,7 +145,7 @@ def path_test_tm(**kwargs):
             return default_timeout_value
 
     def get_duration(args):
-        if 'poll_duration' in args:
+        if 'test_duration' in args:
             return int(args['test_duration'])
         else:
             return default_poll_duration
@@ -173,12 +173,46 @@ def tm_fwding(**kwargs):
     n = int(kwargs['n'])
     return cycle_forwarding_policy(n)
 
+## Test: Waypoint forwarding
+def waypoint_fwding(**kwargs):
+    h1 = IP('10.0.0.1')
+    h2 = IP('10.0.0.2')
+    h3 = IP('10.0.0.3')
+    h4 = IP('10.0.0.4')
+    policy = ((match(dstip=h1) >> ((match(switch=1) >> fwd(3)) +
+                                   (match(switch=2) >> fwd(1)) +
+                                   (match(switch=3) >> fwd(1)) +
+                                   (match(switch=4) >> fwd(2)))) +
+              (match(dstip=h2) >> ((match(switch=1) >> fwd(1)) +
+                                   (match(switch=2) >> fwd(2)) +
+                                   (match(switch=3) >> fwd(3)) +
+                                   (match(switch=4) >> fwd(1)))) +
+              (match(dstip=h3) >> ((match(switch=1) >> fwd(4)) +
+                                   (match(switch=2) >> fwd(1)) +
+                                   (match(switch=3) >> fwd(2)) +
+                                   (match(switch=4) >> fwd(2)))) +
+              (match(dstip=h4) >> ((match(switch=1) >> fwd(2)) +
+                                   (match(switch=2) >> fwd(2)) +
+                                   (match(switch=3) >> fwd(4)) +
+                                   (match(switch=4) >> fwd(1)))))
+    return policy
+
+def path_test_waypoint(**kwargs):
+    """ A waypoint query that specifies all packets not going through switch 4,
+    designated as a 'firewall' switch.
+    """
+    p = (atom(ingress_network()) ^ +atom(~match(switch=4)) ^ end_path(identity))
+    p.register_callback(query_callback("waypoint"))
+    return [p]
+
 # List of tests, to be used with the --test= parameter.
 test_mains = {'loops': loop_fwding,
-              'tm': tm_fwding }
+              'tm': tm_fwding,
+              'waypoint': waypoint_fwding }
 
 test_path_mains = {'loops': path_test_loop,
-                   'tm': path_test_tm }
+                   'tm': path_test_tm,
+                   'waypoint': path_test_waypoint }
 
 def test_setup(test_dict, default_test, **kwargs):
     params = dict(**kwargs)
