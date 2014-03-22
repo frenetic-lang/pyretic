@@ -132,10 +132,8 @@ def setup_waypoint_network(global_params, testwise_params):
 def setup_waypoint_workload(global_params, testwise_params, hosts):
     assert 'violating_frac' in testwise_params
     frac = float(testwise_params['violating_frac'])
-
-    total_bw = 1800000 # 1.8 Megabits per second
-    if 'total_bw' in testwise_params:
-        total_bw = testwise_params['total_bw']
+    assert 'total_bw' in testwise_params
+    total_bw = int(testwise_params['total_bw'])
 
     hosts_src = [hosts[0], hosts[2]]
     hosts_dst = [hosts[1], hosts[3]]
@@ -309,7 +307,9 @@ def query_test():
 
     # Specification of testwise parameters (in code, for now)
     full_testwise_params = { "tm" : {'n': '5'},
-                             "waypoint": {'violating_frac': '0.10' } }
+                             "waypoint": {'violating_frac': '0.10',
+                                          'total_bw': '1800000' }
+                           }
     test = "waypoint"
 
     # Hack to set pythonpath.
