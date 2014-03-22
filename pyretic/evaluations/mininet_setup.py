@@ -186,7 +186,7 @@ def query_test():
     test_duration_sec = 30
     per_flow_bw = "8M"
     overheads_file = "tshark_output.txt"
-    slack_factor = 2 # slack for stopping stats measurement after experiment done
+    slack_factor = 5 # slack for ensuring tshark statistics fall into one interval
     test = "tm"
     testwise_params = {'n': str(num_hosts)}
     c_out = "pyretic-stdout.txt"
