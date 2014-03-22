@@ -133,14 +133,13 @@ def setup_waypoint_workload(global_params, testwise_params, hosts):
     assert 'violating_frac' in testwise_params
     frac = float(testwise_params['violating_frac'])
 
-    total_bw = 18000 # 18 Kilobits per second
+    total_bw = 1800000 # 1.8 Megabits per second
     if 'total_bw' in testwise_params:
         total_bw = testwise_params['total_bw']
 
     hosts_src = [hosts[0], hosts[2]]
     hosts_dst = [hosts[1], hosts[3]]
     per_flow_bw = [str(int(frac*total_bw)), str(int((1-frac)*total_bw))]
-    print "Per flow bandwidth assigned:", per_flow_bw
     return (hosts_src, hosts_dst, per_flow_bw)
 
 def setup_waypoint_full_traffic_measurement(global_params,
