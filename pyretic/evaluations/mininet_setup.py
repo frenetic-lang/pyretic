@@ -276,6 +276,7 @@ def query_test():
                       'slack_factor' : slack_factor }
 
     # Global parameters not used elsewhere outside this function
+    controller_debug_mode = True
     overheads_file = "tshark_output.txt"
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"
@@ -295,8 +296,14 @@ def query_test():
 
     testwise_params = full_testwise_params[test]
 
-    print "Start pyretic controller"
-    ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
+    ctlr = None
+    if controller_debug_mode:
+        print "**** In controller debugging mode. You MUST start the controller"
+        print "separately, in order for switch rules to be installed and the"
+        print "test to progress."
+    else:
+        print "Starting pyretic controller"
+        ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
 
     print "Setting up topology"
     (net, hosts, switches) = setup_network(test, global_params, testwise_params)
@@ -310,8 +317,8 @@ def query_test():
                                                   testwise_params, switches)
 
     print "Setting up handlers for graceful experiment abort"
-    signal.signal(signal.SIGINT, get_abort_handler(ctlr, tshark, switch_stats,
-                                                   net))
+    signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
+                                                   tshark, switch_stats, net))
 
     print "Setting up workload configuration"
     (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, global_params,
@@ -332,9 +339,11 @@ def query_test():
     time.sleep(test_duration_sec)
     print "Experiment done!"
 
-    # CLI(net)
+    finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
 
-    finish_up(ctlr, tshark, switch_stats, net)
+    if controller_debug_mode:
+        CLI(net)
+        net.stop()
 
 if __name__ == "__main__":
     setLogLevel('info')
@@ -347,7 +356,7 @@ if __name__ == "__main__":
 def mn_cleanup():
     subprocess.call("sudo mn -c", shell=True)
 
-def finish_up(ctlr, tshark, switch_stats, net):
+def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
     def close_fds(fds, fd_str):
         for fd in fds:
             fd.close()
@@ -355,9 +364,10 @@ def finish_up(ctlr, tshark, switch_stats, net):
 
     print "--- Cleaning up after experiment ---"
     # controller
-    ([p], fds) = ctlr
-    kill_process(p, "controller")
-    close_fds(fds, "controller")
+    if not controller_debug_mode:
+        ([p], fds) = ctlr
+        kill_process(p, "controller")
+        close_fds(fds, "controller")
     # overhead statistics tshark
     ([p], fds) = tshark
     kill_process(p, "tshark overhead statistics collection")
@@ -368,12 +378,13 @@ def finish_up(ctlr, tshark, switch_stats, net):
         kill_process(p, "tshark switch statistics collection")
     close_fds(fds, "switch statistics")
     # mininet network
-    net.stop()
-    print "Killed mininet network"
+    if not controller_debug_mode:
+        net.stop()
+        print "Killed mininet network"
 
-def get_abort_handler(ctlr, tshark, switch_stats, net):
+def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net):
     def abort_handler(signum, frame):
-        finish_up(ctlr, tshark, switch_stats, net)
+        finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
     return abort_handler
 
 def kill_process(p, process_str):
