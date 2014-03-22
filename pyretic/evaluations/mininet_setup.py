@@ -94,38 +94,14 @@ def setup_tm_full_traffic_measurement(global_params, testwise_params, switches):
     total_traffic_prefix = global_params['total_traffic_prefix']
     test_duration_sec = global_params['test_duration_sec']
     slack = global_params['slack_factor']
-    out_fds = []
-    processes = []
-    for s in switches:
-        s_index = s.name[1:]
-        local_ip = "10.0.0." + s_index
-
-        # Traffic that gets counted exactly once into the total traffic
-        cap_filter_once  = "-f 'host " + local_ip + "' "
-        ints_once = ("-i " + s.name + "-eth1 -i " + s.name + "-eth2 -i " + s.name
-                     + "-eth3 ")
-        cmd_once = ("tshark -q " + ints_once + cap_filter_once +
-                    "-z io,stat," + str(slack * test_duration_sec))
-        file_once = s.name + '-' + total_traffic_prefix + '-once.txt'
-
-        # Traffic that gets counted twice, and needs to be halved before adding
-        # into total traffic volume
-        cap_filter_twice = "-f 'not host " + local_ip + "' "
-        ints_twice = "-i " + s.name + "-eth1 -i " + s.name + "-eth2 "
-        cmd_twice = ("tshark -q " + ints_twice + cap_filter_twice +
-                     "-z io,stat," + str(slack * test_duration_sec))
-        file_twice = s.name + '-' + total_traffic_prefix + '-twice.txt'
-
-        # Collect tshark statistics on separate slices of traffic
-        out_fds.append(open(file_once, 'w'))
-        processes.append(subprocess.Popen(shlex.split(cmd_once),
-                                          stdout=out_fds[-1],
-                                          stderr=subprocess.STDOUT))
-        out_fds.append(open(file_twice, 'w'))
-        processes.append(subprocess.Popen(shlex.split(cmd_twice),
-                                          stdout=out_fds[-1],
-                                          stderr=subprocess.STDOUT))
-    return (processes, out_fds)
+    # setup internal and external interfaces
+    internal_ints = reduce(lambda r, sw: r + [sw.name + '-eth1',
+                                              sw.name + '-eth2'],
+                           switches, [])
+    external_ints = reduce(lambda r, sw: r + [sw.name + '-eth3'], switches, [])
+    return run_tshark_full_traffic_measurement(internal_ints, external_ints,
+                                               test_duration_sec,
+                                               total_traffic_prefix, slack)
 
 ### Test 2. Detecting violations of waypoint constraints
 class WaypointTopo(Topo):
@@ -169,7 +145,19 @@ def setup_waypoint_workload(global_params, testwise_params, hosts):
 def setup_waypoint_full_traffic_measurement(global_params,
                                             testwise_params,
                                             switches):
-    print "Work to do here, still."
+    total_traffic_prefix = global_params['total_traffic_prefix']
+    test_duration_sec = global_params['test_duration_sec']
+    slack = global_params['slack_factor']
+    # setup internal and external interfaces
+    internal_ints = reduce(lambda r, sw: r + [sw.name + '-eth1',
+                                              sw.name + '-eth2'],
+                           switches, [])
+    external_ints = reduce(lambda r, sw: r + [sw.name + '-eth3',
+                                              sw.name + '-eth4'],
+                           [switches[0], switches[2]], [])
+    return run_tshark_full_traffic_measurement(internal_ints, external_ints,
+                                               test_duration_sec,
+                                               total_traffic_prefix, slack)
 
 ################################################################################
 #### Diagnostics
@@ -258,6 +246,42 @@ def setup_overhead_statistics(overheads_file, test_duration_sec, slack):
     print "Started tshark process"
     return ([p], [f])
 
+def run_tshark_full_traffic_measurement(internal_ints, external_ints,
+                                        test_duration_sec, total_traffic_prefix,
+                                        slack):
+    """Given a list of "internal" and "external"-facing interfaces in the
+    network, set up tshark captures to count the number of total packets on all
+    the links in the network (separate traffic counted once and twice for later
+    merging). This function is generic across test cases.
+    """
+    def get_interfaces(intr_list):
+        """ Get tshark interface argument for a switch sw, whose interfaces in
+        interface_list must be captured. """
+        return reduce(lambda r, intr: r + "-i " + intr + " ", intr_list, ' ')
+
+    def get_tshark_cmd_file(interfaces, file_suffix):
+        cmd = ("tshark -q " + get_interfaces(interfaces) +
+               " -z io,stat," + str(slack * test_duration_sec))
+        fname = total_traffic_prefix + file_suffix
+        return (cmd, fname)
+
+    def get_fds_processes(cmds, files):
+        out_fds = []
+        processes = []
+        assert len(cmds) == len(files)
+        for i in range(0, len(cmds)):
+            f = files[i]
+            cmd = cmds[i]
+            out_fds.append(open(f, 'w'))
+            processes.append(subprocess.Popen(shlex.split(cmd),
+                                              stdout=out_fds[-1],
+                                              stderr=subprocess.STDOUT))
+        return out_fds, processes
+
+    (cmd_once,  file_once)  = get_tshark_cmd_file(external_ints,  '-once.txt')
+    (cmd_twice, file_twice) = get_tshark_cmd_file(internal_ints, '-twice.txt')
+    return get_fds_processes([cmd_once, cmd_twice], [file_once, file_twice])
+
 ################################################################################
 ### The main function.
 ################################################################################
@@ -297,11 +321,7 @@ def query_test():
     testwise_params = full_testwise_params[test]
 
     ctlr = None
-    if controller_debug_mode:
-        print "**** In controller debugging mode. You MUST start the controller"
-        print "separately, in order for switch rules to be installed and the"
-        print "test to progress."
-    else:
+    if not controller_debug_mode:
         print "Starting pyretic controller"
         ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
 
@@ -325,6 +345,8 @@ def query_test():
                                                          testwise_params, hosts)
 
     print "Setting up switch rules"
+    if controller_debug_mode:
+        print "*** YOU must start the controller separately for this to work!"
     wait_switch_rules_installed(switches)
 
     # print "Testing network connectivity"
@@ -344,10 +366,6 @@ def query_test():
     if controller_debug_mode:
         CLI(net)
         net.stop()
-
-if __name__ == "__main__":
-    setLogLevel('info')
-    query_test()
 
 ################################################################################
 ### Cleanup-related functions
@@ -390,3 +408,10 @@ def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net):
 def kill_process(p, process_str):
     print "Signaling", process_str, "for experiment completion"
     p.send_signal(signal.SIGINT)
+
+################################################################################
+### Call to main function
+################################################################################
+if __name__ == "__main__":
+    setLogLevel('info')
+    query_test()
