@@ -14,37 +14,32 @@ import argparse
 ################################################################################
 
 # First, common functions which call the test-case-specific functions:
-def setup_network(test, global_params, testwise_params):
+def setup_network(test, params):
     """ A function that returns a 3-tuple (network, hosts, switches), based on
     the test case that's being run.
     """
     if test == "tm":
-        return setup_tm_network(global_params, testwise_params)
+        return setup_tm_network(params)
     elif test == "waypoint":
-        return setup_waypoint_network(global_params, testwise_params)
+        return setup_waypoint_network(params)
     else:
         print "Unknown test case topology!"
         sys.exit(0)
 
-def setup_full_traffic_measurement(test, global_params, testwise_params,
-                                   switches):
+def setup_full_traffic_measurement(test, params, switches):
     if test == "tm":
-        return setup_tm_full_traffic_measurement(global_params,
-                                                 testwise_params,
-                                                 switches)
+        return setup_tm_full_traffic_measurement(params, switches)
     elif test == "waypoint":
-        return setup_waypoint_full_traffic_measurement(global_params,
-                                                       testwise_params,
-                                                       switches)
+        return setup_waypoint_full_traffic_measurement(params, switches)
     else:
         print "Unknown test case traffic measurement call!"
         sys.exit(0)
 
-def setup_workload(test, global_params, testwise_params, hosts):
+def setup_workload(test, params, hosts):
     if test == "tm":
-        return setup_tm_workload(global_params, testwise_params, hosts)
+        return setup_tm_workload(params, hosts)
     elif test == "waypoint":
-        return setup_waypoint_workload(global_params, testwise_params, hosts)
+        return setup_waypoint_workload(params, hosts)
     else:
         print "Unknown test case for workload setup!"
         sys.exit(0)
@@ -72,29 +67,27 @@ def get_default_net_hosts_switches(topo, listen_port, num_hosts, num_switches):
     return (net, hosts, switches)
 
 ### Test 1: traffic matrix
-def setup_tm_network(global_params, testwise_params):
+def setup_tm_network(params):
     """ Set up a cycle topology of num_hosts. """
-    assert 'n' in testwise_params
-    assert 'listen_port' in global_params
-    num_hosts = int(testwise_params['n'])
-    listen_port = int(global_params['listen_port'])
+    num_hosts = params.num_hosts
+    listen_port = params.listen_port
     topo = CycleTopo(num_hosts, num_hosts)
     return get_default_net_hosts_switches(topo, listen_port, num_hosts,
                                           num_hosts)
 
-def setup_tm_workload(global_params, testwise_params, hosts):
+def setup_tm_workload(params, hosts):
     hosts_src = hosts
     hosts_dst = hosts[1:] + [hosts[0]]
     per_flow_bw = ["8M"] * len(hosts)
     return (hosts_src, hosts_dst, per_flow_bw)
 
-def setup_tm_full_traffic_measurement(global_params, testwise_params, switches):
+def setup_tm_full_traffic_measurement(params, switches):
     """ Setup tshark collectors and statistics for the 'total' traffic in the
     network.
     """
-    total_traffic_prefix = global_params['total_traffic_prefix']
-    test_duration_sec = global_params['test_duration_sec']
-    slack = global_params['slack_factor']
+    total_traffic_prefix = params.total_traffic_prefix
+    test_duration_sec = params.test_duration_sec
+    slack = params.slack_factor
     # setup internal and external interfaces
     internal_ints = reduce(lambda r, sw: r + [sw.name + '-eth1',
                                               sw.name + '-eth2'],
@@ -124,29 +117,25 @@ class WaypointTopo(Topo):
         self.addLink('h3', 's1')
         self.addLink('h4', 's3')
 
-def setup_waypoint_network(global_params, testwise_params):
-    assert 'listen_port' in global_params
-    listen_port = global_params['listen_port']
+def setup_waypoint_network(params):
+    listen_port = params.listen_port
     topo = WaypointTopo()
     return get_default_net_hosts_switches(topo, listen_port, 4, 4)
 
-def setup_waypoint_workload(global_params, testwise_params, hosts):
-    assert 'violating_frac' in testwise_params
-    frac = float(testwise_params['violating_frac'])
-    assert 'total_bw' in testwise_params
-    total_bw = int(testwise_params['total_bw'])
+def setup_waypoint_workload(params, hosts):
+    frac = params.violating_frac
+    total_bw = params.total_bw
 
     hosts_src = [hosts[0], hosts[2]]
     hosts_dst = [hosts[1], hosts[3]]
     per_flow_bw = [str(int(frac*total_bw)), str(int((1-frac)*total_bw))]
     return (hosts_src, hosts_dst, per_flow_bw)
 
-def setup_waypoint_full_traffic_measurement(global_params,
-                                            testwise_params,
+def setup_waypoint_full_traffic_measurement(params,
                                             switches):
-    total_traffic_prefix = global_params['total_traffic_prefix']
-    test_duration_sec = global_params['test_duration_sec']
-    slack = global_params['slack_factor']
+    total_traffic_prefix = params.total_traffic_prefix
+    test_duration_sec = params.test_duration_sec
+    slack = params.slack_factor
     # setup internal and external interfaces
     internal_ints = reduce(lambda r, sw: r + [sw.name + '-eth1',
                                               sw.name + '-eth2'],
@@ -289,33 +278,25 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
 def query_test():
     """ Main """
     # Configuring the experiment.
+    args = parseArgs()
+
     # Global parameters used by specific tests as well
-    listen_port = 6634
-    test_duration_sec = 30
-    slack_factor = 5 # slack for ensuring tshark statistics fall into one interval
-    total_traffic_prefix = "total-traffic"
-    global_params = { 'listen_port' : listen_port,
-                      'test_duration_sec': test_duration_sec,
-                      'total_traffic_prefix': total_traffic_prefix,
-                      'slack_factor' : slack_factor }
+    listen_port = args.listen_port
+    test_duration_sec = args.test_duration_sec
+    slack_factor = args.slack_factor
+    total_traffic_prefix = args.total_traffic_prefix
+    controller_debug_mode = args.controller_debug_mode
+    test = args.test
 
     # Global parameters not used elsewhere outside this function
-    controller_debug_mode = False
     overheads_file = "tshark_output.txt"
     c_out = "pyretic-stdout.txt"
     c_err = "pyretic-stderr.txt"
     iperf_client_prefix = "client-udp.txt"
     iperf_server_prefix = "server-udp.txt"
 
-    # Specification of testwise parameters (in code, for now)
-    full_testwise_params = { "tm" : {'n': '5'},
-                             "waypoint": {'violating_frac': '0.10',
-                                          'total_bw': '1800000' }
-                           }
-    test = "waypoint"
-
-    # Get test settings
-    args = parseArgs()
+    # Explicit spelling-out of testwise parameters for pyretic controller
+    testwise_params = get_testwise_params(test, args)
 
     # Hack to set pythonpath.
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
@@ -323,31 +304,27 @@ def query_test():
     # Actual experiment setup.
     mn_cleanup()
 
-    testwise_params = full_testwise_params[test]
-
     ctlr = None
     if not controller_debug_mode:
         print "Starting pyretic controller"
         ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
 
     print "Setting up topology"
-    (net, hosts, switches) = setup_network(test, global_params, testwise_params)
+    (net, hosts, switches) = setup_network(test, params)
 
     print "Setting up overhead statistics measurements"
     tshark = setup_overhead_statistics(overheads_file, test_duration_sec,
                                        slack_factor)
 
     print "Setting up collectors for total traffic"
-    switch_stats = setup_full_traffic_measurement(test, global_params,
-                                                  testwise_params, switches)
+    switch_stats = setup_full_traffic_measurement(test, params, switches)
 
     print "Setting up handlers for graceful experiment abort"
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
                                                    tshark, switch_stats, net))
 
     print "Setting up workload configuration"
-    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, global_params,
-                                                         testwise_params, hosts)
+    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, params, hosts)
 
     print "Setting up switch rules"
     if controller_debug_mode:
@@ -428,6 +405,12 @@ def parseArgs():
 
     parser.add_argument("-t", "--test", default="waypoint",
                         choices=['tm', 'waypoint'], help="Test case to run")
+    parser.add_argument("-l", "--listen_port", default=6634, type=int,
+                        help="Starting port for OVS switches to listen on")
+    parser.add_argument("--total_traffic_prefix", default="total-traffic",
+                        help="Naming prefix for total traffic measurement")
+    parser.add_argument("--slack_factor", default=5.0, type=float,
+                        help="Slack multiple of duration for tshark interval")
 
     # Test-case-specific options
 
@@ -443,6 +426,18 @@ def parseArgs():
 
     args = parser.parse_args()
     return args
+
+def get_testwise_params(test, args):
+    params = {}
+    if test == "tm":
+        params['n'] = str(args.num_hosts)
+    elif test == "waypoint":
+        params['violating_frac'] = str(args.violating_frac)
+        params['total_bw'] = str(args.total_bw)
+    else:
+        print "Error! Requesting test-wise-args for unknown test", test
+        sys.exit(1)
+    return params
 
 ################################################################################
 ### Call to main function
