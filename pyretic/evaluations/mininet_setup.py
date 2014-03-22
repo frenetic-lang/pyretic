@@ -310,21 +310,21 @@ def query_test():
         ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
 
     print "Setting up topology"
-    (net, hosts, switches) = setup_network(test, params)
+    (net, hosts, switches) = setup_network(test, args)
 
     print "Setting up overhead statistics measurements"
     tshark = setup_overhead_statistics(overheads_file, test_duration_sec,
                                        slack_factor)
 
     print "Setting up collectors for total traffic"
-    switch_stats = setup_full_traffic_measurement(test, params, switches)
+    switch_stats = setup_full_traffic_measurement(test, args, switches)
 
     print "Setting up handlers for graceful experiment abort"
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
                                                    tshark, switch_stats, net))
 
     print "Setting up workload configuration"
-    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, params, hosts)
+    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, args, hosts)
 
     print "Setting up switch rules"
     if controller_debug_mode:
