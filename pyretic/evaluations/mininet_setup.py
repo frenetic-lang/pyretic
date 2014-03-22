@@ -187,7 +187,7 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
         src_client_file = src.name + "-client-udp.txt"
         src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
                 hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
-                per_transfer_bandwidth + " > " + src_client_file + "&")
+                per_transfer_bandwidth[i] + " > " + src_client_file + "&")
     print "Client transfers initiated."
 
 def set_up_overhead_statistics(overheads_file, test_duration_sec, slack):
@@ -208,7 +208,7 @@ def query_test():
     num_hosts = 5
     listen_port = 6634
     test_duration_sec = 30
-    per_flow_bw = "8M"
+    per_flow_bw = ["8M"] * num_hosts
     overheads_file = "tshark_output.txt"
     slack_factor = 5 # slack for ensuring tshark statistics fall into one interval
     test = "tm"
