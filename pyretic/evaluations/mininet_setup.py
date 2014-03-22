@@ -116,7 +116,7 @@ def setup_tm_full_traffic_measurement(global_params, testwise_params, switches):
     """
     total_traffic_prefix = global_params['total_traffic_prefix']
     test_duration_sec = global_params['test_duration_sec']
-    slack_factor = global_params['slack_factor']
+    slack = global_params['slack_factor']
     out_fds = []
     processes = []
     for s in switches:
