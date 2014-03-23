@@ -230,7 +230,13 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
                     per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
                     "&")
         else:
-            print "Ignoring transfer", src, '--->', hosts_dst[i], ": zero b/w"
+            print ("Setting transfer", src, '--->', hosts_dst[i], "to very low"
+                   + "bandwidth, because the target input bandwidth is zero.")
+            transfer_bandwidth = "1.5K"
+            src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
+                    hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
+                    transfer_bandwidth + " 2>&1 > " + src_client_file +
+                    "&")
     print "Client transfers initiated."
 
 def setup_overhead_statistics(overheads_file, test_duration_sec, slack):

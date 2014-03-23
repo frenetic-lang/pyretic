@@ -27,8 +27,8 @@ def sweep_waypoint_fractions():
 
     # Fix details of the sweep first (as it's used in multiple stages)
     frac_list = []
-    for index in range(0,6):
-        frac_list.append(str(0.20 * index))
+    for index in range(0,11):
+        frac_list.append(str(0.10 * index))
 
     # Run mininet tests
     if not args.no_mininet:
