@@ -904,13 +904,9 @@ class dfa_utils:
         :param filename: name of file to be written into
         :type filename: str
         """
-        try:
-            f = open(filename, 'w')
-            f.write(string)
-            f.close()
-        except:
-            print error
-            print "There was an error in writing the input to file!"
+        f = open(filename, 'w')
+        f.write(string)
+        f.close()
 
     @classmethod
     def run_ml_ulex(cls, inp_file):
