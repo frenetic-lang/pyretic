@@ -4,9 +4,9 @@ import subprocess, shlex, os, sys, argparse, string
 ### Parameter sweep functions
 ################################################################################
 
-def sweep_waypoint_fractions():
-    """ Sweep across fractions of waypoint constraint violating traffic for the
-    "waypoint" test case for mininet_setup.py.
+def sweep(args, runwise_folder_prefix, plot_file_suffix, sweep_list, sweep_str,
+          get_test_params_fun, queried_hosts, generate_graph_fun):
+    """ Generic sweep function used by various sweep test cases.
 
     Generating plots using this script requires installing some additional
     packages in the VM:
@@ -14,49 +14,80 @@ def sweep_waypoint_fractions():
     sudo apt-get install gnuplot-x11 texlive-font-utils
     """
     def get_runwise_folder(frac):
-        return adjust_path("waypoint-" + frac)
+        return adjust_path(runwise_folder_prefix + '-' + frac)
 
-    args = parse_args()
     results_base_folder = args.results_base_folder
+    create_folder_if_not_exists(results_base_folder)
     adjust_path = get_adjust_path(results_base_folder)
     mininet_errfile = adjust_path("mininet_err.txt")
     stats_file = adjust_path("stats.txt")
-    plot_file = adjust_path("frac-vs-overhead.eps")
+    plot_file = adjust_path(plot_file_suffix)
     plot_script = "./pyretic/evaluations/pubplot.py"
     stats = []
 
-    # Fix details of the sweep first (as it's used in multiple stages)
-    frac_list = []
-    for index in range(0,11):
-        frac_list.append(str(0.10 * index))
-
     # Run mininet tests
     if not args.no_mininet:
-        print "***Starting sweep for different waypoint violation fractions..."
-        for frac in frac_list:
-            print "Fraction", frac, "mininet test running ..."
-            folder = get_runwise_folder(frac)
+        print "***Starting sweep for different " + sweep_str + " values..."
+        for value in sweep_list:
+            print sweep_str, value, "mininet test running ..."
+            folder = get_runwise_folder(value)
             create_folder_if_not_exists(folder)
-            run_mininet_test({'test': 'waypoint',
-                              'violating_frac': frac,
-                              'results_folder': folder}, mininet_errfile)
+            run_mininet_test(get_test_params_fun(value, folder), mininet_errfile)
 
     # Extract stats from runs
     if not args.no_stats:
         print "***Getting stats from mininet raw output data..."
-        for frac in frac_list:
-            print "Extracting fraction", frac, "statistics..."
-            folder = get_runwise_folder(frac)
-            single_run_stats = get_single_run_stats(folder, ["h1"])
-            stats.append((frac, single_run_stats))
+        for value in sweep_list:
+            print "Extracting", sweep_str, value, "statistics..."
+            folder = get_runwise_folder(value)
+            single_run_stats = get_single_run_stats(folder, queried_hosts)
+            stats.append((value, single_run_stats))
         write_stats(stats, stats_file)
 
     # Generate plots
     if not args.no_plots:
-        print "***Generating plots for waypoint sweep experiment..."
-        generate_waypoint_graph(stats_file, plot_file, plot_script)
+        print "***Generating plots for", sweep_str, "sweep experiment..."
+        generate_graph_fun(stats_file, plot_file, plot_script)
 
     print "***Done!"
+
+def sweep_waypoint_fractions(args):
+    """ Sweep access-control violating fractions for the "waypoint" test case in
+    mininet_setup.
+    """
+    def mininet_waypoint_test_params(frac, folder):
+        return {'test': 'waypoint',
+                'violating_frac': frac,
+                'results_folder': folder}
+
+    sweep(args,
+          "waypoint",
+          "frac-vs-overhead.eps",
+          map(lambda i: str(0.10 * i), range(0,11)),
+          "waypoint violating fraction",
+          mininet_waypoint_test_params,
+          ["h1"],
+          generate_waypoint_graph)
+
+def sweep_query_periods(args):
+    """ Sweep across different intervals between successive queries for the
+    traffic matrix ("tm") case in mininet_setup.
+    """
+    num_hosts = 5
+    def mininet_tm_test_params(query_period, folder):
+        return {'test': 'tm',
+                'query_period_sec': query_period,
+                'results_folder': folder,
+                'num_hosts': str(num_hosts)}
+
+    sweep(args,
+          "tm",
+          "overhead-vs-period.eps",
+          map(lambda i: str(5 * i), range(0, 6)),
+          "query period",
+          mininet_tm_test_params,
+          map(lambda i: 'h'+str(i), range(0, num_hosts)),
+          generate_tm_graph)
 
 ################################################################################
 ### Helpers for parameter sweep
@@ -87,9 +118,10 @@ def write_stats(stats, stats_file):
         f.write(str(frac) + ' ' + repr(byte_stats) + '\n')
     f.close()
 
-def generate_waypoint_graph(stats_file, plot_output_file, plot_script):
-    """ Given a stats file, and a plot_output_file, generate a publication
-    quality plot with the given data using plot_script.
+def plot_one_quantity(stats_file, plot_output_file, plot_script,
+                      x_label, y_label, x_range, fields_str):
+    """ Generic function to plot one quantity versus another using the plotting
+    script.
     """
     def change_file_extension(f):
         parts = f.split('.')
@@ -100,20 +132,30 @@ def generate_waypoint_graph(stats_file, plot_output_file, plot_script):
            '-p 2 -f "postscript enhanced color" ' +
            '-o ' + plot_output_file + ' ' +
            '-k "left top" ' +
-           '-x "Fraction of traffic satisfying waypoint query" ' +
-           '-y "Fraction overhead/total bytes" ' +
-           '--xrange "[0:1]" ' +
+           '-x "' + x_label + '" ' +
+           '-y "' + y_label + '" ' +
+           '--xrange "' + x_range + '" ' +
            '--bmargin 5.2 --rmargin 4.3 ' +
-#           stats_file + ' "#bytes at collector" "1:2" ' +
-#           stats_file + ' "#bytes satisfying query" "1:3" ' +
-#           stats_file + ' "fraction overhead/total bytes" "1:(\$2/\$3)" ' +
-           stats_file + ' "" "1:(\$2/\$3)" ' +
+           stats_file + ' "" "' + fields_str + '" ' +
            ' | gnuplot')
     out = subprocess.check_output(cmd, shell=True)
     pdf_cmd = 'epstopdf ' + plot_output_file + ' --autorotate=All'
     out = subprocess.check_output(pdf_cmd, shell=True)
     print ("Plots are at " + plot_output_file + " and " +
            change_file_extension(plot_output_file))
+
+def generate_tm_graph(stats_file, plot_output_file, plot_script):
+    """ TM-specific function: Given a stats file, and a plot_output_file,
+    generate a publication quality plot with the given data using plot_script.
+    """
+    plot_one_quantity(stats_file, plot_output_file, plot_script,
+                      "Query period (sec)", "Overhead (bytes)", "[0:30]", "1:2")
+
+def generate_waypoint_graph(stats_file, plot_output_file, plot_script):
+    plot_one_quantity(stats_file, plot_output_file, plot_script,
+                      "Fraction of traffic satisfying waypoint query",
+                      "Fraction overhead/total bytes",
+                      "[0:1]", "1:(\$2/\$3)")
 
 ################################################################################
 ### Statistics from a single run
@@ -206,8 +248,8 @@ def single_stat_test():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run tests & extract results")
-    parser.add_argument("-s", "--sweep", choices=['waypoint'],
-                        default='waypoint', help="Select experiment to sweep")
+    parser.add_argument("-s", "--sweep", choices=['waypoint1', 'tm1'],
+                        default='waypoint1', help="Select experiment to sweep")
     parser.add_argument("--no_mininet", action="store_true",
                         help="Don't run mininet experiments")
     parser.add_argument("--no_stats", action="store_true",
@@ -226,4 +268,8 @@ def parse_args():
 ################################################################################
 
 if __name__ == "__main__":
-    sweep_waypoint_fractions()
+    args = parse_args()
+    if args.sweep == "waypoint1":
+        sweep_waypoint_fractions(args)
+    elif args.sweep == "tm1":
+        sweep_query_periods(args)
