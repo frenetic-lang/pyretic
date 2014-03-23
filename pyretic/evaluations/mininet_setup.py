@@ -369,7 +369,7 @@ def write_expt_settings(params, params_file):
     f = open(params_file, 'w')
     params_dict = vars(params)
     for k in params_dict.keys():
-        f.write(k + " " + str(params_dict[k]))
+        f.write(k + " " + str(params_dict[k]) + "\n")
     f.close()
 
 def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
