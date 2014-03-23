@@ -95,16 +95,19 @@ def generate_waypoint_graph(stats_file, plot_output_file, plot_script):
         parts = f.split('.')
         return string.join(parts[:-1], '.') + '.pdf'
 
-    cmd = ('sudo python ' + plot_script + ' -l -g -a ' +
+    cmd = ('sudo python ' + plot_script + ' -g -a ' +
            '"font ' + "'Helvetica,24'" + '" ' +
            '-p 2 -f "postscript enhanced color" ' +
            '-o ' + plot_output_file + ' ' +
-           '-x "Fraction of traffic satisfying query" -y "Bytes" ' +
+           '-k "left top" ' +
+           '-x "Fraction of traffic satisfying waypoint query" ' +
+           '-y "Fraction overhead/total bytes" ' +
            '--xrange "[0:1]" ' +
            '--bmargin 5.2 --rmargin 4.3 ' +
-           stats_file + ' "#bytes at collector" "1:2" ' +
-           stats_file + ' "#bytes satisfying query" "1:3" ' +
-           stats_file + ' "fraction overhead/total bytes" "1:(\$2/\$3)" ' +
+#           stats_file + ' "#bytes at collector" "1:2" ' +
+#           stats_file + ' "#bytes satisfying query" "1:3" ' +
+#           stats_file + ' "fraction overhead/total bytes" "1:(\$2/\$3)" ' +
+           stats_file + ' "" "1:(\$2/\$3)" ' +
            ' | gnuplot')
     out = subprocess.check_output(cmd, shell=True)
     pdf_cmd = 'epstopdf ' + plot_output_file + ' --autorotate=All'
