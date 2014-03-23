@@ -349,10 +349,9 @@ def query_test():
     print "Experiment done!"
 
     # Wrapping up and cleaning up
-    print "Writing down experiment parameters for succesful completion"
+    print "Writing down experiment parameters for successful completion"
     write_expt_settings(args, params_file)
 
-    print "Cleaning up experiment"
     finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
 
     if controller_debug_mode:
@@ -436,6 +435,10 @@ def parseArgs():
     # traffic matrix
     parser.add_argument("-n", "--num_hosts", default=5, type=int,
                         help="Number of hosts")
+    parser.add_argument("--query_duration_sec", default=180, type=int,
+                        help="Duration after which no stat queries issued")
+    parser.add_argument("--query_period_sec", default=10, type=int,
+                        help="Polling frequency for switch statistics")
 
     # waypoint
     parser.add_argument("-v", "--violating_frac", default=0.10, type=float,
@@ -450,6 +453,8 @@ def get_testwise_params(test, args):
     params = {}
     if test == "tm":
         params['n'] = str(args.num_hosts)
+        params['poll'] = str(args.query_period_sec)
+        params['test_duration'] = str(args.query_duration_sec)
     elif test == "waypoint":
         params['violating_frac'] = str(args.violating_frac)
         params['total_bw'] = str(args.total_bw)
