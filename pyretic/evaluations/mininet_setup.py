@@ -214,14 +214,14 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     """
     # start iperf servers
     for dst in hosts_dst:
-        dst_server_file = dst.name + '-' + server_prefix
+        dst_server_file = server_prefix + '-' + dst.name
         dst.cmd("iperf -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
     for i in range(0, len(hosts_src)):
         src = hosts_src[i]
-        src_client_file = src.name + '-' + client_prefix
+        src_client_file = client_prefix + '-' + src.name
         src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
                 hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
                 per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file + "&")
@@ -280,20 +280,23 @@ def query_test():
     # Configuring the experiment.
     args = parseArgs()
 
+    # Get path adjustment function
+    adjust_path = get_adjust_path(args)
+
     # Global parameters used by specific tests as well
     listen_port = args.listen_port
     test_duration_sec = args.test_duration_sec
     slack_factor = args.slack_factor
-    total_traffic_prefix = args.total_traffic_prefix
-    controller_debug_mode = args.controller_debug_mode
+    total_traffic_prefix = adjust_path(args.total_traffic_prefix)
+    controller_debug_mode = adjust_path(args.controller_debug_mode)
     test = args.test
 
     # Global parameters not used elsewhere outside this function
-    overheads_file = "tshark_output.txt"
-    c_out = "pyretic-stdout.txt"
-    c_err = "pyretic-stderr.txt"
-    iperf_client_prefix = "client-udp.txt"
-    iperf_server_prefix = "server-udp.txt"
+    overheads_file = adjust_path("tshark_output.txt")
+    c_out = adjust_path("pyretic-stdout.txt")
+    c_err = adjust_path("pyretic-stderr.txt")
+    iperf_client_prefix = adjust_path("client-udp.txt")
+    iperf_server_prefix = adjust_path("server-udp.txt")
 
     # Explicit spelling-out of testwise parameters for pyretic controller
     testwise_params = get_testwise_params(test, args)
@@ -411,6 +414,9 @@ def parseArgs():
                         help="Naming prefix for total traffic measurement")
     parser.add_argument("--slack_factor", default=5.0, type=float,
                         help="Slack multiple of duration for tshark interval")
+    parser.add_argument("-r", "--results_folder",
+                        default="./pyretic/evaluations/results/",
+                        help="Folder to put the raw results data into")
 
     # Test-case-specific options
 
@@ -438,6 +444,15 @@ def get_testwise_params(test, args):
         print "Error! Requesting test-wise-args for unknown test", test
         sys.exit(1)
     return params
+
+def get_adjust_path(args):
+    """ Return a function that adjusts the path of all file outputs into the
+    results folder provided in the arguments.
+    """
+    results_folder = args.results_folder
+    def adjust_path(rel_path):
+        return os.path.join(results_folder, rel_path)
+    return adjust_path
 
 ################################################################################
 ### Call to main function
