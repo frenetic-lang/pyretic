@@ -47,7 +47,7 @@ def sweep(args, runwise_folder_prefix, sweep_list, sweep_str,
     # Generate plots
     if not args.no_plots:
         print "***Generating plots for", sweep_str, "sweep experiment..."
-        generate_graph_fun(stats_file, plot_script)
+        generate_graph_fun(stats_file, plot_script, adjust_path)
 
     print "***Done!"
 
@@ -142,15 +142,21 @@ def plot_one_quantity(stats_file, plot_output_file, plot_script,
     print ("Plots are at " + plot_output_file + " and " +
            change_file_extension(plot_output_file))
 
-def generate_tm_graph(stats_file, plot_script):
+def generate_tm_graph(stats_file, plot_script, adjust_path):
     """ TM-specific function: Given a stats file, and a plot_output_file,
     generate a publication quality plot with the given data using plot_script.
     """
-    plot_one_quantity(stats_file, "overhead-vs-period.eps", plot_script,
-                      "Query period (sec)", "Overhead (bytes)", "[0:30]", "1:2")
+    plot_one_quantity(stats_file,
+                      adjust_path("overhead-vs-period.eps"),
+                      plot_script,
+                      "Query period (sec)",
+                      "Overhead (Kilobytes)",
+                      "[0:30]", "1:(\$2/1000)")
 
-def generate_waypoint_graph(stats_file, plot_script):
-    plot_one_quantity(stats_file, "overhead-vs-frac.eps", plot_script,
+def generate_waypoint_graph(stats_file, plot_script, adjust_path):
+    plot_one_quantity(stats_file,
+                      adjust_path("overhead-vs-frac.eps"),
+                      plot_script,
                       "Fraction of traffic satisfying waypoint query",
                       "Fraction overhead/total bytes",
                       "[0:1]", "1:(\$2/\$3)")
