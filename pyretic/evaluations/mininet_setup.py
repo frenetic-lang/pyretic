@@ -85,7 +85,8 @@ def setup_tm_full_traffic_measurement(params, switches):
     """ Setup tshark collectors and statistics for the 'total' traffic in the
     network.
     """
-    total_traffic_prefix = params.total_traffic_prefix
+    adjust_path = get_adjust_path(params)
+    total_traffic_prefix = adjust_path(params.total_traffic_prefix)
     test_duration_sec = params.test_duration_sec
     slack = params.slack_factor
     # setup internal and external interfaces
@@ -133,7 +134,8 @@ def setup_waypoint_workload(params, hosts):
 
 def setup_waypoint_full_traffic_measurement(params,
                                             switches):
-    total_traffic_prefix = params.total_traffic_prefix
+    adjust_path = get_adjust_path(params)
+    total_traffic_prefix = adjust_path(params.total_traffic_prefix)
     test_duration_sec = params.test_duration_sec
     slack = params.slack_factor
     # setup internal and external interfaces
@@ -287,7 +289,6 @@ def query_test():
     listen_port = args.listen_port
     test_duration_sec = args.test_duration_sec
     slack_factor = args.slack_factor
-    total_traffic_prefix = adjust_path(args.total_traffic_prefix)
     controller_debug_mode = args.controller_debug_mode
     test = args.test
 
