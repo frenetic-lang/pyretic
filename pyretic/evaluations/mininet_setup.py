@@ -224,9 +224,13 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     for i in range(0, len(hosts_src)):
         src = hosts_src[i]
         src_client_file = client_prefix + '-' + src.name + '.txt'
-        src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
-                hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
-                per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file + "&")
+        if per_transfer_bandwidth[i] > 0.0:
+            src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
+                    hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
+                    per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
+                    "&")
+        else:
+            print "Ignoring transfer", src, '--->', hosts_dst[i], ": zero b/w"
     print "Client transfers initiated."
 
 def setup_overhead_statistics(overheads_file, test_duration_sec, slack):
@@ -280,7 +284,7 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
 def query_test():
     """ Main """
     # Configuring the experiment.
-    args = parseArgs()
+    args = parse_args()
 
     # Get path adjustment function
     adjust_path = get_adjust_path(args)
@@ -411,7 +415,7 @@ def kill_process(p, process_str):
 ### Argument parsing
 ################################################################################
 
-def parseArgs():
+def parse_args():
     parser = argparse.ArgumentParser(description="Run tests for query evaluations")
     parser.add_argument("--test_duration_sec", type=int,
                         help="Duration for running data transfers",
