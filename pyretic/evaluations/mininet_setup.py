@@ -214,14 +214,14 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     """
     # start iperf servers
     for dst in hosts_dst:
-        dst_server_file = server_prefix + '-' + dst.name
+        dst_server_file = server_prefix + '-' + dst.name + '.txt'
         dst.cmd("iperf -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
     for i in range(0, len(hosts_src)):
         src = hosts_src[i]
-        src_client_file = client_prefix + '-' + src.name
+        src_client_file = client_prefix + '-' + src.name + '.txt'
         src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
                 hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
                 per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file + "&")
@@ -295,8 +295,8 @@ def query_test():
     overheads_file = adjust_path("tshark_output.txt")
     c_out = adjust_path("pyretic-stdout.txt")
     c_err = adjust_path("pyretic-stderr.txt")
-    iperf_client_prefix = adjust_path("client-udp.txt")
-    iperf_server_prefix = adjust_path("server-udp.txt")
+    iperf_client_prefix = adjust_path("client-udp")
+    iperf_server_prefix = adjust_path("server-udp")
 
     # Explicit spelling-out of testwise parameters for pyretic controller
     testwise_params = get_testwise_params(test, args)
