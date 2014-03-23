@@ -288,7 +288,7 @@ def query_test():
     test_duration_sec = args.test_duration_sec
     slack_factor = args.slack_factor
     total_traffic_prefix = adjust_path(args.total_traffic_prefix)
-    controller_debug_mode = adjust_path(args.controller_debug_mode)
+    controller_debug_mode = args.controller_debug_mode
     test = args.test
 
     # Global parameters not used elsewhere outside this function
@@ -405,7 +405,6 @@ def parseArgs():
                         default=30)
     parser.add_argument("-d", "--controller_debug_mode", action="store_true",
                         help="Run controller separately for debugging")
-
     parser.add_argument("-t", "--test", default="waypoint",
                         choices=['tm', 'waypoint'], help="Test case to run")
     parser.add_argument("-l", "--listen_port", default=6634, type=int,
