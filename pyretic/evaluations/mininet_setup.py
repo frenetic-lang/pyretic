@@ -44,6 +44,21 @@ def setup_workload(test, params, hosts):
         print "Unknown test case for workload setup!"
         sys.exit(0)
 
+def setup_overhead_statistics(test, overheads_file, test_duration_sec, slack):
+    if test == "tm":
+        overheads_filter = 'of.stats_flow_byte_count'
+        return setup_overhead_statistics_global(overheads_filter,
+                                                overheads_file,
+                                                test_duration_sec, slack)
+    elif test == "waypoint":
+        overheads_filter = 'of.pktin'
+        return setup_overhead_statistics_global(overheads_filter,
+                                                overheads_file,
+                                                test_duration_sec, slack)
+    else:
+        print "Unknown test case for overhead statistics measurement!"
+        sys.exit(0)
+
 ### Helper functions for getting hosts and switches from a network
 def get_hosts(net, num_hosts):
     """ Get a list of host objects from the network object """
@@ -239,9 +254,10 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
                     "&")
     print "Client transfers initiated."
 
-def setup_overhead_statistics(overheads_file, test_duration_sec, slack):
-    cmd = ("tshark -q -i lo -z io,stat,0,'of.pktin||of.stats_flow_byte_count' "
-           + " -f 'tcp port 6633'")
+def setup_overhead_statistics_global(overheads_filter, overheads_file,
+                                     test_duration_sec, slack):
+    cmd = ("tshark -q -i lo -z io,stat,0,'" + overheads_filter + "' -f " +
+           "'tcp port 6633'")
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
@@ -327,14 +343,9 @@ def query_test():
     print "Setting up topology"
     (net, hosts, switches) = setup_network(test, args)
 
-    print "Setting up overhead statistics measurements"
-    tshark = setup_overhead_statistics(overheads_file, test_duration_sec,
-                                       slack_factor)
-
-    print "Setting up collectors for total traffic"
-    switch_stats = setup_full_traffic_measurement(test, args, switches)
-
     print "Setting up handlers for graceful experiment abort"
+    tshark = None
+    switch_stats = None
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
                                                    tshark, switch_stats, net))
 
@@ -345,6 +356,17 @@ def query_test():
     if controller_debug_mode:
         print "*** YOU must start the controller separately for this to work!"
     wait_switch_rules_installed(switches)
+
+    print "Setting up overhead statistics measurements"
+    tshark = setup_overhead_statistics(test, overheads_file, test_duration_sec,
+                                       slack_factor)
+
+    print "Setting up collectors for total traffic"
+    switch_stats = setup_full_traffic_measurement(test, args, switches)
+
+    print "Resetting abort handler to tackle overhead stats"
+    signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
+                                                   tshark, switch_stats, net))
 
     # print "Testing network connectivity"
     # ping_flow_pairs(net, hosts_src, hosts_dst)
@@ -395,14 +417,16 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
         kill_process(p, "controller")
         close_fds(fds, "controller")
     # overhead statistics tshark
-    ([p], fds) = tshark
-    kill_process(p, "tshark overhead statistics collection")
-    close_fds(fds, "overhead statistics")
+    if tshark:
+        ([p], fds) = tshark
+        kill_process(p, "tshark overhead statistics collection")
+        close_fds(fds, "overhead statistics")
     # switch statistics
-    (procs, fds) = switch_stats
-    for p in procs:
-        kill_process(p, "tshark switch statistics collection")
-    close_fds(fds, "switch statistics")
+    if switch_stats:
+        (procs, fds) = switch_stats
+        for p in procs:
+            kill_process(p, "tshark switch statistics collection")
+        close_fds(fds, "switch statistics")
     # mininet network
     if not controller_debug_mode:
         net.stop()
@@ -411,6 +435,7 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
 def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net):
     def abort_handler(signum, frame):
         finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
+        sys.exit(0)
     return abort_handler
 
 def kill_process(p, process_str):
