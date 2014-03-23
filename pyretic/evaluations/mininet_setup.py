@@ -240,8 +240,8 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     print "Client transfers initiated."
 
 def setup_overhead_statistics(overheads_file, test_duration_sec, slack):
-    cmd = ("tshark -q -i lo -z io,stat," + str(slack * test_duration_sec) +
-           ",'of.pktin||of.stats_flow_byte_count' -f 'tcp port 6633'")
+    cmd = ("tshark -q -i lo -z io,stat,0,'of.pktin||of.stats_flow_byte_count' "
+           + " -f 'tcp port 6633'")
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
@@ -262,7 +262,7 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
 
     def get_tshark_cmd_file(interfaces, file_suffix):
         cmd = ("tshark -q " + get_interfaces(interfaces) +
-               " -z io,stat," + str(slack * test_duration_sec))
+               " -z io,stat,0")
         fname = total_traffic_prefix + file_suffix
         return (cmd, fname)
 

@@ -4,7 +4,7 @@ import subprocess, shlex, os, sys, argparse, string
 ### Parameter sweep functions
 ################################################################################
 
-def sweep(args, runwise_folder_prefix, plot_file_suffix, sweep_list, sweep_str,
+def sweep(args, runwise_folder_prefix, sweep_list, sweep_str,
           get_test_params_fun, queried_hosts, generate_graph_fun):
     """ Generic sweep function used by various sweep test cases.
 
@@ -19,9 +19,8 @@ def sweep(args, runwise_folder_prefix, plot_file_suffix, sweep_list, sweep_str,
     results_base_folder = args.results_base_folder
     create_folder_if_not_exists(results_base_folder)
     adjust_path = get_adjust_path(results_base_folder)
-    mininet_errfile = adjust_path("mininet_err.txt")
+    mininet_errfile_suffix = "mininet_err.txt"
     stats_file = adjust_path("stats.txt")
-    plot_file = adjust_path(plot_file_suffix)
     plot_script = "./pyretic/evaluations/pubplot.py"
     stats = []
 
@@ -32,6 +31,7 @@ def sweep(args, runwise_folder_prefix, plot_file_suffix, sweep_list, sweep_str,
             print sweep_str, value, "mininet test running ..."
             folder = get_runwise_folder(value)
             create_folder_if_not_exists(folder)
+            mininet_errfile = get_adjust_path(folder)(mininet_errfile_suffix)
             run_mininet_test(get_test_params_fun(value, folder), mininet_errfile)
 
     # Extract stats from runs
@@ -47,7 +47,7 @@ def sweep(args, runwise_folder_prefix, plot_file_suffix, sweep_list, sweep_str,
     # Generate plots
     if not args.no_plots:
         print "***Generating plots for", sweep_str, "sweep experiment..."
-        generate_graph_fun(stats_file, plot_file, plot_script)
+        generate_graph_fun(stats_file, plot_script)
 
     print "***Done!"
 
@@ -62,7 +62,6 @@ def sweep_waypoint_fractions(args):
 
     sweep(args,
           "waypoint",
-          "frac-vs-overhead.eps",
           map(lambda i: str(0.10 * i), range(0,11)),
           "waypoint violating fraction",
           mininet_waypoint_test_params,
@@ -82,11 +81,10 @@ def sweep_query_periods(args):
 
     sweep(args,
           "tm",
-          "overhead-vs-period.eps",
-          map(lambda i: str(5 * i), range(0, 6)),
+          map(lambda i: str(5 * i), range(1, 6)),
           "query period",
           mininet_tm_test_params,
-          map(lambda i: 'h'+str(i), range(0, num_hosts)),
+          map(lambda i: 'h'+str(i), range(1, num_hosts+1)),
           generate_tm_graph)
 
 ################################################################################
@@ -144,15 +142,15 @@ def plot_one_quantity(stats_file, plot_output_file, plot_script,
     print ("Plots are at " + plot_output_file + " and " +
            change_file_extension(plot_output_file))
 
-def generate_tm_graph(stats_file, plot_output_file, plot_script):
+def generate_tm_graph(stats_file, plot_script):
     """ TM-specific function: Given a stats file, and a plot_output_file,
     generate a publication quality plot with the given data using plot_script.
     """
-    plot_one_quantity(stats_file, plot_output_file, plot_script,
+    plot_one_quantity(stats_file, "overhead-vs-period.eps", plot_script,
                       "Query period (sec)", "Overhead (bytes)", "[0:30]", "1:2")
 
-def generate_waypoint_graph(stats_file, plot_output_file, plot_script):
-    plot_one_quantity(stats_file, plot_output_file, plot_script,
+def generate_waypoint_graph(stats_file, plot_script):
+    plot_one_quantity(stats_file, "overhead-vs-frac.eps", plot_script,
                       "Fraction of traffic satisfying waypoint query",
                       "Fraction overhead/total bytes",
                       "[0:1]", "1:(\$2/\$3)")
