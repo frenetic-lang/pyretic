@@ -1,5 +1,58 @@
 import subprocess, shlex, os, sys, argparse
 
+################################################################################
+### Parameter sweep functions
+################################################################################
+
+def sweep_waypoint_fractions():
+    """ Sweep across fractions of waypoint constraint violating traffic for the
+    "waypoint" test case for mininet_setup.py.
+    """
+    results_base_folder = "./pyretic/evaluations/results/waypoint"
+    adjust_path = get_adjust_path(results_base_folder)
+    stats = []
+    print "Starting waypoint sweep for different waypoint violation fractions"
+    for index in range(0, 6):
+        frac = str(0.20 * index)
+        print "Fraction", frac, "running ..."
+        folder = adjust_path("waypoint-" + frac)
+        create_folder_if_not_exists(folder)
+        run_mininet_test({'test': 'waypoint',
+                          'violating_frac': frac,
+                          'results_folder': folder})
+        single_run_stats = get_single_run_stats(folder, ["h1"])
+        stats.append((frac, single_run_stats))
+    generate_waypoint_graph(stats, results_base_folder)
+
+################################################################################
+### Helpers for parameter sweep
+################################################################################
+
+def get_cl_string(params):
+    """ Get command-line parameter string from a dictionary. """
+    return reduce(lambda r, k: r + '--' + k + '=' + params[k] + ' ',
+                  params.keys(), ' ')
+
+def run_mininet_test(params):
+    cmd = ("sudo python pyretic/evaluations/mininet_setup.py" +
+           get_cl_string(params))
+    adjust_path = get_adjust_path(params['results_folder'])
+    mininet_err = open(adjust_path("mininet_err.txt"), 'w')
+    output = subprocess.check_output(cmd, shell=True, stderr=mininet_err)
+    mininet_err.close()
+
+def create_folder_if_not_exists(folder):
+    output = subprocess.check_output("if [ ! -d " + folder + " ]; then mkdir " +
+                                     folder + " ; fi", shell=True)
+
+def generate_waypoint_graph(stats, plot_folder):
+    print stats
+    print "Got plot folder:", plot_folder
+    print "XXX got work to do here, still."
+
+################################################################################
+### Statistics from a single run
+################################################################################
 def parseArgs():
     parser = argparse.ArgumentParser(description="Run tests & extract results")
     parser.add_argument("-r", "--results_folder",
@@ -36,7 +89,7 @@ def get_iperf_client_bytes(client_file):
     cmd = ("grep -B 2 Sent " + client_file + " | grep '0.0-' | tail -1  | awk "
            + " '{print $5}'")
     kbytes = subprocess.check_output(cmd, shell=True)
-    return int(kbytes.strip()) * 1000
+    return float(kbytes.strip()) * 1000
 
 def has_pyretic_error(error_file):
     """ Detect if pyretic controller had an error output. """
@@ -44,7 +97,18 @@ def has_pyretic_error(error_file):
     error_lines = subprocess.check_output(cmd, shell=True)
     return int(error_lines.strip()) > 0
 
-def get_stats_single_run(results_folder, queried_hosts):
+class run_stat:
+    def __init__(self, overhead_bytes, total_bytes, queried_bytes):
+        self.overhead_bytes = overhead_bytes
+        self.total_bytes = total_bytes
+        self.queried_bytes = queried_bytes
+
+    def __repr__(self):
+        return (str(self.overhead_bytes) + ' ' +
+                str(self.total_bytes) + ' ' +
+                str(self.queried_bytes) )
+
+def get_single_run_stats(results_folder, queried_hosts):
     """ Get statistics of interest for a single run of an experiment. 
 
     :param results_folder: folder where the raw result files are dumped.
@@ -70,7 +134,7 @@ def get_stats_single_run(results_folder, queried_hosts):
         for host in queried_hosts:
             client_file = iperf_client_prefix + '-' + host + '.txt'
             queried_bytes += get_iperf_client_bytes(client_file)
-        return (ovhead_bytes, total_bytes, queried_bytes)
+        return run_stat(ovhead_bytes, total_bytes, queried_bytes)
     else:
         return None # signals an error in pyretic during the experiment run!
 
@@ -80,8 +144,12 @@ def single_stat_test():
     """
     results_folder = "./pyretic/evaluations/results/"
     queried_hosts = ["h1"]
-    stats = get_stats_single_run(results_folder, queried_hosts)
+    stats = get_single_run_stats(results_folder, queried_hosts)
     print stats
 
+################################################################################
+### Call to main function
+################################################################################
+
 if __name__ == "__main__":
-    single_stat_test()
+    sweep_waypoint_fractions()
