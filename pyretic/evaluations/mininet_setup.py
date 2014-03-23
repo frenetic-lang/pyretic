@@ -78,7 +78,7 @@ def setup_tm_network(params):
 def setup_tm_workload(params, hosts):
     hosts_src = hosts
     hosts_dst = hosts[1:] + [hosts[0]]
-    per_flow_bw = ["8M"] * len(hosts)
+    per_flow_bw = ["1M"] * len(hosts)
     return (hosts_src, hosts_dst, per_flow_bw)
 
 def setup_tm_full_traffic_measurement(params, switches):
@@ -217,7 +217,7 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     # start iperf servers
     for dst in hosts_dst:
         dst_server_file = server_prefix + '-' + dst.name + '.txt'
-        dst.cmd("iperf -fK -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
+        dst.cmd("iperf -fK -u -s -p 5002 2>&1 > " + dst_server_file + " &")
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
@@ -226,7 +226,7 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
         src_client_file = client_prefix + '-' + src.name + '.txt'
         if per_transfer_bandwidth[i] > 0.0:
             src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
-                    hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
+                    hosts_dst[i].IP() + " -u -p 5002 -b " +
                     per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
                     "&")
         else:
