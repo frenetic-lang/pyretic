@@ -78,7 +78,7 @@ def sweep_query_periods(args):
                 'query_period_sec': query_period,
                 'results_folder': folder,
                 'num_hosts': str(num_hosts),
-                'test_duration_sec': 180}
+                'test_duration_sec': str(180)}
 
     sweep(args,
           "tm",
