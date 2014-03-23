@@ -77,11 +77,12 @@ def sweep_query_periods(args):
         return {'test': 'tm',
                 'query_period_sec': query_period,
                 'results_folder': folder,
-                'num_hosts': str(num_hosts)}
+                'num_hosts': str(num_hosts),
+                'test_duration_sec': 180}
 
     sweep(args,
           "tm",
-          map(lambda i: str(5 * i), range(1, 6)),
+          map(lambda i: str(5 * i), range(1, 7)),
           "query period",
           mininet_tm_test_params,
           map(lambda i: 'h'+str(i), range(1, num_hosts+1)),
@@ -154,6 +155,9 @@ def generate_tm_graph(stats_file, plot_script, adjust_path):
                       "[0:30]", "1:(\$2/1000)")
 
 def generate_waypoint_graph(stats_file, plot_script, adjust_path):
+    """ Waypoint-specific function: Given a stats file, and a plot_output_file,
+    generate a publication quality plot with the given data using plot_script.
+    """
     plot_one_quantity(stats_file,
                       adjust_path("overhead-vs-frac.eps"),
                       plot_script,
