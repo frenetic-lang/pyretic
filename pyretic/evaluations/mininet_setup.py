@@ -217,14 +217,14 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     # start iperf servers
     for dst in hosts_dst:
         dst_server_file = server_prefix + '-' + dst.name + '.txt'
-        dst.cmd("iperf -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
+        dst.cmd("iperf -fK -u -s -p 5002 -i 5 2>&1 > " + dst_server_file + " &")
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
     for i in range(0, len(hosts_src)):
         src = hosts_src[i]
         src_client_file = client_prefix + '-' + src.name + '.txt'
-        src.cmd("iperf -t " + str(test_duration_sec) + " -c " +
+        src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
                 hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
                 per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file + "&")
     print "Client transfers initiated."
@@ -298,6 +298,7 @@ def query_test():
     c_err = adjust_path("pyretic-stderr.txt")
     iperf_client_prefix = adjust_path("client-udp")
     iperf_server_prefix = adjust_path("server-udp")
+    params_file = adjust_path("params.txt")
 
     # Explicit spelling-out of testwise parameters for pyretic controller
     testwise_params = get_testwise_params(test, args)
@@ -347,6 +348,11 @@ def query_test():
     time.sleep(test_duration_sec)
     print "Experiment done!"
 
+    # Wrapping up and cleaning up
+    print "Writing down experiment parameters for succesful completion"
+    write_expt_settings(args, params_file)
+
+    print "Cleaning up experiment"
     finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
 
     if controller_debug_mode:
@@ -359,6 +365,13 @@ def query_test():
 
 def mn_cleanup():
     subprocess.call("sudo mn -c", shell=True)
+
+def write_expt_settings(params, params_file):
+    f = open(params_file, 'w')
+    params_dict = vars(params)
+    for k in params_dict.keys():
+        f.write(k + " " + str(params_dict[k]))
+    f.close()
 
 def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
     def close_fds(fds, fd_str):
