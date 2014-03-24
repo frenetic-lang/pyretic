@@ -62,7 +62,7 @@ def sweep_waypoint_fractions(args):
 
     sweep(args,
           "waypoint",
-          map(lambda i: str(0.10 * i), range(0,11)),
+          map(lambda i: str(0.10 * i), range(1,11)),
           "waypoint violating fraction",
           mininet_waypoint_test_params,
           ["h1"],
@@ -117,8 +117,9 @@ def write_stats(stats, stats_file):
         f.write(str(frac) + ' ' + repr(byte_stats) + '\n')
     f.close()
 
-def plot_one_quantity(stats_file, plot_output_file, plot_script,
-                      x_label, y_label, x_range, fields_str):
+def plot_one_quantity(stats_file, plot_output_file, plot_script, x_label,
+                      y_label, x_range, fields_str, single_col=True,
+                      y_range="[0:1]"):
     """ Generic function to plot one quantity versus another using the plotting
     script.
     """
@@ -126,17 +127,34 @@ def plot_one_quantity(stats_file, plot_output_file, plot_script,
         parts = f.split('.')
         return string.join(parts[:-1], '.') + '.pdf'
 
-    cmd = ('sudo python ' + plot_script + ' -g -a ' +
-           '"font ' + "'Helvetica,24'" + '" ' +
-           '-p 2 -f "postscript enhanced color" ' +
-           '-o ' + plot_output_file + ' ' +
-           '-k "left top" ' +
-           '-x "' + x_label + '" ' +
-           '-y "' + y_label + '" ' +
-           '--xrange "' + x_range + '" ' +
-           '--bmargin 5.2 --rmargin 4.3 ' +
-           stats_file + ' "" "' + fields_str + '" ' +
-           ' | gnuplot')
+    if single_col:
+        cmd = ('sudo python ' + plot_script + ' -g -a ' +
+               '"font ' + "'Helvetica,24'" + '" ' +
+               '-p 2 -f "postscript enhanced color" ' +
+               '-o ' + plot_output_file + ' ' +
+               '-k "left top" ' +
+               '-x "' + x_label + '" ' +
+               '-y "' + y_label + '" ' +
+               '--xrange "' + x_range + '" ' +
+               '--bmargin 5.2 --rmargin 4.3 ' +
+               stats_file + ' "" "' + fields_str + '" ' +
+               ' | gnuplot')
+    else:
+        cmd = ('sudo python ' + plot_script + '  --small -g ' +
+               '-a "font ' + "'Helvetica,34'" + '" ' +
+               '-p 2 -f "postscript enhanced color" ' +
+               '-o ' + plot_output_file + ' ' +
+               '-k "left center vertical width 20 spacing 2.0 font ' +
+               "'Helvetica,34'" + '" ' +
+               '-x "' + x_label + '" ' +
+               '-y "' + y_label + '" ' +
+               '--xrange "' + x_range + '" ' +
+               '--yrange "' + y_range + '" ' +
+               '--bmargin 8.5 --rmargin 5 --lmargin 17 ' +
+               stats_file + ' "naive \'all packets\'" "' + '1:(\$1/\$1)' + '" ' +
+               stats_file + ' "this paper" "' + fields_str + '" ' +
+               stats_file + ' "optimal" "' + '1:(\$1/4)' + '" ' +
+               ' | gnuplot')
     out = subprocess.check_output(cmd, shell=True)
     pdf_cmd = 'epstopdf ' + plot_output_file + ' --autorotate=All'
     out = subprocess.check_output(pdf_cmd, shell=True)
@@ -161,9 +179,11 @@ def generate_waypoint_graph(stats_file, plot_script, adjust_path):
     plot_one_quantity(stats_file,
                       adjust_path("overhead-vs-frac.eps"),
                       plot_script,
-                      "Fraction of traffic satisfying waypoint query",
-                      "Fraction overhead/total bytes",
-                      "[0:1]", "1:(\$2/\$3)")
+                      "Ratio query-satisfying/total",
+                      "Ratio overhead/total",
+                      "[0:1]", "1:(\$2/\$3)",
+                      single_col=False, 
+                      y_range="[0:1.05]")
 
 ################################################################################
 ### Statistics from a single run
