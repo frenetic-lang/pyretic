@@ -152,7 +152,7 @@ def generate_tm_graph(stats_file, plot_script, adjust_path):
                       plot_script,
                       "Query period (sec)",
                       "Overhead (Kilobytes)",
-                      "[0:30]", "1:(\$2/1000)")
+                      "[10:30]", "1:(\$2/1000)")
 
 def generate_waypoint_graph(stats_file, plot_script, adjust_path):
     """ Waypoint-specific function: Given a stats file, and a plot_output_file,
