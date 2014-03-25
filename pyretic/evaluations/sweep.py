@@ -151,9 +151,10 @@ def plot_one_quantity(stats_file, plot_output_file, plot_script, x_label,
                '--xrange "' + x_range + '" ' +
                '--yrange "' + y_range + '" ' +
                '--bmargin 8.5 --rmargin 5 --lmargin 17 ' +
-               stats_file + ' "naive \'all packets\'" "' + '1:(\$1/\$1)' + '" ' +
-               stats_file + ' "this paper" "' + fields_str + '" ' +
-               stats_file + ' "optimal" "' + '1:(\$1/4)' + '" ' +
+#               stats_file + ' "naive \'all packets\'" "' + '1:(\$1/\$1)' + '" ' +
+#               stats_file + ' "this paper" "' + fields_str + '" ' +
+               stats_file + ' "" "' + fields_str + '" ' +
+#               stats_file + ' "optimal" "' + '1:(\$1/4)' + '" ' +
                ' | gnuplot')
     out = subprocess.check_output(cmd, shell=True)
     pdf_cmd = 'epstopdf ' + plot_output_file + ' --autorotate=All'
@@ -170,7 +171,9 @@ def generate_tm_graph(stats_file, plot_script, adjust_path):
                       plot_script,
                       "Query period (sec)",
                       "Overhead (Kilobytes)",
-                      "[10:30]", "1:(\$2/1000)")
+                      "[10:30]", "1:(\$2/1000)",
+                      single_col=False,
+                      y_range="[0:]")
 
 def generate_waypoint_graph(stats_file, plot_script, adjust_path):
     """ Waypoint-specific function: Given a stats file, and a plot_output_file,
