@@ -69,12 +69,7 @@ class Runtime(object):
             from pyretic.lib.path import path
             path_policies = path_main(**kwargs)
             policy_fragments = path.compile(path_policies)
-            print "Classifier before combining with path policies"
-            print self.policy.generate_classifier()
-
             self.policy = path.stitch(self.policy, policy_fragments)
-            print "Classifier after combining with path policies"
-            print self.policy.generate_classifier()
 
         # Virtual field composition
         self.policy = virtual_field_tagging() >> self.policy >> virtual_field_untagging()

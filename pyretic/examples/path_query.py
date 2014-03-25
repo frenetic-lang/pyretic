@@ -210,9 +210,8 @@ def path_test_16():
 
 # type: unit -> path list
 def path_main():
-#    return path_test_15()
-    return path_test_3()
+    return path_test_15()
 
 def main():
-#    return mac_learner()
-    return static_fwding_chain_3_3_only_h1_h3
+    return mac_learner()
+#    return static_fwding_chain_3_3_only_h1_h3
