@@ -29,6 +29,15 @@
 # for regular expressions.                                                     #
 ################################################################################
 
+# Sorting key macros
+KEY_EPSILON = -1
+KEY_EMPTY   = -2
+KEY_CONCAT  = -3
+KEY_ALTER   = -4
+KEY_STAR    = -5
+KEY_INTERS  = -6
+KEY_NEGATE  = -7
+
 # Data type definitions
 class re_deriv:
     def __init__(self):
@@ -38,38 +47,94 @@ class re_epsilon(re_deriv):
     def __init__(self):
         pass
 
+    def __eq__(self, other):
+        return isinstance(other, re_epsilon)
+
+    def sort_key(self):
+        return KEY_EPSILON
+
 class re_empty(re_deriv):
     def __init__(self):
         pass
+
+    def __eq__(self, other):
+        return isinstance(other, re_empty)
+
+    def sort_key(self):
+        return KEY_EMPTY
 
 class re_symbol(re_deriv):
     def __init__(self, char):
         self.char = char
 
+    def __eq__(self, other):
+        return (isinstance(other, re_symbol) and
+                other.char == self.char)
+
+    def sort_key(self):
+        return ord(self.char)
+
 class re_combinator(re_deriv):
-    def __init__(self, re1, re2):
-        self.re1 = re1
-        self.re2 = re2
+    def __init__(self, re_list):
+        self.re_list = re_list
 
 class re_concat(re_combinator):
     def __init__(self, re1, re2):
-        super(re_concat, self).__init__(re1, re2)
+        super(re_concat, self).__init__([re1, re2])
+        self.re1 = re1
+        self.re2 = re2
+
+    def __eq__(self, other):
+        return (isinstance(other, re_concat) and
+                self.re1 == other.re1 and
+                self.re2 == other.re2)
+
+    def sort_key(self):
+        return KEY_CONCAT
 
 class re_alter(re_combinator):
-    def __init__(self, re1, re2):
-        super(re_alter, self).__init__(re1, re2)
+    def __init__(self, re_list):
+        super(re_alter, self).__init__(re_list)
+
+    def __eq__(self, other):
+        return (isinstance(other, re_alter) and
+                self.re_list == other.re_list)
+
+    def sort_key(self):
+        return KEY_ALTER
 
 class re_star(re_deriv):
     def __init__(self, re):
         self.re = re
 
+    def __eq__(self, other):
+        return (isinstance(other, re_star) and
+                self.re == other.re)
+
+    def sort_key(self):
+        return KEY_STAR
+
 class re_inters(re_combinator):
-    def __init__(self, re1, re2):
-        super(re_inters, self).__init__(re1, re2)
+    def __init__(self, re_list):
+        super(re_inters, self).__init__(re_list)
+
+    def __eq__(self, other):
+        return (isinstance(other, re_inters) and
+                self.re_list == other.re_list)
+
+    def sort_key(self):
+        return KEY_INTERS
 
 class re_negate(re_deriv):
     def __init__(self, re):
         self.re = re
+
+    def __eq__(self, other):
+        return (isinstance(other, re_negate) and
+                self.re == other.re)
+
+    def sort_key(self):
+        return KEY_NEGATE
 
 # Nullable function
 def nullable(r):
@@ -103,6 +168,101 @@ def nullable(r):
         return bool_to_re(not re_to_bool(nullable(r.re)))
     else:
         raise TypeError
+
+# Smart constructors, which enforce some useful invariants in the regular
+# expressions they construct. In particular, the RE is flattened out as much as
+# possible (e.g., no head constructor "and" in any r \in re if smart_and is
+# called).
+
+# Sort a list of regular expressions. Uses the sort_key() function to sort
+# through different regular expressions
+def re_sort(re_list):
+    return sorted(re_list, key=lambda r: r.sort_key())
+
+# Function to remove duplicates in a *sorted* list of REs.
+def re_nub(re_list):
+    new_list = []
+    prev_re = None
+    for re in re_list:
+        if not (re == prev_re):
+            new_list.add(re)
+        prev_re = re
+    return new_list
+
+# smart star for regular expressions
+def smart_star(r):
+    if isinstance(r, re_star):
+        return smart_star(r.re)
+    elif isinstance(r, re_epsilon):
+        return re_epsilon
+    elif isinstance(r, re_empty):
+        return re_epsilon
+    else:
+        return r
+
+# smart negation of regular expressions
+def smart_negate(r):
+    if isinstance(r, re_negate):
+        return r.re
+    else:
+        return re_negate(r)
+
+# smart intersection of regular expressions
+def smart_inters(r, s):
+    if r == s:
+        return r
+    elif isinstance(r, re_inters) and isinstance(s, re_inters):
+        return re_inters(re_nub(re_sort(r.re_list + s.re_list)))
+    elif isinstance(r, re_inters):
+        return re_inters(re_nub(re_sort(r.re_list + [s])))
+    elif isinstance(s, re_inters):
+        return re_inters(re_nub(re_sort([r] + s.re_list)))
+    elif isinstance(r, re_empty):
+        return re_empty
+    elif isinstance(s, re_empty):
+        return re_empty
+    elif isinstance(r, re_negate) and isinstance(r.re, re_empty):
+        return s
+    elif isinstance(s, re_negate) and isinstance(s.re, re_empty):
+        return r
+    else:
+        return re_inters(re_nub(re_sort([r, s])))
+
+# smart alternation of regular expressions
+def smart_alter(r, s):
+    if r == s:
+        return r
+    elif isinstance(r, re_alter) and isinstance(s, re_alter):
+        return re_alter(re_nub(re_sort(r.re_list + s.re_list)))
+    elif isinstance(r, re_alter):
+        return re_alter(re_nub(re_sort(r.re_list + [s])))
+    elif isinstance(s, re_alter):
+        return re_alter(re_nub(re_sort([r] + s.re_list)))
+    elif isinstance(r, re_negate) and isinstance(r.re, re_empty):
+        return re_negate(re_empty)
+    elif isinstance(s, re_negate) and isinstance(s.re, re_empty):
+        return re_negate(re_empty)
+    elif isinstance(r, re_empty):
+        return s
+    elif isinstance(s, re_empty):
+        return r
+    else:
+        return re_alter(re_nub(re_sort([r, s])))
+
+# smart concatenation for regular expressions
+def smart_concat(r, s):
+    if isinstance(r, re_concat):
+        return smart_concat(r.re1, smart_concat(r.re2, s))
+    elif isinstance(r, re_empty):
+        return re_empty
+    elif isinstance(s, re_empty):
+        return re_empty
+    elif isinstance(r, re_epsilon):
+        return s
+    elif isinstance(s, re_epsilon):
+        return r
+    else:
+        return re_concat(r, s)
 
 # Derivative of a regular expression with respect to a single symbol
 def deriv(r, a):
