@@ -42,11 +42,12 @@
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
-#
+
+################################################
 # Translate from 
 #   client -> public address : client -> server
 #   server -> client : public address -> client
-#
+################################################
 def translate(c, s, p):
     cp = match(srcip=c, dstip=p)
     sc = match(srcip=s, dstip=c)
@@ -55,9 +56,14 @@ def translate(c, s, p):
             (sc >> modify(srcip=p)) +
             (~cp & ~sc))
 
-class lb(DynamicPolicy):
+##############################################
+# Simple round-robin load balancing policy
+##############################################
+class rrlb(DynamicPolicy):
     def __init__(self, clients, servers, public_ip):
-        super(lb,self).__init__()
+        super(rrlb,self).__init__()
+
+        print("Server addresses", servers)
 
         self.clients   = clients
         self.servers   = servers
@@ -70,13 +76,15 @@ class lb(DynamicPolicy):
         self.lb_policy = None
         self.policy = self.public_to_controller
 
+
     def update_policy(self, pkt):
         client = pkt['srcip']
-        server = self.next_server()
-        p = translate(client, server, self.public_ip)
 
         # Becareful not to redirect servers on themselves
         if client in self.servers: return
+
+        server = self.next_server()
+        p = translate(client, server, self.public_ip)
 
         print("Mapping c:%s to s:%s" % (client, server))
 
@@ -104,4 +112,4 @@ def main(clients, servers):
     client_ips = [IP(ip_prefix+str(i)) for i in range(1, clients+1)]
     server_ips = [IP(ip_prefix+str(i)) for i in range(1+clients, clients+servers+1)]
     
-    return lb(client_ips, server_ips, public_ip) >> mac_learner()
+    return rrlb(client_ips, server_ips, public_ip) >> mac_learner()
