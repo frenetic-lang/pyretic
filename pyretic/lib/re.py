@@ -194,9 +194,9 @@ def smart_star(r):
     if isinstance(r, re_star):
         return smart_star(r.re)
     elif isinstance(r, re_epsilon):
-        return re_epsilon
+        return re_epsilon()
     elif isinstance(r, re_empty):
-        return re_epsilon
+        return re_epsilon()
     else:
         return r
 
@@ -218,9 +218,9 @@ def smart_inters(r, s):
     elif isinstance(s, re_inters):
         return re_inters(re_nub(re_sort([r] + s.re_list)))
     elif isinstance(r, re_empty):
-        return re_empty
+        return re_empty()
     elif isinstance(s, re_empty):
-        return re_empty
+        return re_empty()
     elif isinstance(r, re_negate) and isinstance(r.re, re_empty):
         return s
     elif isinstance(s, re_negate) and isinstance(s.re, re_empty):
@@ -254,9 +254,9 @@ def smart_concat(r, s):
     if isinstance(r, re_concat):
         return smart_concat(r.re1, smart_concat(r.re2, s))
     elif isinstance(r, re_empty):
-        return re_empty
+        return re_empty()
     elif isinstance(s, re_empty):
-        return re_empty
+        return re_empty()
     elif isinstance(r, re_epsilon):
         return s
     elif isinstance(s, re_epsilon):
@@ -264,32 +264,41 @@ def smart_concat(r, s):
     else:
         return re_concat(r, s)
 
+#### Derivative construction
+# Fold from right
+def foldr(fun, re_list, init):
+    return reduce(fun, reversed(re_list), init)
+
 # Derivative of a regular expression with respect to a single symbol
 def deriv(r, a):
     assert isinstance(r, re_deriv)
     assert isinstance(a, re_symbol)
     asym = a.char
-    if isinstance(r, re_epsilon):
+    if isinstance(r, re_empty):
+        return re_empty()
+    elif isinstance(r, re_epsilon):
         return re_empty()
     elif isinstance(r, re_symbol):
         rsym = r.char
         return re_epsilon() if rsym == asym else re_empty()
-    elif isinstance(r, re_empty):
-        return re_empty()
-    elif isinstance(r, re_concat):
-        return re_alter(
-            re_concat(deriv(r.re1, a), r.re2),
-            re_concat(nullable(r.re1), deriv(r.re2, a)))
     elif isinstance(r, re_star):
-        return re_concat(deriv(r.re1, a), r)
-    elif isinstance(r, re_alter):
-        return re_alter(deriv(r.re1, a), deriv(r.re2, a))
-    elif isinstance(r, re_inters):
-        return re_inters(deriv(r.re1, a), deriv(r.re2, a))
+        return smart_concat(deriv(r.re, a), smart_star(r.re))
     elif isinstance(r, re_negate):
-        return re_negate(deriv(r.re, a))
+        return smart_negate(deriv(r.re, a))
+    elif isinstance(r, re_concat):
+        return smart_alter(
+            smart_concat(deriv(r.re1, a), r.re2),
+            smart_concat(nullable(r.re1), deriv(r.re2, a)))
+    elif isinstance(r, re_alter):
+        return foldr(lambda rs, s: smart_alter(rs, deriv(s, a)),
+                     r.re_list,
+                     re_empty())
+    elif isinstance(r, re_inters):
+        return foldr(lambda rs, s: smart_inters(rs, deriv(s, a)),
+                     r.re_list,
+                     re_negate(re_empty()))
     else:
-        raise TypeError
+        raise TypeError('unknown type in deriv')
 
 # Derivative of a regular expression with respect to a string
 def deriv_string(r, s):
@@ -299,7 +308,8 @@ def deriv_string(r, s):
         return r
     else:
         a = re_symbol(s[0])
-        return deriv(deriv_string(r, s[1:]), a)
+        w = s[1:]
+        return deriv_string(deriv(r, a), w)
 
 # Match a single string against a single regular expression
 def match_string(r, s):
