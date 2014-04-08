@@ -39,10 +39,36 @@ KEY_INTERS  = -6
 KEY_NEGATE  = -7
 
 # Data type definitions
+# These are basic elements to be used by applications to construct regular
+# expressions, with various combinators that invoke smart constructors that
+# produce regular expressions in a pre-designated "normal form".
 class re_deriv:
     def __init__(self):
         pass
 
+    def __xor__(self, other):
+        """ Concatenation """
+        return smart_concat(self, other)
+
+    def __or__(self, other):
+        """ Alternation """
+        return smart_alter(self, other)
+
+    def __and__(self, other):
+        """ Intersection """
+        return smart_inters(self, other)
+
+    def __pos__(self):
+        """ Kleene star """
+        return smart_star(self)
+
+    def __invert__(self):
+        """ Negation """
+        return smart_negate(self)
+
+# These are the basic building blocks that applications should use, before
+# combining them with the combinators defined under the parent re_deriv class.
+# epsilon, empty set, and a single symbol from the alphabet.
 class re_epsilon(re_deriv):
     def __init__(self):
         pass
@@ -74,6 +100,9 @@ class re_symbol(re_deriv):
     def sort_key(self):
         return ord(self.char)
 
+### The following classes are only to be used internally to represent various
+### regular expression combinators as ASTs. They should *not* be used to
+### construct regular expressions by applications.
 class re_combinator(re_deriv):
     def __init__(self, re_list):
         self.re_list = re_list
@@ -154,22 +183,24 @@ def nullable(r):
     elif isinstance(r, re_empty):
         return re_empty()
     elif isinstance(r, re_concat):
-        return bool_to_re(re_to_bool(nullable(r.re1)) and 
-                          re_to_bool(nullable(r.re2)))
+        f = lambda x: re_to_bool(nullable(x))
+        return f(r.re1) and f(r.re2)
     elif isinstance(r, re_alter):
-        return bool_to_re(re_to_bool(nullable(r.re1)) or
-                          re_to_bool(nullable(r.re2)))
+        return reduce(lambda acc, s: acc or re_to_bool(nullable(s)),
+                      r.re_list,
+                      False)
     elif isinstance(r, re_star):
         return re_epsilon()
     elif isinstance(r, re_inters):
-        return bool_to_re(re_to_bool(nullable(r.re1)) and 
-                          re_to_bool(nullable(r.re2)))
+        return reduce(lambda acc, s: acc and re_to_bool(nullable(s)),
+                      r.re_list,
+                      True)
     elif isinstance(r, re_negate):
         return bool_to_re(not re_to_bool(nullable(r.re)))
     else:
         raise TypeError
 
-# Smart constructors, which enforce some useful invariants in the regular
+# Smart constructors, which enforce some useful representation invariants in the regular
 # expressions they construct. In particular, the RE is flattened out as much as
 # possible (e.g., no head constructor "and" in any r \in re if smart_and is
 # called).
