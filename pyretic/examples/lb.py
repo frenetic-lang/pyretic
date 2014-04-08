@@ -31,7 +31,7 @@
 # -------------------------------------------------------------------          #
 # input:    --clients=NUM_CLIENTS --servers=NUM_SERVERS                        #
 # mininet:  mininet.sh --topo=clique,1,NUM_CLIENTS+NUM_SERVERS                 #
-#           e.g., if load balancing 4 clients across two tables:               #
+#           e.g., if load balancing 4 clients across two servers:              #
 #              mininet.sh --topo=clique,1,6                                    #
 # test:     hX ping -c 1 10.0.0.100 will work for clients                      #
 #           Clients are h1 through hNUM_CLIENTS                                #
@@ -74,6 +74,10 @@ class lb(DynamicPolicy):
         client = pkt['srcip']
         server = self.next_server()
         p = translate(client, server, self.public_ip)
+
+        # Becareful not to redirect servers on themselves
+        if client in self.servers: return
+
         print("Mapping c:%s to s:%s" % (client, server))
 
         if self.lb_policy:
