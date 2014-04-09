@@ -56,9 +56,13 @@ def translate(c, s, p):
             (sc >> modify(srcip=p)) +
             (~cp & ~sc))
 
-##############################################
-# Simple round-robin load balancing policy
-##############################################
+##################################################################
+# Simple round-robin load balancing policy                       #
+#                                                                #
+# This implementation will drop the first packet of each flow.   #
+# An easy fix would be to use network.inject_packet to send the  #
+# packet to its final destination.                               #
+##################################################################
 class rrlb(DynamicPolicy):
     def __init__(self, clients, servers, public_ip):
         super(rrlb,self).__init__()
