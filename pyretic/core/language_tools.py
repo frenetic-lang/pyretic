@@ -54,6 +54,8 @@ def default_mapper(parent, children):
         # See explanation for query.packets above; applies here as well.
         return DynamicPolicy(children[0])
     else:
+        print("Printing ... ")
+        print parent
         raise NotImplementedError
 
 def ast_map(fun, policy):
@@ -97,16 +99,18 @@ def ast_map(fun, policy):
           isinstance(policy,query.packets)):
         children_pols.append(ast_map(fun, policy.policy))
     else:
+        print("Printing ... ")
+        print policy
         raise NotImplementedError
     return fun(policy, children_pols)
 
 def ast_fold(fun, acc, policy):
     import pyretic.lib.query as query
-    if (  policy == identity or
-          policy == drop or
+    if (  isinstance(policy,identitySingleton) or
+          isinstance(policy,dropSingleton) or
           isinstance(policy,match) or
           isinstance(policy,modify) or
-          policy == Controller or
+          isinstance(policy,ControllerSingleton) or
           isinstance(policy,Query)):
         return fun(acc,policy)
     elif (isinstance(policy,negate) or
@@ -127,6 +131,8 @@ def ast_fold(fun, acc, policy):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
     else:
+        print("Printing ... ")
+        print policy
         raise NotImplementedError
     
 def add_dynamic_sub_pols(acc, policy):

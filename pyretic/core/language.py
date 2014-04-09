@@ -34,6 +34,8 @@ import functools
 import itertools
 import struct
 import time
+import marshal, types
+
 from ipaddr import IPv4Network
 from bitarray import bitarray
 
@@ -43,6 +45,7 @@ from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
+from multiprocessing import Lock
 
 NO_CACHE=False
 
@@ -220,8 +223,7 @@ class Singleton(Filter):
         return Classifier([Rule(identity, {self})])
 
 
-@singleton
-class identity(Singleton):
+class identitySingleton(Singleton):
     """The identity policy, leaves all packets unchanged."""
     def eval(self, pkt):
         """
@@ -240,19 +242,19 @@ class identity(Singleton):
         return True
 
     def __eq__(self, other):
-        return ( id(self) == id(other)
+        return ( isinstance(other, identitySingleton)
             or ( isinstance(other, match) and len(other.map) == 0) )
 
     def __repr__(self):
         return "identity"
 
+identity = identitySingleton()
 passthrough = identity   # Imperative alias
 true = identity          # Logic alias
 all_packets = identity   # Matching alias
 
 
-@singleton
-class drop(Singleton):
+class dropSingleton(Singleton):
     """The drop policy, produces the empty set of packets."""
     def eval(self, pkt):
         """
@@ -274,27 +276,28 @@ class drop(Singleton):
         return False
 
     def __eq__(self, other):
-        return id(self) == id(other)
+        return (isinstance(other, dropSingleton))
 
     def __repr__(self):
         return "drop"
 
+drop = dropSingleton()
 none = drop
 false = drop             # Logic alias
 no_packets = drop        # Matching alias
 
-
-@singleton
-class Controller(Singleton):
+class ControllerSingleton(Singleton):
     def eval(self, pkt):
         return set()
 
     def __eq__(self, other):
-        return id(self) == id(other)
+        return (isinstance(other, ControllerSingleton))
 
     def __repr__(self):
         return "Controller"
-    
+
+Controller = ControllerSingleton()
+
 
 class match(Filter):
     """
@@ -469,7 +472,6 @@ class Query(Filter):
     """
     ### init : unit -> unit
     def __init__(self):
-        from multiprocessing import Lock
         self.callbacks = []
         self.bucket = set()
         self.bucket_lock = Lock()
@@ -490,6 +492,28 @@ class Query(Filter):
     ### register_callback : (Packet -> X) -> unit
     def register_callback(self, fn):
         self.callbacks.append(fn)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        def codify_func(c):
+            assert(len(c.func_code.co_freevars) == 0)
+            return marshal.dumps(c.func_code)
+
+        callbacks = map(codify_func, state['callbacks'])
+        state['callbacks'] = callbacks
+        del state['bucket_lock']
+        return state
+
+    def __setstate__(self, state):
+        state['callbacks'] = \
+            map(
+                lambda f: types.FunctionType(marshal.loads(f), globals()), 
+                state['callbacks'])
+
+        state['bucket_lock'] = Lock()
+        self.__dict__.update(state)
+        return state
 
     def __repr__(self):
         return "Query"
@@ -1123,6 +1147,16 @@ class LocalPolicy(DynamicPolicy):
 
     def __repr__(self):
         return "LocalPolicy:\n%s" % repr(self.policy)
+
+    def __getstate__(self):
+        state  = self.__dict__.copy()
+        state['f'] = marshal.dumps(self.f.func_code)
+        return state
+
+    def __setstate__(self, state):
+        state['f'] = types.FunctionType(marshal.loads(state['f']), globals())
+        self.__dict__.update(state)
+        return state
 
 
 class DynamicFilter(DynamicPolicy,Filter):

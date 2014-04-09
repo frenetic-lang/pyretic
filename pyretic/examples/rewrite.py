@@ -66,7 +66,8 @@ l3route = ((match(dstip=ip1) >> fwd(1)) +
 policy = modify >> l2route
 
 def main():
-    return policy
+    import pickle
+    return pickle.loads(pickle.dumps(policy))
 
 
 
