@@ -295,6 +295,85 @@ def smart_concat(r, s):
     else:
         return re_concat(r, s)
 
+# normal form checking functions
+def re_list_sorted(re_list):
+    return re_list == re_sort(re_list)
+
+def re_list_nodups(re_list):
+    return re_list == re_nub(re_list)
+
+def no_tail_inters(re_list):
+    def is_inters(r):
+        return isinstance(r, re_inters)
+    return reduce(lambda acc, x: acc and not is_inters(x),
+                  re_list,
+                  True)
+
+def no_tail_alter(re_list):
+    def is_alter(r):
+        return isinstance(r, re_alter)
+    return reduce(lambda acc, x: acc and not is_alter(x),
+                  re_list,
+                  True)
+
+def is_normal(r):
+    """ Function RE -> bool, telling us whether the RE is in normal form. """
+    def all_normal(re_list):
+        return reduce(lambda acc, x: acc and is_normal(x),
+                      re_list,
+                      True)
+    if isinstance(r, re_empty):
+        return True
+    elif isinstance(r, re_epsilon):
+        return True
+    elif isinstance(r, re_symbol):
+        return True
+    elif isinstance(r, re_star):
+        s = r.re
+        if isinstance(s, re_star):
+            return False
+        elif isinstance(s, re_epsilon):
+            return False
+        elif isinstance(s, re_empty):
+            return False
+        else:
+            return is_normal(s)
+    elif isinstance(r, re_negate):
+        s = r.re
+        if isinstance(s, re_negate):
+            return False
+        else:
+            return is_normal(s)
+    elif isinstance(r, re_inters):
+        rlist = r.re_list
+        if len(rlist) <= 1:
+            return False
+        else:
+            return (re_list_sorted(rlist) and re_list_nodups(rlist) and
+                    no_tail_inters(rlist) and all_normal(rlist))
+    elif isinstance(r, re_alter):
+        rlist = r.re_list
+        if len(rlist) <= 1:
+            return False
+        else:
+            return (re_list_sorted(rlist) and re_list_nodups(rlist) and
+                    no_tail_alter(rlist) and all_normal(rlist))
+    elif isinstance(r, re_concat):
+        if isinstance(r.re1, re_concat):
+            return False
+        elif isinstance(r.re1, re_empty):
+            return False
+        elif isinstance(r.re2, re_empty):
+            return False
+        elif isinstance(r.re1, re_epsilon):
+            return False
+        elif isinstance(r.re2, re_epsilon):
+            return False
+        else:
+            return is_normal(r.re1) and is_normal(r.re2)
+    else:
+        raise TypeError("normal form check doesn't see the right type!")
+
 #### Derivative construction
 # Fold from right
 def foldr(fun, re_list, init):
