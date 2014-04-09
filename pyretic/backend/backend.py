@@ -119,12 +119,12 @@ class Backend(object):
         def run(self):
             asyncore.loop()
 
-    def __init__(self):
+    def __init__(self,backend_port):
         self.backend_channel = None
-        self.runtime = None
+        self.runtime = None 
         self.channel_lock = threading.Lock()
 
-        address = ('localhost', BACKEND_PORT) # USE KNOWN PORT
+        address = ('localhost',backend_port) # USE KNOWN PORT
         self.backend_server = BackendServer(self,address)
         
         self.al = self.asyncore_loop()

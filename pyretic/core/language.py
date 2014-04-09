@@ -495,6 +495,26 @@ class Query(Filter):
         return "Query"
 
 
+class LocalToGlobalBucket(Query):
+    def __init__(self):
+        self._classifier = self.generate_classifier()
+        super(LocalToGlobalBucket,self).__init__()
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity,{Controller})])
+
+    def apply(self):
+        self.bucket.clear()
+
+    def __repr__(self):
+        return "LocalToGlobalBucket"
+
+    def __eq__(self, other):
+        # TODO: if buckets eventually have names, equality should
+        # be on names.
+        return isinstance(other, LocalToGlobalBucket)
+
+
 class FwdBucket(Query):
     """
     Class for registering callbacks on individual packets sent to
@@ -1087,7 +1107,14 @@ class LocalPolicy(DynamicPolicy):
         self.context = context
         self.overwrite = overwrite
         self.name = name
+        self.is_local = False
         super(LocalPolicy, self).__init__(policy)
+
+    def eval(self, pkt):
+        if self.is_local:
+            return self.policy.eval(pkt)
+        else:
+            return set()
 
     def update_policy(self, pkt):
         (new_pol, new_context) = self.f(self.context, pkt)
