@@ -186,12 +186,55 @@ def test_deriv():
                                                       deriv(r2, s) &
                                                       deriv(r1, s))
 
+def test_match():
+    # declare some symbols first
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    d = re_symbol('d')
+    e = re_symbol('e')
+    eps = re_epsilon()
+    phi = re_empty()
+
+    # simple tests to test out matching using derivatives
+    r = a ^ +b
+    s = 'abb'
+    assert match_string(r, s)
+    s = ''
+    assert not match_string(r, s)
+    s = 'aba'
+    assert not match_string(r, s)
+    r = (a | b) ^ (c | d) ^ e
+    s = 'abe'
+    assert not match_string(r, s)
+    s = 'ace'
+    assert match_string(r, s)
+    r = (~(a ^ +b)) | (a ^ b)
+    s = 'ab'
+    assert match_string(r, s)
+    s = 'abb'
+    assert not match_string(r, s)
+    s = 'cde'
+    assert match_string(r, s)
+    r = ((~a) & (~(b ^ c))) | +(d ^ e)
+    s = 'bc'
+    assert not match_string(r, s)
+    s = 'a'
+    assert not match_string(r, s)
+    s = 'dede'
+    assert match_string(r, s)
+    s = 'dedea'
+    assert match_string(r, s)
+    s = ''
+    assert match_string(r, s)
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
     test_smart_constructors()
     test_nullable()
     test_deriv()
+    test_match()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

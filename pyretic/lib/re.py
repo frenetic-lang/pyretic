@@ -497,7 +497,7 @@ def match_string(r, s):
     assert isinstance(r, re_deriv)
     assert isinstance(s, str)
     if len(s) == 0:
-        return re_to_bool(nullable(r))
+        return True if nullable(r) == re_epsilon() else False
     else:
         a = re_symbol(s[0])
         return match_string(deriv(r, a), s[1:])
