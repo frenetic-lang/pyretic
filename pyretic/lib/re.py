@@ -42,10 +42,8 @@ KEY_NEGATE  = -7
 # These are basic elements to be used by applications to construct regular
 # expressions, with various combinators that invoke smart constructors that
 # produce regular expressions in a pre-designated "normal form".
-class re_deriv:
-    def __init__(self):
-        pass
-
+class re_deriv(object):
+    """ Top-level regular expression class. """
     def __xor__(self, other):
         """ Concatenation """
         return smart_concat(self, other)
@@ -71,7 +69,7 @@ class re_deriv:
 # epsilon, empty set, and a single symbol from the alphabet.
 class re_epsilon(re_deriv):
     def __init__(self):
-        pass
+        super(re_epsilon, self).__init__()
 
     def __eq__(self, other):
         return isinstance(other, re_epsilon)
@@ -81,7 +79,7 @@ class re_epsilon(re_deriv):
 
 class re_empty(re_deriv):
     def __init__(self):
-        pass
+        super(re_empty, self).__init__()
 
     def __eq__(self, other):
         return isinstance(other, re_empty)
@@ -92,6 +90,7 @@ class re_empty(re_deriv):
 class re_symbol(re_deriv):
     def __init__(self, char):
         self.char = char
+        super(re_symbol, self).__init__()
 
     def __eq__(self, other):
         return (isinstance(other, re_symbol) and
@@ -106,12 +105,13 @@ class re_symbol(re_deriv):
 class re_combinator(re_deriv):
     def __init__(self, re_list):
         self.re_list = re_list
+        super(re_combinator, self).__init__()
 
 class re_concat(re_combinator):
     def __init__(self, re1, re2):
-        super(re_concat, self).__init__([re1, re2])
         self.re1 = re1
         self.re2 = re2
+        super(re_concat, self).__init__([re1, re2])
 
     def __eq__(self, other):
         return (isinstance(other, re_concat) and
@@ -135,6 +135,7 @@ class re_alter(re_combinator):
 class re_star(re_deriv):
     def __init__(self, re):
         self.re = re
+        super(re_star, self).__init__()
 
     def __eq__(self, other):
         return (isinstance(other, re_star) and
@@ -157,6 +158,7 @@ class re_inters(re_combinator):
 class re_negate(re_deriv):
     def __init__(self, re):
         self.re = re
+        super(re_negate, self).__init__()
 
     def __eq__(self, other):
         return (isinstance(other, re_negate) and
@@ -216,7 +218,7 @@ def re_nub(re_list):
     prev_re = None
     for re in re_list:
         if not (re == prev_re):
-            new_list.add(re)
+            new_list.append(re)
         prev_re = re
     return new_list
 
