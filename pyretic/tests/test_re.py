@@ -85,6 +85,10 @@ def test_normal_forms():
     assert not is_normal(re_alter([x6, x2]))
     assert is_normal(re_alter([x5, x1]))
 
+    assert is_normal(re_alter([re_star(re_symbol('c')),
+                              re_epsilon(),
+                              re_empty()]))
+
 def test_smart_constructors():
     # Declare some basic re's first
     eps = re_epsilon()
@@ -114,6 +118,26 @@ def test_smart_constructors():
     assert is_normal(eps ^ b ^ b)
     assert is_normal(a | (b | a))
 
+def test_nullable():
+    eps = re_epsilon()
+    phi = re_empty()
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    r = (a|b) ^ (b|eps) ^ +c
+
+    assert nullable(eps) == eps
+    assert nullable(phi) == phi
+    assert nullable(a) == phi
+    assert nullable(a | eps) == eps
+    assert nullable(a & eps) == nullable(a) & nullable(eps)
+    assert nullable(eps & eps) == nullable(eps) & nullable(eps)
+    assert nullable(b ^ eps) == nullable(b) & nullable(eps)
+    assert nullable(+r) == eps
+    assert nullable(a | b) == nullable(a) | nullable(b)
+    assert nullable(~a) == eps
+    assert nullable(~eps) == phi
+
 def test_deriv():
     # Declare some basic re's first
     eps = re_epsilon()
@@ -121,25 +145,52 @@ def test_deriv():
     a = re_symbol('a')
     b = re_symbol('b')
     c = re_symbol('c')
+    symbols = [a, b, c]
 
     # write some regular expressions for later testing
     r1 = (a | b) ^ (+c)
     r2 = a | (b | a)
-    l = [r1, r2]
+    r3 = (~(a ^ b)) & (~(c ^ a))
+    l = symbols + [eps, phi, r1, r2, r3]
 
-    # check derivative equality
+    # Check derivative equality with concatenation
     assert deriv(phi, a) == phi
     assert deriv(eps, a) == phi
     assert deriv(b, a) == phi
     assert deriv(b, b) == eps
     assert deriv(a ^ b, a) == b
-    assert deriv(+r1, a) == (deriv(r1,a) ^ +r1)
-    assert deriv(~c, c) == ~eps
-    
+
+    # Some basic regression for star and negate
+    for r in l:
+        for s in symbols:
+            assert deriv(+r, s) == (deriv(r,s) ^ +r)
+            assert deriv(~r, s) == ~deriv(r, s)
+
+    # Some more regression for intersection, alternation and concatenation
+    for r1 in l:
+        for r2 in l:
+            for r3 in l:
+                for s in symbols:
+                    if not isinstance(r1, re_concat):
+                        assert deriv(r1 ^ r2, s) == ((deriv(r1, s) ^ r2) |
+                                                     (nullable(r1) ^
+                                                      deriv(r2, s)))
+                    assert deriv(r1 | r2, s) == (deriv(r1, s) |
+                                                 deriv(r2, s))
+                    assert deriv(r1 | r2 | r3, s) == (deriv(r3, s) |
+                                                      deriv(r2, s) |
+                                                      deriv(r1, s))
+                    assert deriv(r1 & r2, s) == (deriv(r1, s) &
+                                                 deriv(r2, s))
+                    assert deriv(r1 & r2 & r3, s) == (deriv(r3, s) &
+                                                      deriv(r2, s) &
+                                                      deriv(r1, s))
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
     test_smart_constructors()
+    test_nullable()
     test_deriv()
 
     print "If this message is printed without errors before it, we're good."

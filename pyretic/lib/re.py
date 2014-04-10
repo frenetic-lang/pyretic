@@ -32,8 +32,8 @@
 import string
 
 # Sorting key macros
-KEY_EPSILON = -1
-KEY_EMPTY   = -2
+KEY_EMPTY   = -1
+KEY_EPSILON = -2
 KEY_CONCAT  = -3
 KEY_ALTER   = -4
 KEY_STAR    = -5
@@ -202,8 +202,12 @@ def nullable(r):
     def bool_to_re(b):
         return re_epsilon() if b else re_empty()
     def re_to_bool(r):
-        assert isinstance(r, re_epsilon) or isinstance(r, re_empty)
-        return True if isinstance(r, re_epsilon) else False
+        if isinstance(r, re_epsilon):
+            return True
+        elif isinstance(r, re_empty):
+            return False
+        else:
+            raise TypeError('re_to_bool expects re_epsilon or re_empty')
     
     assert isinstance(r, re_deriv)
     if isinstance(r, re_epsilon):
@@ -214,21 +218,21 @@ def nullable(r):
         return re_empty()
     elif isinstance(r, re_concat):
         f = lambda x: re_to_bool(nullable(x))
-        return f(r.re1) and f(r.re2)
+        return bool_to_re(f(r.re1) and f(r.re2))
     elif isinstance(r, re_alter):
-        return reduce(lambda acc, s: acc or re_to_bool(nullable(s)),
-                      r.re_list,
-                      False)
+        return bool_to_re(reduce(lambda acc, s: acc or re_to_bool(nullable(s)),
+                                 r.re_list,
+                                 False))
     elif isinstance(r, re_star):
         return re_epsilon()
     elif isinstance(r, re_inters):
-        return reduce(lambda acc, s: acc and re_to_bool(nullable(s)),
-                      r.re_list,
-                      True)
+        return bool_to_re(reduce(lambda acc, s: acc and re_to_bool(nullable(s)),
+                                 r.re_list,
+                                 True))
     elif isinstance(r, re_negate):
         return bool_to_re(not re_to_bool(nullable(r.re)))
     else:
-        raise TypeError
+        raise TypeError('unexpected type for nullable!')
 
 # Smart constructors, which enforce some useful representation invariants in the regular
 # expressions they construct. In particular, the RE is flattened out as much as
@@ -268,45 +272,82 @@ def smart_negate(r):
     else:
         return re_negate(r)
 
+# helpers to determine if expression is empty, or inverse of empty
+def is_empty(r):
+    return isinstance(r, re_empty)
+
+def is_negated_empty(r):
+    return isinstance(r, re_negate) and isinstance(r.re, re_empty)
+
 # smart intersection of regular expressions
 def smart_inters(r, s):
+    def r_empty_helper(r, s):
+        """ Helper to return phi if r is empty, and s if r is ~phi, where phi is
+        the empty set regular expression.
+        """
+        if is_empty(r):
+            return re_empty()
+        elif is_negated_empty(r):
+            return s
+        else:
+            return None
+
     if r == s:
         return r
     elif isinstance(r, re_inters) and isinstance(s, re_inters):
         return re_inters(re_nub(re_sort(r.re_list + s.re_list)))
     elif isinstance(r, re_inters):
-        return re_inters(re_nub(re_sort(r.re_list + [s])))
+        ret = r_empty_helper(s, r)
+        if ret:
+            return ret
+        else:
+            return re_inters(re_nub(re_sort(r.re_list + [s])))
     elif isinstance(s, re_inters):
-        return re_inters(re_nub(re_sort([r] + s.re_list)))
-    elif isinstance(r, re_empty):
-        return re_empty()
-    elif isinstance(s, re_empty):
-        return re_empty()
-    elif isinstance(r, re_negate) and isinstance(r.re, re_empty):
-        return s
-    elif isinstance(s, re_negate) and isinstance(s.re, re_empty):
-        return r
+        ret = r_empty_helper(r, s)
+        if ret:
+            return ret
+        else:
+            return re_inters(re_nub(re_sort([r] + s.re_list)))
+    elif r_empty_helper(r, s):
+        return r_empty_helper(r, s)
+    elif r_empty_helper(s, r):
+        return r_empty_helper(s, r)
     else:
         return re_inters(re_nub(re_sort([r, s])))
 
 # smart alternation of regular expressions
 def smart_alter(r, s):
+    def r_empty_helper(r, s):
+        """ Helper to return s if r is empty, and ~phi if r is ~phi, where phi
+        is the empty set regular expression.
+        """
+        if is_empty(r):
+            return s
+        elif is_negated_empty(r):
+            return re_negate(re_empty())
+        else:
+            return None
+
     if r == s:
         return r
     elif isinstance(r, re_alter) and isinstance(s, re_alter):
         return re_alter(re_nub(re_sort(r.re_list + s.re_list)))
     elif isinstance(r, re_alter):
-        return re_alter(re_nub(re_sort(r.re_list + [s])))
+        ret = r_empty_helper(s, r)
+        if ret:
+            return ret
+        else:
+            return re_alter(re_nub(re_sort(r.re_list + [s])))
     elif isinstance(s, re_alter):
-        return re_alter(re_nub(re_sort([r] + s.re_list)))
-    elif isinstance(r, re_negate) and isinstance(r.re, re_empty):
-        return re_negate(re_empty)
-    elif isinstance(s, re_negate) and isinstance(s.re, re_empty):
-        return re_negate(re_empty)
-    elif isinstance(r, re_empty):
-        return s
-    elif isinstance(s, re_empty):
-        return r
+        ret = r_empty_helper(r, s)
+        if ret:
+            return ret
+        else:
+            return re_alter(re_nub(re_sort([r] + s.re_list)))
+    elif r_empty_helper(r, s):
+        return r_empty_helper(r, s)
+    elif r_empty_helper(s, r):
+        return r_empty_helper(s, r)
     else:
         return re_alter(re_nub(re_sort([r, s])))
 
