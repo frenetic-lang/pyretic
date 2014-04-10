@@ -109,6 +109,9 @@ def test_smart_constructors():
     assert is_normal(~~a)
     assert is_normal(~phi)
     assert is_normal((a ^ b) ^ c)
+    assert is_normal(a ^ eps ^ b ^ eps)
+    assert is_normal(phi ^ c)
+    assert is_normal(eps ^ b ^ b)
     
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
