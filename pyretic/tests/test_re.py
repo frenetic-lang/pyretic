@@ -84,10 +84,36 @@ def test_normal_forms():
     assert is_normal(re_alter([x2, x1, x4]))
     assert not is_normal(re_alter([x6, x2]))
     assert is_normal(re_alter([x5, x1]))
+
+def test_smart_constructors():
+    # Declare some basic re's first
+    eps = re_epsilon()
+    phi = re_empty()
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+
+    # Ensure normality of expressions put together using various operators
+    assert is_normal(a)
+    assert is_normal(eps)
+    assert is_normal(phi)
+    assert is_normal(a ^ b)
+    assert is_normal(+(+(b)))
+    assert is_normal(a | (b | c))
+    assert is_normal(a & (b | c))
+    assert is_normal(c & b & a)
+    assert is_normal(a & a)
+    assert is_normal(c | c | b)
+    assert is_normal(++eps)
+    assert is_normal(~a)
+    assert is_normal(~~a)
+    assert is_normal(~phi)
+    assert is_normal((a ^ b) ^ c)
     
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
+    test_smart_constructors()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
