@@ -66,6 +66,9 @@ class re_deriv(object):
         """ Negation """
         return smart_negate(self)
 
+    def __hash__(self):
+        return hash(self.re_string_repr())
+
 # These are the basic building blocks that applications should use, before
 # combining them with the combinators defined under the parent re_deriv class.
 # epsilon, empty set, and a single symbol from the alphabet.
@@ -79,8 +82,11 @@ class re_epsilon(re_deriv):
     def sort_key(self):
         return KEY_EPSILON
 
-    def __repr__(self):
+    def re_string_repr(self):
         return "epsilon"
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_empty(re_deriv):
     def __init__(self):
@@ -92,8 +98,11 @@ class re_empty(re_deriv):
     def sort_key(self):
         return KEY_EMPTY
 
-    def __repr__(self):
+    def re_string_repr(self):
         return "phi"
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_symbol(re_deriv):
     def __init__(self, char):
@@ -107,8 +116,11 @@ class re_symbol(re_deriv):
     def sort_key(self):
         return ord(self.char)
 
-    def __repr__(self):
+    def re_string_repr(self):
         return self.char
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 ### The following classes are only to be used internally to represent various
 ### regular expression combinators as ASTs. They should *not* be used to
@@ -132,8 +144,11 @@ class re_concat(re_combinator):
     def sort_key(self):
         return KEY_CONCAT
 
-    def __repr__(self):
+    def re_string_repr(self):
         return '(' + repr(self.re1) + ')^(' + repr(self.re2) + ')'
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_alter(re_combinator):
     def __init__(self, re_list):
@@ -146,9 +161,12 @@ class re_alter(re_combinator):
     def sort_key(self):
         return KEY_ALTER
 
-    def __repr__(self):
+    def re_string_repr(self):
         words = map(lambda x: repr(x), self.re_list)
         return '(' + string.join(words, ') | (') + ')'
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_star(re_deriv):
     def __init__(self, re):
@@ -162,8 +180,11 @@ class re_star(re_deriv):
     def sort_key(self):
         return KEY_STAR
 
-    def __repr__(self):
+    def re_string_repr(self):
         return '(' + repr(self.re) + ')*'
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_inters(re_combinator):
     def __init__(self, re_list):
@@ -176,9 +197,12 @@ class re_inters(re_combinator):
     def sort_key(self):
         return KEY_INTERS
 
-    def __repr__(self):
+    def re_string_repr(self):
         words = map(lambda x: repr(x), self.re_list)
         return '(' + string.join(words, ') & (') + ')'
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 class re_negate(re_deriv):
     def __init__(self, re):
@@ -192,8 +216,11 @@ class re_negate(re_deriv):
     def sort_key(self):
         return KEY_NEGATE
 
-    def __repr__(self):
+    def re_string_repr(self):
         return '~(' + repr(self.re) + ')'
+
+    def __repr__(self):
+        return self.re_string_repr()
 
 # Nullable function
 def nullable(r):
