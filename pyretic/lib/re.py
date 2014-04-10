@@ -512,3 +512,55 @@ def match_string(r, s):
     else:
         a = re_symbol(s[0])
         return match_string(deriv(r, a), s[1:])
+
+### DFA construction using derivatives
+### basic transition table implementation
+
+class re_transition_table(object):
+    """ The transition table for the DFA """
+    def __init__(self):
+        self.re_to_transitions = {} # map: re -> (map: symbol -> re)
+
+    def add(self, state, symbol, new_state):
+        assert isinstance(state, re_deriv)
+        assert isinstance(symbol, re_symbol)
+        assert isinstance(new_state, re_deriv)
+        if state in self.re_to_transitions:
+            tt_entry = self.re_to_transitions[state]
+            if symbol in tt_entry:
+                raise AssertionError('symbol already in the transition table for'
+                                     + 'this state')
+            self.re_to_transitions[state][symbol] = new_state
+        else:
+            self.re_to_transitions[state] = {}
+            self.re_to_transitions[state][symbol] = new_state
+
+    def re_already_exists(self, state):
+        assert isinstance(state, re_deriv)
+        return state in self.re_to_transitions.keys()
+
+    def __repr__(self):
+        out = ''
+        for state in self.re_to_transitions.keys():
+            out += "** Transitions from state" + repr(state) + '\n'
+            tt_entry = self.re_to_transitions[state]
+            for edge in tt_entry.keys():
+                out += ("  ---> On symbol " + repr(edge) + " go to state:" +
+                        repr(tt_entry[edge]))
+        return out
+
+class re_state_table(object):
+    """ A table of existing RE states in the DFA """
+    def __init__(self):
+        self.re_table = set([])
+
+    def add(self, state):
+        assert isinstance(state, re_deriv)
+        self.re_table.add(state)
+
+    def re_already_exists(self, state):
+        assert isinstance(state, re_deriv)
+        return state in self.re_table
+
+    def __repr__(self):
+        return repr(self.re_table)
