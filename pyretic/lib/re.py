@@ -521,7 +521,7 @@ class re_transition_table(object):
     def __init__(self):
         self.re_to_transitions = {} # map: re -> (map: symbol -> re)
 
-    def add(self, state, symbol, new_state):
+    def add_transition(self, state, symbol, new_state):
         assert isinstance(state, re_deriv)
         assert isinstance(symbol, re_symbol)
         assert isinstance(new_state, re_deriv)
@@ -535,7 +535,7 @@ class re_transition_table(object):
             self.re_to_transitions[state] = {}
             self.re_to_transitions[state][symbol] = new_state
 
-    def re_already_exists(self, state):
+    def contains_state(self, state):
         assert isinstance(state, re_deriv)
         return state in self.re_to_transitions.keys()
 
@@ -554,13 +554,29 @@ class re_state_table(object):
     def __init__(self):
         self.re_table = set([])
 
-    def add(self, state):
+    def add_state(self, state):
         assert isinstance(state, re_deriv)
         self.re_table.add(state)
 
-    def re_already_exists(self, state):
+    def contains_state(self, state):
         assert isinstance(state, re_deriv)
         return state in self.re_table
 
     def __repr__(self):
         return repr(self.re_table)
+
+class re_dfa(object):
+    def __init__(self, all_states, init_state, final_states, transition_table,
+                 symbol_list):
+        assert isinstance(all_states, re_state_table)
+        assert isinstance(init_state, re_deriv)
+        assert isinstance(final_states, re_state_table)
+        assert isinstance(transition_table, re_transition_table)
+        assert isinstance(symbol_list, str)
+        self.all_states = all_states
+        self.init_state = init_state
+        self.final_states = final_states
+        self.transition_table = transition_table
+        self.symbol_list = symbol_list
+
+# def goto(state, symbol, ...
