@@ -112,11 +112,35 @@ def test_smart_constructors():
     assert is_normal(a ^ eps ^ b ^ eps)
     assert is_normal(phi ^ c)
     assert is_normal(eps ^ b ^ b)
+    assert is_normal(a | (b | a))
+
+def test_deriv():
+    # Declare some basic re's first
+    eps = re_epsilon()
+    phi = re_empty()
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+
+    # write some regular expressions for later testing
+    r1 = (a | b) ^ (+c)
+    r2 = a | (b | a)
+    l = [r1, r2]
+
+    # check derivative equality
+    assert deriv(phi, a) == phi
+    assert deriv(eps, a) == phi
+    assert deriv(b, a) == phi
+    assert deriv(b, b) == eps
+    assert deriv(a ^ b, a) == b
+    assert deriv(+r1, a) == (deriv(r1,a) ^ +r1)
+    assert deriv(~c, c) == ~eps
     
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
     test_smart_constructors()
+    test_deriv()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

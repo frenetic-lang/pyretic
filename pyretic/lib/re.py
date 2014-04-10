@@ -29,6 +29,8 @@
 # for regular expressions.                                                     #
 ################################################################################
 
+import string
+
 # Sorting key macros
 KEY_EPSILON = -1
 KEY_EMPTY   = -2
@@ -77,6 +79,9 @@ class re_epsilon(re_deriv):
     def sort_key(self):
         return KEY_EPSILON
 
+    def __repr__(self):
+        return "epsilon"
+
 class re_empty(re_deriv):
     def __init__(self):
         super(re_empty, self).__init__()
@@ -86,6 +91,9 @@ class re_empty(re_deriv):
 
     def sort_key(self):
         return KEY_EMPTY
+
+    def __repr__(self):
+        return "phi"
 
 class re_symbol(re_deriv):
     def __init__(self, char):
@@ -98,6 +106,9 @@ class re_symbol(re_deriv):
 
     def sort_key(self):
         return ord(self.char)
+
+    def __repr__(self):
+        return self.char
 
 ### The following classes are only to be used internally to represent various
 ### regular expression combinators as ASTs. They should *not* be used to
@@ -121,6 +132,9 @@ class re_concat(re_combinator):
     def sort_key(self):
         return KEY_CONCAT
 
+    def __repr__(self):
+        return '(' + repr(self.re1) + ')^(' + repr(self.re2) + ')'
+
 class re_alter(re_combinator):
     def __init__(self, re_list):
         super(re_alter, self).__init__(re_list)
@@ -131,6 +145,10 @@ class re_alter(re_combinator):
 
     def sort_key(self):
         return KEY_ALTER
+
+    def __repr__(self):
+        words = map(lambda x: repr(x), self.re_list)
+        return '(' + string.join(words, ') | (') + ')'
 
 class re_star(re_deriv):
     def __init__(self, re):
@@ -144,6 +162,9 @@ class re_star(re_deriv):
     def sort_key(self):
         return KEY_STAR
 
+    def __repr__(self):
+        return '(' + repr(self.re) + ')*'
+
 class re_inters(re_combinator):
     def __init__(self, re_list):
         super(re_inters, self).__init__(re_list)
@@ -154,6 +175,10 @@ class re_inters(re_combinator):
 
     def sort_key(self):
         return KEY_INTERS
+
+    def __repr__(self):
+        words = map(lambda x: repr(x), self.re_list)
+        return '(' + string.join(words, ') & (') + ')'
 
 class re_negate(re_deriv):
     def __init__(self, re):
@@ -166,6 +191,9 @@ class re_negate(re_deriv):
 
     def sort_key(self):
         return KEY_NEGATE
+
+    def __repr__(self):
+        return '~(' + repr(self.re) + ')'
 
 # Nullable function
 def nullable(r):
@@ -231,7 +259,7 @@ def smart_star(r):
     elif isinstance(r, re_empty):
         return re_epsilon()
     else:
-        return r
+        return re_star(r)
 
 # smart negation of regular expressions
 def smart_negate(r):
