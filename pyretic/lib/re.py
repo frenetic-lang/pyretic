@@ -296,22 +296,14 @@ def smart_inters(r, s):
         return r
     elif isinstance(r, re_inters) and isinstance(s, re_inters):
         return re_inters(re_nub(re_sort(r.re_list + s.re_list)))
-    elif isinstance(r, re_inters):
-        ret = r_empty_helper(s, r)
-        if ret:
-            return ret
-        else:
-            return re_inters(re_nub(re_sort(r.re_list + [s])))
-    elif isinstance(s, re_inters):
-        ret = r_empty_helper(r, s)
-        if ret:
-            return ret
-        else:
-            return re_inters(re_nub(re_sort([r] + s.re_list)))
     elif r_empty_helper(r, s):
         return r_empty_helper(r, s)
     elif r_empty_helper(s, r):
         return r_empty_helper(s, r)
+    elif isinstance(r, re_inters):
+        return re_inters(re_nub(re_sort(r.re_list + [s])))
+    elif isinstance(s, re_inters):
+        return re_inters(re_nub(re_sort([r] + s.re_list)))
     else:
         return re_inters(re_nub(re_sort([r, s])))
 
@@ -332,22 +324,14 @@ def smart_alter(r, s):
         return r
     elif isinstance(r, re_alter) and isinstance(s, re_alter):
         return re_alter(re_nub(re_sort(r.re_list + s.re_list)))
-    elif isinstance(r, re_alter):
-        ret = r_empty_helper(s, r)
-        if ret:
-            return ret
-        else:
-            return re_alter(re_nub(re_sort(r.re_list + [s])))
-    elif isinstance(s, re_alter):
-        ret = r_empty_helper(r, s)
-        if ret:
-            return ret
-        else:
-            return re_alter(re_nub(re_sort([r] + s.re_list)))
     elif r_empty_helper(r, s):
         return r_empty_helper(r, s)
     elif r_empty_helper(s, r):
         return r_empty_helper(s, r)
+    elif isinstance(r, re_alter):
+        return re_alter(re_nub(re_sort(r.re_list + [s])))
+    elif isinstance(s, re_alter):
+        return re_alter(re_nub(re_sort([r] + s.re_list)))
     else:
         return re_alter(re_nub(re_sort([r, s])))
 
