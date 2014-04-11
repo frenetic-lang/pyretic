@@ -228,6 +228,12 @@ def test_match():
     s = ''
     assert match_string(r, s)
 
+def test_dfa():
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    print makeDFA((a ^ b) | (a ^ c), 'abc')
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
@@ -235,6 +241,7 @@ if __name__ == "__main__":
     test_nullable()
     test_deriv()
     test_match()
+    test_dfa()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

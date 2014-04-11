@@ -523,7 +523,7 @@ class re_transition_table(object):
 
     def add_transition(self, state, symbol, new_state):
         assert isinstance(state, re_deriv)
-        assert isinstance(symbol, re_symbol)
+        assert isinstance(symbol, str) and len(symbol) == 1
         assert isinstance(new_state, re_deriv)
         if state in self.re_to_transitions:
             tt_entry = self.re_to_transitions[state]
@@ -542,17 +542,20 @@ class re_transition_table(object):
     def __repr__(self):
         out = ''
         for state in self.re_to_transitions.keys():
-            out += "** Transitions from state" + repr(state) + '\n'
+            out += "** Transitions from state " + repr(state) + '\n'
             tt_entry = self.re_to_transitions[state]
             for edge in tt_entry.keys():
-                out += ("  ---> On symbol " + repr(edge) + " go to state:" +
-                        repr(tt_entry[edge]))
+                out += (repr(state) + "  ---> " + repr(edge) + " ---> " +
+                        repr(tt_entry[edge]) + '\n')
         return out
 
 class re_state_table(object):
     """ A table of existing RE states in the DFA """
-    def __init__(self):
-        self.re_table = set([])
+    def __init__(self, states=None):
+        if states:
+            self.re_table = set(states)
+        else:
+            self.re_table = set([])
 
     def add_state(self, state):
         assert isinstance(state, re_deriv)
@@ -563,7 +566,17 @@ class re_state_table(object):
         return state in self.re_table
 
     def __repr__(self):
-        return repr(self.re_table)
+        out = ""
+        for q in self.re_table:
+            out += '  ' + repr(q) + '\n'
+        return out
+
+    def get_final_states(self):
+        f = []
+        for q in self.re_table:
+            if nullable(q) == re_epsilon():
+                f.append(q)
+        return re_state_table(f)
 
 class re_dfa(object):
     def __init__(self, all_states, init_state, final_states, transition_table,
@@ -579,4 +592,56 @@ class re_dfa(object):
         self.transition_table = transition_table
         self.symbol_list = symbol_list
 
-# def goto(state, symbol, ...
+    def __repr__(self):
+        out = ''
+        out += "Alphabet list:\n" + repr(self.symbol_list) + '\n'
+        out += "Initial state:\n  " + repr(self.init_state) + '\n'
+        out += "States:\n" + repr(self.all_states)
+        out += "Transition table:\n" + repr(self.transition_table)
+        out += "Final states:\n" + repr(self.final_states)
+        return out
+
+def goto(q, c, tt, states, alphabet_list):
+    """ Explore the state q on the transition through the symbol c, and update
+    the state transition table accordingly.
+    """
+    assert isinstance(q, re_deriv)
+    assert isinstance(c, str) and len(c) == 1
+    assert isinstance(tt, re_transition_table)
+    assert isinstance(states, re_state_table)
+    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+                       alphabet_list))
+            == len(alphabet_list))
+
+    sc = re_symbol(c)
+    qc = deriv(q, sc)
+    if states.contains_state(qc):
+        tt.add_transition(q, c, qc)
+    else:
+        states.add_state(qc)
+        tt.add_transition(q, c, qc)
+        explore(states, tt, qc, alphabet_list)
+
+def explore(states, tt, q, alphabet_list):
+    """ Explore all the transitions through any symbol in alphabet_list on the
+    state q.
+    """
+    assert isinstance(states, re_state_table)
+    assert isinstance(tt, re_transition_table)
+    assert isinstance(q, re_deriv)
+    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+                       alphabet_list))
+            == len(alphabet_list))
+
+    for symbol in alphabet_list:
+        goto(q, symbol, tt, states, alphabet_list)
+
+def makeDFA(r, alphabet_list):
+    """ Make a DFA from a regular expression r. """
+    assert isinstance(r, re_deriv)
+    q0 = r
+    tt = re_transition_table()
+    states = re_state_table([q0])
+    explore(states, tt, q0, alphabet_list)
+    f = states.get_final_states()
+    return re_dfa(states, q0, f, tt, alphabet_list)
