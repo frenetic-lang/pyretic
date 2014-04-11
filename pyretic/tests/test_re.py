@@ -232,7 +232,21 @@ def test_dfa():
     a = re_symbol('a')
     b = re_symbol('b')
     c = re_symbol('c')
-    print makeDFA((a ^ b) | (a ^ c), 'abc')
+    dfa1 = makeDFA((a ^ b) | (a ^ c), 'abc')
+    dfa2 = makeDFA((a ^ c) | (b ^ c), 'abc')
+    dfa3 = makeDFA((+a) | (b ^ c), 'abc')
+
+    assert dfa1.accepts('ab')
+    assert not dfa1.accepts('bc')
+    assert not dfa1.accepts('ca')
+    assert dfa2.accepts('ac')
+    assert not dfa2.accepts('')
+    assert dfa2.accepts('bc')
+    assert not dfa1.accepts('')
+    assert dfa3.accepts('')
+    assert dfa3.accepts('bc')
+    assert not dfa3.accepts('b')
+    assert dfa3.accepts('aaaa')
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":

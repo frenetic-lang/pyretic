@@ -69,6 +69,9 @@ class re_deriv(object):
     def __hash__(self):
         return hash(self.re_string_repr())
 
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 # These are the basic building blocks that applications should use, before
 # combining them with the combinators defined under the parent re_deriv class.
 # epsilon, empty set, and a single symbol from the alphabet.
@@ -539,6 +542,15 @@ class re_transition_table(object):
         assert isinstance(state, re_deriv)
         return state in self.re_to_transitions.keys()
 
+    def lookup_state_symbol(self, q, c):
+        assert isinstance(q, re_deriv)
+        assert isinstance(c, str) and len(c) == 1
+
+        if q in self.re_to_transitions.keys():
+            if c in self.re_to_transitions[q].keys():
+                return self.re_to_transitions[q][c]
+        return None
+
     def __repr__(self):
         out = ''
         for state in self.re_to_transitions.keys():
@@ -591,6 +603,47 @@ class re_dfa(object):
         self.final_states = final_states
         self.transition_table = transition_table
         self.symbol_list = symbol_list
+
+    def run_one_step(self, qcurr, instr):
+        """ Run one step of the DFA from the current state `qcurr` and the
+        remaining input string `instr`.
+        """
+        assert (isinstance(qcurr, re_deriv) and
+                self.all_states.contains_state(qcurr))
+        assert isinstance(instr, str) and len(instr) >= 1
+
+        c = instr[0]
+        assert c in self.symbol_list
+        rest = instr[1:]
+        new_state = self.transition_table.lookup_state_symbol(qcurr, c)
+        return (new_state, rest)
+
+    def run(self, instr):
+        """ Run the input string `instr` through the DFA starting from the
+        initial state, until either the input is completely consumed, or the DFA
+        reaches the \epsilon or \phi state.
+        """
+        (qcurr, rest) = (self.init_state, instr)
+        while rest != '' and qcurr != re_empty():
+            (qcurr, rest) = self.run_one_step(qcurr, rest)
+        return (qcurr, rest)
+
+    def accepts(self, instr):
+        """ Return True if the string `instr` is accepted by this automaton. """
+        (qfinal, rest) = self.run(instr)
+        if rest == '' and self.final_states.contains_state(qfinal):
+            # full string read, and reached a final state
+            return True
+        elif qfinal == re_empty() and len(rest) > 0:
+            # automaton got into a "dead" state before reading the full string
+            return False
+        elif len(rest) == 0 and not self.final_states.contains_state(qfinal):
+            # read the entire input, but not in a final state
+            return False
+        else:
+            raise AssertionError('unexpected result after running DFA!\n' +
+                                 'q: ' + repr(qfinal) +
+                                 ' rest of input: ' + rest)
 
     def __repr__(self):
         out = ''
