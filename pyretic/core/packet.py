@@ -483,6 +483,13 @@ class ArpSrcIp(object): pass
 @of_field("arp.dst_ip", "dstip", ether_validator(ARP), version="1.0")
 class ArpDstIp(object): pass
 
+@of_field("arp.src_mac", "srcmac", ether_validator(ARP), version="1.0")
+class ArpSrcMac(object): pass
+
+@of_field("arp.dst_mac", "dstmac", ether_validator(ARP), version="1.0")
+class ArpDstMac(object): pass
+
+
 ################################################################################
 # Packet 
 ################################################################################
