@@ -248,6 +248,30 @@ def test_dfa():
     assert not dfa3.accepts('b')
     assert dfa3.accepts('aaaa')
 
+def test_dot():
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    symbol_list = 'abc'
+
+    exp1 = (a ^ b) | (a ^ c)
+    exp2 = (+a) | (b ^ c)
+    exp_list = [exp1, exp2]
+
+    import subprocess
+    file_prefix = "/tmp/re_test_"
+    index = 0
+
+    for e in exp_list:
+        index += 1
+        d = makeDFA(e, symbol_list)
+        fname = file_prefix + str(index) + '.txt'
+        f = open(fname, 'w')
+        f.write(d.dot_repr())
+        f.close()
+        print "Printing DFA for expression:", e
+        output = subprocess.check_output(['dot', '-Tx11', fname])
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
@@ -256,6 +280,7 @@ if __name__ == "__main__":
     test_deriv()
     test_match()
     test_dfa()
+    test_dot()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

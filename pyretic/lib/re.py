@@ -30,6 +30,11 @@
 ################################################################################
 
 import string
+try:
+    import pyretic.vendor
+    import pydot as dot
+except:
+    print "Couldn't import pydot; dot visualization will not be possible."
 
 # Sorting key macros
 KEY_EMPTY   = -1
@@ -519,6 +524,9 @@ def match_string(r, s):
 ### DFA construction using derivatives
 ### basic transition table implementation
 
+def get_state_label(i, re):
+    return 'Q' + str(i) + '/' + repr(re)
+
 class re_transition_table(object):
     """ The transition table for the DFA """
     def __init__(self):
@@ -551,6 +559,19 @@ class re_transition_table(object):
                 return self.re_to_transitions[q][c]
         return None
 
+    def dot_add_transitions_to_graph(self, g, re_map):
+        """ Add transitions in this table to the pydot graph object provided
+        (g). This function also uses a numeric mapping from the state to a
+        number provided in re_map.
+        """
+        for state in self.re_to_transitions.keys():
+            tt_entry = self.re_to_transitions[state]
+            src = get_state_label(re_map[state], state)
+            for symbol in tt_entry:
+                dstate = tt_entry[symbol]
+                dst = get_state_label(re_map[dstate], dstate)
+                g.add_edge(dot.Edge(src, dst, label=symbol))
+
     def __repr__(self):
         out = ''
         for state in self.re_to_transitions.keys():
@@ -568,19 +589,44 @@ class re_state_table(object):
             self.re_table = set(states)
         else:
             self.re_table = set([])
+        self.re_map   = {}
+        self.si = 0
+        for s in self.re_table:
+            self.re_map[s] = self.si
+            self.si += 1
 
     def add_state(self, state):
         assert isinstance(state, re_deriv)
+        assert not state in self.re_table
         self.re_table.add(state)
+        self.re_map[state] = self.si
+        self.si += 1
 
     def contains_state(self, state):
         assert isinstance(state, re_deriv)
         return state in self.re_table
 
+    def get_index(self, state):
+        """ Get the numeric index associated with an RE state. """
+        assert state in self.re_map
+        return self.re_map[state]
+
+    def dot_add_states_to_graph(self, g):
+        """ Add all the states in the pydot graph object provided (g). Requires
+        pydot import to successfully work at module startup.
+        """
+        for q in self.re_map.keys():
+            qi = str(self.re_map[q])
+            if nullable(q) == re_epsilon():
+                qshape = 'doublecircle'
+            else:
+                qshape = 'circle'
+            g.add_node(dot.Node(get_state_label(qi, q), shape=qshape))
+
     def __repr__(self):
         out = ""
         for q in self.re_table:
-            out += '  ' + repr(q) + '\n'
+            out += '  ' + repr(q) + ":" + str(self.re_map[q]) + '\n'
         return out
 
     def get_final_states(self):
@@ -644,6 +690,16 @@ class re_dfa(object):
             raise AssertionError('unexpected result after running DFA!\n' +
                                  'q: ' + repr(qfinal) +
                                  ' rest of input: ' + rest)
+
+    def dot_repr(self):
+        """ Output a string which when provided to the graphviz tool `dot` can
+        be used to visualize this DFA.
+        """
+        g  = dot.Dot('my_dfa_name', graph_type='digraph')
+        self.all_states.dot_add_states_to_graph(g)
+        re_map = self.all_states.re_map
+        self.transition_table.dot_add_transitions_to_graph(g, re_map)
+        return g.to_string()
 
     def __repr__(self):
         out = ''
