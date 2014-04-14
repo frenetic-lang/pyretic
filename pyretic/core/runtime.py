@@ -558,6 +558,25 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
+        def check_OF_rules(classifier):
+            def check_OF_rule_has_outport(r):
+                for a in r.actions:
+                    if not 'outport' in a:
+                        raise TypeError('Invalid rule: concrete actions must have an outport',str(r))  
+            def check_OF_rule_has_compilable_action_list(r):
+                if len(r.actions)<2:
+                    pass
+                else:
+                    moded_fields = set(r.actions[0].keys())
+                    for a in r.actions:
+                        fields = set(a.keys())
+                        if fields - moded_fields:
+                            raise TypeError('Non-compilable rule',str(r))  
+            for r in classifier.rules:
+                check_OF_rule_has_outport(r)
+                check_OF_rule_has_compilable_action_list(r)
+            return Classifier(classifier.rules)
+
         def OF_inportize(classifier):
             """
             Specialize classifier to ensure that packets to be forwarded 
@@ -642,6 +661,7 @@ class Runtime(object):
             switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
+            classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
 
