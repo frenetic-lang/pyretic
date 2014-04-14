@@ -500,6 +500,55 @@ def deriv(r, a):
     else:
         raise TypeError('unknown type in deriv')
 
+def deriv_consumed(r, a):
+    """ A version of the derivative function that also returns the list of
+    `re_symbol`s that was consumed. The type of this function is
+    re_deriv -> re_symbol -> (re_deriv * list re_symbol).
+    """
+    assert isinstance(r, re_deriv)
+    assert isinstance(a, re_symbol)
+    asym = a.char
+    if isinstance(r, re_empty):
+        return (re_empty(), [])
+    elif isinstance(r, re_epsilon):
+        return (re_empty(), [])
+    elif isinstance(r, re_symbol):
+        rsym = r.char
+        if rsym == asym:
+            return (re_epsilon(), [r])
+        else:
+            return (re_empty(), [])
+    elif isinstance(r, re_star):
+        (d, s) = deriv_consumed(r.re, a)
+        return (smart_concat(d, smart_star(r.re)), s)
+    elif isinstance(r, re_negate):
+        (d, s) = deriv_consumed(r.re, a)
+        return (smart_negate(d), s)
+    elif isinstance(r, re_concat):
+        (d1, s1) = deriv_consumed(r.re1, a)
+        (d2, s2) = deriv_consumed(r.re2, a)
+        return (smart_alter(
+            smart_concat(d1, r.re2),
+            smart_concat(nullable(r.re1), d2)),
+                s1 + (s2 if nullable(r.re1) == re_epsilon() else []))
+    elif isinstance(r, re_alter):
+        dslist = map(lambda x: deriv_consumed(x, a), r.re_list)
+        return (foldr(lambda rs, s: smart_alter(rs, s[0]),
+                      dslist, re_empty()),
+                foldr(lambda ss, s: ss + s[1],
+                      dslist, []))
+    elif isinstance(r, re_inters):
+        dslist = map(lambda x: deriv_consumed(x, a), r.re_list)
+        """ The union of the consumed symbol list is just one
+        interpretation; other interpretations are possible.
+        """
+        return (foldr(lambda rs, s: smart_inters(rs, s[0]),
+                      dslist, re_negate(re_empty())),
+                foldr(lambda ss, s: ss + s[1],
+                      dslist, []))
+    else:
+        raise TypeError('unknown type in deriv')
+
 # Derivative of a regular expression with respect to a string
 def deriv_string(r, s):
     assert isinstance(r, re_deriv)
@@ -531,20 +580,28 @@ class re_transition_table(object):
     """ The transition table for the DFA """
     def __init__(self):
         self.re_to_transitions = {} # map: re -> (map: symbol -> re)
+        self.re_to_symbols = {} # map: re -> (map: symbol -> re_symbol list)
 
-    def add_transition(self, state, symbol, new_state):
+    def add_transition(self, state, symbol, new_state, symbol_objs=None):
+        def add_hash_entry(htable, key1, key2, error_msg, new_obj):
+            if key1 in htable:
+                entry = htable[key1]
+                if key2 in entry:
+                    raise AssertionError(error_msg)
+                htable[key1][key2] = new_obj
+            else:
+                htable[key1] = {}
+                htable[key1][key2] = new_obj
+
         assert isinstance(state, re_deriv)
         assert isinstance(symbol, str) and len(symbol) == 1
         assert isinstance(new_state, re_deriv)
-        if state in self.re_to_transitions:
-            tt_entry = self.re_to_transitions[state]
-            if symbol in tt_entry:
-                raise AssertionError('symbol already in the transition table for'
-                                     + 'this state')
-            self.re_to_transitions[state][symbol] = new_state
-        else:
-            self.re_to_transitions[state] = {}
-            self.re_to_transitions[state][symbol] = new_state
+        add_hash_entry(self.re_to_transitions, state, symbol,
+                       "Symbol already in transition table for this state!",
+                       new_state)
+        add_hash_entry(self.re_to_symbols, state, symbol,
+                       "re_symbols already in table for this state + symbol!",
+                       symbol_objs)
 
     def contains_state(self, state):
         assert isinstance(state, re_deriv)
@@ -723,12 +780,12 @@ def goto(q, c, tt, states, alphabet_list):
             == len(alphabet_list))
 
     sc = re_symbol(c)
-    qc = deriv(q, sc)
+    (qc, objs) = deriv_consumed(q, sc)
     if states.contains_state(qc):
-        tt.add_transition(q, c, qc)
+        tt.add_transition(q, c, qc, objs)
     else:
         states.add_state(qc)
-        tt.add_transition(q, c, qc)
+        tt.add_transition(q, c, qc, objs)
         explore(states, tt, qc, alphabet_list)
 
 def explore(states, tt, q, alphabet_list):
