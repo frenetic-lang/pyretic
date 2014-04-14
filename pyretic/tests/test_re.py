@@ -254,9 +254,9 @@ def test_dot():
     c = re_symbol('c')
     symbol_list = 'abc'
 
-    exp1 = (a ^ b) | (a ^ c)
-    exp2 = (+a) | (b ^ c)
-    exp_list = [exp1, exp2]
+    exp_list = [(a ^ b) | (a ^ c),
+                (+a) | (b ^ c),
+                (+a) & ~(a ^ a ^ a)]
 
     import subprocess
     file_prefix = "/tmp/re_test_"
