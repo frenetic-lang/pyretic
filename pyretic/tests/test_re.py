@@ -326,24 +326,51 @@ def test_deriv_metadata():
 
     # tests for sample expressions
     (d, r) = deriv_consumed(a1, a)
-    assert d == deriv(a1, a)
+    assert d == re_epsilon()
     assert len(r) == 1 and r[0].get_metadata() == a1.get_metadata()
 
     (d, r) = deriv_consumed(c2, c)
-    assert d == deriv(c2, c)
+    assert d == re_epsilon()
     assert len(r) == 1 and r[0].get_metadata() == c2.get_metadata()
 
     (d, r) = deriv_consumed(a1, b)
-    assert d == deriv(a1, b)
+    assert d == re_empty()
     assert len(r) == 0
 
-    # a1 ^ b
-    # b ^ c1 ^ c2
+    (d, r) = deriv_consumed(a1 ^ b, a)
+    assert d == b
+    assert len(r) == 1 and r[0].get_metadata() == a1.get_metadata()
 
-    # a1 & a2
-    # a1 | c2 | b
+    (d, r) = deriv_consumed(c1 | c2, c)
+    assert d == re_epsilon()
+    assert len(r) == 1
+    assert r[0].get_metadata() == [c1.get_metadata()[0], c2.get_metadata()[0]]
 
-    # (a1 ^ +c1) & ~(a2 ^ c1 ^ c2)
+    (d, r) = deriv_consumed((c1 ^ a) | (c2 ^ b), c)
+    assert d == a | b
+    assert len(r) == 2
+    meta = map(lambda x: x.get_metadata(), r)
+    assert sorted(meta) == sorted([c1.get_metadata(), c2.get_metadata()])
+
+    (d, r) = deriv_consumed((c1 | a) & (c2 | b), c)
+    assert d == re_epsilon()
+    assert len(r) == 2
+    meta = map(lambda x: x.get_metadata(), r)
+    assert sorted(meta) == sorted([c1.get_metadata(), c2.get_metadata()])
+
+    (d, r) = deriv_consumed(~(c2 & (+c) & (c1 ^ b)), c)
+    assert d == ~(re_epsilon() & (re_epsilon() ^ +c) & b)
+    assert len(r) == 3
+    result_meta = map(lambda x: x.get_metadata(), r)
+    actual_meta = [c2.get_metadata(), [], c1.get_metadata()]
+    assert sorted(result_meta) == sorted(actual_meta)
+
+    (d, r) = deriv_consumed((a1 ^ +c1) & ~(a2 ^ c1 ^ c2), a)
+    assert d == +c & ~(c ^ c)
+    assert len(r) == 2
+    result_meta = map(lambda x: x.get_metadata(), r)
+    actual_meta = [a1.get_metadata(), a2.get_metadata()]
+    assert sorted(result_meta) == sorted(actual_meta)
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
