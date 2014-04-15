@@ -160,6 +160,16 @@ def test_deriv():
     assert deriv(b, b) == eps
     assert deriv(a ^ b, a) == b
 
+    # Sample tests with small mixes of various operations
+    assert deriv(+a ^ b, a) == +a ^ b
+    assert deriv(+a ^ b, b) == re_epsilon()
+    assert deriv(+a | b | (a ^ b), a) == +a | b
+    assert deriv(~a, a) == ~re_epsilon()
+    assert deriv(~b, a) == ~re_empty()
+    assert deriv(~(a | (a ^ b)), a) == ~(re_epsilon() | b)
+    assert deriv(~(+a ^ b ^ b) & (a ^ +b), a) == ~(+a ^ b ^ b) & +b
+    assert deriv(~(+a ^ b ^ b) & (a ^ +b), b) == re_empty()
+
     # Some basic regression for star and negate
     for r in l:
         for s in symbols:
