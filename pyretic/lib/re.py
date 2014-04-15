@@ -80,9 +80,36 @@ class re_deriv(object):
 # These are the basic building blocks that applications should use, before
 # combining them with the combinators defined under the parent re_deriv class.
 # epsilon, empty set, and a single symbol from the alphabet.
-class re_epsilon(re_deriv):
-    def __init__(self):
-        super(re_epsilon, self).__init__()
+class re_base(re_deriv):
+    """ Base class for the most basic elements of the language: epsilon, phi,
+    and a single symbol from the alphabet.
+    """
+    def __init__(self, metadata=None, lst=True):
+        super(re_base, self).__init__()
+        if metadata:
+            if lst:
+                self.metadata = [metadata]
+            else:
+                self.metadata = metadata
+        else:
+            self.metadata = []
+
+    def add_metadata(self, new_meta):
+        assert isinstance(new_meta, list)
+        self.metadata += new_meta
+
+    def get_metadata(self):
+        return self.metadata
+
+    def __repr__(self):
+        if self.metadata:
+            return self.re_string_repr() + ' (' + repr(self.metadata) + ')'
+        else:
+            return self.re_string_repr()
+
+class re_epsilon(re_base):
+    def __init__(self, metadata=None, lst=True):
+        super(re_epsilon, self).__init__(metadata, lst)
 
     def __eq__(self, other):
         return isinstance(other, re_epsilon)
@@ -93,12 +120,9 @@ class re_epsilon(re_deriv):
     def re_string_repr(self):
         return "epsilon"
 
-    def __repr__(self):
-        return self.re_string_repr()
-
-class re_empty(re_deriv):
-    def __init__(self):
-        super(re_empty, self).__init__()
+class re_empty(re_base):
+    def __init__(self, metadata=None, lst=True):
+        super(re_empty, self).__init__(metadata, lst)
 
     def __eq__(self, other):
         return isinstance(other, re_empty)
@@ -109,13 +133,10 @@ class re_empty(re_deriv):
     def re_string_repr(self):
         return "phi"
 
-    def __repr__(self):
-        return self.re_string_repr()
-
-class re_symbol(re_deriv):
-    def __init__(self, char):
+class re_symbol(re_base):
+    def __init__(self, char, metadata=None, lst=True):
+        super(re_symbol, self).__init__(metadata, lst)
         self.char = char
-        super(re_symbol, self).__init__()
 
     def __eq__(self, other):
         return (isinstance(other, re_symbol) and
@@ -126,9 +147,6 @@ class re_symbol(re_deriv):
 
     def re_string_repr(self):
         return self.char
-
-    def __repr__(self):
-        return self.re_string_repr()
 
 ### The following classes are only to be used internally to represent various
 ### regular expression combinators as ASTs. They should *not* be used to
@@ -284,10 +302,27 @@ def re_nub(re_list):
     new_list = []
     prev_re = None
     for re in re_list:
-        if not (re == prev_re):
+        if re != prev_re:
             new_list.append(re)
-        prev_re = re
+            prev_re = re
+        else:
+            prev_re = aggregate_metadata(prev_re, re)
     return new_list
+
+def aggregate_metadata(r, s):
+    assert type(r) == type(s)
+    if isinstance(r, re_base):
+        new_meta = r.get_metadata() + s.get_metadata()
+    if isinstance(r, re_symbol):
+        assert r.char == s.char
+        return re_symbol(r.char, metadata=new_meta, lst=False)
+    elif isinstance(r, re_epsilon):
+        return re_epsilon(metadata=new_meta, lst=False)
+    elif isinstance(r, re_empty):
+        return re_empty(metadata=new_meta, lst=False)
+    else:
+        # one of the non re_base types. No metadata to aggregate.
+        return r
 
 # smart star for regular expressions
 def smart_star(r):
@@ -328,7 +363,7 @@ def smart_inters(r, s):
             return None
 
     if r == s:
-        return r
+        return aggregate_metadata(r, s)
     elif isinstance(r, re_inters) and isinstance(s, re_inters):
         return re_inters(re_nub(re_sort(r.re_list + s.re_list)))
     elif r_empty_helper(r, s):
@@ -356,7 +391,7 @@ def smart_alter(r, s):
             return None
 
     if r == s:
-        return r
+        return aggregate_metadata(r, s)
     elif isinstance(r, re_alter) and isinstance(s, re_alter):
         return re_alter(re_nub(re_sort(r.re_list + s.re_list)))
     elif r_empty_helper(r, s):

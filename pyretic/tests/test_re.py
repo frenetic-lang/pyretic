@@ -254,7 +254,7 @@ def test_dot():
     c = re_symbol('c')
     symbol_list = 'abc'
 
-    exp_list = [(a ^ b) | (a ^ c),
+    expr_list = [(a ^ b) | (a ^ c),
                 (+a) | (b ^ c),
                 (+a) & ~(a ^ a ^ a)]
 
@@ -262,15 +262,78 @@ def test_dot():
     file_prefix = "/tmp/re_test_"
     index = 0
 
-    for e in exp_list:
+    for e in expr_list:
         index += 1
         d = makeDFA(e, symbol_list)
+        dot_text = d.dot_repr()
         fname = file_prefix + str(index) + '.txt'
         f = open(fname, 'w')
-        f.write(d.dot_repr())
+        f.write(dot_text)
         f.close()
-        print "Printing DFA for expression:", e
-        output = subprocess.check_output(['dot', '-Tx11', fname])
+        # print "Printing DFA for expression:", e
+        # output = subprocess.check_output(['dot', '-Tx11', fname])
+        # print dot_text
+
+def test_smart_constructors_metadata():
+    """ Test if smart constructors remember objects with metadata correctly. """
+    a  = re_symbol('a')
+    a1 = re_symbol('a', metadata='ingress')
+    a2 = re_symbol('a', metadata='egress')
+    b  = re_symbol('b')
+    b1 = re_symbol('b', metadata='hook')
+    c  = re_symbol('c')
+    c1 = re_symbol('c', metadata='ingress')
+    c2 = re_symbol('c', metadata='egress')
+    symbol_list = 'cba'
+
+    assert a.get_metadata() == []
+    assert a1 == a
+
+    assert a1 & a == a
+    assert (a1 & a).get_metadata() == ['ingress']
+    assert c1 & c & c2 == c
+    assert (c1 & c2 & c).get_metadata() == ['ingress', 'egress']
+    assert (c1 & c2 & c & c2).get_metadata() == ['ingress', 'egress', 'egress']
+    assert c1 & c2 & c & c2 == c
+
+    assert a1 | a == a
+    assert (a1 | a).get_metadata() == ['ingress']
+    assert c1 | c | c2 == c
+    assert (c1 | c2 | c).get_metadata() == ['ingress', 'egress']
+    assert (c1 | c2 | c | c2).get_metadata() == ['ingress', 'egress', 'egress']
+    assert c1 | c2 | c | c2 == c
+
+def test_deriv_metadata():
+    """ Test if derivation works well when consuming derivatives """
+    a  = re_symbol('a')
+    a1 = re_symbol('a', metadata='ingress')
+    a2 = re_symbol('a', metadata='egress')
+    b  = re_symbol('b')
+    b1 = re_symbol('b', metadata='hook')
+    c  = re_symbol('c')
+    c1 = re_symbol('c', metadata='ingress')
+    c2 = re_symbol('c', metadata='egress')
+
+    # tests for sample expressions
+    (d, r) = deriv_consumed(a1, a)
+    assert d == deriv(a1, a)
+    assert len(r) == 1 and r[0].get_metadata() == a1.get_metadata()
+
+    (d, r) = deriv_consumed(c2, c)
+    assert d == deriv(c2, c)
+    assert len(r) == 1 and r[0].get_metadata() == c2.get_metadata()
+
+    (d, r) = deriv_consumed(a1, b)
+    assert d == deriv(a1, b)
+    assert len(r) == 0
+
+    # a1 ^ b
+    # b ^ c1 ^ c2
+
+    # a1 & a2
+    # a1 | c2 | b
+
+    # (a1 ^ +c1) & ~(a2 ^ c1 ^ c2)
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
@@ -281,6 +344,9 @@ if __name__ == "__main__":
     test_match()
     test_dfa()
     test_dot()
+    test_smart_constructors_metadata()
+    test_deriv_metadata()
+    # test_dfa_metadata()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
