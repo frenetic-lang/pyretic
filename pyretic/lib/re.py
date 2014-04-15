@@ -550,7 +550,7 @@ def deriv_consumed(r, a):
     elif isinstance(r, re_symbol):
         rsym = r.char
         if rsym == asym:
-            return (re_epsilon(), [r])
+            return (re_epsilon(), r.get_metadata())
         else:
             return (re_empty(), [])
     elif isinstance(r, re_star):
