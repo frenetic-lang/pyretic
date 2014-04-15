@@ -615,9 +615,9 @@ class re_transition_table(object):
     """ The transition table for the DFA """
     def __init__(self):
         self.re_to_transitions = {} # map: re -> (map: symbol -> re)
-        self.re_to_symbols = {} # map: re -> (map: symbol -> re_symbol list)
+        self.re_to_symbols = {} # map: re -> (map: symbol -> metadata list)
 
-    def add_transition(self, state, symbol, new_state, symbol_objs=None):
+    def add_transition(self, state, symbol, new_state, metadata_objs=None):
         def add_hash_entry(htable, key1, key2, error_msg, new_obj):
             if key1 in htable:
                 entry = htable[key1]
@@ -636,7 +636,7 @@ class re_transition_table(object):
                        new_state)
         add_hash_entry(self.re_to_symbols, state, symbol,
                        "re_symbols already in table for this state + symbol!",
-                       symbol_objs)
+                       metadata_objs)
 
     def contains_state(self, state):
         assert isinstance(state, re_deriv)
