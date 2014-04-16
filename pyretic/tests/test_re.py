@@ -366,6 +366,49 @@ def test_deriv_metadata():
     assert len(r) == 2
     assert sorted(r) == sorted(a1.get_metadata() + a2.get_metadata())
 
+def test_dfa_metadata():
+    """ Check if metadata is stored appropriately mapping to the transitions in
+    the resulting DFA from specific regular expressions. """
+    a  = re_symbol('a')
+    a1 = re_symbol('a', metadata='ingress')
+    a2 = re_symbol('a', metadata='egress')
+    b  = re_symbol('b')
+    b1 = re_symbol('b', metadata='hook')
+    c  = re_symbol('c')
+    c1 = re_symbol('c', metadata='ingress')
+    c2 = re_symbol('c', metadata='egress')
+    c3 = re_symbol('c', metadata='hook')
+    symbol_list = 'cba'
+
+    # make DFAs, and check all metadata transitions
+    e = a1
+    tt = makeDFA(e, symbol_list).transition_table
+    assert tt.get_metadata(a1, 'a') == a1.get_metadata()
+    assert tt.get_metadata(re_empty(), 'a') == []
+
+    e = a1 ^ b
+    tt = makeDFA(e, symbol_list).transition_table
+    assert tt.get_metadata(a1 ^ b, 'a') == a1.get_metadata()
+    assert tt.get_metadata(b, 'b') == []
+    assert tt.get_metadata(re_empty(), 'a') == []
+
+    e = c1 | c2
+    tt = makeDFA(e, symbol_list).transition_table
+    assert (sorted(tt.get_metadata(c1 | c2, 'c')) ==
+            sorted(c1.get_metadata() + c2.get_metadata()))
+    assert tt.get_metadata(re_empty(), 'c') == []
+
+    e = (c1 ^ a2 ^ c3) | (c2 ^ b1 ^ c)
+    tt = makeDFA(e, symbol_list).transition_table
+    assert (sorted(tt.get_metadata(e, 'c')) ==
+            sorted(c1.get_metadata() + c2.get_metadata()))
+    r1 = (a ^ c) | (b ^ c)
+    assert tt.get_metadata(r1, 'a') == a2.get_metadata()
+    assert tt.get_metadata(r1, 'b') == b1.get_metadata()
+    # Problematic! c doesn't get the metadata it should have.
+    assert tt.get_metadata(c, 'c') == c3.get_metadata()
+    assert tt.get_metadata(re_empty(), 'b') == []
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
@@ -377,7 +420,7 @@ if __name__ == "__main__":
     test_dot()
     test_smart_constructors_metadata()
     test_deriv_metadata()
-    # test_dfa_metadata()
+    test_dfa_metadata()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

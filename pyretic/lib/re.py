@@ -71,8 +71,18 @@ class re_deriv(object):
         """ Negation """
         return smart_negate(self)
 
+    def re_string_repr(self):
+        """ This is the representation of the regular expression only depending
+        on the characters and combinators involved (no metadata). Each child
+        class should override this method."""
+        raise NotImplementedError
+
     def __hash__(self):
         return hash(self.re_string_repr())
+
+    def __eq__(self, other):
+        """ Each child class should override this method. """
+        raise NotImplementedError
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -171,10 +181,12 @@ class re_concat(re_combinator):
         return KEY_CONCAT
 
     def re_string_repr(self):
-        return '(' + repr(self.re1) + ')^(' + repr(self.re2) + ')'
+        return ('(' + self.re1.re_string_repr() + ')^(' +
+                self.re2.re_string_repr() + ')')
 
     def __repr__(self):
-        return self.re_string_repr()
+        return ('(' + repr(self.re1) + ')^(' +
+                self.re2.re_string_repr() + ')')
 
 class re_alter(re_combinator):
     def __init__(self, re_list):
@@ -188,11 +200,12 @@ class re_alter(re_combinator):
         return KEY_ALTER
 
     def re_string_repr(self):
-        words = map(lambda x: repr(x), self.re_list)
+        words = map(lambda x: x.re_string_repr(), self.re_list)
         return '(' + string.join(words, ') | (') + ')'
 
     def __repr__(self):
-        return self.re_string_repr()
+        words = map(lambda x: repr(x), self.re_list)
+        return '(' + string.join(words, ') | (') + ')'
 
 class re_star(re_deriv):
     def __init__(self, re):
@@ -207,10 +220,10 @@ class re_star(re_deriv):
         return KEY_STAR
 
     def re_string_repr(self):
-        return '(' + repr(self.re) + ')*'
+        return '(' + self.re.re_string_repr() + ')*'
 
     def __repr__(self):
-        return self.re_string_repr()
+        return '(' + repr(self.re) + ')*'
 
 class re_inters(re_combinator):
     def __init__(self, re_list):
@@ -224,11 +237,12 @@ class re_inters(re_combinator):
         return KEY_INTERS
 
     def re_string_repr(self):
-        words = map(lambda x: repr(x), self.re_list)
+        words = map(lambda x: x.re_string_repr(), self.re_list)
         return '(' + string.join(words, ') & (') + ')'
 
     def __repr__(self):
-        return self.re_string_repr()
+        words = map(lambda x: repr(x), self.re_list)
+        return '(' + string.join(words, ') & (') + ')'
 
 class re_negate(re_deriv):
     def __init__(self, re):
@@ -243,10 +257,10 @@ class re_negate(re_deriv):
         return KEY_NEGATE
 
     def re_string_repr(self):
-        return '~(' + repr(self.re) + ')'
+        return '~(' + self.re.re_string_repr() + ')'
 
     def __repr__(self):
-        return self.re_string_repr()
+        return '~(' + repr(self.re) + ')'
 
 # Nullable function
 def nullable(r):
@@ -504,6 +518,10 @@ def is_normal(r):
 def foldr(fun, re_list, init):
     return reduce(fun, reversed(re_list), init)
 
+# Fold from left
+def foldl(fun, re_list, init):
+    return reduce(fun, re_list, init)
+
 # Derivative of a regular expression with respect to a single symbol
 def deriv(r, a):
     assert isinstance(r, re_deriv)
@@ -525,11 +543,11 @@ def deriv(r, a):
             smart_concat(deriv(r.re1, a), r.re2),
             smart_concat(nullable(r.re1), deriv(r.re2, a)))
     elif isinstance(r, re_alter):
-        return foldr(lambda rs, s: smart_alter(rs, deriv(s, a)),
+        return foldl(lambda rs, s: smart_alter(rs, deriv(s, a)),
                      r.re_list,
                      re_empty())
     elif isinstance(r, re_inters):
-        return foldr(lambda rs, s: smart_inters(rs, deriv(s, a)),
+        return foldl(lambda rs, s: smart_inters(rs, deriv(s, a)),
                      r.re_list,
                      re_negate(re_empty()))
     else:
@@ -568,18 +586,18 @@ def deriv_consumed(r, a):
                 s1 + (s2 if nullable(r.re1) == re_epsilon() else []))
     elif isinstance(r, re_alter):
         dslist = map(lambda x: deriv_consumed(x, a), r.re_list)
-        return (foldr(lambda rs, s: smart_alter(rs, s[0]),
+        return (foldl(lambda rs, s: smart_alter(rs, s[0]),
                       dslist, re_empty()),
-                foldr(lambda ss, s: ss + s[1],
+                foldl(lambda ss, s: ss + s[1],
                       dslist, []))
     elif isinstance(r, re_inters):
         dslist = map(lambda x: deriv_consumed(x, a), r.re_list)
         """ The union of the consumed symbol list is just one
         interpretation; other interpretations are possible.
         """
-        return (foldr(lambda rs, s: smart_inters(rs, s[0]),
+        return (foldl(lambda rs, s: smart_inters(rs, s[0]),
                       dslist, re_negate(re_empty())),
-                foldr(lambda ss, s: ss + s[1],
+                foldl(lambda ss, s: ss + s[1],
                       dslist, []))
     else:
         raise TypeError('unknown type in deriv')
@@ -651,6 +669,15 @@ class re_transition_table(object):
                 return self.re_to_transitions[q][c]
         return None
 
+    def get_metadata(self, q, s):
+        """ Get list of metadata of the objects corresponding to the transition
+        from state `q` over the symbol `s`.
+        """
+        assert isinstance(q, re_deriv) and q in self.transition_to_metadata
+        assert (isinstance(s, str) and len(s) == 1 and
+                s in self.transition_to_metadata[q])
+        return self.transition_to_metadata[q][s]
+
     def dot_add_transitions_to_graph(self, g, re_map):
         """ Add transitions in this table to the pydot graph object provided
         (g). This function also uses a numeric mapping from the state to a
@@ -667,11 +694,13 @@ class re_transition_table(object):
     def __repr__(self):
         out = ''
         for state in self.re_to_transitions.keys():
-            out += "** Transitions from state " + repr(state) + '\n'
+            out += "** Transitions from state " + state.re_string_repr() + '\n'
             tt_entry = self.re_to_transitions[state]
             for edge in tt_entry.keys():
-                out += (repr(state) + "  ---> " + repr(edge) + " ---> " +
-                        repr(tt_entry[edge]) + '\n')
+                out += (state.re_string_repr() + "  ---> " + repr(edge) +
+                        " ---> " + tt_entry[edge].re_string_repr() + '\n')
+                out += ("      on reading metadata: " +
+                        str(self.transition_to_metadata[state][edge]) + '\n')
         return out
 
 class re_state_table(object):
