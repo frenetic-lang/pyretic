@@ -111,6 +111,15 @@ class re_base(re_deriv):
     def get_metadata(self):
         return self.metadata
 
+    def equals_meta(self, other):
+        """ Return True if the other re equals self including metadata,
+        otherwise False.
+        """
+        try:
+            return self == other and self.metadata == other.metadata
+        except:
+            return self == other and id(self.metadata) == id(other.metadata)
+
     def __repr__(self):
         if self.metadata:
             return self.re_string_repr() + ' (' + repr(self.metadata) + ')'
@@ -166,6 +175,17 @@ class re_combinator(re_deriv):
         self.re_list = re_list
         super(re_combinator, self).__init__()
 
+    def equals_meta(self, other):
+        """ Return True if the other re equals self including metadata,
+        otherwise False.
+        """
+        if self == other:
+            return reduce(lambda acc, (x,y): acc and x.equals_meta(y),
+                          zip(self.re_list, other.re_list),
+                          True)
+        else:
+            return False
+
 class re_concat(re_combinator):
     def __init__(self, re1, re2):
         self.re1 = re1
@@ -175,7 +195,8 @@ class re_concat(re_combinator):
     def __eq__(self, other):
         return (isinstance(other, re_concat) and
                 self.re1 == other.re1 and
-                self.re2 == other.re2)
+                self.re2 == other.re2 and
+                self.re_list == other.re_list)
 
     def sort_key(self):
         return KEY_CONCAT
@@ -207,14 +228,15 @@ class re_alter(re_combinator):
         words = map(lambda x: repr(x), self.re_list)
         return '(' + string.join(words, ') | (') + ')'
 
-class re_star(re_deriv):
+class re_star(re_combinator):
     def __init__(self, re):
         self.re = re
-        super(re_star, self).__init__()
+        super(re_star, self).__init__([re])
 
     def __eq__(self, other):
         return (isinstance(other, re_star) and
-                self.re == other.re)
+                self.re == other.re and
+                self.re_list == other.re_list)
 
     def sort_key(self):
         return KEY_STAR
@@ -244,14 +266,15 @@ class re_inters(re_combinator):
         words = map(lambda x: repr(x), self.re_list)
         return '(' + string.join(words, ') & (') + ')'
 
-class re_negate(re_deriv):
+class re_negate(re_combinator):
     def __init__(self, re):
         self.re = re
-        super(re_negate, self).__init__()
+        super(re_negate, self).__init__([re])
 
     def __eq__(self, other):
         return (isinstance(other, re_negate) and
-                self.re == other.re)
+                self.re == other.re and
+                self.re_list == other.re_list)
 
     def sort_key(self):
         return KEY_NEGATE
