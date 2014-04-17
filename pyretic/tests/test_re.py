@@ -408,6 +408,23 @@ def test_dfa_metadata():
     assert tt.get_metadata(c, 'c') == c3.get_metadata()
     assert tt.get_metadata(re_empty(), 'b') == []
 
+    e = (+c1 ^ a1 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
+    d = makeDFA(e, symbol_list)
+    print d
+    tt = d.transition_table
+    st = d.all_states
+    assert (sorted(tt.get_metadata(e, 'c')) ==
+            sorted(c1.get_metadata() + c2.get_metadata()))
+    r1 = (+c ^ a ^ b ^ a) | (c ^ b ^ a)
+    print st.get_expressions(r1)
+    assert (sorted(tt.get_metadata(r1, 'c')) ==
+            sorted(c1.get_metadata() + c3.get_metadata()))
+    print st.get_expressions(b ^ a)
+    assert (sorted(st.get_expressions(b ^ a)) ==
+            sorted([b ^ a2, b1 ^ a1]))
+    assert tt.get_metadata(b ^ a, 'b') == b1.get_metadata()
+    assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()

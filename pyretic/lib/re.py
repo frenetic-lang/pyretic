@@ -207,7 +207,7 @@ class re_concat(re_combinator):
 
     def __repr__(self):
         return ('(' + repr(self.re1) + ')^(' +
-                self.re2.re_string_repr() + ')')
+                repr(self.re2) + ')')
 
 class re_alter(re_combinator):
     def __init__(self, re_list):
@@ -840,8 +840,11 @@ class re_state_table(object):
 
     def __repr__(self):
         out = ""
-        for q in self.re_table:
-            out += '  ' + repr(q) + ":" + str(self.re_map[q]) + '\n'
+        sorted_states = sorted(self.re_table, key=lambda x: self.re_map[x])
+        for q in sorted_states:
+            out += '  ' + str(self.re_map[q]) + ': ' + repr(q) + '\n'
+            for exp in self.get_expressions(q):
+                out += '    --  ' + repr(exp) + '\n'
         return out
 
     def get_final_states(self):
