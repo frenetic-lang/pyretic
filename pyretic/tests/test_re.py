@@ -410,20 +410,33 @@ def test_dfa_metadata():
 
     e = (+c1 ^ a1 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
     d = makeDFA(e, symbol_list)
-    print d
     tt = d.transition_table
     st = d.all_states
     assert (sorted(tt.get_metadata(e, 'c')) ==
             sorted(c1.get_metadata() + c2.get_metadata()))
     r1 = (+c ^ a ^ b ^ a) | (c ^ b ^ a)
-    print st.get_expressions(r1)
     assert (sorted(tt.get_metadata(r1, 'c')) ==
             sorted(c1.get_metadata() + c3.get_metadata()))
-    print st.get_expressions(b ^ a)
+    assert st.get_expressions(b ^ a) == [b ^ a2]
+    assert tt.get_metadata(b ^ a, 'b') == []
+    assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+
+    e = (+c1 ^ c3 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
+    tt = makeDFA(e, symbol_list).transition_table
+    assert (sorted(tt.get_metadata(e, 'c')) ==
+            sorted(c1.get_metadata() + c2.get_metadata() + c3.get_metadata()))
+
+    e = (b1 ^ c1 ^ b ^ a2) | (c3 ^ b1 ^ b1 ^ a1)
+    d = makeDFA(e, symbol_list)
+    tt = d.transition_table
+    st = d.all_states
+    assert tt.get_metadata(e, 'c') == c3.get_metadata()
     assert (sorted(st.get_expressions(b ^ a)) ==
             sorted([b ^ a2, b1 ^ a1]))
     assert tt.get_metadata(b ^ a, 'b') == b1.get_metadata()
     assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+    assert (sorted(tt.get_metadata(a, 'a')) ==
+            sorted(a1.get_metadata() + a2.get_metadata()))
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
