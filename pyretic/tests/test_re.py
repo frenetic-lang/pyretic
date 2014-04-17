@@ -374,11 +374,13 @@ def test_dfa_metadata():
     a2 = re_symbol('a', metadata='egress')
     b  = re_symbol('b')
     b1 = re_symbol('b', metadata='hook')
+    b2 = re_symbol('b', metadata='egress')
     c  = re_symbol('c')
     c1 = re_symbol('c', metadata='ingress')
     c2 = re_symbol('c', metadata='egress')
     c3 = re_symbol('c', metadata='hook')
-    symbol_list = 'cba'
+    d  = re_symbol('d')
+    symbol_list = 'abcd'
 
     # make DFAs, and check all metadata transitions
     e = a1
@@ -435,6 +437,17 @@ def test_dfa_metadata():
             sorted([b ^ a2, b1 ^ a1]))
     assert tt.get_metadata(b ^ a, 'b') == b1.get_metadata()
     assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+    assert (sorted(tt.get_metadata(a, 'a')) ==
+            sorted(a1.get_metadata() + a2.get_metadata()))
+
+    e = (+c1 ^ a1 ^ b2 ^ a2) | (c ^ d ^ b1 ^ a1)
+    d = makeDFA(e, symbol_list)
+    st = d.all_states
+    assert (sorted(st.get_expressions(b ^ a)) ==
+            sorted([b ^ a2, b1 ^ a1]))
+    assert (sorted(tt.get_metadata(b ^ a, 'b')) ==
+            sorted(b1.get_metadata() + b2.get_metadata()))
+    assert (sorted(st.get_expressions(a)) == sorted([a1, a2]))
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 
