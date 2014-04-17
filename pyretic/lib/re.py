@@ -658,26 +658,54 @@ class re_transition_table(object):
         self.re_to_transitions = {} # map: re -> (map: symbol -> re)
         self.transition_to_metadata = {} # map: re -> (map: symbol -> metadata list)
 
-    def add_transition(self, state, symbol, new_state, metadata_objs=None):
-        def add_hash_entry(htable, key1, key2, error_msg, new_obj):
-            if key1 in htable:
-                entry = htable[key1]
-                if key2 in entry:
-                    raise AssertionError(error_msg)
-                htable[key1][key2] = new_obj
-            else:
-                htable[key1] = {}
-                htable[key1][key2] = new_obj
-
+    def add_transition(self, state, symbol, new_state):
         assert isinstance(state, re_deriv)
         assert isinstance(symbol, str) and len(symbol) == 1
         assert isinstance(new_state, re_deriv)
-        add_hash_entry(self.re_to_transitions, state, symbol,
-                       "Symbol already in transition table for this state!",
-                       new_state)
-        add_hash_entry(self.transition_to_metadata, state, symbol,
-                       "metadata already in table for this transition!",
-                       metadata_objs)
+        if state in self.re_to_transitions:
+            entry = self.re_to_transitions[state]
+            if symbol in entry:
+                # sanity check to ensure the destination states of the
+                # transition are the same, if the transition already exists.
+                assert entry[symbol] == new_state
+            entry[symbol] = new_state
+        else:
+            self.re_to_transitions[state] = {}
+            self.re_to_transitions[state][symbol] = new_state
+
+    def add_metadata(self, state, symbol, metadata_objs=None):
+        """ Add a list of metadata objects to an existing transition in the
+        DFA.
+        """
+        def create_meta_list_if_not_exists(meta_map, q, c):
+            if q in meta_map:
+                if not c in meta_map[q]:
+                    meta_map[q][c] = []
+            else:
+                meta_map[q] = {}
+                meta_map[q][c] = []
+
+        def add_single_metadata(meta_list, new_meta):
+            def equals(x, y):
+                try:
+                    return x == y
+                except:
+                    return id(x) == id(y)
+            meta_exists = reduce(lambda acc, x: acc or equals(x, new_meta),
+                                 meta_list,
+                                 False)
+            if not meta_exists:
+                meta_list.append(new_meta)
+                return new_meta
+            else:
+                return None
+
+        assert isinstance(state, re_deriv)
+        assert isinstance(symbol, str) and len(symbol) == 1
+        create_meta_list_if_not_exists(self.transition_to_metadata,
+                                       state, symbol)
+        meta_list = self.transition_to_metadata[state][symbol]
+        map(lambda x: add_single_metadata(meta_list, x), metadata_objs)
 
     def contains_state(self, state):
         assert isinstance(state, re_deriv)
@@ -728,11 +756,20 @@ class re_transition_table(object):
 
 class re_state_table(object):
     """ A table of existing RE states in the DFA """
-    def __init__(self, states=None):
+    def __init__(self, states=None, re_to_exp=None):
         if states:
             self.re_table = set(states)
         else:
             self.re_table = set([])
+        # set up a mapping from state to a list of corresponding expressions, to
+        # keep track of distinct expressions with respect to metadata (even if
+        # same with respect to the regular expression itself).
+        if re_to_exp:
+            self.re_to_exp = re_to_exp
+        else:
+            self.re_to_exp = {}
+            for q in self.re_table:
+                self.re_to_exp[q] = [q]
         self.re_map   = {}
         self.si = 0
         for s in self.re_table:
@@ -745,6 +782,40 @@ class re_state_table(object):
         self.re_table.add(state)
         self.re_map[state] = self.si
         self.si += 1
+        self.re_to_exp[state] = [state]
+
+    def add_expressions(self, q, exps):
+        """ Add some new expressions to a pre-existing state `q`. Note that the
+        new expressions need to be equal to the state under regular expression
+        semantics, but may be different in terms of the metadata of their
+        constituents.
+
+        Returns None if all provided expressions are already in the list of
+        expressions corresponding to the state (equality with respect to
+        metadata), or the list of added expressions.
+        """
+        def add_expression(re_to_exp, q, exp):
+            """ Add a single expression e to the state q. """
+            assert isinstance(exp, re_deriv)
+            for e in re_to_exp[q]:
+                if e.equals_meta(exp):
+                    return None
+            re_to_exp[q] += [exp]
+            return exp
+
+        assert isinstance(q, re_deriv)
+        assert q in self.re_table and q in self.re_to_exp
+        added_exps = []
+        for e in exps:
+            added = add_expression(self.re_to_exp, q, e)
+            if added:
+                added_exps.append(e)
+        return added_exps
+
+    def get_expressions(self, q):
+        """ Get all re expressions corresponding to a state q. """
+        assert q in self.re_table and q in self.re_to_exp
+        return self.re_to_exp[q]
 
     def contains_state(self, state):
         assert isinstance(state, re_deriv)
@@ -866,13 +937,34 @@ def goto(q, c, tt, states, alphabet_list):
                        alphabet_list))
             == len(alphabet_list))
 
+    def get_transition_exps_metadata(q, c, Q):
+        """ Get a list of expressions of the new state that is reached by going
+        from state `q` on reading symbol `c`. The data structure representing
+        the state table is another parameter `Q`. The function returns a set of
+        expressions for the new state that is reached, along with a list of
+        metadata objects consumed in the transition.
+        """
+        assert isinstance(q, re_deriv)
+        assert isinstance(c, str) and len(c) == 1
+        exps = Q.get_expressions(q)
+        sc = re_symbol(c)
+        dst_expressions = []
+        metadata_list = []
+        for e in exps:
+            (e_dst, meta) = deriv_consumed(e, sc)
+            dst_expressions.append(e_dst)
+            metadata_list.append(meta)
+        return (dst_expressions, metadata_list)
+
     sc = re_symbol(c)
-    (qc, objs) = deriv_consumed(q, sc)
-    if states.contains_state(qc):
-        tt.add_transition(q, c, qc, objs)
-    else:
+    qc = deriv(q, sc)
+    (exps, meta) = get_deriv_consumed_exps(q, c, states)
+    if not states.contains_state(qc):
         states.add_state(qc)
-        tt.add_transition(q, c, qc, objs)
+    added_exps = states.add_expressions(qc, exps)
+    tt.add_transition(q, c, qc)
+    tt.add_metadata(q, c, qc, meta)
+    if added_exps: # true if new state, or new expressions on existing state.
         explore(states, tt, qc, alphabet_list)
 
 def explore(states, tt, q, alphabet_list):
