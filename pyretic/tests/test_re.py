@@ -373,7 +373,7 @@ def test_dfa_metadata():
     a1 = re_symbol('a', metadata='ingress')
     a2 = re_symbol('a', metadata='egress')
     b  = re_symbol('b')
-    b1 = re_symbol('b', metadata='hook')
+    b1 = re_symbol('b', metadata='ingress')
     b2 = re_symbol('b', metadata='egress')
     c  = re_symbol('c')
     c1 = re_symbol('c', metadata='ingress')
@@ -381,6 +381,11 @@ def test_dfa_metadata():
     c3 = re_symbol('c', metadata='hook')
     d  = re_symbol('d')
     symbol_list = 'abcd'
+
+    def list_equals_meta(x, y):
+        return reduce(lambda acc, (u,v): acc and u.equals_meta(v),
+                      zip(x, y),
+                      True)
 
     # make DFAs, and check all metadata transitions
     e = a1
@@ -411,17 +416,17 @@ def test_dfa_metadata():
     assert tt.get_metadata(re_empty(), 'b') == []
 
     e = (+c1 ^ a1 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
-    d = makeDFA(e, symbol_list)
-    tt = d.transition_table
-    st = d.all_states
+    dfa = makeDFA(e, symbol_list)
+    tt = dfa.transition_table
+    st = dfa.all_states
     assert (sorted(tt.get_metadata(e, 'c')) ==
             sorted(c1.get_metadata() + c2.get_metadata()))
     r1 = (+c ^ a ^ b ^ a) | (c ^ b ^ a)
     assert (sorted(tt.get_metadata(r1, 'c')) ==
             sorted(c1.get_metadata() + c3.get_metadata()))
-    assert st.get_expressions(b ^ a) == [b ^ a2]
+    assert list_equals_meta(st.get_expressions(b ^ a), [b ^ a2])
     assert tt.get_metadata(b ^ a, 'b') == []
-    assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+    assert list_equals_meta(st.get_expressions(a), [a2, a1])
 
     e = (+c1 ^ c3 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
     tt = makeDFA(e, symbol_list).transition_table
@@ -429,25 +434,26 @@ def test_dfa_metadata():
             sorted(c1.get_metadata() + c2.get_metadata() + c3.get_metadata()))
 
     e = (b1 ^ c1 ^ b ^ a2) | (c3 ^ b1 ^ b1 ^ a1)
-    d = makeDFA(e, symbol_list)
-    tt = d.transition_table
-    st = d.all_states
+    dfa = makeDFA(e, symbol_list)
+    tt = dfa.transition_table
+    st = dfa.all_states
     assert tt.get_metadata(e, 'c') == c3.get_metadata()
-    assert (sorted(st.get_expressions(b ^ a)) ==
-            sorted([b ^ a2, b1 ^ a1]))
+    assert list_equals_meta(st.get_expressions(b ^ a),
+                            [b ^ a2, b1 ^ a1])
     assert tt.get_metadata(b ^ a, 'b') == b1.get_metadata()
-    assert sorted(st.get_expressions(a)) == sorted([a1, a2])
+    assert list_equals_meta(st.get_expressions(a), [a2, a1])
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 
     e = (+c1 ^ a1 ^ b2 ^ a2) | (c ^ d ^ b1 ^ a1)
-    d = makeDFA(e, symbol_list)
-    st = d.all_states
-    assert (sorted(st.get_expressions(b ^ a)) ==
-            sorted([b ^ a2, b1 ^ a1]))
+    dfa = makeDFA(e, symbol_list)
+    st = dfa.all_states
+    tt = dfa.transition_table
+    assert list_equals_meta(st.get_expressions(b ^ a),
+                            [b2 ^ a2, b1 ^ a1])
     assert (sorted(tt.get_metadata(b ^ a, 'b')) ==
             sorted(b1.get_metadata() + b2.get_metadata()))
-    assert (sorted(st.get_expressions(a)) == sorted([a1, a2]))
+    assert list_equals_meta(st.get_expressions(a), [a2, a1])
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 

@@ -928,6 +928,25 @@ class re_dfa(object):
         out += "Final states:\n" + repr(self.final_states)
         return out
 
+def get_transition_exps_metadata(q, c, Q):
+    """ Get a list of expressions of the new state that is reached by going
+    from state `q` on reading symbol `c`. The data structure representing
+    the state table is another parameter `Q`. The function returns a set of
+    expressions for the new state that is reached, along with a list of
+    metadata objects consumed in the transition.
+    """
+    assert isinstance(q, re_deriv)
+    assert isinstance(c, str) and len(c) == 1
+    exps = Q.get_expressions(q)
+    sc = re_symbol(c)
+    dst_expressions = []
+    metadata_list = []
+    for e in exps:
+        (e_dst, meta) = deriv_consumed(e, sc)
+        dst_expressions.append(e_dst)
+        metadata_list += meta
+    return (dst_expressions, metadata_list)
+
 def goto(q, c, tt, states, alphabet_list):
     """ Explore the state q on the transition through the symbol c, and update
     the state transition table accordingly.
@@ -939,25 +958,6 @@ def goto(q, c, tt, states, alphabet_list):
     assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
                        alphabet_list))
             == len(alphabet_list))
-
-    def get_transition_exps_metadata(q, c, Q):
-        """ Get a list of expressions of the new state that is reached by going
-        from state `q` on reading symbol `c`. The data structure representing
-        the state table is another parameter `Q`. The function returns a set of
-        expressions for the new state that is reached, along with a list of
-        metadata objects consumed in the transition.
-        """
-        assert isinstance(q, re_deriv)
-        assert isinstance(c, str) and len(c) == 1
-        exps = Q.get_expressions(q)
-        sc = re_symbol(c)
-        dst_expressions = []
-        metadata_list = []
-        for e in exps:
-            (e_dst, meta) = deriv_consumed(e, sc)
-            dst_expressions.append(e_dst)
-            metadata_list += meta
-        return (dst_expressions, metadata_list)
 
     sc = re_symbol(c)
     qc = deriv(q, sc)
