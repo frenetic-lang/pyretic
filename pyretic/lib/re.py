@@ -782,7 +782,7 @@ class re_state_table(object):
         self.re_table.add(state)
         self.re_map[state] = self.si
         self.si += 1
-        self.re_to_exp[state] = [state]
+        self.re_to_exp[state] = []
 
     def add_expressions(self, q, exps):
         """ Add some new expressions to a pre-existing state `q`. Note that the
@@ -953,17 +953,17 @@ def goto(q, c, tt, states, alphabet_list):
         for e in exps:
             (e_dst, meta) = deriv_consumed(e, sc)
             dst_expressions.append(e_dst)
-            metadata_list.append(meta)
+            metadata_list += meta
         return (dst_expressions, metadata_list)
 
     sc = re_symbol(c)
     qc = deriv(q, sc)
-    (exps, meta) = get_deriv_consumed_exps(q, c, states)
+    (exps, meta) = get_transition_exps_metadata(q, c, states)
     if not states.contains_state(qc):
         states.add_state(qc)
     added_exps = states.add_expressions(qc, exps)
     tt.add_transition(q, c, qc)
-    tt.add_metadata(q, c, qc, meta)
+    tt.add_metadata(q, c, meta)
     if added_exps: # true if new state, or new expressions on existing state.
         explore(states, tt, qc, alphabet_list)
 

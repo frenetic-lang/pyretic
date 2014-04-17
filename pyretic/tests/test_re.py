@@ -405,7 +405,6 @@ def test_dfa_metadata():
     r1 = (a ^ c) | (b ^ c)
     assert tt.get_metadata(r1, 'a') == a2.get_metadata()
     assert tt.get_metadata(r1, 'b') == b1.get_metadata()
-    # Problematic! c doesn't get the metadata it should have.
     assert tt.get_metadata(c, 'c') == c3.get_metadata()
     assert tt.get_metadata(re_empty(), 'b') == []
 
