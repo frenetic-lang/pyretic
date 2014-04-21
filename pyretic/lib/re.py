@@ -652,16 +652,20 @@ def match_string(r, s):
 def get_state_label(i, re):
     return 'Q' + str(i) + '/' + repr(re)
 
-class re_transition_table(object):
-    """ The transition table for the DFA """
-    def __init__(self):
+class dfa_transition_table(object):
+    """ A generic transition table for DFAs """
+    def __init__(self, state_type, state_type_check_fun,
+                 symbol_type, symbol_type_check_fun):
         self.re_to_transitions = {} # map: re -> (map: symbol -> re)
-        self.transition_to_metadata = {} # map: re -> (map: symbol -> metadata list)
+        self.state_type = state_type
+        self.state_type_check_fun = state_type_check_fun
+        self.symbol_type = symbol_type
+        self.symbol_type_check_fun = symbol_type_check_fun
 
     def add_transition(self, state, symbol, new_state):
-        assert isinstance(state, re_deriv)
-        assert isinstance(symbol, str) and len(symbol) == 1
-        assert isinstance(new_state, re_deriv)
+        assert self.state_type_check_fun(state, self.state_type)
+        assert self.state_type_check_fun(new_state, self.state_type)
+        assert self.symbol_type_check_fun(symbol, self.symbol_type)
         if state in self.re_to_transitions:
             entry = self.re_to_transitions[state]
             if symbol in entry:
@@ -672,6 +676,53 @@ class re_transition_table(object):
         else:
             self.re_to_transitions[state] = {}
             self.re_to_transitions[state][symbol] = new_state
+
+    def contains_state(self, state):
+        assert self.state_type_check_fun(state, self.state_type)
+        return state in self.re_to_transitions.keys()
+
+    def lookup_state_symbol(self, q, c):
+        assert self.state_type_check_fun(q, self.state_type)
+        assert self.symbol_type_check_fun(c, self.symbol_type)
+        if q in self.re_to_transitions.keys():
+            if c in self.re_to_transitions[q].keys():
+                return self.re_to_transitions[q][c]
+        return None
+
+    def dot_add_transitions_to_graph(self, g, re_map):
+        """ Add transitions in this table to the pydot graph object provided
+        (g). This function also uses a numeric mapping from the state to a
+        number provided in re_map.
+        """
+        for state in self.re_to_transitions.keys():
+            tt_entry = self.re_to_transitions[state]
+            src = get_state_label(re_map[state], state)
+            for symbol in tt_entry:
+                dstate = tt_entry[symbol]
+                dst = get_state_label(re_map[dstate], dstate)
+                g.add_edge(dot.Edge(src, dst, label=symbol))
+
+    def __repr__(self):
+        out = ''
+        for state in self.re_to_transitions.keys():
+            out += "** Transitions from state " + repr(state) + '\n'
+            tt_entry = self.re_to_transitions[state]
+            for edge in tt_entry.keys():
+                out += (repr(state) + "  ---> " + repr(edge) +
+                        " ---> " + repr(tt_entry[edge]) + '\n')
+        return out
+
+class re_transition_table(dfa_transition_table):
+    """ The transition table for the DFA """
+    def __init__(self):
+        def symcheck(s, typ):
+            return isinstance(s, typ) and len(s) == 1
+        super(re_transition_table, self).__init__(re_deriv,
+                                                  isinstance,
+                                                  str,
+                                                  symcheck)
+        self.transition_to_metadata = {} # map: re -> (map: symbol -> metadata
+                                         # list)
 
     def add_metadata(self, state, symbol, metadata_objs=None):
         """ Add a list of metadata objects to an existing transition in the
@@ -707,19 +758,6 @@ class re_transition_table(object):
         meta_list = self.transition_to_metadata[state][symbol]
         map(lambda x: add_single_metadata(meta_list, x), metadata_objs)
 
-    def contains_state(self, state):
-        assert isinstance(state, re_deriv)
-        return state in self.re_to_transitions.keys()
-
-    def lookup_state_symbol(self, q, c):
-        assert isinstance(q, re_deriv)
-        assert isinstance(c, str) and len(c) == 1
-
-        if q in self.re_to_transitions.keys():
-            if c in self.re_to_transitions[q].keys():
-                return self.re_to_transitions[q][c]
-        return None
-
     def get_metadata(self, q, s):
         """ Get list of metadata of the objects corresponding to the transition
         from state `q` over the symbol `s`.
@@ -728,19 +766,6 @@ class re_transition_table(object):
         assert (isinstance(s, str) and len(s) == 1 and
                 s in self.transition_to_metadata[q])
         return self.transition_to_metadata[q][s]
-
-    def dot_add_transitions_to_graph(self, g, re_map):
-        """ Add transitions in this table to the pydot graph object provided
-        (g). This function also uses a numeric mapping from the state to a
-        number provided in re_map.
-        """
-        for state in self.re_to_transitions.keys():
-            tt_entry = self.re_to_transitions[state]
-            src = get_state_label(re_map[state], state)
-            for symbol in tt_entry:
-                dstate = tt_entry[symbol]
-                dst = get_state_label(re_map[dstate], dstate)
-                g.add_edge(dot.Edge(src, dst, label=symbol))
 
     def __repr__(self):
         out = ''
@@ -754,12 +779,10 @@ class re_transition_table(object):
                         str(self.transition_to_metadata[state][edge]) + '\n')
         return out
 
-class re_state_table(object):
-    """ A table of existing RE states in the DFA """
-    def __init__(self, states=None, re_to_exp=None, keep_re_exps=True,
-                 state_type=re_deriv, state_type_check_fun=isinstance,
-                 final_state_check_fun=lambda x: nullable(x) == re_epsilon()):
-        self.keep_re_exps = keep_re_exps
+class dfa_state_table(object):
+    """ A table of generic states in a DFA """
+    def __init__(self, states, state_type,
+                 state_type_check_fun, final_state_check_fun):
         self.state_type = state_type
         self.state_type_check_fun = state_type_check_fun
         self.final_state_check_fun = final_state_check_fun
@@ -769,16 +792,6 @@ class re_state_table(object):
             self.re_table = set(states)
         else:
             self.re_table = set([])
-        # set up a mapping from state to a list of corresponding expressions, to
-        # keep track of distinct expressions with respect to metadata (even if
-        # same with respect to the regular expression itself).
-        if self.keep_re_exps:
-            if re_to_exp:
-                self.re_to_exp = re_to_exp
-            else:
-                self.re_to_exp = {}
-                for q in self.re_table:
-                    self.re_to_exp[q] = [q]
         self.re_map   = {}
         self.si = 0
         for s in self.re_table:
@@ -791,45 +804,6 @@ class re_state_table(object):
         self.re_table.add(state)
         self.re_map[state] = self.si
         self.si += 1
-        if self.keep_re_exps:
-            self.re_to_exp[state] = []
-
-    def add_expressions(self, q, exps):
-        """ Add some new expressions to a pre-existing state `q`. Note that the
-        new expressions need to be equal to the state under regular expression
-        semantics, but may be different in terms of the metadata of their
-        constituents.
-
-        Returns None if all provided expressions are already in the list of
-        expressions corresponding to the state (equality with respect to
-        metadata), or the list of added expressions.
-        """
-        def add_expression(re_to_exp, q, exp):
-            """ Add a single expression e to the state q. """
-            assert isinstance(exp, re_deriv)
-            for e in re_to_exp[q]:
-                if e.equals_meta(exp):
-                    return None
-            re_to_exp[q] += [exp]
-            return exp
-
-        if not self.keep_re_exps:
-            return None
-        assert isinstance(q, re_deriv)
-        assert q in self.re_table and q in self.re_to_exp
-        added_exps = []
-        for e in exps:
-            added = add_expression(self.re_to_exp, q, e)
-            if added:
-                added_exps.append(e)
-        return added_exps
-
-    def get_expressions(self, q):
-        """ Get all re expressions corresponding to a state q. """
-        if not self.keep_re_exps:
-            return None
-        assert q in self.re_table and q in self.re_to_exp
-        return self.re_to_exp[q]
 
     def contains_state(self, state):
         assert self.state_type_check_fun(state, self.state_type)
@@ -857,9 +831,6 @@ class re_state_table(object):
         sorted_states = sorted(self.re_table, key=lambda x: self.re_map[x])
         for q in sorted_states:
             out += '  ' + str(self.re_map[q]) + ': ' + repr(q) + '\n'
-            if self.keep_re_exps:
-                for exp in self.get_expressions(q):
-                    out += '    --  ' + repr(exp) + '\n'
         return out
 
     def get_final_states(self):
@@ -867,8 +838,81 @@ class re_state_table(object):
         for q in self.re_table:
             if self.final_state_check_fun(q):
                 f.append(q)
-        return re_state_table(f, keep_re_exps=self.keep_re_exps,
-                              state_type=self.state_type,
+        return dfa_state_table(f, state_type=self.state_type,
+                               state_type_check_fun=self.state_type_check_fun,
+                               final_state_check_fun=self.final_state_check_fun)
+
+class re_state_table(dfa_state_table):
+    """ A table of RE states in the DFA """
+    def __init__(self, states=None, re_to_exp=None,
+                 state_type=re_deriv, state_type_check_fun=isinstance,
+                 final_state_check_fun=lambda x: nullable(x) == re_epsilon()):
+        super(re_state_table, self).__init__(states,
+                                             state_type,
+                                             state_type_check_fun,
+                                             final_state_check_fun)
+        # set up a mapping from state to a list of corresponding expressions, to
+        # keep track of distinct expressions with respect to metadata (even if
+        # same with respect to the regular expression itself).
+        if re_to_exp:
+            self.re_to_exp = re_to_exp
+        else:
+            self.re_to_exp = {}
+            for q in self.re_table:
+                self.re_to_exp[q] = [q]
+
+    def __repr__(self):
+        out = ""
+        sorted_states = sorted(self.re_table, key=lambda x: self.re_map[x])
+        for q in sorted_states:
+            out += '  ' + str(self.re_map[q]) + ': ' + q.re_string_repr() + '\n'
+            for exp in self.get_expressions(q):
+                out += '    --  ' + repr(exp) + '\n'
+        return out
+
+    def add_state(self, state):
+        super(re_state_table, self).add_state(state)
+        self.re_to_exp[state] = []
+
+    def add_expressions(self, q, exps):
+        """ Add some new expressions to a pre-existing state `q`. Note that the
+        new expressions need to be equal to the state under regular expression
+        semantics, but may be different in terms of the metadata of their
+        constituents.
+
+        Returns None if all provided expressions are already in the list of
+        expressions corresponding to the state (equality with respect to
+        metadata), or the list of added expressions.
+        """
+        def add_expression(re_to_exp, q, exp):
+            """ Add a single expression e to the state q. """
+            assert isinstance(exp, re_deriv)
+            for e in re_to_exp[q]:
+                if e.equals_meta(exp):
+                    return None
+            re_to_exp[q] += [exp]
+            return exp
+
+        assert isinstance(q, re_deriv)
+        assert q in self.re_table and q in self.re_to_exp
+        added_exps = []
+        for e in exps:
+            added = add_expression(self.re_to_exp, q, e)
+            if added:
+                added_exps.append(e)
+        return added_exps
+
+    def get_expressions(self, q):
+        """ Get all re expressions corresponding to a state q. """
+        assert q in self.re_table and q in self.re_to_exp
+        return self.re_to_exp[q]
+
+    def get_final_states(self):
+        f = []
+        for q in self.re_table:
+            if self.final_state_check_fun(q):
+                f.append(q)
+        return re_state_table(f, state_type=self.state_type,
                               state_type_check_fun=self.state_type_check_fun,
                               final_state_check_fun=self.final_state_check_fun)
 
@@ -1011,3 +1055,51 @@ def makeDFA(r, alphabet_list):
     explore(states, tt, q0, alphabet_list)
     f = states.get_final_states()
     return re_dfa(states, q0, f, tt, alphabet_list)
+
+### Vector regular expressions
+def list_isinstance(l, typ):
+    """ Equivalent of isinstance, but on a list of items of a given type. """
+    return reduce(lambda acc, x: acc and isinstance(x, typ), l, True)
+
+def tuple_from_list(l):
+    return reduce(lambda acc, x: acc + (x,), l, ())
+
+def list_from_tuple(t):
+    return reduce(lambda acc, z: acc + [z], t, [])
+
+def tuple_has_final_state(qtuple):
+    return reduce(lambda acc, x: acc or nullable(x) == re_epsilon(),
+                  qtuple, False)
+
+class re_vector_state_table(dfa_state_table):
+    def __init__(self, states=None):
+        super(re_vector_state_table, self).__init__(
+            states,
+            re_deriv,
+            list_isinstance,
+            tuple_has_final_state)
+
+class re_vector_transition_table(dfa_transition_table):
+    def __init__(self):
+        def symcheck(c, typ):
+            return isinstance(c, typ) and len(c) == 1
+        super(re_vector_transition_table, self).__init__(
+            re_deriv,
+            list_isinstance,
+            str,
+            symcheck)
+
+def goto_vector(q, c, tt, states, alphabet_list):
+    """ Explore the (vector) state q on the transition through the symbol c, and
+    update the (vector) state transition table accordingly.
+    """
+    print "To do, still."
+
+def makeDFA_vector(re_list, alphabet_list):
+    """ Make a DFA from a list of regular expressions `re_list`. """
+    assert list_isinstance(re_list, re_deriv)
+    dfa_dict = {}
+    for exp in re_list:
+        dfa_dict[exp] = makeDFA(exp, alphabet_list)
+    q0 = tuple_from_list(re_list)
+    print "Under construction, still."
