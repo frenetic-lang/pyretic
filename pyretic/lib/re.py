@@ -756,20 +756,29 @@ class re_transition_table(object):
 
 class re_state_table(object):
     """ A table of existing RE states in the DFA """
-    def __init__(self, states=None, re_to_exp=None):
+    def __init__(self, states=None, re_to_exp=None, keep_re_exps=True,
+                 state_type=re_deriv, state_type_check_fun=isinstance,
+                 final_state_check_fun=lambda x: nullable(x) == re_epsilon()):
+        self.keep_re_exps = keep_re_exps
+        self.state_type = state_type
+        self.state_type_check_fun = state_type_check_fun
+        self.final_state_check_fun = final_state_check_fun
         if states:
+            for s in states:
+                self.state_type_check_fun(s, self.state_type)
             self.re_table = set(states)
         else:
             self.re_table = set([])
         # set up a mapping from state to a list of corresponding expressions, to
         # keep track of distinct expressions with respect to metadata (even if
         # same with respect to the regular expression itself).
-        if re_to_exp:
-            self.re_to_exp = re_to_exp
-        else:
-            self.re_to_exp = {}
-            for q in self.re_table:
-                self.re_to_exp[q] = [q]
+        if self.keep_re_exps:
+            if re_to_exp:
+                self.re_to_exp = re_to_exp
+            else:
+                self.re_to_exp = {}
+                for q in self.re_table:
+                    self.re_to_exp[q] = [q]
         self.re_map   = {}
         self.si = 0
         for s in self.re_table:
@@ -777,12 +786,13 @@ class re_state_table(object):
             self.si += 1
 
     def add_state(self, state):
-        assert isinstance(state, re_deriv)
+        assert self.state_type_check_fun(state, self.state_type)
         assert not state in self.re_table
         self.re_table.add(state)
         self.re_map[state] = self.si
         self.si += 1
-        self.re_to_exp[state] = []
+        if self.keep_re_exps:
+            self.re_to_exp[state] = []
 
     def add_expressions(self, q, exps):
         """ Add some new expressions to a pre-existing state `q`. Note that the
@@ -803,6 +813,8 @@ class re_state_table(object):
             re_to_exp[q] += [exp]
             return exp
 
+        if not self.keep_re_exps:
+            return None
         assert isinstance(q, re_deriv)
         assert q in self.re_table and q in self.re_to_exp
         added_exps = []
@@ -814,11 +826,13 @@ class re_state_table(object):
 
     def get_expressions(self, q):
         """ Get all re expressions corresponding to a state q. """
+        if not self.keep_re_exps:
+            return None
         assert q in self.re_table and q in self.re_to_exp
         return self.re_to_exp[q]
 
     def contains_state(self, state):
-        assert isinstance(state, re_deriv)
+        assert self.state_type_check_fun(state, self.state_type)
         return state in self.re_table
 
     def get_index(self, state):
@@ -832,7 +846,7 @@ class re_state_table(object):
         """
         for q in self.re_map.keys():
             qi = str(self.re_map[q])
-            if nullable(q) == re_epsilon():
+            if self.final_state_check_fun(q):
                 qshape = 'doublecircle'
             else:
                 qshape = 'circle'
@@ -843,16 +857,20 @@ class re_state_table(object):
         sorted_states = sorted(self.re_table, key=lambda x: self.re_map[x])
         for q in sorted_states:
             out += '  ' + str(self.re_map[q]) + ': ' + repr(q) + '\n'
-            for exp in self.get_expressions(q):
-                out += '    --  ' + repr(exp) + '\n'
+            if self.keep_re_exps:
+                for exp in self.get_expressions(q):
+                    out += '    --  ' + repr(exp) + '\n'
         return out
 
     def get_final_states(self):
         f = []
         for q in self.re_table:
-            if nullable(q) == re_epsilon():
+            if self.final_state_check_fun(q):
                 f.append(q)
-        return re_state_table(f)
+        return re_state_table(f, keep_re_exps=self.keep_re_exps,
+                              state_type=self.state_type,
+                              state_type_check_fun=self.state_type_check_fun,
+                              final_state_check_fun=self.final_state_check_fun)
 
 class re_dfa(object):
     def __init__(self, all_states, init_state, final_states, transition_table,
