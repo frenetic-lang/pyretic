@@ -916,25 +916,31 @@ class re_state_table(dfa_state_table):
                               state_type_check_fun=self.state_type_check_fun,
                               final_state_check_fun=self.final_state_check_fun)
 
-class re_dfa(object):
+class dfa(object):
     def __init__(self, all_states, init_state, final_states, transition_table,
-                 symbol_list):
-        assert isinstance(all_states, re_state_table)
-        assert isinstance(init_state, re_deriv)
-        assert isinstance(final_states, re_state_table)
-        assert isinstance(transition_table, re_transition_table)
+                 symbol_list, state_table_type, state_type,
+                 state_type_check_fun, tt_type, dead_state_check_fun):
+        assert isinstance(all_states, state_table_type)
+        assert state_type_check_fun(init_state, state_type)
+        assert isinstance(final_states, state_table_type)
+        assert isinstance(transition_table, tt_type)
         assert isinstance(symbol_list, str)
         self.all_states = all_states
         self.init_state = init_state
         self.final_states = final_states
         self.transition_table = transition_table
         self.symbol_list = symbol_list
+        self.state_table_type = state_table_type
+        self.state_type = state_type
+        self.state_type_check_fun = state_type_check_fun
+        self.tt_type = tt_type
+        self.dead_state_check_fun = dead_state_check_fun
 
     def run_one_step(self, qcurr, instr):
         """ Run one step of the DFA from the current state `qcurr` and the
         remaining input string `instr`.
         """
-        assert (isinstance(qcurr, re_deriv) and
+        assert (self.state_type_check_fun(qcurr, self.state_type) and
                 self.all_states.contains_state(qcurr))
         assert isinstance(instr, str) and len(instr) >= 1
 
@@ -950,7 +956,7 @@ class re_dfa(object):
         reaches the \epsilon or \phi state.
         """
         (qcurr, rest) = (self.init_state, instr)
-        while rest != '' and qcurr != re_empty():
+        while rest != '' and not self.dead_state_check_fun(qcurr):
             (qcurr, rest) = self.run_one_step(qcurr, rest)
         return (qcurr, rest)
 
@@ -960,7 +966,7 @@ class re_dfa(object):
         if rest == '' and self.final_states.contains_state(qfinal):
             # full string read, and reached a final state
             return True
-        elif qfinal == re_empty() and len(rest) > 0:
+        elif self.dead_state_check_fun(qfinal) and len(rest) > 0:
             # automaton got into a "dead" state before reading the full string
             return False
         elif len(rest) == 0 and not self.final_states.contains_state(qfinal):
@@ -990,6 +996,15 @@ class re_dfa(object):
         out += "Final states:\n" + repr(self.final_states)
         return out
 
+class re_dfa(dfa):
+    def __init__(self, all_states, init_state, final_states, transition_table,
+                 symbol_list):
+        super(re_dfa, self).__init__(all_states, init_state, final_states,
+                                     transition_table, symbol_list,
+                                     re_state_table, re_deriv, isinstance,
+                                     re_transition_table,
+                                     lambda x: x == re_empty())
+
 def get_transition_exps_metadata(q, c, Q):
     """ Get a list of expressions of the new state that is reached by going
     from state `q` on reading symbol `c`. The data structure representing
@@ -1009,17 +1024,23 @@ def get_transition_exps_metadata(q, c, Q):
         metadata_list += meta
     return (dst_expressions, metadata_list)
 
+def typecheck_goto(q, c, tt, states, alphabet_list,
+                   state_type, state_type_check_fun,
+                   tt_type, states_table_type):
+    assert state_type_check_fun(q, state_type)
+    assert isinstance(c, str) and len(c) == 1
+    assert isinstance(tt, tt_type)
+    assert isinstance(states, states_table_type)
+    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+                       alphabet_list))
+            == len(alphabet_list))
+
 def goto(q, c, tt, states, alphabet_list):
     """ Explore the state q on the transition through the symbol c, and update
     the state transition table accordingly.
     """
-    assert isinstance(q, re_deriv)
-    assert isinstance(c, str) and len(c) == 1
-    assert isinstance(tt, re_transition_table)
-    assert isinstance(states, re_state_table)
-    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
-                       alphabet_list))
-            == len(alphabet_list))
+    typecheck_goto(q, c, tt, states, alphabet_list, re_deriv, isinstance,
+                   re_transition_table, re_state_table)
 
     sc = re_symbol(c)
     qc = deriv(q, sc)
@@ -1032,17 +1053,21 @@ def goto(q, c, tt, states, alphabet_list):
     if added_exps: # true if new state, or new expressions on existing state.
         explore(states, tt, qc, alphabet_list)
 
-def explore(states, tt, q, alphabet_list):
-    """ Explore all the transitions through any symbol in alphabet_list on the
-    state q.
-    """
-    assert isinstance(states, re_state_table)
-    assert isinstance(tt, re_transition_table)
-    assert isinstance(q, re_deriv)
+def typecheck_explore(states, tt, q, alphabet_list, state_table_type, tt_type,
+                      state_type, state_type_check_fun):
+    assert isinstance(states, state_table_type)
+    assert isinstance(tt, tt_type)
+    assert state_type_check_fun(q, state_type)
     assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
                        alphabet_list))
             == len(alphabet_list))
 
+def explore(states, tt, q, alphabet_list):
+    """ Explore all the transitions through any symbol in alphabet_list on the
+    state q.
+    """
+    typecheck_explore(states, tt, q, alphabet_list, re_state_table,
+                      re_transition_table, re_deriv, isinstance)
     for symbol in alphabet_list:
         goto(q, symbol, tt, states, alphabet_list)
 
@@ -1089,11 +1114,52 @@ class re_vector_transition_table(dfa_transition_table):
             str,
             symcheck)
 
+class re_vector_dfa(dfa):
+    def __init__(self, all_states, init_state, final_states, transition_table,
+                 symbol_list):
+        def check_dead_state(x):
+            return reduce(lambda q, acc: acc and q == re_empty(), x, True)
+
+        super(re_vector_dfa, self).__init__(all_states, init_state,
+                                            final_states, transition_table,
+                                            symbol_list, re_vector_state_table,
+                                            re_deriv, list_isinstance,
+                                            re_vector_transition_table,
+                                            check_dead_state)
+
+def deriv_vector(r, a):
+    """ Derive a regular vector `r` with respect to an re_symbol `a`. """
+    assert list_isinstance(r, re_deriv)
+    assert isinstance(a, re_symbol)
+    s = []
+    for exp in r:
+        s += [deriv(exp, a)]
+    return tuple_from_list(s)
+
 def goto_vector(q, c, tt, states, alphabet_list):
     """ Explore the (vector) state q on the transition through the symbol c, and
     update the (vector) state transition table accordingly.
     """
-    print "To do, still."
+    typecheck_goto(q, c, tt, states, alphabet_list, re_deriv, list_isinstance,
+                   re_vector_transition_table, re_vector_state_table)
+
+    sc = re_symbol(c)
+    qc = deriv_vector(q, sc)
+    if states.contains_state(qc):
+        tt.add_transition(q, c, qc)
+    else:
+        states.add_states(qc)
+        tt.add_transition(q, c, qc)
+        explore_vector(states, tt, qc, alphabet_list)
+
+def explore_vector(states, tt, q, alphabet_list):
+    """ Explore all the transitions through any symbol in alphabet_list on the
+    state q.
+    """
+    typecheck_explore(states, tt, q, alphabet_list, re_vector_state_table,
+                      re_vector_transition_table, re_deriv, list_isinstance)
+    for symbol in alphabet_list:
+        goto_vector(q, symbol, tt, states, alphabet_list)
 
 def makeDFA_vector(re_list, alphabet_list):
     """ Make a DFA from a list of regular expressions `re_list`. """
@@ -1102,4 +1168,8 @@ def makeDFA_vector(re_list, alphabet_list):
     for exp in re_list:
         dfa_dict[exp] = makeDFA(exp, alphabet_list)
     q0 = tuple_from_list(re_list)
-    print "Under construction, still."
+    tt = re_vector_transition_table()
+    states = re_vector_state_table([q0])
+    explore_vector(states, tt, q0, alphabet_list)
+    f = states.get_final_states()
+    return re_vector_dfa(states, q0, f, tt, alphabet_list)
