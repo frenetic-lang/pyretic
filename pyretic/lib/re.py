@@ -1092,17 +1092,23 @@ def tuple_from_list(l):
 def list_from_tuple(t):
     return reduce(lambda acc, z: acc + [z], t, [])
 
-def tuple_has_final_state(qtuple):
-    return reduce(lambda acc, x: acc or nullable(x) == re_epsilon(),
-                  qtuple, False)
-
 class re_vector_state_table(dfa_state_table):
     def __init__(self, states=None):
+        def tuple_has_final_state(qtuple):
+            return reduce(lambda acc, x: acc or nullable(x) == re_epsilon(),
+                          qtuple, False)
         super(re_vector_state_table, self).__init__(
             states,
             re_deriv,
             list_isinstance,
             tuple_has_final_state)
+
+    def get_final_states(self):
+        f = []
+        for q in self.re_table:
+            if self.final_state_check_fun(q):
+                f.append(q)
+        return re_vector_state_table(f)
 
 class re_vector_transition_table(dfa_transition_table):
     def __init__(self):
@@ -1133,7 +1139,7 @@ def deriv_vector(r, a):
     assert isinstance(a, re_symbol)
     s = []
     for exp in r:
-        s += [deriv(exp, a)]
+        s.append(deriv(exp, a))
     return tuple_from_list(s)
 
 def goto_vector(q, c, tt, states, alphabet_list):
@@ -1148,7 +1154,7 @@ def goto_vector(q, c, tt, states, alphabet_list):
     if states.contains_state(qc):
         tt.add_transition(q, c, qc)
     else:
-        states.add_states(qc)
+        states.add_state(qc)
         tt.add_transition(q, c, qc)
         explore_vector(states, tt, qc, alphabet_list)
 
@@ -1164,6 +1170,9 @@ def explore_vector(states, tt, q, alphabet_list):
 def makeDFA_vector(re_list, alphabet_list):
     """ Make a DFA from a list of regular expressions `re_list`. """
     assert list_isinstance(re_list, re_deriv)
+    if len(re_list) == 0:
+        print "No DFA constructed from empty list of regular expressions."
+        return None
     dfa_dict = {}
     for exp in re_list:
         dfa_dict[exp] = makeDFA(exp, alphabet_list)

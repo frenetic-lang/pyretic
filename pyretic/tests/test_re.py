@@ -457,6 +457,32 @@ def test_dfa_metadata():
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 
+def test_dfa_vector():
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    e1 = (a ^ b) | (a ^ c)
+    e2 = (a ^ c) | (b ^ c)
+    e3 = (+a) | (b ^ c)
+    symlist = 'abc'
+
+    # base case: single expression lists.
+    dfa1 = makeDFA_vector([e1], symlist)
+    dfa2 = makeDFA_vector([e2], symlist)
+    dfa3 = makeDFA_vector([e3], symlist)
+
+    assert dfa1.accepts('ab')
+    assert not dfa1.accepts('bc')
+    assert not dfa1.accepts('ca')
+    assert dfa2.accepts('ac')
+    assert not dfa2.accepts('')
+    assert dfa2.accepts('bc')
+    assert not dfa1.accepts('')
+    assert dfa3.accepts('')
+    assert dfa3.accepts('bc')
+    assert not dfa3.accepts('b')
+    assert dfa3.accepts('aaaa')
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
@@ -469,6 +495,7 @@ if __name__ == "__main__":
     test_smart_constructors_metadata()
     test_deriv_metadata()
     test_dfa_metadata()
+    test_dfa_vector()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
