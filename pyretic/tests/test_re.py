@@ -461,10 +461,12 @@ def test_dfa_vector():
     a = re_symbol('a')
     b = re_symbol('b')
     c = re_symbol('c')
+    d = re_symbol('d')
     e1 = (a ^ b) | (a ^ c)
     e2 = (a ^ c) | (b ^ c)
     e3 = (+a) | (b ^ c)
-    symlist = 'abc'
+    e4 = (+a ^ +b) | (c ^ d)
+    symlist = 'abcd'
 
     # base case: single expression lists.
     dfa1 = makeDFA_vector([e1], symlist)
@@ -483,6 +485,65 @@ def test_dfa_vector():
     assert not dfa3.accepts('b')
     assert dfa3.accepts('aaaa')
 
+    # try multiple expression tests :)
+    dfa12 = makeDFA_vector([e1, e2], symlist)
+    assert dfa12.accepts('ab')
+    assert dfa12.accepts('bc')
+    assert not dfa12.accepts('abc')
+    assert not dfa12.accepts('ca')
+    assert dfa12.accepts('ac')
+    assert not dfa12.accepts('')
+    assert dfa12.accepts('bc')
+    assert not dfa12.accepts('')
+
+    dfa23 = makeDFA_vector([e2, e3], symlist)
+    assert dfa23.accepts('ac')
+    assert dfa23.accepts('')
+    assert dfa23.accepts('bc')
+    assert not dfa23.accepts('b')
+    assert dfa23.accepts('aaaa')
+    assert not dfa23.accepts('aaaaaaaab')
+    assert dfa23.accepts('aaaaaaaaa')
+
+    dfa1234 = makeDFA_vector([e1, e2, e3, e4], symlist)
+    assert dfa1234.accepts('')
+    assert dfa1234.accepts('ac')
+    assert dfa1234.accepts('ab')
+    assert dfa1234.accepts('aaaaaaaaab')
+    assert dfa1234.accepts('aaaaaaaaabbbbbb')
+    assert not dfa1234.accepts('aaaaaaaaabbbbbbc')
+    assert not dfa1234.accepts('c')
+    assert dfa1234.accepts('cd')
+
+def test_dot_vector():
+    a = re_symbol('a')
+    b = re_symbol('b')
+    c = re_symbol('c')
+    d = re_symbol('d')
+    symbol_list = 'abcd'
+
+    expr_list1 = [(a ^ b) | (a ^ c),
+                (+a) | (b ^ c),
+                (+a) & ~(a ^ a ^ a)]
+    expr_list2 = [(+c ^ a ^ b ^ a) | (c ^ d ^ b ^ a),
+                  (c ^ a ^ c) | (c ^ b ^ c)]
+
+    re_lists = [expr_list1, expr_list2]
+
+    import subprocess
+    file_prefix = "/tmp/re_test_"
+    index = 0
+
+    for e in re_lists:
+        index += 1
+        d = makeDFA_vector(e, symbol_list)
+        dot_text = d.dot_repr()
+        fname = file_prefix + '-' + str(index) + '-vector.txt'
+        f = open(fname, 'w')
+        f.write(dot_text)
+        f.close()
+        # output = subprocess.check_output(['dot', '-Tx11', fname])
+
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
     test_normal_forms()
@@ -496,6 +557,7 @@ if __name__ == "__main__":
     test_deriv_metadata()
     test_dfa_metadata()
     test_dfa_vector()
+    test_dot_vector()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."
