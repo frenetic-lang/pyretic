@@ -37,10 +37,6 @@ import subprocess
 import pyretic.vendor
 import pydot
 
-#############################################################################
-### Basic classes for generating path atoms and creating path expressions ###
-#############################################################################
-
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
 # token type definitions
 TOK_INGRESS = "ingress"
@@ -48,6 +44,10 @@ TOK_EGRESS = "egress"
 TOK_DROP = "drop"
 TOK_END_PATH = "end_path"
 TOK_HOOK = "ingress_hook"
+
+#############################################################################
+###             Utilities to map predicates to characters                 ###
+#############################################################################
 
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
@@ -316,6 +316,10 @@ class CharacterGenerator:
         else:
             return []
 
+#############################################################################
+###               Path query language components                          ###
+#############################################################################
+
 class path(Query):
     """A way to query packets or traffic volumes satisfying regular expressions
     denoting paths of located packets.
@@ -369,6 +373,177 @@ class path(Query):
         """
         return path_star(self)
 
+
+class abstract_atom(path, Filter):
+    """A single atomic match in a path expression. This is an abstract class
+    where the token isn't initialized.
+
+    :param m: a Filter (or match) object used to initialize the path atom.
+    :type match: Filter
+    """
+    def __init__(self, m):
+        assert isinstance(m, Filter)
+        self.policy = m
+        super(abstract_atom, self).__init__(a=self)
+
+    def __and__(self, other):
+        assert isinstance(other, type(self))
+        return type(self)(self.policy & other.policy)
+
+    def __or__(self, other):
+        if isinstance(other, abstract_atom):
+            assert isinstance(other, type(self))
+            return type(self)(self.policy | other.policy)
+        elif isinstance(other, path):
+            return super(abstract_atom, self).__or__(other)
+        else:
+            raise TypeError
+
+    def __sub__(self, other):
+        assert isinstance(other, type(self))
+        return type(self)((~other.policy) & self.policy)
+
+    def __invert__(self):
+        return type(self)(~(self.policy))
+
+
+class atom(abstract_atom):
+    """A concrete "ingress" match atom."""
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
+                                                  nonoverlapping_filters=True)
+        super(atom, self).__init__(m)
+
+
+class egress_atom(abstract_atom):
+    """An atom that denotes a match on a packet after the forwarding decision
+    has been made. It can always be substituted by a normal ("ingress") atom at
+    the next hop, unless the packet is egressing the network. Hence, it may be
+    noted that this is only necessary (apart from expressive power, of course)
+    to match on packets that egress the network.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
+                                                  nonoverlapping_filters=True)
+        super(egress_atom, self).__init__(m)
+
+
+class drop_atom(abstract_atom):
+    """An atom that matches on packets that were dropped by the forwarding
+    policy.
+    """
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
+                                                  nonoverlapping_filters=True)
+        super(drop_atom, self).__init__(m)
+
+class end_path(abstract_atom):
+    def __init__(self, m):
+        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
+                                                  nonoverlapping_filters=True)
+        super(end_path, self).__init__(m)
+
+
+class hook(abstract_atom):
+    """A hook is essentially like an atom, but has a notion of "grouping"
+    associated with it. Whenever a packet arrives into this hook, we group them
+    by the values of the fields specified in the groupby=... argument of the
+    constructor.
+    """
+    def __init__(self, m, groupby=[]):
+        assert groupby and len(groupby) > 0
+        self.groupby = groupby
+        cg = CharacterGenerator
+        self.token = cg.get_token(m, toktype=TOK_INGRESS,
+                                  nonoverlapping_filters=True)
+        self.groupby_token = cg.get_token(identity, toktype=TOK_HOOK,
+                                          nonoverlapping_filters=False)
+        cg.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
+        super(hook, self).__init__(m)
+        char = cg.get_char_from_token
+        self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
+
+    def __and__(self, other):
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook(self.policy & other.policy, self.groupby)
+
+    def __or__(self, other):
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook(self.policy | other.policy, self.groupby)
+
+    def __sub__(self, other):
+        assert isinstance(other, hook)
+        assert self.groupby == other.groupby
+        return hook((~other.policy) & self.policy, self.groupby)
+
+    def __invert__(self):
+        return hook(~(self.policy), self.groupby)
+
+
+### Path combinator classes ###
+
+class path_alternate(path):
+    """ Alternation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_alternate, self).__init__(paths=paths_list)
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        paths = self.paths
+        if len(paths) > 1:
+            expr = reduce(lambda x, y: x + '|(' + y.expr + ')', paths[1:],
+                          '(' + paths[0].expr + ')')
+            expr = '(' + expr + ')'
+        elif len(paths) == 1:
+            expr = paths[0].expr
+        else:
+            expr = ''
+        return expr
+
+
+class path_star(path):
+    """ Kleene star on a path. """
+    def __init__(self, p):
+        self.__check_type(p)
+        super(path_star, self).__init__(paths=[p])
+
+    def __check_type(self, p):
+        assert isinstance(p, path)
+
+    @property
+    def expr(self):
+        expr = '(' + self.paths[0].expr + ')*'
+        return expr
+
+
+class path_concat(path):
+    """ Concatenation of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_concat, self).__init__(paths=paths_list)
+
+    @property
+    def expr(self):
+        return reduce(lambda x, y: x + y.expr, self.paths, '')
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+
+#############################################################################
+###                      Path query compilation                           ###
+#############################################################################
+
+class pathcomp(object):
+    """ Functionality related to actual compilation of path queries. """
     @classmethod
     def clear(cls):
         cls.re_list = []
@@ -596,7 +771,7 @@ class path(Query):
         hooks_bucket.register_callback(cls.set_up_hooks_callback(hooks_map,
                                                                  tagging_policy))
 
-        frags = path.policy_frags()
+        frags = pathcomp.policy_frags()
         frags.set_tagging(tagging_policy)
         frags.set_untagging(untagging_policy)
         frags.set_counting(capture_policy[TOK_INGRESS])
@@ -622,7 +797,7 @@ class path(Query):
                 cls.finalize(p)
             return cls.get_policy_fragments()
         else:
-            frags = path.policy_frags()
+            frags = pathcomp.policy_frags()
             frags.set_tagging(identity)
             frags.set_untagging(identity)
             frags.set_counting(drop)
@@ -707,170 +882,6 @@ class path(Query):
                         print hook.groupby, '=', p[hook]
 
         return actual_callback
-
-class abstract_atom(path, Filter):
-    """A single atomic match in a path expression. This is an abstract class
-    where the token isn't initialized.
-    
-    :param m: a Filter (or match) object used to initialize the path atom.
-    :type match: Filter
-    """
-    def __init__(self, m):
-        assert isinstance(m, Filter)
-        self.policy = m
-        super(abstract_atom, self).__init__(a=self)
-
-    def __and__(self, other):
-        assert isinstance(other, type(self))
-        return type(self)(self.policy & other.policy)
-
-    def __or__(self, other):
-        if isinstance(other, abstract_atom):
-            assert isinstance(other, type(self))
-            return type(self)(self.policy | other.policy)
-        elif isinstance(other, path):
-            return super(abstract_atom, self).__or__(other)
-        else:
-            raise TypeError
-
-    def __sub__(self, other):
-        assert isinstance(other, type(self))
-        return type(self)((~other.policy) & self.policy)
-
-    def __invert__(self):
-        return type(self)(~(self.policy))
-
-
-class atom(abstract_atom):
-    """A concrete "ingress" match atom."""
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_INGRESS,
-                                                  nonoverlapping_filters=True)
-        super(atom, self).__init__(m)
-
-
-class egress_atom(abstract_atom):
-    """An atom that denotes a match on a packet after the forwarding decision
-    has been made. It can always be substituted by a normal ("ingress") atom at
-    the next hop, unless the packet is egressing the network. Hence, it may be
-    noted that this is only necessary (apart from expressive power, of course)
-    to match on packets that egress the network.
-    """
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_EGRESS,
-                                                  nonoverlapping_filters=True)
-        super(egress_atom, self).__init__(m)
-
-
-class drop_atom(abstract_atom):
-    """An atom that matches on packets that were dropped by the forwarding
-    policy.
-    """
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_DROP,
-                                                  nonoverlapping_filters=True)
-        super(drop_atom, self).__init__(m)
-
-class end_path(abstract_atom):
-    def __init__(self, m):
-        self.token = CharacterGenerator.get_token(m, toktype=TOK_END_PATH,
-                                                  nonoverlapping_filters=True)
-        super(end_path, self).__init__(m)
-
-
-class hook(abstract_atom):
-    """A hook is essentially like an atom, but has a notion of "grouping"
-    associated with it. Whenever a packet arrives into this hook, we group them
-    by the values of the fields specified in the groupby=... argument of the
-    constructor.
-    """
-    def __init__(self, m, groupby=[]):
-        assert groupby and len(groupby) > 0
-        self.groupby = groupby
-        cg = CharacterGenerator
-        self.token = cg.get_token(m, toktype=TOK_INGRESS,
-                                  nonoverlapping_filters=True)
-        self.groupby_token = cg.get_token(identity, toktype=TOK_HOOK,
-                                          nonoverlapping_filters=False)
-        cg.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
-        super(hook, self).__init__(m)
-        char = cg.get_char_from_token
-        self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
-
-    def __and__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook(self.policy & other.policy, self.groupby)
-
-    def __or__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook(self.policy | other.policy, self.groupby)
-
-    def __sub__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook((~other.policy) & self.policy, self.groupby)
-
-    def __invert__(self):
-        return hook(~(self.policy), self.groupby)
-
-
-### Path combinator classes ###
-
-class path_alternate(path):
-    """ Alternation of paths. """
-    def __init__(self, paths_list):
-        self.__check_type(paths_list)
-        super(path_alternate, self).__init__(paths=paths_list)
-
-    def __check_type(self, paths):
-        for p in paths:
-            assert isinstance(p, path)
-
-    @property
-    def expr(self):
-        paths = self.paths
-        if len(paths) > 1:
-            expr = reduce(lambda x, y: x + '|(' + y.expr + ')', paths[1:],
-                          '(' + paths[0].expr + ')')
-            expr = '(' + expr + ')'
-        elif len(paths) == 1:
-            expr = paths[0].expr
-        else:
-            expr = ''
-        return expr
-
-
-class path_star(path):
-    """ Kleene star on a path. """
-    def __init__(self, p):
-        self.__check_type(p)
-        super(path_star, self).__init__(paths=[p])
-
-    def __check_type(self, p):
-        assert isinstance(p, path)
-
-    @property
-    def expr(self):
-        expr = '(' + self.paths[0].expr + ')*'
-        return expr
-
-
-class path_concat(path):
-    """ Concatenation of paths. """
-    def __init__(self, paths_list):
-        self.__check_type(paths_list)
-        super(path_concat, self).__init__(paths=paths_list)
-
-    @property
-    def expr(self):
-        return reduce(lambda x, y: x + y.expr, self.paths, '')
-
-    def __check_type(self, paths):
-        for p in paths:
-            assert isinstance(p, path)
-
 
 
 #############################################################################

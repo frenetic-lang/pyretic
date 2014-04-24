@@ -66,10 +66,10 @@ class Runtime(object):
         self.policy = main(**kwargs)
 
         if path_main:
-            from pyretic.lib.path import path
+            from pyretic.lib.path import pathcomp
             path_policies = path_main(**kwargs)
-            policy_fragments = path.compile(path_policies)
-            self.policy = path.stitch(self.policy, policy_fragments)
+            policy_fragments = pathcomp.compile(path_policies)
+            self.policy = pathcomp.stitch(self.policy, policy_fragments)
 
         # Virtual field composition
         self.policy = virtual_field_tagging() >> self.policy >> virtual_field_untagging()

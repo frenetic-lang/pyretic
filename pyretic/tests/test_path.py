@@ -259,63 +259,63 @@ def test_regex_intersection():
 ### Test path finalization and compilation ###
 
 def test_path_finalize_1():
-    path.clear()
+    pathcomp.clear()
     cg.clear()
     a1 = atom(match(srcip=ip2))
     a2 = atom(match(srcip=ip1))
     p = a1 ^ a2
-    path.finalize(p)
-    assert path.re_list and path.paths_list and path.path_to_bucket
-    assert path.re_list == [p.expr]
-    assert path.paths_list == [[p]]
-    assert isinstance(path.path_to_bucket[p], Query)
+    pathcomp.finalize(p)
+    assert pathcomp.re_list and pathcomp.paths_list and pathcomp.path_to_bucket
+    assert pathcomp.re_list == [p.expr]
+    assert pathcomp.paths_list == [[p]]
+    assert isinstance(pathcomp.path_to_bucket[p], Query)
 
 def test_path_finalize_2():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip2))
     a2 = atom(match(srcip=ip1))
     p1 = a1 ^ a2
     p2 = a1 | a2
-    path.finalize(p1)
-    path.finalize(p2)
-    assert path.re_list == [p1.expr, '(' + a1.expr + '|' + a2.expr + ')']
-    assert path.paths_list == [ [p1], [p2] ]
-    for p in path.path_to_bucket:
-        assert isinstance(path.path_to_bucket[p], Query)
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    assert pathcomp.re_list == [p1.expr, '(' + a1.expr + '|' + a2.expr + ')']
+    assert pathcomp.paths_list == [ [p1], [p2] ]
+    for p in pathcomp.path_to_bucket:
+        assert isinstance(pathcomp.path_to_bucket[p], Query)
 
 def test_path_finalize_3():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p1 = a1 ^ a2
     p2 = a1 ^ a2
-    path.finalize(p1)
-    path.finalize(p2)
-    assert len(path.re_list) == 1 # re_list only has non-overlapping expressions
-    assert path.re_list == [p1.expr]
-    assert path.paths_list == [ [p1, p2] ]
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    assert len(pathcomp.re_list) == 1 # re_list only has non-overlapping expressions
+    assert pathcomp.re_list == [p1.expr]
+    assert pathcomp.paths_list == [ [p1, p2] ]
 
 def test_path_finalize_4():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     a3 = atom(match(srcip=ip3))
     a4 = atom(match(srcip=ip4))
     p1 = a1 ^ a2
     p2 = (a1 ^ a2) | (a3 ^ a4)
-    path.finalize(p1)
-    path.finalize(p2)
-    assert len(path.re_list) == 2
-    assert path.re_list[0] == p1.expr
-    assert path.re_list[1] != p2.expr
-    assert path.paths_list == [ [p1, p2], [p2] ]
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    assert len(pathcomp.re_list) == 2
+    assert pathcomp.re_list[0] == p1.expr
+    assert pathcomp.re_list[1] != p2.expr
+    assert pathcomp.paths_list == [ [p1, p2], [p2] ]
 
 def test_path_finalize_5():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     a3 = atom(match(srcip=ip3))
@@ -323,17 +323,17 @@ def test_path_finalize_5():
     p1 = (a1 ^ a2) | a3
     p2 = a2 ^ a4
     p3 = a3 | (a2 ^ a4)
-    path.finalize(p1)
-    path.finalize(p2)
-    path.finalize(p3)
-    assert len(path.re_list) == 3
-    assert path.re_list[1] == p2.expr
-    assert path.re_list[2] != p3.expr and path.re_list[0] != p1.expr
-    assert path.paths_list == [ [p1], [p2, p3], [p1, p3] ]
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    pathcomp.finalize(p3)
+    assert len(pathcomp.re_list) == 3
+    assert pathcomp.re_list[1] == p2.expr
+    assert pathcomp.re_list[2] != p3.expr and pathcomp.re_list[0] != p1.expr
+    assert pathcomp.paths_list == [ [p1], [p2, p3], [p1, p3] ]
 
 def test_path_finalize_6():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     a3 = atom(match(srcip=ip3))
@@ -341,19 +341,19 @@ def test_path_finalize_6():
     p1 = (a1 ^ a2) | a3
     p2 = a2 ^ a4
     p3 = a3 | (a2 ^ a3)
-    path.finalize(p1)
-    path.finalize(p2)
-    path.finalize(p3)
-    assert len(path.re_list) == 4
-    assert path.re_list[1] == p2.expr
-    assert path.re_list[2] != p3.expr and path.re_list[0] != p1.expr
-    assert path.paths_list == [ [p1], [p2], [p1, p3], [p3] ]
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    pathcomp.finalize(p3)
+    assert len(pathcomp.re_list) == 4
+    assert pathcomp.re_list[1] == p2.expr
+    assert pathcomp.re_list[2] != p3.expr and pathcomp.re_list[0] != p1.expr
+    assert pathcomp.paths_list == [ [p1], [p2], [p1, p3], [p3] ]
 
 def test_path_compile_1():
-    path.clear()
+    pathcomp.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    frags = path.compile([a1])
+    frags = pathcomp.compile([a1])
     tags = frags.get_tagging()
     untagging = frags.get_untagging()
     counts = frags.get_counting()
@@ -371,11 +371,11 @@ def test_path_compile_1():
     assert counts._classifier == ref_counts._classifier
 
 def test_path_compile_2():
-    path.clear()
+    pathcomp.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    frags = path.compile([a1 ^ a2])
+    frags = pathcomp.compile([a1 ^ a2])
     tags = frags.get_tagging()
     untagging = frags.get_untagging()
     counts = frags.get_counting()
@@ -453,38 +453,38 @@ def test_drop_atom():
 
 def test_endpath_drop_finalization():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     p1 = end_path(match(srcip=ip1))
     p2 = drop_atom(match(srcip=ip1))
-    path.finalize(p1)
-    path.finalize(p2)
-    assert path.re_list and path.paths_list and path.path_to_bucket
-    assert path.re_list == [p1.expr, p2.expr]
-    assert path.paths_list == [ [p1], [p2] ]
+    pathcomp.finalize(p1)
+    pathcomp.finalize(p2)
+    assert pathcomp.re_list and pathcomp.paths_list and pathcomp.path_to_bucket
+    assert pathcomp.re_list == [p1.expr, p2.expr]
+    assert pathcomp.paths_list == [ [p1], [p2] ]
 
 def test_endpath_compilation():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     p = end_path(match(srcip=ip1))
-    endpath = path.compile([p]).get_endpath()
+    endpath = pathcomp.compile([p]).get_endpath()
     assert endpath == ((match({'path_tag': None}) &
                         match(srcip=ip1)) >> p.bucket_instance)
 
 def test_drop_compilation():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     p = drop_atom(match(srcip=ip1))
-    dropping = path.compile([p]).get_dropping()
+    dropping = pathcomp.compile([p]).get_dropping()
     assert dropping == ((match({'path_tag': None}) &
                          match(srcip=ip1)) >> p.bucket_instance)
 
 def test_multiple_atomtype_compilation_1():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = end_path(match(dstip=ip2))
     p = a1 ^ a2
-    frags = path.compile([p])
+    frags = pathcomp.compile([p])
     tagging = frags.get_tagging()
     counting = frags.get_counting()
     endpath = frags.get_endpath()
@@ -498,11 +498,11 @@ def test_multiple_atomtype_compilation_1():
 
 def test_multiple_atomtype_compilation_2():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = drop_atom(match(dstip=ip2))
     p = a1 ^ a2
-    frags = path.compile([p])
+    frags = pathcomp.compile([p])
     tagging = frags.get_tagging()
     counting = frags.get_counting()
     dropping = frags.get_dropping()
@@ -516,7 +516,7 @@ def test_multiple_atomtype_compilation_2():
 
 def test_multiple_atomtype_compilation_3():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = drop_atom(match(dstip=ip2))
     a3 = end_path(match(srcip=ip3))
@@ -524,7 +524,7 @@ def test_multiple_atomtype_compilation_3():
     p1 = a1 ^ a2
     p2 = a1 ^ a3
     p3 = a1 ^ a4
-    frags = path.compile([p1, p2, p3])
+    frags = pathcomp.compile([p1, p2, p3])
     tagging = frags.get_tagging()
     counting = frags.get_counting()
     endpath = frags.get_endpath()
@@ -546,32 +546,32 @@ def test_multiple_atomtype_compilation_3():
 
 def test_hook_compilation_1():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     h2 = hook(match(srcip=ip2), ['srcip'])
     a3 = atom(match(srcip=ip3))
     p = a1 ^ h2 ^ a3
-    hooks = path.compile([p]).get_hooks()
+    hooks = pathcomp.compile([p]).get_hooks()
     assert hooks == match(path_tag=2) >> FwdBucket()
 
 def test_hook_compilation_2():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     h2 = hook(match(srcip=ip2), ['srcip'])
     h3 = hook(match(srcip=ip3), ['dstip'])
     p = a1 ^ h2 ^ h3
-    hooks = path.compile([p]).get_hooks()
+    hooks = pathcomp.compile([p]).get_hooks()
     assert hooks == ((match(path_tag=4) + match(path_tag=2))
                      >> FwdBucket())
 
 def test_empty_paths():
     cg.clear()
-    path.clear()
+    pathcomp.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p = a1 ^ a2
-    frags = path.compile([])
+    frags = pathcomp.compile([])
     tagging = frags.get_tagging()
     counting = frags.get_counting()
     assert tagging == identity
