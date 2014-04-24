@@ -650,7 +650,14 @@ def match_string(r, s):
 ### basic transition table implementation
 
 def get_state_label(i, re):
+    """ Return a label which is to be used to represent the state in a DFA
+    diagram. In general, the index i of the state is used, but representations
+    of the regular expression (or vector) that the state represents can also be
+    used, e.g.,
+
     return 'Q' + str(i) + '/' + repr(re)
+    """
+    return 'Q' + str(i)
 
 class dfa_transition_table(object):
     """ A generic transition table for DFAs """
@@ -661,6 +668,19 @@ class dfa_transition_table(object):
         self.state_type_check_fun = state_type_check_fun
         self.symbol_type = symbol_type
         self.symbol_type_check_fun = symbol_type_check_fun
+
+    def get_transitions(self):
+        """ Get the set of edges (transitions) in the DFA as a list of
+        tuples.
+        """
+        lst = []
+        for re in self.re_to_transitions:
+            for sym in self.re_to_transitions[re]:
+                lst.append((re, self.re_to_transitions[re][sym], sym))
+        return lst
+
+    def get_num_transitions(self):
+        return len(self.get_transitions())
 
     def add_transition(self, state, symbol, new_state):
         assert self.state_type_check_fun(state, self.state_type)
@@ -794,8 +814,11 @@ class dfa_state_table(object):
             self.re_table = set([])
         self.re_map   = {}
         self.si = 0
+        self.state_list = []
         for s in self.re_table:
             self.re_map[s] = self.si
+            self.state_list.append(s)
+            assert self.state_list[self.si] == s
             self.si += 1
 
     def add_state(self, state):
@@ -803,7 +826,13 @@ class dfa_state_table(object):
         assert not state in self.re_table
         self.re_table.add(state)
         self.re_map[state] = self.si
+        self.state_list.append(state)
+        assert self.state_list[self.si] == state
         self.si += 1
+
+    def get_state_by_index(self, i):
+        """ Given the numerical index of a state i, get the state. """
+        return self.state_list[i]
 
     def contains_state(self, state):
         assert self.state_type_check_fun(state, self.state_type)
@@ -813,6 +842,9 @@ class dfa_state_table(object):
         """ Get the numeric index associated with an RE state. """
         assert state in self.re_map
         return self.re_map[state]
+
+    def get_num_states(self):
+        return self.si
 
     def dot_add_states_to_graph(self, g):
         """ Add all the states in the pydot graph object provided (g). Requires
@@ -832,6 +864,10 @@ class dfa_state_table(object):
         for q in sorted_states:
             out += '  ' + str(self.re_map[q]) + ': ' + repr(q) + '\n'
         return out
+
+    def is_accepting(self, qindex):
+        """ Return True if state with index `qindex` is accepting in this set of states. """
+        return self.final_state_check_fun(self.state_list[q])
 
     def get_final_states(self):
         f = []
@@ -916,7 +952,7 @@ class re_state_table(dfa_state_table):
                               state_type_check_fun=self.state_type_check_fun,
                               final_state_check_fun=self.final_state_check_fun)
 
-class dfa(object):
+class dfa_base(object):
     def __init__(self, all_states, init_state, final_states, transition_table,
                  symbol_list, state_table_type, state_type,
                  state_type_check_fun, tt_type, dead_state_check_fun):
@@ -977,14 +1013,18 @@ class dfa(object):
                                  'q: ' + repr(qfinal) +
                                  ' rest of input: ' + rest)
 
-    def dot_repr(self):
-        """ Output a string which when provided to the graphviz tool `dot` can
-        be used to visualize this DFA.
-        """
-        g  = dot.Dot('my_dfa_name', graph_type='digraph')
+    def get_graph(self):
+        """ Output a pydot graph object which represents the DFA. """
+        g  = dot.Dot('re_dfa', graph_type='digraph')
         self.all_states.dot_add_states_to_graph(g)
         re_map = self.all_states.re_map
         self.transition_table.dot_add_transitions_to_graph(g, re_map)
+        return g
+
+    def dot_repr(self):
+        """ Output a string representation of the DFA which when provided to the
+        graphviz tool `dot` can be used to visualize this DFA. """
+        g = self.get_graph()
         return g.to_string()
 
     def __repr__(self):
@@ -996,7 +1036,7 @@ class dfa(object):
         out += "Final states:\n" + repr(self.final_states)
         return out
 
-class re_dfa(dfa):
+class re_dfa(dfa_base):
     def __init__(self, all_states, init_state, final_states, transition_table,
                  symbol_list):
         super(re_dfa, self).__init__(all_states, init_state, final_states,
@@ -1110,6 +1150,17 @@ class re_vector_state_table(dfa_state_table):
                 f.append(q)
         return re_vector_state_table(f)
 
+    def get_accepting_states_ordinal(self, q):
+        """ Given a vector state q, return a list of ordinal number of the re
+        components of the state that are accepting strings there."""
+        assert list_isinstance(q, re_deriv)
+        ordinal_list = []
+        for index in range(0, len(q)):
+            qcomp = q[index]
+            if nullable(qcomp) == re_epsilon():
+                ordinal_list.append(index)
+        return ordinal_list
+
 class re_vector_transition_table(dfa_transition_table):
     def __init__(self):
         def symcheck(c, typ):
@@ -1120,7 +1171,7 @@ class re_vector_transition_table(dfa_transition_table):
             str,
             symcheck)
 
-class re_vector_dfa(dfa):
+class re_vector_dfa(dfa_base):
     def __init__(self, all_states, init_state, final_states, transition_table,
                  symbol_list):
         def check_dead_state(x):

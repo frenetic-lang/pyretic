@@ -877,8 +877,38 @@ class path_concat(path):
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
 #############################################################################
 
-class dfa_utils:
+class dfa_utils(object):
+    """ Base class for utilities regarding construction of DFAs and extraction
+    of various DFA properties.
+    """
+    @classmethod
+    def intersection_is_null(cls, re1, re2, tmp_file):
+        raise NotImplementedError
 
+    @classmethod
+    def re_equals(cls, re1, re2):
+        """Determine if two regular expressions are equal."""
+        nre1 = '~(' + re1 + ')'
+        nre2 = '~(' + re2 + ')'
+        return (cls.intersection_is_null(re1, nre2) and
+                cls.intersection_is_null(nre1, re2))
+
+    @classmethod
+    def re_belongs_to(cls, re1, re2):
+        """Return True if re1 is a subset of re2 (including equals), and False
+        otherwise.
+        """
+        nre2 = '~(' + re2 + ')'
+        return cls.intersection_is_null(re1, nre2)
+
+    @classmethod
+    def re_has_nonempty_intersection(cls, re1, re2):
+        return not cls.intersection_is_null(re1, re2)
+
+class ml_ulex_dfa_utils(dfa_utils):
+    """ Class that uses the ml-ulex tool to do various DFA construction
+    functions.
+    """
     @classmethod
     def get_lexer_input(cls, re_list):
         """Return a string formatted such that ml-ulex could take it as input for
@@ -955,6 +985,10 @@ class dfa_utils:
         return [n for n in g.get_node_list() if n.get_name() != 'graph']
 
     @classmethod
+    def get_edges(cls, g):
+        return g.get_edge_list()
+
+    @classmethod
     def get_edge_src(cls, e, g):
         """Get the source node object of an edge.
 
@@ -967,6 +1001,7 @@ class dfa_utils:
 
     @classmethod
     def get_edge_dst(cls, e, g):
+        """ Get the destination node object of an edge. """
         return g.get_node(e.get_destination())[0]
 
     @classmethod
@@ -1009,10 +1044,6 @@ class dfa_utils:
             return [enumerated_label, negated]
 
         return get_enumerated_labels(e.get_label()[1:-1])
-
-    @classmethod
-    def get_edges(cls, g):
-        return g.get_edge_list()
 
     @classmethod
     def get_num_states(cls, g):
@@ -1059,22 +1090,112 @@ class dfa_utils:
         dfa = cls.regexes_to_dfa(re, tmp_file)
         return (cls.get_num_accepting_states(dfa) == 0)
 
+class re_deriv_dfa_utils(dfa_utils):
+    """ DFA utilities that use the custom-built re_deriv library to construct
+    and extract DFA properties from regular expressions.
+    """
     @classmethod
-    def re_equals(cls, re1, re2):
-        """Determine if two regular expressions are equal."""
-        nre1 = '~(' + re1 + ')'
-        nre2 = '~(' + re2 + ')'
-        return (cls.intersection_is_null(re1, nre2) and
-                cls.intersection_is_null(nre1, re2))
+    def print_dfa(cls, d):
+        """ Print a DFA object d. """
+        assert isinstance(d, dfa_base)
+        return repr(d)
 
     @classmethod
-    def re_belongs_to(cls, re1, re2):
-        """Return True if re1 is a subset of re2 (including equals), and False
-        otherwise.
+    def get_edges(cls, d):
+        assert isinstance(d, dfa_base)
+        """ The output has the form
+        (src_state_re, dst_state_re, symbol) list
         """
-        nre2 = '~(' + re2 + ')'
-        return cls.intersection_is_null(re1, nre2)
+        return d.transition_table.get_transitions()
 
     @classmethod
-    def re_has_nonempty_intersection(cls, re1, re2):
-        return not cls.intersection_is_null(re1, re2)
+    def get_edge_src(cls, d, tt_entry):
+        """ tt_entry here is one of the elements of the output of
+        dfa_transition_table.get_transitions(), and hence has the form
+        (source_state_re, dst_state_re, symbol)
+        """
+        assert isinstance(d, dfa_base)
+        assert isinstance(tt_entry, tuple) and len(tt_entry) == 3
+        src = tt_entry[0]
+        return d.all_states.get_index(src)
+
+    @classmethod
+    def get_edge_dst(cls, d, tt_entry):
+        assert isinstance(d, dfa_base)
+        assert isinstance(tt_entry, tuple) and len(tt_entry) == 3
+        dst = tt_entry[1]
+        return d.all_states.get_index(dst)
+
+    @classmethod
+    def get_edge_label(cls, tt_entry):
+        assert isinstance(tt_entry, tuple) and len(tt_entry) == 3
+        return tt_entry[2]
+
+    @classmethod
+    def get_num_states(cls, d):
+        assert isinstance(d, dfa_base)
+        return d.all_states.get_num_states()
+
+    @classmethod
+    def get_num_transitions(cls, d):
+        assert isinstance(d, dfa_base)
+        return d.transition_table.get_num_transitions()
+
+    @classmethod
+    def is_accepting(cls, s, d):
+        assert isinstance(s, int) # state index (number)
+        assert isinstance(d, dfa_base) # re_dfa object
+        return d.all_states.is_accepting(s)
+
+    @classmethod
+    def get_accepted_token(cls, d, s):
+        assert isinstance(s, int) # state index (number)
+        assert isinstance(d, dfa_base) # dfa object
+        assert isinstance(d.all_states, re_vector_state_table)
+        assert cls.is_accepting(s)
+        q = d.all_states.get_state_by_index(s)
+        accepted_tokens = d.all_states.get_accepting_states_ordinal(q)
+        # TODO(ngsrinivas): The invariant below may be removed once the notion
+        # of "accepting tokens" is changed in the calling code.
+        assert isinstance(accepted_tokens, list) and len(accepted_tokens) == 1
+        return accepted_tokens[0]
+
+    @classmethod
+    def get_num_accepting_states(cls, d):
+        assert isinstance(d, dfa_base)
+        return d.final_states.get_num_states()
+
+    @classmethod
+    def construct_symlist(cls, re_list):
+        """ Construct an alphabet list from the set of symbols used in
+        re_list.
+        """
+        # TODO(ngsrinivas): there's a need to construct a list of symbols used
+        # in all the expressions. This can be either done retro-actively after
+        # getting all the final expressions, or can just be provided as an
+        # argument from all the leaf-level symbols (of the re AST) through one
+        # of the book-keeping data structures.
+        raise NotImplementedError
+
+    @classmethod
+    def construct_re_expressions(cls, re_list):
+        """ Construct re AST from a list of re strings. """
+        raise NotImplementedError
+
+    @classmethod
+    def regexes_to_dfa(cls, re_list):
+        """ Convert a list of regular expressions re_list to a DFA.
+
+        This method will soon be superseded by providing the AST of the
+        path-level regular expressions to the makeDFA function directly."""
+        re_exps = cls.construct_re_expressions(re_list)
+        symlist = cls.construct_symlist(re_list)
+        return makeDFA_vector(re_exps, symlist)
+
+    @classmethod
+    def intersection_is_null(cls, re1, re2):
+        # TODO(ngsrinivas): string expression construction below will soon be
+        # converted to an intersection "expression" of REs.
+        re = ['(' + re1 + ') & (' + re2 + ')']
+        dfa = cls.regexes_to_dfa(re)
+        return (cls.get_num_accepting_states(dfa) == 0)
