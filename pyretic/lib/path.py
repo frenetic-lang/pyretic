@@ -377,6 +377,15 @@ class path(Query):
         """
         return path_star(self)
 
+    def __invert__(self):
+        """ Implementation of the path negation operator ('~') """
+        return path_negate(self)
+
+    def __and__(self, other):
+        """ Implementation of the path intersection operator ('&') """
+        assert isinstance(other, path)
+        return path_inters([self, other])
+
 
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class
