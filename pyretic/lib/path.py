@@ -33,6 +33,8 @@ from pyretic.core.language import PathBucket
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
 
+from pyretic.lib.re import *
+
 import subprocess
 import pyretic.vendor
 import pydot
@@ -327,20 +329,22 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, expr=None, paths=None):
+    def __init__(self, a=None, paths=None):
         if a:
             assert isinstance(a, abstract_atom)
             self.atom = a
-            self.expr = CharacterGenerator.get_char_from_token(self.atom.token)
-        elif expr:
-            assert isinstance(expr, str)
-            self.expr = expr
+            # TODO(ngsrinivas): unicode tokens break this assignment below!
+            self.re_tree = re_symbol(chr(self.atom.token), metadata=self.atom)
         elif paths:
             self.paths = paths
         else:
             raise RuntimeError
         super(path, self).__init__()
         self.bucket_instance = FwdBucket() # default bucket type
+
+    @property
+    def expr(self):
+        return self.re_tree.re_string_repr()
 
     def get_bucket(self):
         return self.bucket_instance
