@@ -51,6 +51,49 @@ TOK_HOOK = "ingress_hook"
 ###             Utilities to map predicates to characters                 ###
 #############################################################################
 
+class classifier_utils(object):
+    """ Utilities related to analysis of classifiers, that come in handy to do
+    various manipulations on policies.
+    """
+    @classmethod
+    def get_classifier(cls, p):
+        # Hackety hack
+        if p._classifier:
+            return p._classifier
+        try:
+            return p.generate_classifier()
+        except:
+            p.compile()
+            return p._classifier
+
+    @classmethod
+    def has_nonempty_intersection(cls, p1, p2):
+        """Return True if policies p1, p2 have an intesection which is
+        drop. Works by generating the classifiers for the intersection of the
+        policies, and checking if there are anything other than drop rules.
+        """
+        int_class = cls.get_classifier(p1 & p2)
+        for rule in int_class.rules:
+            if not drop in rule.actions:
+                return True
+        return False
+
+    @classmethod
+    def get_dropped_packets(cls, p):
+        """For an arbitrary policy p, return the set of packets (as a filter
+        policy) that are dropped by it.
+        """
+        pol_classifier = cls.get_classifier(p)
+        matched_packets = drop
+        for rule in pol_classifier.rules:
+            fwd_actions = filter(lambda a: (isinstance(a, modify)
+                                         and a['outport'] != OFPP_CONTROLLER),
+                              rule.actions)
+            if len(fwd_actions) > 0:
+                matched_packets += rule.match
+        return ~matched_packets
+
+
 class CharacterGenerator:
     """ Generate characters to represent equivalence classes of existing match
     predicates. `get_token` returns the same token value as before if a policy
@@ -75,49 +118,6 @@ class CharacterGenerator:
         cls.token_to_atom = {cls.default_toktype: {}}
         cls.token_to_toktype = {}
 
-    @classmethod
-    def get_classifier(cls, p):
-        # TODO(ngsrinivas): this function should probably reside in
-        # classifier.py
-        # Hackety hack
-        if p._classifier:
-            return p._classifier
-        try:
-            return p.generate_classifier()
-        except:
-            p.compile()
-            return p._classifier
-
-    @classmethod
-    def has_nonempty_intersection(cls, p1, p2):
-        """Return True if policies p1, p2 have an intesection which is
-        drop. Works by generating the classifiers for the intersection of the
-        policies, and checking if there are anything other than drop rules.
-        """
-        # TODO(ngsrinivas): this function should probably reside in
-        # classifier.py
-        int_class = cls.get_classifier(p1 & p2)
-        for rule in int_class.rules:
-            if not drop in rule.actions:
-                return True
-        return False
-
-    @classmethod
-    def get_dropped_packets(cls, p):
-        """For an arbitrary policy p, return the set of packets (as a filter
-        policy) that are dropped by it.
-        """
-        # TODO(ngsrinivas): this function should probably reside in
-        # classifier.py
-        pol_classifier = cls.get_classifier(p)
-        matched_packets = drop
-        for rule in pol_classifier.rules:
-            fwd_actions = filter(lambda a: (isinstance(a, modify)
-                                         and a['outport'] != OFPP_CONTROLLER),
-                              rule.actions)
-            if len(fwd_actions) > 0:
-                matched_packets += rule.match
-        return ~matched_packets
 
     @classmethod
     def __ensure_toktype(cls, toktype):
@@ -144,10 +144,11 @@ class CharacterGenerator:
         # expressions represents a mutually exclusive packet match.
         diff_list = drop
         new_intersecting_tokens = []
+        cu = classifier_utils
         for existing_filter in cls.token_to_filter[toktype].values():
-            if cls.has_nonempty_intersection(existing_filter, new_filter):
+            if cu.has_nonempty_intersection(existing_filter, new_filter):
                 tok = cls.filter_to_token[toktype][existing_filter]
-                if cls.has_nonempty_intersection(existing_filter, ~new_filter):
+                if cu.has_nonempty_intersection(existing_filter, ~new_filter):
                     # do actions below only if the existing filter has some
                     # intersection with, but is not completely contained in, the
                     # new filter.
@@ -172,7 +173,7 @@ class CharacterGenerator:
         if diff_list != drop: # i.e., if there was intersection with existing filters
             new_token = cls.__new_token__()
             new_disjoint_token = []
-            if cls.has_nonempty_intersection(new_filter, ~diff_list):
+            if cu.has_nonempty_intersection(new_filter, ~diff_list):
                 # i.e., if the intersections didn't completely make up the new filter
                 new_disjoint_token.append(cls.__add_new_token(new_filter &
                                                               ~diff_list,
@@ -317,6 +318,133 @@ class CharacterGenerator:
             return cls.token_to_atom[toktype][tok]
         else:
             return []
+
+
+class re_tree_gen(object):
+    """ A class that provides utilities to book-keep "leaf-level" predicates in
+    a regular expression abstract syntax tree (AST), and return new re_deriv
+    trees for new predicates.
+    """
+    token = TOKEN_START_VALUE
+    # Invariants: pred is always a leaf-level predicate in the re AST of some
+    # path query.
+    pred_to_symbol = {}
+    pred_to_atoms  = {}
+
+    @classmethod
+    def __new_symbol__(cls):
+        """ Returns a new token/symbol for a leaf-level predicate. """
+        cls.token += 1
+        try:
+            return chr(cls.token)
+        except:
+            return unichr(cls.token)
+
+    @classmethod
+    def replace_predicate_AST(cls, old_pred, new_preds):
+        """ Replace the re symbol corresponding to `old_pred` with an
+        alternation of predicates in `new_preds`. The metadata from the
+        old_pred's re symbol is copied over to all leaf nodes of its new re AST.
+        """
+        def new_metadata_tree(m, re_tree):
+            """ Return a new tree which has a given metadata m on all nodes in
+            the given re_tree."""
+            if isinstance(re_tree, re_symbol):
+                assert re_tree.metadata == []
+                return re_symbol(re_tree.char, metadata=m, lst=False)
+            elif isinstance(re_tree, re_alter):
+                new_re = re_empty()
+                for re in re_tree.re_list:
+                    new_re = new_re | new_metadata_tree(m, re)
+                return new_re
+            else:
+                raise TypeError("Trees are only allowed to have alternation!")
+
+        def replace_node(old_re_tree, new_re_tree, old_sym):
+            """ Replace all nodes in the provided re_tree, which correspond to a
+            symbol `old_sym`, with the re tree `new_re_tree`. Also retain the
+            original metadata that was in the respective old node."""
+            if isinstance(re_tree, re_symbol):
+                if re_tree.char == old_sym:
+                    # replace with metadata!
+                    return new_metadata_tree(re_tree.metadata, new_re_tree)
+                else:
+                    return re_tree
+            elif isinstance(re_tree, re_alter):
+                new_re = re_empty()
+                for re in re_tree.re_list:
+                    new_re = new_re | replace_node(re, new_re_tree, old_sym)
+                return new_re
+            else:
+                raise TypeError("Trees are only allowed to have alternation!")
+
+        assert old_pred in cls.pred_to_symbol and old_pred in cls.pred_to_atoms
+        old_sym = cls.pred_to_symbol[old_pred]
+        new_re_tree = re_empty()
+        # Construct replacement tree (without metadata first)
+        for pred in new_preds:
+            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            new_sym = cls.pred_to_symbol[pred]
+            new_re_tree = new_re_tree | re_symbol(new_sym)
+
+        for at in cls.pred_to_atoms[old_pred]:
+            # for each atom containing old_pred, replace re leaf by new tree.
+            new_atom_re_tree = replace_node(at.re_tree, new_re_tree, old_sym)
+            at.re_tree = new_atom_re_tree # change the atom objects themselves!
+
+    @classmethod
+    def get_overlapping_preds(cls, new_pred):
+        """ Returns a tuple of 4 lists of leaf-level predicates:
+        ( list of preds that are a subset of new_pred,
+          list of preds that are a superset of new_pred,
+          list of preds that have a non-empty intersection of new_pred but are
+        neither a subset nor superset of new_pred,
+          list of preds that are exactly equal )
+
+        This function assumes that classifier_utils.has_nonempty_intersection is
+        both sound and complete.
+        """
+        assert isinstance(new_pred, Filter)
+        ne_inters = classifier_utils.has_nonempty_intersection
+        subset_list   = []
+        superset_list = []
+        inters_list   = []
+        equal_list    = []
+        pred_list     = filter(lambda x: ne_inters(x, new_pred),
+                               cls.pred_to_symbol.keys())
+        for pred in pred_list:
+            if  (not ne_inters( pred, ~new_pred) and
+                 not ne_inters(~pred,  new_pred)):
+                equal_list.append(pred)
+            elif not ne_inters( pred, ~new_pred):
+                subset_list.append(pred)
+            elif not ne_inters(~pred,  new_pred):
+                superset_list.append(pred)
+            else:
+                inters_list.append(pred)
+        return (subset_list, superset_list, inters_list, equal_list)
+
+    @classmethod
+    def deal_equal_preds(cls, pred_list, new_pred, at):
+        """ Deal with other leaf-level preds which are equal to a given (new)
+        packet predicate `new_pred`, by returning the symbol corresponding to
+        the existing predicate (in `pred_list`) which is equal.
+        """
+        assert len(pred_list) <= 1
+        if len(pred_list) == 1:
+            pred = pred_list[0]
+            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            cls.pred_to_atoms.append(atom)
+            return re_symbol(cls.pred_to_symbol[pred], metadata=at)
+        else:
+            return None
+
+
+    @classmethod
+    def clear(cls):
+        cls.token = TOKEN_START_VALUE
+        cls.pred_to_symbols = {}
+        cls.pred_to_atoms   = {}
 
 #############################################################################
 ###               Path query language components                          ###
