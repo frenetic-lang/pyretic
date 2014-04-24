@@ -332,6 +332,21 @@ class re_tree_gen(object):
     pred_to_atoms  = {}
 
     @classmethod
+    def __add_pred__(cls, pred, symbol, atoms):
+        """ Add a new predicate to the global state. """
+        assert not pred in cls.pred_to_symbol
+        assert not pred in cls.pred_to_atoms
+        cls.pred_to_symbol[pred] = symbol
+        cls.pred_to_atoms[pred] = atoms
+
+    @classmethod
+    def __del_pred__(cls, pred):
+        """ Remove a predicate from existing global state of leaf-level
+        predicates. """
+        del cls.pred_to_symbol[pred]
+        del cls.pred_to_atoms[pred]
+
+    @classmethod
     def __new_symbol__(cls):
         """ Returns a new token/symbol for a leaf-level predicate. """
         cls.token += 1
@@ -386,9 +401,8 @@ class re_tree_gen(object):
             assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
             new_sym = cls.pred_to_symbol[pred]
             new_re_tree = new_re_tree | re_symbol(new_sym)
-
+        # For each atom containing old_pred, replace re leaf by new tree.
         for at in cls.pred_to_atoms[old_pred]:
-            # for each atom containing old_pred, replace re leaf by new tree.
             new_atom_re_tree = replace_node(at.re_tree, new_re_tree, old_sym)
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
 
@@ -434,11 +448,96 @@ class re_tree_gen(object):
         if len(pred_list) == 1:
             pred = pred_list[0]
             assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
-            cls.pred_to_atoms.append(atom)
+            cls.pred_to_atoms[pred].append(atom)
             return re_symbol(cls.pred_to_symbol[pred], metadata=at)
         else:
             return None
 
+    @classmethod
+    def deal_superset_preds(cls, pred_list, new_pred, at):
+        """ Deal with a predicate (in `pred_list`) which is a superset of
+        `new_pred`, by breaking the super-set predicate into component parts
+        including and excluding `new_pred`.
+        """
+        assert len(pred_list) <= 1
+        if len(pred_list) == 1:
+            pred = pred_list[0]
+            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            # Add new constituent predicates -- leaf-level
+            cls.__add_pred__(pred & ~new_pred,
+                             cls.__new_symbol__(),
+                             cls.pred_to_atoms[pred])
+            cls.__add_pred__(new_pred,
+                             cls.__new_symbol__(),
+                             cls.pred_to_atoms[pred] + [at])
+            # Replace the superset predicate by constituents in every re AST
+            cls.replace_predicate_AST(pred, [pred & ~new_pred, new_pred])
+            # Return a new re_tree just for the new predicate
+            return re_symbol(cls.pred_to_symbol[new_pred], metadata=at)
+        else:
+            return None
+
+    ### XXX: dealing with subset, and intersecting predicates.
+
+    ### XXX this is replicated from characterGenerator -- to be removed soon.
+    def add_overlapping_filter(cls, new_filter, toktype):
+        # The algorithm below ensures that matches are disjoint before adding
+        # them. Basically, each character that is present in the path
+        # expressions represents a mutually exclusive packet match.
+        diff_list = drop
+        new_intersecting_tokens = []
+        cu = classifier_utils
+        for existing_filter in cls.token_to_filter[toktype].values():
+            if cu.has_nonempty_intersection(existing_filter, new_filter):
+                tok = cls.filter_to_token[toktype][existing_filter]
+                if cu.has_nonempty_intersection(existing_filter, ~new_filter):
+                    # do actions below only if the existing filter has some
+                    # intersection with, but is not completely contained in, the
+                    # new filter.
+                    del cls.filter_to_token[toktype][existing_filter]
+                    del cls.token_to_filter[toktype][tok]
+                    new_tok1 = cls.__add_new_token(existing_filter &
+                                                   ~new_filter, toktype)
+                    new_tok2 = cls.__add_new_token(existing_filter &
+                                                   new_filter, toktype)
+                    cls.token_to_tokens[toktype][tok] = [new_tok1, new_tok2]
+                    new_intersecting_tokens.append(new_tok2)
+                else:
+                    # i.e., if existing filter is completely contained in new one.
+                    new_intersecting_tokens.append(tok)
+                # add existing_filter into list of policies to be subtracted as
+                # long as there is some intersection.
+                if diff_list == drop:
+                    diff_list = existing_filter
+                else:
+                    diff_list = diff_list | existing_filter
+        # add the new_filter itself, differenced by all the intersecting parts.
+        if diff_list != drop: # i.e., if there was intersection with existing filters
+            new_token = cls.__new_token__()
+            new_disjoint_token = []
+            if cu.has_nonempty_intersection(new_filter, ~diff_list):
+                # i.e., if the intersections didn't completely make up the new filter
+                new_disjoint_token.append(cls.__add_new_token(new_filter &
+                                                              ~diff_list,
+                                                              toktype))
+            cls.token_to_tokens[toktype][new_token] = (new_intersecting_tokens +
+                                                       new_disjoint_token)
+            cls.token_to_toktype[new_token] = toktype
+        else:
+            # i.e., if there was no intersection at all with existing filters
+            new_token = cls.__add_new_token(new_filter, toktype)
+        return new_token
+
+    @classmethod
+    def get_re_tree(cls, pred, at):
+        """ Get an re_tree for a single atom with its predicate. """
+        assert isinstance(at, atom)
+        assert isinstance(pred, Filter)
+        if pred in cls.pred_to_atoms:
+            return cls.deal_equal_preds([pred], pred, at)
+        else:
+            ### XXX todo.
+            return cls.get_overlapped_re_tree(pred, at)
 
     @classmethod
     def clear(cls):
