@@ -460,12 +460,7 @@ class hook(abstract_atom):
         cg = CharacterGenerator
         self.token = cg.get_token(m, toktype=TOK_INGRESS,
                                   nonoverlapping_filters=True)
-        self.groupby_token = cg.get_token(identity, toktype=TOK_HOOK,
-                                          nonoverlapping_filters=False)
-        cg.set_token_to_atom(self.groupby_token, self, TOK_HOOK)
         super(hook, self).__init__(m)
-        char = cg.get_char_from_token
-        self.expr = char(self.token) + '(' + char(self.groupby_token) + '?)'
 
     def __and__(self, other):
         assert isinstance(other, hook)
@@ -493,23 +488,16 @@ class path_alternate(path):
     def __init__(self, paths_list):
         self.__check_type(paths_list)
         super(path_alternate, self).__init__(paths=paths_list)
+        self.set_tree(paths_list)
 
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
 
-    @property
-    def expr(self):
-        paths = self.paths
-        if len(paths) > 1:
-            expr = reduce(lambda x, y: x + '|(' + y.expr + ')', paths[1:],
-                          '(' + paths[0].expr + ')')
-            expr = '(' + expr + ')'
-        elif len(paths) == 1:
-            expr = paths[0].expr
-        else:
-            expr = ''
-        return expr
+    def set_tree(self, paths):
+        self.re_tree = re_empty()
+        for p in paths:
+            self.re_tree = self.re_tree | p.re_tree
 
 
 class path_star(path):
@@ -517,14 +505,13 @@ class path_star(path):
     def __init__(self, p):
         self.__check_type(p)
         super(path_star, self).__init__(paths=[p])
+        self.set_tree(self, p)
 
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    @property
-    def expr(self):
-        expr = '(' + self.paths[0].expr + ')*'
-        return expr
+    def set_tree(self, p):
+        self.re_tree = +(p.re_tree)
 
 
 class path_concat(path):
@@ -532,14 +519,47 @@ class path_concat(path):
     def __init__(self, paths_list):
         self.__check_type(paths_list)
         super(path_concat, self).__init__(paths=paths_list)
-
-    @property
-    def expr(self):
-        return reduce(lambda x, y: x + y.expr, self.paths, '')
+        self.set_tree(self, paths_list)
 
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
+
+    def set_tree(self, paths):
+        self.re_tree = re_epsilon()
+        for p in paths:
+            self.re_tree = self.re_tree ^ p.re_tree
+
+
+class path_negate(path):
+    """ Negation of paths. """
+    def __init__(self, p):
+        self.__check_type(p)
+        super(path_negate, self).__init__(paths=[p])
+        self.set_tree(self, p)
+
+    def __check_type(self, p):
+        assert isinstance(p, path)
+
+    def set_tree(self, p):
+        self.re_tree = ~(p.re_tree)
+
+
+class path_inters(path):
+    """ Intersection of paths. """
+    def __init__(self, paths_list):
+        self.__check_type(paths_list)
+        super(path_inters, self).__init__(paths=paths_list)
+        self.set_tree(self, paths_list)
+
+    def __check_type(self, paths):
+        for p in paths:
+            assert isinstance(p, path)
+
+    def set_tree(self, paths):
+        self.re_tree = ~re_empty()
+        for p in paths:
+            self.re_tree = self.re_tree & p.re_tree
 
 
 #############################################################################
