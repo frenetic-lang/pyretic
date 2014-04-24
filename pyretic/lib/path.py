@@ -377,7 +377,7 @@ class path(Query):
 
     @classmethod
     def append_re_without_intersection(cls, new_re, p):
-        du = dfa_utils
+        du = ml_ulex_dfa_utils
         i = 0
         diff_re_list = []
         length = len(cls.re_list)
@@ -507,7 +507,7 @@ class path(Query):
         """Generates tagging and counting policy fragments to use with the
         returned general network policy.
         """
-        du = dfa_utils
+        du = ml_ulex_dfa_utils
         cg = CharacterGenerator
         dfa = du.regexes_to_dfa(cls.re_list, '/tmp/pyretic-regexes.txt')
         
@@ -882,7 +882,8 @@ class dfa_utils(object):
     of various DFA properties.
     """
     @classmethod
-    def intersection_is_null(cls, re1, re2, tmp_file):
+    def intersection_is_null(cls, re1, re2,
+                             tmp_file='/tmp/pyretic-regexes-int.txt'):
         raise NotImplementedError
 
     @classmethod

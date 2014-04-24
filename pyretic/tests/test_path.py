@@ -225,7 +225,7 @@ def test_slightly_complicated_expr_1():
 ### correctness by visually inspecting the DFA from ml-ulex for these lists of
 ### regexes, and ensuring the printed DFA from du.print_dfa is consistent.
 
-du = dfa_utils
+du = ml_ulex_dfa_utils
 
 def test_dfa_const_1():
     re_list = ['ab', 'cd']
