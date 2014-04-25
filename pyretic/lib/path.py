@@ -216,7 +216,7 @@ class re_tree_gen(object):
         add_pred = cls.__add_pred__
         new_sym  = cls.__new_symbol__
         del_pred = cls.__del_pred__
-        replace_pred = cls.__replace_pred__(old_pred, new_preds)
+        replace_pred = cls.__replace_pred__
         ovlap = cls.__get_overlap_mode__
 
         new_pred = copy.deepcopy(new_pred)
