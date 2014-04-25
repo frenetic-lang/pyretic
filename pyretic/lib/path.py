@@ -38,6 +38,7 @@ from pyretic.lib.re import *
 import subprocess
 import pyretic.vendor
 import pydot
+import copy
 
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
 # token type definitions
@@ -407,137 +408,85 @@ class re_tree_gen(object):
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
 
     @classmethod
-    def get_overlapping_preds(cls, new_pred):
-        """ Returns a tuple of 4 lists of leaf-level predicates:
-        ( list of preds that are a subset of new_pred,
-          list of preds that are a superset of new_pred,
-          list of preds that have a non-empty intersection of new_pred but are
-        neither a subset nor superset of new_pred,
-          list of preds that are exactly equal )
-
-        This function assumes that classifier_utils.has_nonempty_intersection is
-        both sound and complete.
+    def get_overlap_mode(cls, pred, new_pred):
+        """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
+        booleans, depending on whether pred is equal, is a superset of, is a subset
+        of, or just intersects new_pred.
         """
-        assert isinstance(new_pred, Filter)
+        assert isinstance(new_pred, Filter) and isinstance(pred, Filter)
         ne_inters = classifier_utils.has_nonempty_intersection
-        subset_list   = []
-        superset_list = []
-        inters_list   = []
-        equal_list    = []
-        pred_list     = filter(lambda x: ne_inters(x, new_pred),
-                               cls.pred_to_symbol.keys())
-        for pred in pred_list:
-            if  (not ne_inters( pred, ~new_pred) and
-                 not ne_inters(~pred,  new_pred)):
-                equal_list.append(pred)
-            elif not ne_inters( pred, ~new_pred):
-                subset_list.append(pred)
-            elif not ne_inters(~pred,  new_pred):
-                superset_list.append(pred)
-            else:
-                inters_list.append(pred)
-        return (subset_list, superset_list, inters_list, equal_list)
+        (is_equal,is_superset,is_subset,intersects) = (False,False,False,False)
+        if  (not ne_inters( pred, ~new_pred) and
+             not ne_inters(~pred,  new_pred)):
+            is_equal = True
+        elif not ne_inters(~pred,  new_pred):
+            is_superset = True
+        elif not ne_inters( pred, ~new_pred):
+            is_subset = True
+        elif ne_inters(pred, new_pred):
+            intersects = True
+        else:
+            pass
+        return (is_equal, is_superset, is_subset, intersects)
 
     @classmethod
-    def deal_equal_preds(cls, pred_list, new_pred, at):
-        """ Deal with other leaf-level preds which are equal to a given (new)
-        packet predicate `new_pred`, by returning the symbol corresponding to
-        the existing predicate (in `pred_list`) which is equal.
+    def get_re_tree(cls, new_pred, at):
+        """ Deal with existing leaf-level predicates, taking different actions
+        based on whether the existing predicates are equal, superset, subset, or
+        just intersecting, the new predicate.
         """
-        assert len(pred_list) <= 1
-        if len(pred_list) == 1:
-            pred = pred_list[0]
-            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
-            cls.pred_to_atoms[pred].append(atom)
-            return re_symbol(cls.pred_to_symbol[pred], metadata=at)
-        else:
-            return None
-
-    @classmethod
-    def deal_superset_preds(cls, pred_list, new_pred, at):
-        """ Deal with a predicate (in `pred_list`) which is a superset of
-        `new_pred`, by breaking the super-set predicate into component parts
-        including and excluding `new_pred`.
-        """
-        assert len(pred_list) <= 1
-        if len(pred_list) == 1:
-            pred = pred_list[0]
-            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
-            # Add new constituent predicates -- leaf-level
-            cls.__add_pred__(pred & ~new_pred,
-                             cls.__new_symbol__(),
-                             cls.pred_to_atoms[pred])
-            cls.__add_pred__(new_pred,
-                             cls.__new_symbol__(),
-                             cls.pred_to_atoms[pred] + [at])
-            # Replace the superset predicate by constituents in every re AST
-            cls.replace_predicate_AST(pred, [pred & ~new_pred, new_pred])
-            # Return a new re_tree just for the new predicate
-            return re_symbol(cls.pred_to_symbol[new_pred], metadata=at)
-        else:
-            return None
-
-    ### XXX: dealing with subset, and intersecting predicates.
-
-    ### XXX this is replicated from characterGenerator -- to be removed soon.
-    def add_overlapping_filter(cls, new_filter, toktype):
-        # The algorithm below ensures that matches are disjoint before adding
-        # them. Basically, each character that is present in the path
-        # expressions represents a mutually exclusive packet match.
-        diff_list = drop
-        new_intersecting_tokens = []
-        cu = classifier_utils
-        for existing_filter in cls.token_to_filter[toktype].values():
-            if cu.has_nonempty_intersection(existing_filter, new_filter):
-                tok = cls.filter_to_token[toktype][existing_filter]
-                if cu.has_nonempty_intersection(existing_filter, ~new_filter):
-                    # do actions below only if the existing filter has some
-                    # intersection with, but is not completely contained in, the
-                    # new filter.
-                    del cls.filter_to_token[toktype][existing_filter]
-                    del cls.token_to_filter[toktype][tok]
-                    new_tok1 = cls.__add_new_token(existing_filter &
-                                                   ~new_filter, toktype)
-                    new_tok2 = cls.__add_new_token(existing_filter &
-                                                   new_filter, toktype)
-                    cls.token_to_tokens[toktype][tok] = [new_tok1, new_tok2]
-                    new_intersecting_tokens.append(new_tok2)
-                else:
-                    # i.e., if existing filter is completely contained in new one.
-                    new_intersecting_tokens.append(tok)
-                # add existing_filter into list of policies to be subtracted as
-                # long as there is some intersection.
-                if diff_list == drop:
-                    diff_list = existing_filter
-                else:
-                    diff_list = diff_list | existing_filter
-        # add the new_filter itself, differenced by all the intersecting parts.
-        if diff_list != drop: # i.e., if there was intersection with existing filters
-            new_token = cls.__new_token__()
-            new_disjoint_token = []
-            if cu.has_nonempty_intersection(new_filter, ~diff_list):
-                # i.e., if the intersections didn't completely make up the new filter
-                new_disjoint_token.append(cls.__add_new_token(new_filter &
-                                                              ~diff_list,
-                                                              toktype))
-            cls.token_to_tokens[toktype][new_token] = (new_intersecting_tokens +
-                                                       new_disjoint_token)
-            cls.token_to_toktype[new_token] = toktype
-        else:
-            # i.e., if there was no intersection at all with existing filters
-            new_token = cls.__add_new_token(new_filter, toktype)
-        return new_token
-
-    @classmethod
-    def get_re_tree(cls, pred, at):
-        """ Get an re_tree for a single atom with its predicate. """
         assert isinstance(at, atom)
         assert isinstance(pred, Filter)
-        if pred in cls.pred_to_atoms:
-            return cls.deal_equal_preds([pred], pred, at)
-        else:
-            ### XXX todo.
-            return cls.get_overlapped_re_tree(pred, at)
+
+        ne_inters = classifier_utils.has_nonempty_intersection
+        add_pred = cls.__add_pred__
+        new_sym  = cls.__new_symbol__
+        del_pred = cls.__del_pred__
+        replace_pred = cls.replace_predicate_AST(old_pred, new_preds)
+        ovlap = cls.get_overlap_mode
+
+        new_pred = copy.deepcopy(new_pred)
+        re_tree = re_empty()
+        pred_list = cls.pred_to_symbol.keys()
+
+        for pred in pred_list:
+            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            pred_atoms = cls.pred_to_atoms[pred]
+            pred_symbol = cls.pred_to_symbol[pred]
+            (is_equal,is_superset,is_subset,intersects) = ovlap(pred, new_pred)
+            if is_equal:
+                pred_atoms.append(at)
+                re_tree |= re_symbol(pred_symbol, metadata=at)
+                return re_tree
+            elif is_superset:
+                add_pred(pred & ~new_pred, new_sym(), pred_atoms)
+                add_pred(new_pred, new_sym(), pred_atoms + [at])
+                replace_pred(pred, [pred & ~new_pred, new_pred])
+                del_pred(pred)
+                added_sym = cls.pred_to_symbol[new_pred]
+                re_tree |= re_symbol(added_sym, metadata=at)
+                return re_tree
+            elif is_subset:
+                new_pred = new_pred & ~pred
+                pred_atoms.append(at)
+                re_tree |= re_symbol(pred_symbol, metadata=at)
+            elif intersects:
+                add_pred(pred & ~new_pred, new_sym(), pred_atoms)
+                add_pred(pred &  new_pred, new_sym(), pred_atoms + [at])
+                replace_pred(pred, [pred & ~new_pred, pred & new_pred])
+                del_pred(pred)
+                added_sym = cls.pred_to_symbol[pred & new_pred]
+                re_tree |= re_symbol(added_sym, metadata=at)
+                new_pred = new_pred & ~pred
+            else:
+                pass
+
+        if ne_inters(new_pred, identity):
+            add_pred(new_pred, new_sym(), [at])
+            added_sym = cls.pred_to_symbol[new_pred]
+            re_tree |= re_symbol(added_sym, metadata=at)
+
+        return re_tree
 
     @classmethod
     def clear(cls):
