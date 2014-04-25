@@ -357,7 +357,7 @@ class re_tree_gen(object):
             return unichr(cls.token)
 
     @classmethod
-    def replace_predicate_AST(cls, old_pred, new_preds):
+    def __replace_pred__(cls, old_pred, new_preds):
         """ Replace the re symbol corresponding to `old_pred` with an
         alternation of predicates in `new_preds`. The metadata from the
         old_pred's re symbol is copied over to all leaf nodes of its new re AST.
@@ -408,7 +408,7 @@ class re_tree_gen(object):
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
 
     @classmethod
-    def get_overlap_mode(cls, pred, new_pred):
+    def __get_overlap_mode__(cls, pred, new_pred):
         """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
         booleans, depending on whether pred is equal, is a superset of, is a subset
         of, or just intersects new_pred.
@@ -442,8 +442,8 @@ class re_tree_gen(object):
         add_pred = cls.__add_pred__
         new_sym  = cls.__new_symbol__
         del_pred = cls.__del_pred__
-        replace_pred = cls.replace_predicate_AST(old_pred, new_preds)
-        ovlap = cls.get_overlap_mode
+        replace_pred = cls.__replace_pred__(old_pred, new_preds)
+        ovlap = cls.__get_overlap_mode__
 
         new_pred = copy.deepcopy(new_pred)
         re_tree = re_empty()
