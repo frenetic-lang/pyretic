@@ -509,8 +509,7 @@ class path(Query):
         if a:
             assert isinstance(a, abstract_atom)
             self.atom = a
-            # TODO(ngsrinivas): unicode tokens break this assignment below!
-            self.re_tree = re_symbol(chr(self.atom.token), metadata=self.atom)
+            self.re_tree = re_tree_gen.get_re_tree(a.policy, a)
         elif paths:
             self.paths = paths
         else:
@@ -673,30 +672,31 @@ class path_alternate(path):
     def __init__(self, paths_list):
         self.__check_type(paths_list)
         super(path_alternate, self).__init__(paths=paths_list)
-        self.set_tree(paths_list)
 
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
 
-    def set_tree(self, paths):
-        self.re_tree = re_empty()
-        for p in paths:
-            self.re_tree = self.re_tree | p.re_tree
-
+    @property
+    def re_tree(self):
+        tree = re_empty()
+        for p in self.paths:
+            tree = tree | p.re_tree
+        return tree
 
 class path_star(path):
     """ Kleene star on a path. """
     def __init__(self, p):
         self.__check_type(p)
         super(path_star, self).__init__(paths=[p])
-        self.set_tree(self, p)
 
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    def set_tree(self, p):
-        self.re_tree = +(p.re_tree)
+    @property
+    def re_tree(self):
+        p = self.paths[0]
+        return +(p.re_tree)
 
 
 class path_concat(path):
@@ -704,16 +704,17 @@ class path_concat(path):
     def __init__(self, paths_list):
         self.__check_type(paths_list)
         super(path_concat, self).__init__(paths=paths_list)
-        self.set_tree(self, paths_list)
 
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
 
-    def set_tree(self, paths):
-        self.re_tree = re_epsilon()
-        for p in paths:
-            self.re_tree = self.re_tree ^ p.re_tree
+    @property
+    def re_tree(self):
+        tree = re_epsilon()
+        for p in self.paths:
+            tree = tree ^ p.re_tree
+        return tree
 
 
 class path_negate(path):
@@ -721,13 +722,14 @@ class path_negate(path):
     def __init__(self, p):
         self.__check_type(p)
         super(path_negate, self).__init__(paths=[p])
-        self.set_tree(self, p)
 
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    def set_tree(self, p):
-        self.re_tree = ~(p.re_tree)
+    @property
+    def re_tree(self):
+        p = self.paths[0]
+        return ~(p.re_tree)
 
 
 class path_inters(path):
@@ -735,16 +737,17 @@ class path_inters(path):
     def __init__(self, paths_list):
         self.__check_type(paths_list)
         super(path_inters, self).__init__(paths=paths_list)
-        self.set_tree(self, paths_list)
 
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
 
-    def set_tree(self, paths):
-        self.re_tree = ~re_empty()
-        for p in paths:
-            self.re_tree = self.re_tree & p.re_tree
+    @property
+    def re_tree(self):
+        tree = ~re_empty()
+        for p in self.paths:
+            tree = tree & p.re_tree
+        return tree
 
 
 #############################################################################
