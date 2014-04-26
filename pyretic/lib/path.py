@@ -268,6 +268,11 @@ class re_tree_gen(object):
         cls.pred_to_symbols = {}
         cls.pred_to_atoms   = {}
 
+    @classmethod
+    def get_symlist(cls):
+        """ Get a list of symbols which are leaf-level predicates """
+        return cls.pred_to_symbols.values()
+
 #############################################################################
 ###               Path query language components                          ###
 #############################################################################
@@ -319,10 +324,6 @@ class path(Query):
 
     def __pos__(self):
         """Implementation of the Kleene star operator.
-
-        TODO(ngsrinivas): It just looks wrong to use '+' instead of '*', but
-        unfortunately there is no unary (prefix or postfix) '*' operator in
-        python.
         """
         return path_star(self)
 
@@ -520,78 +521,62 @@ class path_inters(path):
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
     @classmethod
-    def clear(cls):
-        cls.re_list = []
-        cls.paths_list = []
-        cls.path_to_bucket = {}
+    def __get_pred__(cls, edge_atoms_list):
+        prev_pred = None
+        pred = None
+        for m in edge_atoms_list:
+            for a in m:
+                pred = a.policy
+                if not prev_pred:
+                    prev_pred = pred
+                assert pred == prev_pred
+                prev_pred = pred
+        assert pred
+        return pred
 
     @classmethod
-    def append_re_without_intersection(cls, new_re, p):
-        du = ml_ulex_dfa_utils
-        i = 0
-        diff_re_list = []
-        length = len(cls.re_list)
-        for i in range(0, length):
-            existing_re = cls.re_list[i]
-            if du.re_equals(existing_re, new_re):
-                cls.paths_list[i] += [p]
-                return False
-            elif du.re_belongs_to(existing_re, new_re):
-                cls.paths_list[i] += [p]
-                diff_re_list.append(existing_re)
-            elif du.re_has_nonempty_intersection(existing_re, new_re):
-                # separate out the intersecting and non-intersecting parts
-                # non-intersecting part first:
-                cls.re_list[i] = '(' + existing_re + ') & ~(' + new_re + ')'
-                # create a new expression for the intersecting part:
-                intersection_re = '(' + existing_re + ') & (' + new_re + ')'
-                cls.re_list.append(intersection_re)
-                cls.paths_list.append(cls.paths_list[i] + [p])
-                diff_re_list.append(existing_re)
-            # Finally, we do nothing if there is no intersection at all.
-            i += 1
-        # So far we've handled intersecting parts with existing res. Now deal
-        # with the intersecting parts of the new re.
-        new_nonintersecting_re = new_re
-        if diff_re_list:
-            all_intersecting_parts = reduce(lambda x,y: x + '|' + y,
-                                            diff_re_list)
-            if not du.re_belongs_to(new_re, all_intersecting_parts):
-                # there's some part of the new expression that's not covered by
-                # any of the existing expressions.
-                new_nonintersecting_re = ('(' + new_re + ') & ~(' +
-                                          all_intersecting_parts + ')')
-            else:
-                # the new expression was already covered by (parts) of existing
-                # expressions, and we've already added path references for those.
-                return False
-        # add just the non-overlapping parts of the new re to the re_list.
-        cls.re_list.append(new_nonintersecting_re)
-        cls.paths_list.append([p])
-        return True
+    def __set_tag__(cls, q):
+        val = dfa_utils.get_state_index(q)
+        if int(val) == 0:
+            return modify(path_tag=None)
+        else:
+            return modify(path_tag=int(val))
 
     @classmethod
-    def finalize(cls, p):
-        """Add a path into the set of final path queries that will be
-        compiled. This is explicitly needed since at the highest level there is
-        no AST for the paths.
+    def __match_tag__(cls, q):
+        val = dfa_utils.get_state_index(q)
+        if int(val) == 0:
+            return match(path_tag=None)
+        else:
+            return match(path_tag=int(val))
 
-        :param p: path to be finalized for querying (and hence compilation).
-        :type p: path
+    @classmethod
+    def compile(cls, path_list, fwding):
+        """ Compile the list of paths along with the forwarding policy `fwding`
+        into a single classifier to be installed on switches.
         """
-        # ensure finalization structures exist
-        try:
-            if cls.re_list and cls.paths_list and cls.path_to_bucket:
-                pass
-        except:
-            cls.re_list = [] # str list
-            cls.paths_list = [] # path list list
-            cls.path_to_bucket = {} # dict path: bucket
+        du = dfa_utils
 
-        # modify finalization structures to keep track of newly added expression
-        expr = CharacterGenerator.get_terminal_expression(p.expr)
-        cls.append_re_without_intersection(expr, p)
-        cls.path_to_bucket[p] = p.bucket_instance
+        re_list = map(lambda x: x.re_tree, path_list)
+        dfa = du.regexes_to_dfa(re_list)
+        tagging = drop
+        capture = drop
+        edges = du.get_edges()
+
+        for e in edges:
+            src = du.get_edge_src(dfa, edge)
+            dst = du.get_edge_dst(dfa, edge)
+            atoms = cls.get_edge_atoms(dfa, edge)
+            pred = cls.__get_pred__(atoms)
+            tagging += ((cls.__match_tag__(src) & pred) >> cls.__set_tag__(dst))
+
+            if du.is_accepting(dst, dfa):
+                ords = du.get_accepting_exps(dfa, dst)
+                for i in ords:
+                    bucket = path_list[i].get_bucket()
+                    capture += ((cls.__match_tag__(src) & pred) >> bucket)
+
+        return (tagging >> fwding) + capture
 
     class policy_frags:
         def __init__(self):
@@ -638,20 +623,7 @@ class pathcomp(object):
         def get_hooks(self):
             return self.hooks
 
-    @classmethod
-    def set_tag(cls, val):
-        if int(val) == 0:
-            return modify(path_tag=None)
-        else:
-            return modify(path_tag=int(val))
-
-    @classmethod
-    def match_tag(cls, val):
-        if int(val) == 0:
-            return match(path_tag=None)
-        else:
-            return match(path_tag=int(val))
-
+    # XXX: use hints for hooks compilation, egress atom compilation, ... here.
     @classmethod
     def get_policy_fragments(cls):
         """Generates tagging and counting policy fragments to use with the
@@ -756,31 +728,7 @@ class pathcomp(object):
 
         return frags
 
-    @classmethod
-    def compile(cls, path_pols):
-        """Finalize all the paths in the given list of path policies, and return
-        a bunch of policy fragments to be used with the forwarding policy later.
-
-        :param path_pols: a list of path queries
-        :type path_pols: path list
-        :param single_pkt_pol: main forwarding (single pkt) policy set by
-        application
-        :type single_pkt_pol: Policy
-        """
-        if path_pols:
-            for p in path_pols:
-                cls.finalize(p)
-            return cls.get_policy_fragments()
-        else:
-            frags = pathcomp.policy_frags()
-            frags.set_tagging(identity)
-            frags.set_untagging(identity)
-            frags.set_counting(drop)
-            frags.set_endpath(drop)
-            frags.set_dropping(drop)
-            frags.set_hooks(drop)
-            return frags
-
+    # XXX: use hints to stitch compiled fragments from other atom types here.
     @classmethod
     def stitch(cls, fwding, path_pol_fragments):
         """Stitch together the "single packet policy" and "path policy" and
@@ -813,6 +761,8 @@ class pathcomp(object):
                 # TODO(ngsrinivas): drop atoms are not stitched in as of now
                 # + (tagging >> dropped_by_fwding >> dropping)) # capture when
                                                             # dropped
+
+    # XXX: hooks state management and callback setup forthcoming.
     @classmethod
     def set_up_hooks_callback(cls, hooks_map, tagging):
         # 1. get path_tag from the packet (not direct as of now)
@@ -864,38 +814,6 @@ class pathcomp(object):
 #############################################################################
 
 class dfa_utils(object):
-    """ Base class for utilities regarding construction of DFAs and extraction
-    of various DFA properties.
-    """
-    @classmethod
-    def intersection_is_null(cls, re1, re2,
-                             tmp_file='/tmp/pyretic-regexes-int.txt'):
-        raise NotImplementedError
-
-    @classmethod
-    def re_equals(cls, re1, re2):
-        """Determine if two regular expressions are equal."""
-        nre1 = '~(' + re1 + ')'
-        nre2 = '~(' + re2 + ')'
-        return (cls.intersection_is_null(re1, nre2) and
-                cls.intersection_is_null(nre1, re2))
-
-    @classmethod
-    def re_belongs_to(cls, re1, re2):
-        """Return True if re1 is a subset of re2 (including equals), and False
-        otherwise.
-        """
-        nre2 = '~(' + re2 + ')'
-        return cls.intersection_is_null(re1, nre2)
-
-    @classmethod
-    def re_has_nonempty_intersection(cls, re1, re2):
-        return not cls.intersection_is_null(re1, re2)
-
-class re_deriv_dfa_utils(dfa_utils):
-    """ DFA utilities that use the custom-built re_deriv library to construct
-    and extract DFA properties from regular expressions.
-    """
     @classmethod
     def print_dfa(cls, d):
         """ Print a DFA object d. """
@@ -934,6 +852,17 @@ class re_deriv_dfa_utils(dfa_utils):
         return tt_entry[2]
 
     @classmethod
+    def get_edge_atoms(cls, d, tt_entry):
+        q = cls.get_edge_src(d, tt_entry)
+        c = cls.get_edge_label(tt_entry)
+        return d.transition_table.get_metadata(q, c)
+
+    @classmethod
+    def get_state_index(cls, d, q):
+        assert isinstance(d, dfa_base)
+        return d.all_states.get_index(q)
+
+    @classmethod
     def get_num_states(cls, d):
         assert isinstance(d, dfa_base)
         return d.all_states.get_num_states()
@@ -944,23 +873,16 @@ class re_deriv_dfa_utils(dfa_utils):
         return d.transition_table.get_num_transitions()
 
     @classmethod
-    def is_accepting(cls, s, d):
-        assert isinstance(s, int) # state index (number)
-        assert isinstance(d, dfa_base) # re_dfa object
-        return d.all_states.is_accepting(s)
+    def is_accepting(cls, d, q):
+        assert isinstance(d, dfa_base)
+        return d.all_states.is_accepting(q)
 
     @classmethod
-    def get_accepted_token(cls, d, s):
-        assert isinstance(s, int) # state index (number)
+    def get_accepting_exps(cls, d, q):
         assert isinstance(d, dfa_base) # dfa object
         assert isinstance(d.all_states, re_vector_state_table)
-        assert cls.is_accepting(s)
-        q = d.all_states.get_state_by_index(s)
-        accepted_tokens = d.all_states.get_accepting_states_ordinal(q)
-        # TODO(ngsrinivas): The invariant below may be removed once the notion
-        # of "accepting tokens" is changed in the calling code.
-        assert isinstance(accepted_tokens, list) and len(accepted_tokens) == 1
-        return accepted_tokens[0]
+        assert cls.is_accepting(q)
+        return d.all_states.get_accepting_exps_ordinal(q)
 
     @classmethod
     def get_num_accepting_states(cls, d):
@@ -968,36 +890,34 @@ class re_deriv_dfa_utils(dfa_utils):
         return d.final_states.get_num_states()
 
     @classmethod
-    def construct_symlist(cls, re_list):
-        """ Construct an alphabet list from the set of symbols used in
-        re_list.
-        """
-        # TODO(ngsrinivas): there's a need to construct a list of symbols used
-        # in all the expressions. This can be either done retro-actively after
-        # getting all the final expressions, or can just be provided as an
-        # argument from all the leaf-level symbols (of the re AST) through one
-        # of the book-keeping data structures.
-        raise NotImplementedError
+    def get_symlist(re_exps):
+        """ Given a list of re expressions, get the list of symbols at the
+        leaf-level. """
+        def get_symlist_single_re(r):
+            assert isinstance(r, re_deriv)
+            lst = []
+            if isinstance(r, re_symbol):
+                lst = [r.char]
+            elif isinstance(r, re_epsilon) or isinstance(r, re_empty):
+                lst = []
+            elif isinstance(r, re_combinator):
+                lst = reduce(lambda acc, x: acc + get_symlist_single_re(x),
+                             r.re_list, [])
+            else:
+                raise TypeError
+            return lst
+
+        symlist = set([])
+        for r in re_exps:
+            syms_r = get_symlist_single_re(r)
+            reduce(lambda acc, x: acc.add(x), syms_r, symlist)
+        return list(symlist)
 
     @classmethod
-    def construct_re_expressions(cls, re_list):
-        """ Construct re AST from a list of re strings. """
-        raise NotImplementedError
-
-    @classmethod
-    def regexes_to_dfa(cls, re_list):
-        """ Convert a list of regular expressions re_list to a DFA.
-
-        This method will soon be superseded by providing the AST of the
-        path-level regular expressions to the makeDFA function directly."""
-        re_exps = cls.construct_re_expressions(re_list)
-        symlist = cls.construct_symlist(re_list)
+    def regexes_to_dfa(cls, re_exps, symlist=None):
+        """ Convert a list of regular expressions to a DFA. """
+        assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
+                      re_exps, True)
+        if not symlist:
+            symlist = re_tree_gen.get_symlist()
         return makeDFA_vector(re_exps, symlist)
-
-    @classmethod
-    def intersection_is_null(cls, re1, re2):
-        # TODO(ngsrinivas): string expression construction below will soon be
-        # converted to an intersection "expression" of REs.
-        re = ['(' + re1 + ') & (' + re2 + ')']
-        dfa = cls.regexes_to_dfa(re)
-        return (cls.get_num_accepting_states(dfa) == 0)

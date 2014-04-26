@@ -865,9 +865,9 @@ class dfa_state_table(object):
             out += '  ' + str(self.re_map[q]) + ': ' + repr(q) + '\n'
         return out
 
-    def is_accepting(self, qindex):
-        """ Return True if state with index `qindex` is accepting in this set of states. """
-        return self.final_state_check_fun(self.state_list[q])
+    def is_accepting(self, q):
+        """ Return True if state `q` is an accepting state."""
+        return self.final_state_check_fun(q)
 
     def get_final_states(self):
         f = []
@@ -1150,7 +1150,7 @@ class re_vector_state_table(dfa_state_table):
                 f.append(q)
         return re_vector_state_table(f)
 
-    def get_accepting_states_ordinal(self, q):
+    def get_accepting_exps_ordinal(self, q):
         """ Given a vector state q, return a list of ordinal number of the re
         components of the state that are accepting strings there."""
         assert list_isinstance(q, re_deriv)
@@ -1162,7 +1162,7 @@ class re_vector_state_table(dfa_state_table):
         return ordinal_list
 
 class re_vector_transition_table(dfa_transition_table):
-    def __init__(self):
+    def __init__(self, component_dfas):
         def symcheck(c, typ):
             return isinstance(c, typ) and len(c) == 1
         super(re_vector_transition_table, self).__init__(
@@ -1170,6 +1170,21 @@ class re_vector_transition_table(dfa_transition_table):
             list_isinstance,
             str,
             symcheck)
+        self.component_dfas = component_dfas
+
+    def get_metadata(self, qvec, c):
+        """ Get metadata on a vector transition using the scalar DFAs & their
+        transition metadata.
+        """
+        assert isinstance(c, str) and len(c) == 1
+        meta_list = []
+        for i in range(0, len(qvec)):
+            q = qvec[i]
+            dfa = self.component_dfas[i]
+            states = dfa.all_states
+            tt = dfa.transition_table
+            meta_list.append(tt.get_metadata(q, c))
+        return tuple_from_list(meta_list)
 
 class re_vector_dfa(dfa_base):
     def __init__(self, all_states, init_state, final_states, transition_table,
@@ -1224,11 +1239,10 @@ def makeDFA_vector(re_list, alphabet_list):
     if len(re_list) == 0:
         print "No DFA constructed from empty list of regular expressions."
         return None
-    dfa_dict = {}
-    for exp in re_list:
-        dfa_dict[exp] = makeDFA(exp, alphabet_list)
+    component_dfas = tuple_from_list(map(lambda x: makeDFA(x, alphabet_list),
+                                         re_list))
     q0 = tuple_from_list(re_list)
-    tt = re_vector_transition_table()
+    tt = re_vector_transition_table(component_dfas)
     states = re_vector_state_table([q0])
     explore_vector(states, tt, q0, alphabet_list)
     f = states.get_final_states()
