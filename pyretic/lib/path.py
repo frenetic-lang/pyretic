@@ -566,7 +566,7 @@ class pathcomp(object):
         for e in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
-            atoms = cls.get_edge_atoms(dfa, edge)
+            atoms = du.get_edge_atoms(dfa, edge)
             pred = cls.__get_pred__(atoms)
             tagging += ((cls.__match_tag__(src) & pred) >> cls.__set_tag__(dst))
 
