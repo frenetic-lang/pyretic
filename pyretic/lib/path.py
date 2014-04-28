@@ -535,7 +535,7 @@ class pathcomp(object):
         return pred
 
     @classmethod
-    def __set_tag__(cls, q):
+    def __set_tag__(cls, d, q):
         val = dfa_utils.get_state_index(q)
         if int(val) == 0:
             return modify(path_tag=None)
@@ -543,7 +543,7 @@ class pathcomp(object):
             return modify(path_tag=int(val))
 
     @classmethod
-    def __match_tag__(cls, q):
+    def __match_tag__(cls, d, q):
         val = dfa_utils.get_state_index(q)
         if int(val) == 0:
             return match(path_tag=None)
@@ -561,20 +561,22 @@ class pathcomp(object):
         dfa = du.regexes_to_dfa(re_list)
         tagging = drop
         capture = drop
-        edges = du.get_edges()
+        match_tag = lambda q: cls.__match_tag__(dfa, q)
+        set_tag   = lambda q: cls.__set_tag__(dfa, q)
 
+        edges = du.get_edges()
         for e in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
             atoms = du.get_edge_atoms(dfa, edge)
             pred = cls.__get_pred__(atoms)
-            tagging += ((cls.__match_tag__(src) & pred) >> cls.__set_tag__(dst))
+            tagging += ((match_tag(src) & pred) >> set_tag(dst))
 
             if du.is_accepting(dst, dfa):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
                     bucket = path_list[i].get_bucket()
-                    capture += ((cls.__match_tag__(src) & pred) >> bucket)
+                    capture += ((match_tag(src) & pred) >> bucket)
 
         return (tagging >> fwding) + capture
 
