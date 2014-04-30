@@ -308,15 +308,7 @@ class path(Query):
     :param a: path atom used to construct this path element
     :type atom: atom
     """
-    def __init__(self, a=None, paths=None):
-        if a:
-            assert isinstance(a, abstract_atom)
-            self.atom = a
-            self.re_tree = re_tree_gen.get_re_tree(a.policy, a)
-        elif paths:
-            self.paths = paths
-        else:
-            raise RuntimeError
+    def __init__(self):
         super(path, self).__init__()
         self.bucket_instance = FwdBucket() # default bucket type
 
@@ -371,7 +363,8 @@ class abstract_atom(path, Filter):
     def __init__(self, m):
         assert isinstance(m, Filter)
         self.policy = m
-        super(abstract_atom, self).__init__(a=self)
+        self.re_tree = re_tree_gen.get_re_tree(m, self)
+        super(abstract_atom, self).__init__()
 
     def __and__(self, other):
         assert isinstance(other, type(self))
@@ -392,6 +385,10 @@ class abstract_atom(path, Filter):
 
     def __invert__(self):
         return type(self)(~(self.policy))
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.policy == other.policy)
 
 
 class atom(abstract_atom):
@@ -455,7 +452,19 @@ class hook(abstract_atom):
 
 ### Path combinator classes ###
 
-class path_alternate(path):
+class path_combinator(path):
+    """ Base class for all path combinators. """
+    def __init__(self, paths_list):
+        self.paths = paths_list
+        super(path_combinator, self).__init__()
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                reduce(lambda acc, (x,y): acc and x == y,
+                       zip(self.paths, other.paths),
+                       True))
+
+class path_alternate(path_combinator):
     """ Alternation of paths. """
     def __init__(self, paths_list):
         self.__check_type(paths_list)
@@ -472,7 +481,7 @@ class path_alternate(path):
             tree = tree | p.re_tree
         return tree
 
-class path_star(path):
+class path_star(path_combinator):
     """ Kleene star on a path. """
     def __init__(self, p):
         self.__check_type(p)
@@ -487,7 +496,7 @@ class path_star(path):
         return +(p.re_tree)
 
 
-class path_concat(path):
+class path_concat(path_combinator):
     """ Concatenation of paths. """
     def __init__(self, paths_list):
         self.__check_type(paths_list)
@@ -505,7 +514,7 @@ class path_concat(path):
         return tree
 
 
-class path_negate(path):
+class path_negate(path_combinator):
     """ Negation of paths. """
     def __init__(self, p):
         self.__check_type(p)
@@ -520,7 +529,7 @@ class path_negate(path):
         return ~(p.re_tree)
 
 
-class path_inters(path):
+class path_inters(path_combinator):
     """ Intersection of paths. """
     def __init__(self, paths_list):
         self.__check_type(paths_list)

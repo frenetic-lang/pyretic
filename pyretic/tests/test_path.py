@@ -89,7 +89,8 @@ def test_CG_token_equality_1():
     a1 = atom(m1)
     a2 = atom(m2)
     assert a1.re_tree == a2.re_tree
-    assert not a1.re_tree.equals_meta(a2.re_tree)
+    assert not a1.re_tree.equals_meta_by_id(a2.re_tree)
+    assert a1.re_tree.equals_meta_structural(a2.re_tree)
 
 def test_CG_token_equality_2():
     cg.clear()
@@ -99,8 +100,11 @@ def test_CG_token_equality_2():
     a2 = atom(m2)
     tree1 = a1.re_tree
     tree2 = a2.re_tree
+    assert a1 == a2
+    assert id(a1) != id(a2)
     assert tree1 == tree2
-    assert not tree1.equals_meta(tree2)
+    assert tree1.equals_meta_structural(tree2)
+    assert not tree1.equals_meta_by_id(tree2)
 
 def test_CG_token_equality_3():
     cg.clear()

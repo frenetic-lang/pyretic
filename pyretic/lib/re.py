@@ -111,14 +111,17 @@ class re_base(re_deriv):
     def get_metadata(self):
         return self.metadata
 
-    def equals_meta(self, other):
-        """ Return True if the other re equals self including metadata,
-        otherwise False.
+    def equals_meta_structural(self, other):
+        """ Return True if the other re equals self including metadata
+        (structurally), otherwise False.
         """
-        try:
-            return self == other and self.metadata == other.metadata
-        except:
-            return self == other and id(self.metadata) == id(other.metadata)
+        return self == other and self.metadata == other.metadata
+
+    def equals_meta_by_id(self, other):
+        """ Return True if the other re equals self including metadata (by id),
+        else False.
+        """
+        return self == other and id(self.metadata) == id(other.metadata)
 
     def __repr__(self):
         if self.metadata:
@@ -175,12 +178,24 @@ class re_combinator(re_deriv):
         self.re_list = re_list
         super(re_combinator, self).__init__()
 
-    def equals_meta(self, other):
-        """ Return True if the other re equals self including metadata,
+    def equals_meta_structural(self, other):
+        """ Return True if the other re equals self including metadata
+        (structurally), otherwise False.
+        """
+        if self == other:
+            return reduce(lambda acc, (x,y): (acc and
+                          x.equals_meta_structural(y)),
+                          zip(self.re_list, other.re_list),
+                          True)
+        else:
+            return False
+
+    def equals_meta_by_id(self, other):
+        """ Return True if the other re equals self including metadata (by id),
         otherwise False.
         """
         if self == other:
-            return reduce(lambda acc, (x,y): acc and x.equals_meta(y),
+            return reduce(lambda acc, (x,y): acc and x.equals_meta_by_id(y),
                           zip(self.re_list, other.re_list),
                           True)
         else:
@@ -924,7 +939,7 @@ class re_state_table(dfa_state_table):
             """ Add a single expression e to the state q. """
             assert isinstance(exp, re_deriv)
             for e in re_to_exp[q]:
-                if e.equals_meta(exp):
+                if e.equals_meta_structural(exp):
                     return None
             re_to_exp[q] += [exp]
             return exp

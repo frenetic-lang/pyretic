@@ -382,8 +382,8 @@ def test_dfa_metadata():
     d  = re_symbol('d')
     symbol_list = 'abcd'
 
-    def list_equals_meta(x, y):
-        return reduce(lambda acc, (u,v): acc and u.equals_meta(v),
+    def list_equals_meta_structural(x, y):
+        return reduce(lambda acc, (u,v): acc and u.equals_meta_structural(v),
                       zip(x, y),
                       True)
 
@@ -424,9 +424,9 @@ def test_dfa_metadata():
     r1 = (+c ^ a ^ b ^ a) | (c ^ b ^ a)
     assert (sorted(tt.get_metadata(r1, 'c')) ==
             sorted(c1.get_metadata() + c3.get_metadata()))
-    assert list_equals_meta(st.get_expressions(b ^ a), [b ^ a2])
+    assert list_equals_meta_structural(st.get_expressions(b ^ a), [b ^ a2])
     assert tt.get_metadata(b ^ a, 'b') == []
-    assert list_equals_meta(st.get_expressions(a), [a2, a1])
+    assert list_equals_meta_structural(st.get_expressions(a), [a2, a1])
 
     e = (+c1 ^ c3 ^ b ^ a2) | (c2 ^ c3 ^ b1 ^ a1)
     tt = makeDFA(e, symbol_list).transition_table
@@ -438,10 +438,10 @@ def test_dfa_metadata():
     tt = dfa.transition_table
     st = dfa.all_states
     assert tt.get_metadata(e, 'c') == c3.get_metadata()
-    assert list_equals_meta(st.get_expressions(b ^ a),
+    assert list_equals_meta_structural(st.get_expressions(b ^ a),
                             [b ^ a2, b1 ^ a1])
     assert tt.get_metadata(b ^ a, 'b') == b1.get_metadata()
-    assert list_equals_meta(st.get_expressions(a), [a2, a1])
+    assert list_equals_meta_structural(st.get_expressions(a), [a2, a1])
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 
@@ -449,11 +449,11 @@ def test_dfa_metadata():
     dfa = makeDFA(e, symbol_list)
     st = dfa.all_states
     tt = dfa.transition_table
-    assert list_equals_meta(st.get_expressions(b ^ a),
+    assert list_equals_meta_structural(st.get_expressions(b ^ a),
                             [b2 ^ a2, b1 ^ a1])
     assert (sorted(tt.get_metadata(b ^ a, 'b')) ==
             sorted(b1.get_metadata() + b2.get_metadata()))
-    assert list_equals_meta(st.get_expressions(a), [a2, a1])
+    assert list_equals_meta_structural(st.get_expressions(a), [a2, a1])
     assert (sorted(tt.get_metadata(a, 'a')) ==
             sorted(a1.get_metadata() + a2.get_metadata()))
 
