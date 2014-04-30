@@ -244,7 +244,6 @@ class re_tree_gen(object):
         replace_pred = cls.__replace_pred__
         ovlap = classifier_utils.get_overlap_mode
 
-        new_pred = copy.copy(new_pred) # XXX: will shallow copy cause problems?
         re_tree = re_empty()
         pred_list = cls.pred_to_symbol.keys()
 

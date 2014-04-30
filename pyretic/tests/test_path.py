@@ -110,44 +110,51 @@ def test_CG_token_equality_3():
     a2 = atom(m2)
     assert a1.re_tree != a2.re_tree
 
-def test_CG_intersection_matches_1():
-    cg.clear()
-    m1 = match(srcip=ip1)
-    m2 = match(dstip=ip2)
-    a1 = atom(m1)
-    a2 = atom(m2)
+@pytest.mark.skipif(True)
+def check_metadata_list(a_list):
+    """ Given a list of atoms, check if their re_tree objects have metadata
+    pointing back to the atom objects. """
+    def check_metadata_single_re(r, m):
+        """ Subroutine to check metadata """
+        if isinstance(r, re_symbol):
+            assert r.metadata == [m]
+        elif isinstance(r, re_combinator):
+            for re in r.re_list:
+                check_metadata_single_re(re, m)
+        else:
+            raise TypeError("Can't check metadata on re of any other type!")
+    for a in a_list:
+        check_metadata_single_re(a.re_tree, a)
 
-    assert len(cg.pred_to_symbol.keys()) == 3
-    ms = [(match(srcip=ip1) & ~match(dstip=ip2)),
-          (match(dstip=ip2) & ~match(srcip=ip1)),
-          (match(srcip=ip1) & match(dstip=ip2))]
-
+@pytest.mark.skipif(True)
+def assert_and_get_syms(ms):
     syms = []
     for m in ms:
         assert m in cg.pred_to_symbol
         assert m in cg.pred_to_atoms
         syms.append(cg.pred_to_symbol[m])
+    return syms
 
-    assert not m1 in cg.pred_to_symbol and not m1 in cg.pred_to_atoms
-    assert not m2 in cg.pred_to_symbol and not m2 in cg.pred_to_atoms
+def test_CG_equal_matches():
+    cg.clear()
+    m1 = match(srcip=ip1)
+    m2 = match(srcip=ip1)
+    a1 = atom(m1)
+    a2 = atom(m2)
 
-    assert a1.re_tree == re_symbol(syms[0]) | re_symbol(syms[2])
-    assert a2.re_tree == re_symbol(syms[1]) | re_symbol(syms[2])
+    assert len(cg.pred_to_symbol.keys()) == 1
+    ms = [match(srcip=ip1)]
+    syms = assert_and_get_syms(ms)
 
-    assert cg.pred_to_atoms[ms[0]] == [a1]
-    assert cg.pred_to_atoms[ms[1]] == [a2]
-    assert cg.pred_to_atoms[ms[2]] == [a1, a2]
+    assert m1 in cg.pred_to_symbol and m1 in cg.pred_to_atoms
+    assert m2 in cg.pred_to_symbol and m2 in cg.pred_to_atoms
 
-    def check_metadata(r, m):
-        if isinstance(r, re_symbol):
-            assert r.metadata == [m]
-        elif isinstance(r, re_combinator):
-            for re in r.re_list:
-                check_metadata(re, m)
-        else:
-            raise TypeError("Can't check metadata on re of any other type!")
-    check_metadata(a1.re_tree, a1)
-    check_metadata(a2.re_tree, a2)
+    assert a1.re_tree == re_symbol(syms[0])
+    assert a2.re_tree == re_symbol(syms[0])
+
+    assert cg.pred_to_atoms[ms[0]] == [a1, a2]
+
+    check_metadata_list([a1, a2])
 
 def test_CG_superset_matches():
     cg.clear()
@@ -160,11 +167,7 @@ def test_CG_superset_matches():
     ms = [match(srcip=ip1) & match(switch=2),
           match(srcip=ip1) & ~(match(srcip=ip1) & match(switch=2))]
 
-    syms = []
-    for m in ms:
-        assert m in cg.pred_to_symbol
-        assert m in cg.pred_to_atoms
-        syms.append(cg.pred_to_symbol[m])
+    syms = assert_and_get_syms(ms)
 
     assert not m1 in cg.pred_to_symbol
     assert m2 in cg.pred_to_symbol
@@ -175,16 +178,82 @@ def test_CG_superset_matches():
     assert cg.pred_to_atoms[ms[0]] == [a1, a2]
     assert cg.pred_to_atoms[ms[1]] == [a1]
 
-    def check_metadata(r, m):
-        if isinstance(r, re_symbol):
-            assert r.metadata == [m]
-        elif isinstance(r, re_combinator):
-            for re in r.re_list:
-                check_metadata(re, m)
-        else:
-            raise TypeError("Can't check metadata on re of any other type!")
-    check_metadata(a1.re_tree, a1)
-    check_metadata(a2.re_tree, a2)
+    check_metadata_list([a1, a2])
+
+def test_CG_subset_matches():
+    cg.clear()
+    m1 = match(srcip=ip1, switch=2)
+    m2 = match(srcip=ip1)
+    a1 = atom(m1)
+    a2 = atom(m2)
+
+    assert len(cg.pred_to_symbol.keys()) == 2
+
+    ms = [(match(srcip=ip1, switch=2)),
+          (match(srcip=ip1) & ~match(srcip=ip1, switch=2))]
+
+    syms = assert_and_get_syms(ms)
+
+    assert m1 in cg.pred_to_symbol and m1 in cg.pred_to_atoms
+    assert not m2 in cg.pred_to_symbol and not m2 in cg.pred_to_symbol
+
+    assert a1.re_tree == re_symbol(syms[0])
+    assert a2.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
+
+    assert cg.pred_to_atoms[ms[0]] == [a1, a2]
+    assert cg.pred_to_atoms[ms[1]] == [a2]
+
+    check_metadata_list([a1, a2])
+
+def test_CG_intersection_matches_1():
+    cg.clear()
+    m1 = match(srcip=ip1)
+    m2 = match(dstip=ip2)
+    a1 = atom(m1)
+    a2 = atom(m2)
+
+    assert len(cg.pred_to_symbol.keys()) == 3
+    ms = [(match(srcip=ip1) & ~match(dstip=ip2)),
+          (match(dstip=ip2) & ~match(srcip=ip1)),
+          (match(srcip=ip1) & match(dstip=ip2))]
+
+    syms = assert_and_get_syms(ms)
+
+    assert not m1 in cg.pred_to_symbol and not m1 in cg.pred_to_atoms
+    assert not m2 in cg.pred_to_symbol and not m2 in cg.pred_to_atoms
+
+    assert a1.re_tree == re_symbol(syms[0]) | re_symbol(syms[2])
+    assert a2.re_tree == re_symbol(syms[1]) | re_symbol(syms[2])
+
+    assert cg.pred_to_atoms[ms[0]] == [a1]
+    assert cg.pred_to_atoms[ms[1]] == [a2]
+    assert cg.pred_to_atoms[ms[2]] == [a1, a2]
+
+    check_metadata_list([a1, a2])
+
+def test_CG_intersection_matches_2():
+    cg.clear()
+    m1 = match(srcip=ip1)
+    m2 = match(srcip=ip2)
+    m3 = m1 | m2
+    a1 = atom(m1)
+    a2 = atom(m2)
+    a3 = atom(m3)
+
+    assert len(cg.pred_to_symbol.keys()) == 2
+    ms = [match(srcip=ip1),
+          match(srcip=ip2)]
+
+    syms = assert_and_get_syms(ms)
+
+    assert a1.re_tree == re_symbol(syms[0])
+    assert a2.re_tree == re_symbol(syms[1])
+    assert a3.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
+
+    assert cg.pred_to_atoms[ms[0]] == [a1, a3]
+    assert cg.pred_to_atoms[ms[1]] == [a2, a3]
+
+    check_metadata_list([a1, a2, a3])
 
     sys.exit(0)
 
@@ -690,9 +759,11 @@ if __name__ == "__main__":
     test_CG_token_equality_2()
     test_CG_token_equality_3()
 
-    test_CG_intersection_matches_1()
-
+    test_CG_equal_matches()
     test_CG_superset_matches()
+    test_CG_subset_matches()
+    test_CG_intersection_matches_1()
+    test_CG_intersection_matches_2()
 
     test_CG_policy_equality()
 
