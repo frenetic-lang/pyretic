@@ -454,8 +454,8 @@ class hook(abstract_atom):
 
 class path_combinator(path):
     """ Base class for all path combinators. """
-    def __init__(self, paths_list):
-        self.paths = paths_list
+    def __init__(self, paths=None):
+        self.paths = paths
         super(path_combinator, self).__init__()
 
     def __eq__(self, other):
