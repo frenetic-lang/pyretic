@@ -57,7 +57,7 @@ class classifier_utils(object):
     various manipulations on policies.
     """
     @classmethod
-    def get_classifier(cls, p):
+    def __get_classifier__(cls, p):
         # Hackety hack
         if p._classifier:
             return p._classifier
@@ -68,23 +68,54 @@ class classifier_utils(object):
             return p._classifier
 
     @classmethod
+    def __is_not_drop_classifier__(cls, c):
+        for rule in c.rules:
+            if not drop in rule.actions:
+                return True
+        return False
+
+    @classmethod
+    def is_not_drop(cls, p):
+        """ Return true if policy p is effectively a drop. """
+        p_class = cls.__get_classifier__(p)
+        return cls.__is_not_drop_classifier__(p_class)
+
+    @classmethod
     def has_nonempty_intersection(cls, p1, p2):
         """Return True if policies p1, p2 have an intesection which is
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-        int_class = cls.get_classifier(p1 & p2)
-        for rule in int_class.rules:
-            if not drop in rule.actions:
-                return True
-        return False
+        return cls.is_not_drop(p1 & p2)
+
+    @classmethod
+    def get_overlap_mode(cls, pred, new_pred):
+        """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
+        booleans, depending on whether pred is equal, is a superset of, is a subset
+        of, or just intersects new_pred.
+        """
+        assert isinstance(new_pred, Filter) and isinstance(pred, Filter)
+        ne_inters = cls.has_nonempty_intersection
+        (is_equal,is_superset,is_subset,intersects) = (False,False,False,False)
+        if  (not ne_inters( pred, ~new_pred) and
+             not ne_inters(~pred,  new_pred)):
+            is_equal = True
+        elif not ne_inters(~pred,  new_pred):
+            is_superset = True
+        elif not ne_inters( pred, ~new_pred):
+            is_subset = True
+        elif ne_inters(pred, new_pred):
+            intersects = True
+        else:
+            pass
+        return (is_equal, is_superset, is_subset, intersects)
 
     @classmethod
     def get_dropped_packets(cls, p):
         """For an arbitrary policy p, return the set of packets (as a filter
         policy) that are dropped by it.
         """
-        pol_classifier = cls.get_classifier(p)
+        pol_classifier = cls.__get_classifier__(p)
         matched_packets = drop
         for rule in pol_classifier.rules:
             fwd_actions = filter(lambda a: (isinstance(a, modify)
@@ -105,6 +136,20 @@ class re_tree_gen(object):
     # path query.
     pred_to_symbol = {}
     pred_to_atoms  = {}
+
+    @classmethod
+    def repr_state(cls):
+        assert (sorted(cls.pred_to_symbol.keys()) ==
+                sorted(cls.pred_to_atoms.keys()))
+        output = ''
+        for pred in cls.pred_to_symbol:
+            output += repr(pred) + ":\n"
+            output += '  symbol: ' + repr(cls.pred_to_symbol[pred]) + '\n'
+            try:
+                output += '  atoms: ' + repr(cls.pred_to_atoms[pred] ) + '\n'
+            except:
+                pass
+        return output
 
     @classmethod
     def __add_pred__(cls, pred, symbol, atoms):
@@ -154,15 +199,15 @@ class re_tree_gen(object):
             """ Replace all nodes in the provided re_tree, which correspond to a
             symbol `old_sym`, with the re tree `new_re_tree`. Also retain the
             original metadata that was in the respective old node."""
-            if isinstance(re_tree, re_symbol):
-                if re_tree.char == old_sym:
+            if isinstance(old_re_tree, re_symbol):
+                if old_re_tree.char == old_sym:
                     # replace with metadata!
-                    return new_metadata_tree(re_tree.metadata, new_re_tree)
+                    return new_metadata_tree(old_re_tree.metadata, new_re_tree)
                 else:
-                    return re_tree
-            elif isinstance(re_tree, re_alter):
+                    return old_re_tree
+            elif isinstance(old_re_tree, re_alter):
                 new_re = re_empty()
-                for re in re_tree.re_list:
+                for re in old_re_tree.re_list:
                     new_re = new_re | replace_node(re, new_re_tree, old_sym)
                 return new_re
             else:
@@ -173,7 +218,8 @@ class re_tree_gen(object):
         new_re_tree = re_empty()
         # Construct replacement tree (without metadata first)
         for pred in new_preds:
-            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            assert pred in cls.pred_to_symbol
+            assert pred in cls.pred_to_atoms
             new_sym = cls.pred_to_symbol[pred]
             new_re_tree = new_re_tree | re_symbol(new_sym)
         # For each atom containing old_pred, replace re leaf by new tree.
@@ -182,49 +228,28 @@ class re_tree_gen(object):
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
 
     @classmethod
-    def __get_overlap_mode__(cls, pred, new_pred):
-        """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
-        booleans, depending on whether pred is equal, is a superset of, is a subset
-        of, or just intersects new_pred.
-        """
-        assert isinstance(new_pred, Filter) and isinstance(pred, Filter)
-        ne_inters = classifier_utils.has_nonempty_intersection
-        (is_equal,is_superset,is_subset,intersects) = (False,False,False,False)
-        if  (not ne_inters( pred, ~new_pred) and
-             not ne_inters(~pred,  new_pred)):
-            is_equal = True
-        elif not ne_inters(~pred,  new_pred):
-            is_superset = True
-        elif not ne_inters( pred, ~new_pred):
-            is_subset = True
-        elif ne_inters(pred, new_pred):
-            intersects = True
-        else:
-            pass
-        return (is_equal, is_superset, is_subset, intersects)
-
-    @classmethod
     def get_re_tree(cls, new_pred, at):
         """ Deal with existing leaf-level predicates, taking different actions
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
         assert isinstance(at, atom)
-        assert isinstance(pred, Filter)
+        assert isinstance(new_pred, Filter)
 
-        ne_inters = classifier_utils.has_nonempty_intersection
+        ne_inters   = classifier_utils.has_nonempty_intersection
+        is_not_drop = classifier_utils.is_not_drop
         add_pred = cls.__add_pred__
         new_sym  = cls.__new_symbol__
         del_pred = cls.__del_pred__
         replace_pred = cls.__replace_pred__
-        ovlap = cls.__get_overlap_mode__
+        ovlap = classifier_utils.get_overlap_mode
 
-        new_pred = copy.deepcopy(new_pred)
+        new_pred = copy.copy(new_pred) # XXX: will shallow copy cause problems?
         re_tree = re_empty()
         pred_list = cls.pred_to_symbol.keys()
 
         for pred in pred_list:
-            assert pred in cls.pred_to_symbol and pred in cls.pred_to_atoms
+            assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
             pred_symbol = cls.pred_to_symbol[pred]
             (is_equal,is_superset,is_subset,intersects) = ovlap(pred, new_pred)
@@ -255,7 +280,7 @@ class re_tree_gen(object):
             else:
                 pass
 
-        if ne_inters(new_pred, identity):
+        if is_not_drop(new_pred):
             add_pred(new_pred, new_sym(), [at])
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
@@ -265,13 +290,13 @@ class re_tree_gen(object):
     @classmethod
     def clear(cls):
         cls.token = TOKEN_START_VALUE
-        cls.pred_to_symbols = {}
+        cls.pred_to_symbol = {}
         cls.pred_to_atoms   = {}
 
     @classmethod
     def get_symlist(cls):
         """ Get a list of symbols which are leaf-level predicates """
-        return cls.pred_to_symbols.values()
+        return cls.pred_to_symbol.values()
 
 #############################################################################
 ###               Path query language components                          ###

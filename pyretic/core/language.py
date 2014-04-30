@@ -196,6 +196,10 @@ class Filter(Policy):
         """
         return negate([self])
 
+    def __hash__(self):
+        """ Hash function for using Filters in sets and dictionaries. """
+        return hash(repr(self))
+
 
 class Singleton(Filter):
     """Abstract policy from which Singletons descend"""

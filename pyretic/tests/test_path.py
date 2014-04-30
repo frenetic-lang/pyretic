@@ -33,12 +33,45 @@ from pyretic.lib.path import *
 
 import copy
 import pytest
+import sys
 
 ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
-cg = CharacterGenerator
+cg = re_tree_gen
+cu = classifier_utils
+ne_inters = cu.has_nonempty_intersection
+
+### Classifier utilities sanity checks ###
+
+def test_classifier_ne_inters():
+    m1 = match(srcip=ip1)
+    m2 = match(switch=1)
+    m3 = match(srcip=ip2)
+    m4 = match(srcip=ip1) & match(switch=2)
+    assert ne_inters(m1, m2)
+    assert not ne_inters(m1, m3)
+    assert ne_inters(m1, m4)
+    assert ne_inters(m1, ~m4)
+    assert not ne_inters(m4, ~m1)
+
+def test_overlap_mode():
+    ovlap = cu.get_overlap_mode
+    m1 = match(srcip=ip1)
+    m2 = match(switch=1)
+    m3 = match(srcip=ip2)
+    m4 = match(srcip=ip1) & match(switch=2)
+    m5 = match(srcip=ip2) | match(srcip=ip1)
+    m6 = match(srcip=ip2) | match(switch=1)
+    m7 = match(switch=1)
+    assert ovlap(m1, m1) == (True, False, False, False)
+    assert ovlap(m2, m7) == (True, False, False, False)
+    assert ovlap(m1, m3) == (False, False, False, False)
+    assert ovlap(m1, m4) == (False, True, False, False)
+    assert ovlap(m5, m6) == (False, False, False, True)
+    assert ovlap(m4, m1) == (False, False, True, False)
+    assert ovlap(m6, m5) == (False, False, False, True)
 
 ### Character generator basic sanity checks ###
 
@@ -46,32 +79,37 @@ def test_CG_token_gen():
     """Ensure you get a token back."""
     cg.clear()
     m = match(srcip=ip1) & match(switch=1)
-    new_token = cg.get_token(m)
-    assert new_token
+    a = atom(m)
+    assert a.re_tree
 
 def test_CG_token_equality_1():
     cg.clear()
     m1 = match(srcip=ip1)
     m2 = m1
-    token1 = cg.get_token(m1)
-    token2 = cg.get_token(m2)
-    assert token1 == token2
+    a1 = atom(m1)
+    a2 = atom(m2)
+    assert a1.re_tree == a2.re_tree
+    assert not a1.re_tree.equals_meta(a2.re_tree)
 
 def test_CG_token_equality_2():
     cg.clear()
     m1 = match(srcip=ip1)
-    m2 = copy.deepcopy(m1)
-    token1 = cg.get_token(m1)
-    token2 = cg.get_token(m2)
-    assert token1 == token2
+    a1 = atom(m1)
+    m2 = copy.copy(m1)
+    a2 = atom(m2)
+    tree1 = a1.re_tree
+    tree2 = a2.re_tree
+    assert tree1 == tree2
+    assert not tree1.equals_meta(tree2)
 
 def test_CG_token_equality_3():
     cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(srcip=ip1) & match(switch=2)
-    token1 = cg.get_token(m1)
-    token2 = cg.get_token(m2)
-    assert token1 != token2
+    a1 = atom(m1)
+    a2 = atom(m2)
+    assert a1.re_tree != a2.re_tree
+    sys.exit(0)
 
 def test_CG_intersection_matches_1():
     cg.clear()
@@ -225,7 +263,7 @@ def test_slightly_complicated_expr_1():
 ### correctness by visually inspecting the DFA from ml-ulex for these lists of
 ### regexes, and ensuring the printed DFA from du.print_dfa is consistent.
 
-du = ml_ulex_dfa_utils
+du = dfa_utils
 
 def test_dfa_const_1():
     re_list = ['ab', 'cd']
@@ -580,6 +618,9 @@ def test_empty_paths():
 
 # Just in case: keep these here to run unit tests in vanilla python
 if __name__ == "__main__":
+
+    test_overlap_mode()
+    test_classifier_ne_inters()
 
     test_CG_token_gen()
 
