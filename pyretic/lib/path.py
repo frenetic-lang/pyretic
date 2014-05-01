@@ -136,6 +136,7 @@ class re_tree_gen(object):
     # path query.
     pred_to_symbol = {}
     pred_to_atoms  = {}
+    symbol_to_pred = {} # Used solely during compilation, not re_tree generation.
 
     @classmethod
     def repr_state(cls):
@@ -158,11 +159,14 @@ class re_tree_gen(object):
         assert not pred in cls.pred_to_atoms
         cls.pred_to_symbol[pred] = symbol
         cls.pred_to_atoms[pred] = atoms
+        cls.symbol_to_pred[symbol] = pred
 
     @classmethod
     def __del_pred__(cls, pred):
         """ Remove a predicate from existing global state of leaf-level
         predicates. """
+        sym = cls.pred_to_symbol[pred]
+        del cls.symbol_to_pred[sym]
         del cls.pred_to_symbol[pred]
         del cls.pred_to_atoms[pred]
 
@@ -289,13 +293,14 @@ class re_tree_gen(object):
     @classmethod
     def clear(cls):
         cls.token = TOKEN_START_VALUE
-        cls.pred_to_symbol = {}
+        cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
+        cls.symbol_to_pred  = {}
 
     @classmethod
     def get_symlist(cls):
         """ Get a list of symbols which are leaf-level predicates """
-        return cls.pred_to_symbol.values()
+        return cls.symbol_to_pred.keys()
 
 #############################################################################
 ###               Path query language components                          ###
@@ -554,22 +559,8 @@ class path_inters(path_combinator):
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
     @classmethod
-    def __get_pred__(cls, edge_atoms_list):
-        prev_pred = None
-        pred = None
-        for m in edge_atoms_list:
-            for a in m:
-                pred = a.policy
-                if not prev_pred:
-                    prev_pred = pred
-                assert pred == prev_pred
-                prev_pred = pred
-        assert pred
-        return pred
-
-    @classmethod
     def __set_tag__(cls, d, q):
-        val = dfa_utils.get_state_index(q)
+        val = dfa_utils.get_state_index(d, q)
         if int(val) == 0:
             return modify(path_tag=None)
         else:
@@ -577,11 +568,16 @@ class pathcomp(object):
 
     @classmethod
     def __match_tag__(cls, d, q):
-        val = dfa_utils.get_state_index(q)
+        val = dfa_utils.get_state_index(d, q)
         if int(val) == 0:
             return match(path_tag=None)
         else:
             return match(path_tag=int(val))
+
+    @classmethod
+    def __get_pred__(cls, edge):
+        """ Get predicate corresponding to an edge. """
+        return re_tree_gen.symbol_to_pred[dfa_utils.get_edge_label(edge)]
 
     @classmethod
     def compile(cls, path_list, fwding):
@@ -596,16 +592,19 @@ class pathcomp(object):
         capture = drop
         match_tag = lambda q: cls.__match_tag__(dfa, q)
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
+        get_pred  = cls.__get_pred__
+        virtual_field(name="path_tag",
+                      values=range(0, du.get_num_states(dfa)),
+                      type="integer")
 
-        edges = du.get_edges()
-        for e in edges:
+        edges = du.get_edges(dfa)
+        for edge in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
-            atoms = du.get_edge_atoms(dfa, edge)
-            pred = cls.__get_pred__(atoms)
+            pred = get_pred(edge)
             tagging += ((match_tag(src) & pred) >> set_tag(dst))
 
-            if du.is_accepting(dst, dfa):
+            if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
                     bucket = path_list[i].get_bucket()
@@ -871,15 +870,13 @@ class dfa_utils(object):
         """
         assert isinstance(d, dfa_base)
         assert isinstance(tt_entry, tuple) and len(tt_entry) == 3
-        src = tt_entry[0]
-        return d.all_states.get_index(src)
+        return tt_entry[0]
 
     @classmethod
     def get_edge_dst(cls, d, tt_entry):
         assert isinstance(d, dfa_base)
         assert isinstance(tt_entry, tuple) and len(tt_entry) == 3
-        dst = tt_entry[1]
-        return d.all_states.get_index(dst)
+        return tt_entry[1]
 
     @classmethod
     def get_edge_label(cls, tt_entry):
@@ -916,7 +913,7 @@ class dfa_utils(object):
     def get_accepting_exps(cls, d, q):
         assert isinstance(d, dfa_base) # dfa object
         assert isinstance(d.all_states, re_vector_state_table)
-        assert cls.is_accepting(q)
+        assert cls.is_accepting(d, q)
         return d.all_states.get_accepting_exps_ordinal(q)
 
     @classmethod

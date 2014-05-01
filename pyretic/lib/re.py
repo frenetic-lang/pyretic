@@ -975,7 +975,8 @@ class dfa_base(object):
         assert state_type_check_fun(init_state, state_type)
         assert isinstance(final_states, state_table_type)
         assert isinstance(transition_table, tt_type)
-        assert isinstance(symbol_list, str)
+        is_strlist = lambda acc, x: acc and isinstance(x, str) and len(x) == 1
+        assert reduce(is_strlist, symbol_list, True)
         self.all_states = all_states
         self.init_state = init_state
         self.final_states = final_states

@@ -114,6 +114,8 @@ def test_CG_token_equality_3():
     a2 = atom(m2)
     assert a1.re_tree != a2.re_tree
 
+### Check re_tree generation under various predicate overlap conditions ###
+
 @pytest.mark.skipif(True)
 def check_metadata_list(a_list):
     """ Given a list of atoms, check if their re_tree objects have metadata
@@ -341,8 +343,6 @@ def test_path_kleene_closure():
     assert isinstance(p2, path)
     assert p2.expr == '(' + a1.expr + ')*'
 
-### Slightly more complicated path expressions testing ###
-
 def test_slightly_complicated_expr_1():
     cg.clear()
     a1 = atom(match(srcip=ip1, switch=2))
@@ -354,7 +354,6 @@ def test_slightly_complicated_expr_1():
     assert isinstance(p, path)
     assert p.expr == ('(((' + a1.expr + ') ^ (' + a4.expr + ')) | ((' + a2.expr +
                       ') ^ (' + a3.expr + '))) & (' + a5.expr + ')')
-    sys.exit(0)
 
 ### Path compilation testing ###
 
@@ -363,10 +362,10 @@ du = dfa_utils
 def test_path_compile_1():
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    frags = pathcomp.compile([a1])
-    tags = frags.get_tagging()
-    untagging = frags.get_untagging()
-    counts = frags.get_counting()
+    pol = pathcomp.compile([a1], identity)
+    print pol
+    sys.exit(0)
+
     # Note: this test depends on state numbers, which eventually get changed
     # into tags. So it's not implementation detail-independent. Also, it relies
     # on the fact that vlan is used for packet tagging.
