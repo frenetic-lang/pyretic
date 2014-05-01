@@ -302,6 +302,14 @@ class re_tree_gen(object):
         """ Get a list of symbols which are leaf-level predicates """
         return cls.symbol_to_pred.keys()
 
+    @classmethod
+    def get_unaffected_pred(cls):
+        """ Predicate that covers packets unaffected by query predicates. """
+        if len(cls.pred_to_symbol.keys()) >= 1:
+            return ~(reduce(lambda a,x: a | x, cls.pred_to_symbol.keys()))
+        else:
+            return identity
+
 #############################################################################
 ###               Path query language components                          ###
 #############################################################################
@@ -585,6 +593,7 @@ class pathcomp(object):
         into a single classifier to be installed on switches.
         """
         du = dfa_utils
+        cg = re_tree_gen
 
         re_list = map(lambda x: x.re_tree, path_list)
         dfa = du.regexes_to_dfa(re_list)
@@ -610,6 +619,7 @@ class pathcomp(object):
                     bucket = path_list[i].get_bucket()
                     capture += ((match_tag(src) & pred) >> bucket)
 
+        tagging += cg.get_unaffected_pred()
         return (tagging >> fwding) + capture
 
     class policy_frags:

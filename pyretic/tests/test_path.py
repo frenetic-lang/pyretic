@@ -362,7 +362,7 @@ du = dfa_utils
 def test_path_compile_1():
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    pol = pathcomp.compile([a1], identity)
+    pol = pathcomp.compile([a1], fwd(1))
     print pol
     sys.exit(0)
 
