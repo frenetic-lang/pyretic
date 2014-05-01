@@ -1144,6 +1144,16 @@ def explore(states, tt, q, alphabet_list):
     for symbol in alphabet_list:
         goto(q, symbol, tt, states, alphabet_list)
 
+def make_null_DFA():
+    """ This is a "null" DFA, which is returned if there are no input regular
+    expressions to make DFA functions. """
+    q0 = re_empty()
+    states = re_state_table([q0])
+    tt = re_transition_table()
+    f = re_state_table([])
+    alphabet_list = []
+    return re_dfa(states, q0, f, tt, alphabet_list)
+
 def makeDFA(r, alphabet_list):
     """ Make a DFA from a regular expression r. """
     assert isinstance(r, re_deriv)
@@ -1275,8 +1285,7 @@ def makeDFA_vector(re_list, alphabet_list):
     """ Make a DFA from a list of regular expressions `re_list`. """
     assert list_isinstance(re_list, re_deriv)
     if len(re_list) == 0:
-        print "No DFA constructed from empty list of regular expressions."
-        return None
+        return make_null_DFA()
     component_dfas = tuple_from_list(map(lambda x: makeDFA(x, alphabet_list),
                                          re_list))
     q0 = tuple_from_list(re_list)

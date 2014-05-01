@@ -407,14 +407,13 @@ def test_path_compile_2():
 
 def test_empty_paths():
     cg.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    p = a1 ^ a2
     fwding = fwd(2)
     policy = pathcomp.compile([], fwding)
-    ref_policy = (identity >> fwding) + drop
-    print policy
-    print ref_policy
+    ref_tagging = (match(path_tag=None) + identity)
+    ref_capture = drop
+    ref_policy = (ref_tagging >> fwding) + ref_capture
+    [x.compile() for x in [policy, ref_policy]]
+    assert policy._classifier == ref_policy._classifier
 
 ### Unit test class-based token generation using the various atom types ###
 
@@ -616,8 +615,11 @@ if __name__ == "__main__":
 
     test_path_compile_1()
     test_path_compile_2()
-    sys.exit(0)
     test_empty_paths()
+
+    print "If this message is printed without errors before it, we're good."
+    print "Also ensure all unit tests are listed above this line in the source."
+    sys.exit(0)
 
     # XXX: legacy tests from old token generator remain
     # for testing later if token types are re-introduced.
@@ -638,5 +640,3 @@ if __name__ == "__main__":
     test_hook_compilation_1()
     test_hook_compilation_2()
 
-    print "If this message is printed without errors before it, we're good."
-    print "Also ensure all unit tests are listed above this line in the source."
