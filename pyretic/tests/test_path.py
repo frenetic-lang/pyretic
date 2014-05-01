@@ -259,14 +259,6 @@ def test_CG_intersection_matches_2():
 
     check_metadata_list([a1, a2, a3])
 
-    sys.exit(0)
-
-def test_CG_policy_equality():
-    cg.clear()
-    m = match(srcip=ip1)
-    tok = cg.get_token(m)
-    assert cg.get_filter_from_token(tok) == m
-
 ### Basic checks on creating and manipulating path atoms ###
 
 def test_atom_creation():
@@ -305,35 +297,11 @@ def test_atom_or():
     a2 = atom(match(switch=2))
     assert (a1 | a2).policy == (match(switch=1) | match(switch=2))
 
-# TODO(ngsrinivas): skipping test_atom_add (i.e., '+' operator on the atom
-# object), since this will result in a TypeError (match + match is a `parallel`
-# type, not a `Filter` type).
-
-### Basic token generation capabilities for atoms ###
-
-def test_atom_token_generation_1():
-    cg.clear()
-    a = atom(match(srcip=ip1))
-    assert a.token
-
-def test_atom_token_generation_2():
-    cg.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    a3 = atom(match(srcip=ip1))
-    assert a1.token != a2.token
-    assert a1.token == a3.token
-
 ### Basic path creation and expression capabilities ###
 
-def test_path_creation_1():
+def test_path_creation():
     cg.clear()
     a = atom(match(srcip=ip2))
-    assert isinstance(a, path)
-    assert a.expr
-
-def test_path_creation_2():
-    a = path(expr='abc|def')
     assert isinstance(a, path)
     assert a.expr
 
@@ -343,7 +311,7 @@ def test_path_concatenation():
     a2 = atom(match(dstip=ip2))
     p = a1 ^ a2
     assert isinstance(p, path)
-    assert p.expr == (a1.expr + a2.expr)
+    assert p.expr == ('(' + a1.expr + ') ^ (' + a2.expr + ')')
 
 def test_path_alternation_1():
     cg.clear()
@@ -351,13 +319,7 @@ def test_path_alternation_1():
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
     assert isinstance(p, path)
-    # This assertion below is not true anymore: a1 | a2 is a new atomic filter
-    # with the policy filter a1.policy | a2.policy. This does introduce a kink
-    # in the denotational semantics for the '|' operator w.r.t. the path
-    # expression, since '|' is simultaneously the filter union as well as path
-    # alternation, with the former taking precedence when used with atoms.
-    # assert p.expr == ('((' + a1.expr + ')|(' + a2.expr + '))')
-    assert p.expr != ('((' + a1.expr + ')|(' + a2.expr + '))')
+    assert p.expr == ('(' + a1.expr + ') | (' + a2.expr + ')')
 
 def test_path_alternation_2():
     cg.clear()
@@ -367,17 +329,17 @@ def test_path_alternation_2():
     p2 = a2 ^ a1
     p = p1 | p2
     assert isinstance(p, path)
-    assert p.expr == ('((' + p1.expr + ')|(' + p2.expr + '))')
+    assert p.expr == ('(' + p1.expr + ') | (' + p2.expr + ')')
 
 def test_path_kleene_closure():
     cg.clear()
     a1 = atom(match(srcip=ip1))
-    p1 = +a1 # kleene closure is a unary prefix '+' as of now.
+    p1 = +a1
     assert isinstance(p1, path)
     assert p1.expr == '(' + a1.expr + ')*'
     p2 = +p1
     assert isinstance(p2, path)
-    assert p2.expr == '(' + p1.expr + ')*'
+    assert p2.expr == '(' + a1.expr + ')*'
 
 ### Slightly more complicated path expressions testing ###
 
@@ -387,143 +349,18 @@ def test_slightly_complicated_expr_1():
     a2 = atom(match(srcip=ip2, switch=1))
     a3 = atom(match(dstip=ip2))
     a4 = atom(match(dstip=ip1))
-    p = (a1 ^ a4) | (a2 ^ a3)
+    a5 = atom(match(switch=1)) | atom(match(srcip=ip3))
+    p = ((a1 ^ a4) | (a2 ^ a3)) & a5
     assert isinstance(p, path)
-    assert p.expr == ('((' + a1.expr + a4.expr + ')|(' + a2.expr +
-                      a3.expr + '))')
+    assert p.expr == ('(((' + a1.expr + ') ^ (' + a4.expr + ')) | ((' + a2.expr +
+                      ') ^ (' + a3.expr + '))) & (' + a5.expr + ')')
+    sys.exit(0)
 
-### Simple tests on dfa_utils ### 
-
-### These are some very basic sanity checks, but it's best to confirm
-### correctness by visually inspecting the DFA from ml-ulex for these lists of
-### regexes, and ensuring the printed DFA from du.print_dfa is consistent.
+### Path compilation testing ###
 
 du = dfa_utils
 
-def test_dfa_const_1():
-    re_list = ['ab', 'cd']
-    tmp_file = '/tmp/my_regexes.txt'
-    dfa = du.regexes_to_dfa(re_list, tmp_file) 
-    assert dfa # i.e., we get the dfa without errors.
-    assert du.get_num_states(dfa) == 5
-    assert du.get_num_transitions(dfa) == 4
-    assert du.get_num_accepting_states(dfa) == 2
-
-def test_dfa_const_2():
-    re_list = ['ab',
-               'a|b',
-               'abb*',
-               'cd | ef',
-               '((ac)|(bd))*e',
-               '\ufc66ab']
-    tmp_file = '/tmp/my_regexes.txt'
-    dfa = du.regexes_to_dfa(re_list, tmp_file) 
-    assert dfa
-    assert du.get_num_states(dfa) == 15
-    assert du.get_num_transitions(dfa) == 19
-    assert du.get_num_accepting_states(dfa) == 8
-
-def test_regex_intersection():
-    tmp = '/tmp/my_regexes_int.txt'
-    assert not du.intersection_is_null('ab*', 'a*b', tmp)
-    assert du.intersection_is_null('ab', 'cd', tmp)
-    assert not du.intersection_is_null('ab|cd', 'ef|a*b*', tmp)
-
-### Test path finalization and compilation ###
-
-def test_path_finalize_1():
-    pathcomp.clear()
-    cg.clear()
-    a1 = atom(match(srcip=ip2))
-    a2 = atom(match(srcip=ip1))
-    p = a1 ^ a2
-    pathcomp.finalize(p)
-    assert pathcomp.re_list and pathcomp.paths_list and pathcomp.path_to_bucket
-    assert pathcomp.re_list == [p.expr]
-    assert pathcomp.paths_list == [[p]]
-    assert isinstance(pathcomp.path_to_bucket[p], Query)
-
-def test_path_finalize_2():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip2))
-    a2 = atom(match(srcip=ip1))
-    p1 = a1 ^ a2
-    p2 = a1 | a2
-    pathcomp.finalize(p1)
-    pathcomp.finalize(p2)
-    assert pathcomp.re_list == [p1.expr, '(' + a1.expr + '|' + a2.expr + ')']
-    assert pathcomp.paths_list == [ [p1], [p2] ]
-    for p in pathcomp.path_to_bucket:
-        assert isinstance(pathcomp.path_to_bucket[p], Query)
-
-def test_path_finalize_3():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    p1 = a1 ^ a2
-    p2 = a1 ^ a2
-    pathcomp.finalize(p1)
-    pathcomp.finalize(p2)
-    assert len(pathcomp.re_list) == 1 # re_list only has non-overlapping expressions
-    assert pathcomp.re_list == [p1.expr]
-    assert pathcomp.paths_list == [ [p1, p2] ]
-
-def test_path_finalize_4():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    a3 = atom(match(srcip=ip3))
-    a4 = atom(match(srcip=ip4))
-    p1 = a1 ^ a2
-    p2 = (a1 ^ a2) | (a3 ^ a4)
-    pathcomp.finalize(p1)
-    pathcomp.finalize(p2)
-    assert len(pathcomp.re_list) == 2
-    assert pathcomp.re_list[0] == p1.expr
-    assert pathcomp.re_list[1] != p2.expr
-    assert pathcomp.paths_list == [ [p1, p2], [p2] ]
-
-def test_path_finalize_5():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    a3 = atom(match(srcip=ip3))
-    a4 = atom(match(srcip=ip4))
-    p1 = (a1 ^ a2) | a3
-    p2 = a2 ^ a4
-    p3 = a3 | (a2 ^ a4)
-    pathcomp.finalize(p1)
-    pathcomp.finalize(p2)
-    pathcomp.finalize(p3)
-    assert len(pathcomp.re_list) == 3
-    assert pathcomp.re_list[1] == p2.expr
-    assert pathcomp.re_list[2] != p3.expr and pathcomp.re_list[0] != p1.expr
-    assert pathcomp.paths_list == [ [p1], [p2, p3], [p1, p3] ]
-
-def test_path_finalize_6():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    a3 = atom(match(srcip=ip3))
-    a4 = atom(match(srcip=ip4))
-    p1 = (a1 ^ a2) | a3
-    p2 = a2 ^ a4
-    p3 = a3 | (a2 ^ a3)
-    pathcomp.finalize(p1)
-    pathcomp.finalize(p2)
-    pathcomp.finalize(p3)
-    assert len(pathcomp.re_list) == 4
-    assert pathcomp.re_list[1] == p2.expr
-    assert pathcomp.re_list[2] != p3.expr and pathcomp.re_list[0] != p1.expr
-    assert pathcomp.paths_list == [ [p1], [p2], [p1, p3], [p3] ]
-
 def test_path_compile_1():
-    pathcomp.clear()
     cg.clear()
     a1 = atom(match(srcip=ip1))
     frags = pathcomp.compile([a1])
@@ -769,8 +606,6 @@ if __name__ == "__main__":
     test_CG_intersection_matches_1()
     test_CG_intersection_matches_2()
 
-    test_CG_policy_equality()
-
     test_atom_creation()
     test_atom_and_1()
     test_atom_and_2()
@@ -778,28 +613,13 @@ if __name__ == "__main__":
     test_atom_difference()
     test_atom_or()
 
-    test_atom_token_generation_1()
-    test_atom_token_generation_2()
-
-    test_path_creation_1()
-    test_path_creation_2()
+    test_path_creation()
     test_path_concatenation()
     test_path_alternation_1()
     test_path_alternation_2()
     test_path_kleene_closure()
 
     test_slightly_complicated_expr_1()
-
-    test_dfa_const_1()
-    test_dfa_const_2()
-    test_regex_intersection()
-
-    test_path_finalize_1()
-    test_path_finalize_2()
-    test_path_finalize_3()
-    test_path_finalize_4()
-    test_path_finalize_5()
-    test_path_finalize_6()
 
     test_path_compile_1()
     test_path_compile_2()

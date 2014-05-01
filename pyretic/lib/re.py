@@ -217,11 +217,11 @@ class re_concat(re_combinator):
         return KEY_CONCAT
 
     def re_string_repr(self):
-        return ('(' + self.re1.re_string_repr() + ')^(' +
+        return ('(' + self.re1.re_string_repr() + ') ^ (' +
                 self.re2.re_string_repr() + ')')
 
     def __repr__(self):
-        return ('(' + repr(self.re1) + ')^(' +
+        return ('(' + repr(self.re1) + ') ^ (' +
                 repr(self.re2) + ')')
 
 class re_alter(re_combinator):
