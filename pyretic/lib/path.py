@@ -588,6 +588,11 @@ class pathcomp(object):
         return re_tree_gen.symbol_to_pred[dfa_utils.get_edge_label(edge)]
 
     @classmethod
+    def __get_dead_state_pred__(cls, dfa):
+        dead = dfa_utils.get_dead_state(dfa)
+        return cls.__match_tag__(dfa, dead)
+
+    @classmethod
     def compile(cls, path_list, fwding):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
@@ -597,21 +602,22 @@ class pathcomp(object):
 
         re_list = map(lambda x: x.re_tree, path_list)
         dfa = du.regexes_to_dfa(re_list)
-        tagging = drop
+        virtual_field(name="path_tag",
+                      values=range(0, du.get_num_states(dfa)),
+                      type="integer")
+        tagging = (cls.__get_dead_state_pred__(dfa))
         capture = drop
         match_tag = lambda q: cls.__match_tag__(dfa, q)
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
         get_pred  = cls.__get_pred__
-        virtual_field(name="path_tag",
-                      values=range(0, du.get_num_states(dfa)),
-                      type="integer")
 
         edges = du.get_edges(dfa)
         for edge in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
             pred = get_pred(edge)
-            tagging += ((match_tag(src) & pred) >> set_tag(dst))
+            if not du.is_dead(dfa, src):
+                tagging += ((match_tag(src) & pred) >> set_tag(dst))
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
@@ -918,6 +924,14 @@ class dfa_utils(object):
     def is_accepting(cls, d, q):
         assert isinstance(d, dfa_base)
         return d.all_states.is_accepting(q)
+
+    @classmethod
+    def is_dead(cls, d, q):
+        return d.all_states.is_dead(q)
+
+    @classmethod
+    def get_dead_state(cls, d):
+        return d.all_states.get_dead_state()
 
     @classmethod
     def get_accepting_exps(cls, d, q):

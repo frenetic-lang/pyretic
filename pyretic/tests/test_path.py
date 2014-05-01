@@ -361,55 +361,60 @@ du = dfa_utils
 
 def test_path_compile_1():
     cg.clear()
+    fwding = fwd(1)
     a1 = atom(match(srcip=ip1))
-    pol = pathcomp.compile([a1], fwd(1))
-    print pol
-    sys.exit(0)
-
-    # Note: this test depends on state numbers, which eventually get changed
-    # into tags. So it's not implementation detail-independent. Also, it relies
-    # on the fact that vlan is used for packet tagging.
-    ref_tags = (((match(srcip=ip1, path_tag=None))
-                >> modify(path_tag=1)) +
-                (~match(srcip=ip1, path_tag=None)))
-    ref_counts = (match(srcip=ip1, path_tag=None) >> FwdBucket())
-    [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
-    assert tags._classifier
-    assert counts._classifier
-    assert tags._classifier == ref_tags._classifier
-    assert counts._classifier == ref_counts._classifier
+    policy = pathcomp.compile([a1], fwding)
+    ref_tagging = ((match(path_tag=2)) +
+                   (match(srcip=ip1, path_tag=None) >> modify(path_tag=1)) +
+                   (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)) +
+                   (~match(srcip=ip1)))
+    ref_capture = (drop +
+                   (match(srcip=ip1, path_tag=None) >> FwdBucket()))
+    ref_policy = (ref_tagging >> fwding) + ref_capture
+    assert policy
+    assert ref_policy
+    [x.compile() for x in [policy, ref_policy]]
+    assert policy._classifier == ref_policy._classifier
 
 def test_path_compile_2():
-    pathcomp.clear()
     cg.clear()
+    fwding = fwd(2)
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    frags = pathcomp.compile([a1 ^ a2])
-    tags = frags.get_tagging()
-    untagging = frags.get_untagging()
-    counts = frags.get_counting()
-    # Note: Caveats in test_path_compile_1 apply.
-    # This is the simplified policy, but not the actual policy that's
-    # returned. This is because of an intersection between the two matches that
-    # doesn't actually happen in the DFA (but it's hard to predict that before
-    # constructing the DFA ;))
-    ref_tags = ((match(srcip=ip1, path_tag=None)
-                 >> modify(path_tag=1)) +
-                ((match(path_tag=1) & match(dstip=ip2))
-                 >> modify(path_tag=2)) +
-                ( ~match(srcip=ip1, path_tag=None) +
-                   ~match(path_tag=1,dstip=ip2) ))
-    ref_counts = ((match(path_tag=1) & match(dstip=ip2)) >>
-                  FwdBucket())
-    [x.compile() for x in [tags, ref_tags, counts, ref_counts]]
+    policy = pathcomp.compile([a1 ^ a2], fwding)
 
-    assert tags._classifier
-    assert counts._classifier
+    pred_a = match(srcip=ip1) & match(dstip=ip2)
+    pred_b = match(srcip=ip1) & ~match(dstip=ip2)
+    pred_c = match(dstip=ip2) & ~match(srcip=ip1)
+    ref_tagging = ((match(path_tag=3)) +
+                   ((match(path_tag=1) & pred_a) >> modify(path_tag=2)) +
+                   ((match(path_tag=1) & pred_b) >> modify(path_tag=3)) +
+                   ((match(path_tag=1) & pred_c) >> modify(path_tag=2)) +
+                   ((match(path_tag=2) & pred_a) >> modify(path_tag=3)) +
+                   ((match(path_tag=2) & pred_b) >> modify(path_tag=3)) +
+                   ((match(path_tag=2) & pred_c) >> modify(path_tag=3)) +
+                   ((match(path_tag=None) & pred_a) >> modify(path_tag=1)) +
+                   ((match(path_tag=None) & pred_b) >> modify(path_tag=1)) +
+                   ((match(path_tag=None) & pred_c) >> modify(path_tag=3)) +
+                   ~(pred_a | pred_c | pred_b))
+    ref_capture = (drop +
+                   ((match(path_tag=1) & pred_a) >> FwdBucket()) +
+                   ((match(path_tag=1) & pred_c) >> FwdBucket()))
+    ref_policy = (ref_tagging >> fwding) + ref_capture
 
-    # TODO(ngsrinivas) There should be a better way to test "policy
-    # equivalence", but unfortunately this isn't netkat ;)
-    # assert tags._classifier == ref_tags._classifier
-    # assert counts._classifier == ref_counts._classifier
+    [x.compile() for x in [policy, ref_policy]]
+    assert policy._classifier == ref_policy._classifier
+
+def test_empty_paths():
+    cg.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+    p = a1 ^ a2
+    fwding = fwd(2)
+    policy = pathcomp.compile([], fwding)
+    ref_policy = (identity >> fwding) + drop
+    print policy
+    print ref_policy
 
 ### Unit test class-based token generation using the various atom types ###
 
@@ -574,17 +579,6 @@ def test_hook_compilation_2():
     assert hooks == ((match(path_tag=4) + match(path_tag=2))
                      >> FwdBucket())
 
-def test_empty_paths():
-    cg.clear()
-    pathcomp.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(srcip=ip2))
-    p = a1 ^ a2
-    frags = pathcomp.compile([])
-    tagging = frags.get_tagging()
-    counting = frags.get_counting()
-    assert tagging == identity
-    assert counting == drop
 
 
 # Just in case: keep these here to run unit tests in vanilla python
@@ -622,7 +616,11 @@ if __name__ == "__main__":
 
     test_path_compile_1()
     test_path_compile_2()
+    sys.exit(0)
+    test_empty_paths()
 
+    # XXX: legacy tests from old token generator remain
+    # for testing later if token types are re-introduced.
     test_CG_token_equivalence_classes_1()
     test_CG_token_equivalence_classes_2()
     test_CG_token_equivalence_classes_3()
@@ -639,8 +637,6 @@ if __name__ == "__main__":
 
     test_hook_compilation_1()
     test_hook_compilation_2()
-
-    test_empty_paths()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

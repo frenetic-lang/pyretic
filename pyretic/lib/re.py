@@ -817,10 +817,12 @@ class re_transition_table(dfa_transition_table):
 class dfa_state_table(object):
     """ A table of generic states in a DFA """
     def __init__(self, states, state_type,
-                 state_type_check_fun, final_state_check_fun):
+                 state_type_check_fun, final_state_check_fun,
+                 dead_state_check_fun):
         self.state_type = state_type
         self.state_type_check_fun = state_type_check_fun
         self.final_state_check_fun = final_state_check_fun
+        self.dead_state_check_fun = dead_state_check_fun
         if states:
             for s in states:
                 self.state_type_check_fun(s, self.state_type)
@@ -884,6 +886,19 @@ class dfa_state_table(object):
         """ Return True if state `q` is an accepting state."""
         return self.final_state_check_fun(q)
 
+    def is_dead(self, q):
+        """ Return if a state is dead. """
+        return self.dead_state_check_fun(q)
+
+    def get_dead_state(self):
+        """ Return the (one) dead state in the state table. """
+        dead_states = []
+        for q in self.re_table:
+            if self.dead_state_check_fun(q):
+                dead_states.append(q)
+        assert len(dead_states) == 1
+        return dead_states[0]
+
     def get_final_states(self):
         f = []
         for q in self.re_table:
@@ -897,11 +912,13 @@ class re_state_table(dfa_state_table):
     """ A table of RE states in the DFA """
     def __init__(self, states=None, re_to_exp=None,
                  state_type=re_deriv, state_type_check_fun=isinstance,
-                 final_state_check_fun=lambda x: nullable(x) == re_epsilon()):
+                 final_state_check_fun=lambda x: nullable(x) == re_epsilon(),
+                 dead_state_check_fun=lambda x: x == re_empty()):
         super(re_state_table, self).__init__(states,
                                              state_type,
                                              state_type_check_fun,
-                                             final_state_check_fun)
+                                             final_state_check_fun,
+                                             dead_state_check_fun)
         # set up a mapping from state to a list of corresponding expressions, to
         # keep track of distinct expressions with respect to metadata (even if
         # same with respect to the regular expression itself).
@@ -1153,11 +1170,16 @@ class re_vector_state_table(dfa_state_table):
         def tuple_has_final_state(qtuple):
             return reduce(lambda acc, x: acc or nullable(x) == re_epsilon(),
                           qtuple, False)
+
+        def tuple_is_dead_state(qtuple):
+            return reduce(lambda acc, x: acc and x == re_empty(), qtuple, True)
+
         super(re_vector_state_table, self).__init__(
             states,
             re_deriv,
             list_isinstance,
-            tuple_has_final_state)
+            tuple_has_final_state,
+            tuple_is_dead_state)
 
     def get_final_states(self):
         f = []
