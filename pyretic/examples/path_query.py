@@ -106,19 +106,19 @@ def path_callback(test_num):
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
     a2 = atom(match(switch=3,dstip=ip3))
-    p = a1 ^ a2
+    p = a1 ** a2
     p.register_callback(query_callback(1))
     return [p]
 
 def path_test_2():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
-    p = a1 ^ a2
+    p = a1 ** a2
     p.register_callback(query_callback(2))
     return [p]
 
 def path_test_3():
-    return path_test_1() + path_test_2()
+    return path_test_2() + path_test_1()
 
 def path_test_4():
     a1 = atom(match(switch=1))
@@ -201,8 +201,8 @@ def path_test_16():
 
 # type: unit -> path list
 def path_main():
-    return path_test_15()
+    return path_test_3()
 
 def main():
-    return mac_learner()
-#    return static_fwding_chain_3_3
+#    return mac_learner()
+    return static_fwding_chain_3_3

@@ -303,6 +303,14 @@ class re_tree_gen(object):
         return cls.symbol_to_pred.keys()
 
     @classmethod
+    def get_leaf_preds(cls):
+        output = ''
+        for sym in cls.symbol_to_pred:
+            pred = cls.symbol_to_pred[sym]
+            output += (sym + ': ' + repr(pred) + '\n')
+        return output
+
+    @classmethod
     def get_unaffected_pred(cls):
         """ Predicate that covers packets unaffected by query predicates. """
         if len(cls.pred_to_symbol.keys()) >= 1:
@@ -345,6 +353,14 @@ class path(Query):
         """Implementation of the path concatenation operator ('^')"""
         assert isinstance(other, path)
         return path_concat([self, other])
+
+    def __pow__(self, other):
+        """ Implementation of the 'concatenate anytime later' operator ('**').
+
+        x ** y is just a shorthand for x ^ identity* ^ y.
+        """
+        assert isinstance(other, path)
+        return path_concat([self, +atom(identity), other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
@@ -621,6 +637,8 @@ class pathcomp(object):
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
+                print "Got accepting expressions:", ords
+                print "for state", dst
                 for i in ords:
                     bucket = path_list[i].get_bucket()
                     capture += ((match_tag(src) & pred) >> bucket)
@@ -970,10 +988,19 @@ class dfa_utils(object):
         return list(symlist)
 
     @classmethod
+    def __dump_file__(cls, string, tmp_file):
+        f = open(tmp_file, 'w')
+        f.write(string)
+        f.close()
+
+    @classmethod
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
                       re_exps, True)
         if not symlist:
             symlist = re_tree_gen.get_symlist()
-        return makeDFA_vector(re_exps, symlist)
+        dfa = makeDFA_vector(re_exps, symlist)
+        cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
+        cls.__dump_file__(re_tree_gen.get_leaf_preds(), '/tmp/symbols.txt')
+        return dfa
