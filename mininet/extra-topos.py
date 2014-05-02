@@ -60,8 +60,8 @@ class CycleTopo(ChainTopo):
     def connect_switches(self,switch_inds):
 
         # Topology trivial if less than 2 switches
-        if len(switch_inds) < 2:
-            return
+        if len(switch_inds) < 3:
+            raise Exception("Cycles must have at least three switches (use 'linear,2' for n=2, 'single' for n=1)")
 
         # Connect Switches in cycle topology
         for s in switch_inds:
@@ -72,8 +72,8 @@ class CliqueTopo(ChainTopo):
 
     def connect_switches(self,switch_inds):
         # Topology trivial if less than 2 switches
-        if len(switch_inds) < 2:
-            return
+        if len(switch_inds) < 3:
+            raise Exception("Cliques must have at least three switches (use 'linear,2' for n=2, 'single' for n=1)")
 
         # Connect Switches in clique topology
         for s1 in switch_inds:
