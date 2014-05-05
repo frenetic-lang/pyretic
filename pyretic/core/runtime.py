@@ -86,7 +86,14 @@ class Runtime(object):
         self.old_rules = self.manager.list()
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
-
+        self.topo_fns = { 
+            'handle_switch_join' : self.handle_switch_join,
+            'handle_switch_part' : self.handle_switch_part,
+            'handle_port_join'   : self.handle_port_join,
+            'handle_port_mod'    : self.handle_port_mod,
+            'handle_port_part'   : self.handle_port_part,
+            'handle_link_update' : self.handle_link_update}
+        
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,
@@ -119,7 +126,10 @@ class Runtime(object):
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
             for q in queries:
-                q.apply()
+                if isinstance(q,LocalToGlobal):
+                    self.send_to_global('packet',concrete_pkt)
+                else:
+                    q.apply()
             self.in_bucket_apply = False
             
             # if the query changed the policy, update the controller and switch state
@@ -872,9 +882,34 @@ class Runtime(object):
 # TO OPENFLOW         
 #######################
 
-    ### HACK, WILL BE PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
+    def send_to_local(self,act,*args):
+        print act, args
+
+    def receive_from_local(self,act,*args):
+        if act == 'packet':
+            (concrete_packet) = args
+            self.handle_packet_in(concrete_packet)
+        elif act == 'inject_discovery_packet':
+            (dpid,port) = args
+            self.inject_discovery_packet(dpid,port)
+        else:
+            raise TypeError('Bad message type %s' % act)
+
     def send_packet(self,concrete_packet):
-        self.backend.send_packet(concrete_packet)
+        if self.role == GLOBAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
+            self.send_to_local('packet',concrete_packet)
+        else:
+            self.backend.send_packet(concrete_packet)
+
+    
+    def inject_discovery_packet(self,dpid, port):
+        if self.role == GLOBAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
+            self.send_to_local('inject_discovery_packet',dpid,port)
+        else:
+            self.backend.inject_discovery_packet(dpid,port)
+
 
     def install_rule(self,(concrete_pred,priority,action_list)):
         self.log.debug(
@@ -907,33 +942,58 @@ class Runtime(object):
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
 
-    ### HACK, WILL BE PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
-    def inject_discovery_packet(self,dpid, port):
-        self.backend.inject_discovery_packet(dpid,port)
-
 
 #######################
 # FROM OPENFLOW       
 #######################
 
-    ### HACK, ALL BELOW WILL BE PASSTHROUGH TO CHANNEL TO GLOBAL
+    def send_to_global(self,act,*args):
+        print act, args
+
+    def receive_from_global(self,act,*args):
+        self.topo_fns[act](*args)
+
     def handle_switch_join(self,switch_id):
-        self.network.handle_switch_join(switch_id)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_switch_join',switch_id)
+        else:
+            self.network.handle_switch_join(switch_id)
 
     def handle_switch_part(self,switch_id):
-        self.network.handle_switch_part(switch_id)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_switch_part',switch_id)
+        else:
+            self.network.handle_switch_part(switch_id)
 
     def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_join',switch_id,port_id,conf_up,stat_up)
+        else:
+            self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
 
     def handle_port_mod(self, switch, port_no, config, status):
-        self.network.handle_port_mod(switch, port_no, config, status)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_mod', switch, port_no, config, status)
+        else:
+            self.network.handle_port_mod(switch, port_no, config, status)
 
     def handle_port_part(self, switch, port_no):
-        self.network.handle_port_part(switch, port_no)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_part', switch, port_no)
+        else:
+            self.network.handle_port_part(switch, port_no)
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
-        self.network.handle_link_update(s1, p_no1, s2, p_no2)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_link_update', switch, port_no)
+        else:
+            self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
     def handle_flow_stats_reply(self, switch, flow_stats):
         def convert(f,val):
