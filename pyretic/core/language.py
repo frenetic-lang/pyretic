@@ -1095,7 +1095,7 @@ class LocalPolicy(DynamicPolicy):
         self.policy = new_pol
 
     def __repr__(self):
-        return "LocalPolicy:\n%s", repr(self.policy)
+        return "LocalPolicy:\n%s" % repr(self.policy)
 
 
 class DynamicFilter(DynamicPolicy,Filter):
