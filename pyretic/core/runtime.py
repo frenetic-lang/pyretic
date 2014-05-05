@@ -99,6 +99,7 @@ class Runtime(object):
 # PACKET INTERPRETER 
 ######################
 
+    ### HACK, WILL BE CALLED BY A LOCAL CHANNEL IN GLOBAL MODE
     def handle_packet_in(self, concrete_pkt):
         """
         The packet interpreter.
@@ -207,6 +208,7 @@ class Runtime(object):
         if self.mode == 'reactive0':
             self.clear_all() 
 
+        # HACK, THIS MODE CHANGES IF WE ARE GLOBAL
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             classifier = self.policy.compile()
             self.log.debug(
@@ -870,6 +872,7 @@ class Runtime(object):
 # TO OPENFLOW         
 #######################
 
+    ### HACK, WILL BE PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
@@ -904,6 +907,7 @@ class Runtime(object):
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
 
+    ### HACK, WILL BE PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
     def inject_discovery_packet(self,dpid, port):
         self.backend.inject_discovery_packet(dpid,port)
 
@@ -912,6 +916,7 @@ class Runtime(object):
 # FROM OPENFLOW       
 #######################
 
+    ### HACK, ALL BELOW WILL BE PASSTHROUGH TO CHANNEL TO GLOBAL
     def handle_switch_join(self,switch_id):
         self.network.handle_switch_join(switch_id)
 
