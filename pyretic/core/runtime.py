@@ -39,6 +39,7 @@ import logging, sys, time
 from datetime import datetime
 
 TABLE_MISS_PRIORITY = 0
+GLOBAL, LOCAL = ("global", "local")
 
 class Runtime(object):
     """
@@ -56,13 +57,14 @@ class Runtime(object):
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
     """
-    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
+    def __init__(self, backend, main, kwargs, role, mode='interpreted', verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         self.mode = mode
+        self.role = role
         self.backend = backend
         self.backend.runtime = self
         self.policy_lock = RLock()
@@ -988,6 +990,7 @@ class Runtime(object):
             extended_values = self.vlan_to_extended_values_db.get((vid, pcp))
             assert extended_values is not None, "use of vlan that pyretic didn't allocate! not allowed."
             return extended_values
+
 
 @util.cached
 def extended_values_from(packet):
