@@ -86,8 +86,10 @@ def parseArgs():
     op.add_option( '--role', '-r', type='choice',
                    choices=['local', 'global'],
                    help = '|'.join(['local', 'global']) )
+    op.add_option( '--pox_port', '-p', type='int', dest="pox_port", help = "enter POX port"  )
+    op.add_option( '--backend_port', '-b', type='int', dest="backend_port", help = "enter backend port"  )
 
-    op.set_defaults(frontend_only=False,mode='reactive0')
+    op.set_defaults(frontend_only=False,mode='reactive0',pox_port=6633,backend_port=41414)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -168,8 +170,8 @@ def main():
     handler = util.QueueStreamHandler(logging_queue)
     logger.addHandler(handler)
     logger.setLevel(log_level)
-    
-    runtime = Runtime(Backend(),main,kwargs,options.role,options.mode,options.verbosity)
+     
+    runtime = Runtime(Backend(options.backend_port),main,kwargs,options.role,options.mode,options.verbosity)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
@@ -190,7 +192,10 @@ def main():
         # other log file descriptor if necessary
         of_client = subprocess.Popen([python, 
                                       pox_exec,
-                                      'of_client.pox_client' ],
+                                      'openflow.of_01',
+                                      '--port='+str(options.pox_port),
+                                      'of_client.pox_client',
+                                      '--port='+str(options.backend_port) ],
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
     

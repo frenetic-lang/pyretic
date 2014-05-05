@@ -32,8 +32,8 @@ import asyncore
 import socket
 
 import json
-
-BACKEND_PORT=41414
+ 
+#BACKEND_PORT=41414
 TERM_CHAR='\n'
 
 def serialize(msg):

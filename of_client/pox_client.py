@@ -121,7 +121,7 @@ class BackendChannel(asynchat.async_chat):
 
 class POXClient(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT):
+    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=41414):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
@@ -604,7 +604,7 @@ class POXClient(revent.EventMixin):
         originatorPort = None
         if lldph.tlvs[1].id.isdigit():
             # We expect it to be a decimal value
-            originatorPort = int(lldph.tlvs[1].id)
+            originatorPort = int(lldph.tlvs[1].id) 
         elif len(lldph.tlvs[1].id) == 2:
             # Maybe it's a 16 bit port number...
             try:
@@ -653,13 +653,13 @@ class POXClient(revent.EventMixin):
         self.send_to_pyretic(['packet',received])
         
        
-def launch():
+def launch(port = 41414):
 
     class asyncore_loop(threading.Thread):
         def run(self):
             asyncore.loop()
-
-    POXClient()
+            
+    POXClient(port=int(port))
     al = asyncore_loop()
     al.start()
 
