@@ -3,6 +3,103 @@ from pyretic.core.language import *
 ###############################################################################
 # Class hierarchy syntax tree traversal
 
+###############################################################################
+# Class hierarchy syntax tree traversal
+
+def default_mapper(parent, children):
+    """Default mapping function for ast_map, which produces a copy of the input
+    policy when provided to ast_map. The semantics of thenew policy that will be
+    returned by ast_map() is that it is identical to the original policy from
+    the point of view of eval(), while all nodes in the new policy AST are
+    copies of the original (except for Queries, which share nodes with the input
+    policy, to prevent lock sharing issues).
+    """
+    import copy
+    import pyretic.lib.query as query
+    from pyretic.core.language import _match, _modify
+    # Leaf-level policies
+    if ( parent == identity or
+         parent == drop or
+         isinstance(parent,match) or
+         isinstance(parent,modify) or
+         isinstance(parent, _match) or
+         isinstance(parent, _modify) or
+         parent == Controller):
+        return copy.deepcopy(parent)
+    # Queries are special: we return the actual instance directly because of
+    # lock sharing bugs that would arise otherwise
+    elif isinstance(parent,Query):
+        return parent
+    # Combinator policies are re-initialized with the constituent children
+    elif ( (isinstance(parent,negate) or
+            isinstance(parent,parallel) or
+            isinstance(parent,union) or
+            isinstance(parent,sequential) or
+            isinstance(parent,intersection))):
+        return (type(parent))(children)
+    # Derived policies are treated case by case:
+    elif isinstance(parent,difference):
+        return difference(parent.f1, parent.f2)
+    elif isinstance(parent,if_):
+        return if_(parent.pred, parent.t_branch, parent.f_branch)
+    elif isinstance(parent, fwd) or isinstance(parent,xfwd):
+        return (type(parent))(parent.outport)
+    elif isinstance(parent,query.packets):
+        # The packets() constructor doesn't store data required to re-create the
+        # object *exactly*. But if we're only concerned about the AST for eval()
+        # purposes, then just creating a derived policy with the child policy
+        # object is enough.
+        return DerivedPolicy(children[0])
+    elif isinstance(parent,DynamicPolicy):
+        # See explanation for query.packets above; applies here as well.
+        return DynamicPolicy(children[0])
+    else:
+        raise NotImplementedError
+
+def ast_map(fun, policy):
+    """
+    Apply the function fun to each node, including putting together the results
+    of the function application to children nodes and parent node in flexible
+    ways.
+
+    :param fun: the map function, which returns a transformed policy.
+    :type fun: Policy * Policy list -> Policy
+    :param policy: main policy to apply the map function to
+    :type policy: Policy
+
+    The map function takes two arguments.
+    1. the parent policy
+    2. the result of applying ast_map on all the children policies, as a list.
+    It produces a new transformed policy that represents the entire tree rooted
+    at the policy argument to this function.
+    """
+    import pyretic.lib.query as query
+    children_pols = []
+    if (  policy == identity or
+          policy == drop or
+          isinstance(policy,match) or
+          isinstance(policy,modify) or
+          policy == Controller or
+          isinstance(policy,Query)):
+        children_pols = []
+    elif (isinstance(policy,negate) or
+          isinstance(policy,parallel) or
+          isinstance(policy,union) or
+          isinstance(policy,sequential) or
+          isinstance(policy,intersection)):
+        for sub_policy in policy.policies:
+            children_pols.append(ast_map(fun, sub_policy))
+    elif (isinstance(policy,difference) or
+          isinstance(policy,if_) or
+          isinstance(policy,fwd) or
+          isinstance(policy,xfwd) or
+          isinstance(policy,DynamicPolicy) or
+          isinstance(policy,query.packets)):
+        children_pols.append(ast_map(fun, policy.policy))
+    else:
+        raise NotImplementedError
+    return fun(policy, children_pols)
+
 def ast_fold(fun, acc, policy):
     import pyretic.lib.query as query
     if (  policy == identity or
