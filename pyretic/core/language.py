@@ -503,6 +503,9 @@ class LocalToGlobalBucket(Query):
     def generate_classifier(self):
         return Classifier([Rule(identity,{Controller})])
 
+    def apply(self):
+        self.bucket.clear()
+
     def __repr__(self):
         return "LocalToGlobalBucket"
 

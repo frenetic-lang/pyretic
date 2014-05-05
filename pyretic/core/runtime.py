@@ -106,7 +106,6 @@ class Runtime(object):
 # PACKET INTERPRETER 
 ######################
 
-    ### HACK, WILL BE CALLED BY A LOCAL CHANNEL IN GLOBAL MODE
     def handle_packet_in(self, concrete_pkt):
         """
         The packet interpreter.
@@ -126,10 +125,10 @@ class Runtime(object):
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
             for q in queries:
-                if isinstance(q,LocalToGlobal):
+                # HACK, SEND LocalToGlobalBucket PACKETS STRAIGHT TO THE GLOBAL
+                if isinstance(q,LocalToGlobalBucket):
                     self.send_to_global('packet',concrete_pkt)
-                else:
-                    q.apply()
+                q.apply()
             self.in_bucket_apply = False
             
             # if the query changed the policy, update the controller and switch state
@@ -218,7 +217,7 @@ class Runtime(object):
         if self.mode == 'reactive0':
             self.clear_all() 
 
-        # HACK, THIS MODE CHANGES IF WE ARE GLOBAL
+        # HACK, THIS MODE CHANGES IF WE ARE GLOBAL TODO COLE
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             classifier = self.policy.compile()
             self.log.debug(
@@ -879,21 +878,45 @@ class Runtime(object):
         return concrete_packet
 
 #######################
-# TO OPENFLOW         
+# HACK, GLOBAL/LOCAL         
 #######################
 
     def send_to_local(self,act,*args):
+        ### DISCOVERY PACKETS, DATAPLANE PACKETS
         print act, args
 
+
+    def receive_from_global(self,act,*args):
+        ### DISCOVERY PACKETS, DATAPLANE PACKETS
+        if act == 'inject_discovery_packet':
+            (dpid,port) = args
+            self.inject_discovery_packet(dpid,port)
+        elif act == 'packet':
+            (concrete_packet) = args
+            self.send_packet(concrete_packet)
+        else:
+            raise TypeError('Bad message type %s' % act)
+
+
+    def send_to_global(self,act,*args):
+        ### PACKETS, TOPO EVENTS
+        print act, args
+
+
     def receive_from_local(self,act,*args):
+        ### PACKETS, TOPO EVENTS
         if act == 'packet':
             (concrete_packet) = args
             self.handle_packet_in(concrete_packet)
-        elif act == 'inject_discovery_packet':
-            (dpid,port) = args
-            self.inject_discovery_packet(dpid,port)
         else:
-            raise TypeError('Bad message type %s' % act)
+            try:
+                self.topo_fns[act](*args)
+            except:
+                raise TypeError('Bad action %s' % act)
+
+#######################
+# TO OPENFLOW         
+#######################
 
     def send_packet(self,concrete_packet):
         if self.role == GLOBAL:
@@ -946,12 +969,6 @@ class Runtime(object):
 #######################
 # FROM OPENFLOW       
 #######################
-
-    def send_to_global(self,act,*args):
-        print act, args
-
-    def receive_from_global(self,act,*args):
-        self.topo_fns[act](*args)
 
     def handle_switch_join(self,switch_id):
         if self.role == LOCAL:
