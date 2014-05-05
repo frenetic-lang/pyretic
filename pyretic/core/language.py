@@ -1107,7 +1107,14 @@ class LocalPolicy(DynamicPolicy):
         self.context = context
         self.overwrite = overwrite
         self.name = name
+        self.is_local = False
         super(LocalPolicy, self).__init__(policy)
+
+    def eval(self, pkt):
+        if self.is_local:
+            return self.policy.eval(pkt)
+        else:
+            return set()
 
     def update_policy(self, pkt):
         (new_pol, new_context) = self.f(self.context, pkt)
