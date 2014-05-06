@@ -87,7 +87,8 @@ def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
           isinstance(policy,parallel) or
           isinstance(policy,union) or
           isinstance(policy,sequential) or
-          isinstance(policy,intersection)):
+          isinstance(policy,intersection) or
+          isinstance(policy,CombinatorPolicy)):
         for sub_policy in policy.policies:
             children_pols.append(hackathon_ast_map(fun, sub_policy, curr_switch,
                                                    inside_local))
@@ -95,7 +96,8 @@ def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
           isinstance(policy,if_) or
           isinstance(policy,fwd) or
           isinstance(policy,xfwd) or
-          isinstance(policy,query.packets)):
+          isinstance(policy,query.packets) or
+          isinstance(policy,DerivedPolicy)):
         children_pols.append(hackathon_ast_map(fun, policy.policy, curr_switch,
                                                inside_local))
     elif isinstance(policy,DynamicPolicy):
@@ -224,7 +226,7 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,union) or
           isinstance(policy,sequential) or
           isinstance(policy,intersection) or
-          isinstance(policy,DerivedPolicy)):
+          isinstance(policy,CombinatorPolicy)):
         acc = fun(acc,policy)
         for sub_policy in policy.policies:
             acc = ast_fold(fun,acc,sub_policy)
@@ -234,7 +236,8 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,fwd) or
           isinstance(policy,xfwd) or
           isinstance(policy,DynamicPolicy) or
-          isinstance(policy,query.packets)):
+          isinstance(policy,query.packets) or
+          isinstance(policy,DerivedPolicy)):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
     else:
