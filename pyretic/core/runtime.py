@@ -974,6 +974,11 @@ class Runtime(object):
                 self.inject_discovery_packet(self.switch,*args)
             elif act == 'packet':
                 self.send_packet(*args)
+            elif act == 'policy':
+                self.policy = received_policy
+                self.update_dynamic_sub_pols()
+                self.update_switch_classifiers()
+                print "policy applied!!!!!!!!"
             else:
                 raise TypeError('Bad message type %s' % act)
 
