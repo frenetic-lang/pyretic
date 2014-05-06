@@ -78,7 +78,7 @@ def parseArgs():
                      dest="frontend_only", help = 'only start the frontend'  )
     op.add_option( '--mode', '-m', type='choice',
                      choices=['interpreted','i','reactive0','r0','proactive0','p0','proactive1','p1','split', 's'], 
-                     help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}, split/s'] )  )
+                     help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
@@ -106,8 +106,6 @@ def main():
         options.mode = 'proactive0'
     elif options.mode == 'p1':
         options.mode = 'proactive1'
-    elif options.mode == 's':
-        options.mode = 'split'
     if options.role == 'local':
         options.role = LOCAL
     elif options.role == 'global':
