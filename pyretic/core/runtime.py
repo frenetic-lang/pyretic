@@ -39,6 +39,7 @@ import logging, sys, time
 from datetime import datetime
 
 TABLE_MISS_PRIORITY = 0
+GLOBAL, LOCAL = ("global", "local")
 
 class Runtime(object):
     """
@@ -56,13 +57,14 @@ class Runtime(object):
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
     """
-    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
+    def __init__(self, backend, main, kwargs, role, mode='interpreted', verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         self.mode = mode
+        self.role = role
         self.backend = backend
         self.backend.runtime = self
         self.policy_lock = RLock()
@@ -84,7 +86,14 @@ class Runtime(object):
         self.old_rules = self.manager.list()
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
-
+        self.topo_fns = { 
+            'handle_switch_join' : self.handle_switch_join,
+            'handle_switch_part' : self.handle_switch_part,
+            'handle_port_join'   : self.handle_port_join,
+            'handle_port_mod'    : self.handle_port_mod,
+            'handle_port_part'   : self.handle_port_part,
+            'handle_link_update' : self.handle_link_update}
+        
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,
@@ -116,6 +125,9 @@ class Runtime(object):
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
             for q in queries:
+                # HACK, SEND LocalToGlobalBucket PACKETS STRAIGHT TO THE GLOBAL
+                if isinstance(q,LocalToGlobalBucket):
+                    self.send_to_global('packet',concrete_pkt)
                 q.apply()
             self.in_bucket_apply = False
             
@@ -205,6 +217,7 @@ class Runtime(object):
         if self.mode == 'reactive0':
             self.clear_all() 
 
+        # HACK, THIS MODE CHANGES IF WE ARE GLOBAL TODO COLE
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             classifier = self.policy.compile()
             self.log.debug(
@@ -865,11 +878,61 @@ class Runtime(object):
         return concrete_packet
 
 #######################
+# HACK, GLOBAL/LOCAL         
+#######################
+
+    def send_to_local(self,act,*args):
+        ### DISCOVERY PACKETS, DATAPLANE PACKETS
+        print act, args
+
+
+    def receive_from_global(self,act,*args):
+        ### DISCOVERY PACKETS, DATAPLANE PACKETS
+        if act == 'inject_discovery_packet':
+            (dpid,port) = args
+            self.inject_discovery_packet(dpid,port)
+        elif act == 'packet':
+            (concrete_packet) = args
+            self.send_packet(concrete_packet)
+        else:
+            raise TypeError('Bad message type %s' % act)
+
+
+    def send_to_global(self,act,*args):
+        ### PACKETS, TOPO EVENTS
+        print act, args
+
+
+    def receive_from_local(self,act,*args):
+        ### PACKETS, TOPO EVENTS
+        if act == 'packet':
+            (concrete_packet) = args
+            self.handle_packet_in(concrete_packet)
+        else:
+            try:
+                self.topo_fns[act](*args)
+            except:
+                raise TypeError('Bad action %s' % act)
+
+#######################
 # TO OPENFLOW         
 #######################
 
     def send_packet(self,concrete_packet):
-        self.backend.send_packet(concrete_packet)
+        if self.role == GLOBAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
+            self.send_to_local('packet',concrete_packet)
+        else:
+            self.backend.send_packet(concrete_packet)
+
+    
+    def inject_discovery_packet(self,dpid, port):
+        if self.role == GLOBAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
+            self.send_to_local('inject_discovery_packet',dpid,port)
+        else:
+            self.backend.inject_discovery_packet(dpid,port)
+
 
     def install_rule(self,(concrete_pred,priority,action_list)):
         self.log.debug(
@@ -902,31 +965,52 @@ class Runtime(object):
     def request_flow_stats(self,switch):
         self.backend.send_flow_stats_request(switch)
 
-    def inject_discovery_packet(self,dpid, port):
-        self.backend.inject_discovery_packet(dpid,port)
-
 
 #######################
 # FROM OPENFLOW       
 #######################
 
     def handle_switch_join(self,switch_id):
-        self.network.handle_switch_join(switch_id)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_switch_join',switch_id)
+        else:
+            self.network.handle_switch_join(switch_id)
 
     def handle_switch_part(self,switch_id):
-        self.network.handle_switch_part(switch_id)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_switch_part',switch_id)
+        else:
+            self.network.handle_switch_part(switch_id)
 
     def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_join',switch_id,port_id,conf_up,stat_up)
+        else:
+            self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
 
     def handle_port_mod(self, switch, port_no, config, status):
-        self.network.handle_port_mod(switch, port_no, config, status)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_mod', switch, port_no, config, status)
+        else:
+            self.network.handle_port_mod(switch, port_no, config, status)
 
     def handle_port_part(self, switch, port_no):
-        self.network.handle_port_part(switch, port_no)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_port_part', switch, port_no)
+        else:
+            self.network.handle_port_part(switch, port_no)
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
-        self.network.handle_link_update(s1, p_no1, s2, p_no2)
+        if self.role == LOCAL:
+            ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
+            self.send_to_global('handle_link_update', switch, port_no)
+        else:
+            self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
     def handle_flow_stats_reply(self, switch, flow_stats):
         def convert(f,val):
@@ -988,6 +1072,7 @@ class Runtime(object):
             extended_values = self.vlan_to_extended_values_db.get((vid, pcp))
             assert extended_values is not None, "use of vlan that pyretic didn't allocate! not allowed."
             return extended_values
+
 
 @util.cached
 def extended_values_from(packet):

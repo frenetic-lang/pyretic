@@ -28,7 +28,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.runtime import Runtime
+from pyretic.core.runtime import Runtime, LOCAL, GLOBAL
 from pyretic.backend.backend import Backend
 import sys
 import threading
@@ -77,14 +77,19 @@ def parseArgs():
     op.add_option( '--frontend-only', '-f', action="store_true", 
                      dest="frontend_only", help = 'only start the frontend'  )
     op.add_option( '--mode', '-m', type='choice',
-                     choices=['interpreted','i','reactive0','r0','proactive0','p0','proactive1','p1'], 
-                     help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}'] )  )
+                     choices=['interpreted','i','reactive0','r0','proactive0','p0','proactive1','p1','split', 's'], 
+                     help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}, split/s'] )  )
     op.add_option( '--verbosity', '-v', type='choice',
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
                    help = '|'.join( ['low','normal','high','please-make-it-stop'] )  )
+    op.add_option( '--role', '-r', type='choice',
+                   choices=['local', 'global'],
+                   help = '|'.join(['local', 'global']) )
+    op.add_option( '--pox_port', '-p', type='int', dest="pox_port", help = "enter POX port"  )
+    op.add_option( '--backend_port', '-b', type='int', dest="backend_port", help = "enter backend port"  )
 
-    op.set_defaults(frontend_only=False,mode='reactive0')
+    op.set_defaults(frontend_only=False,mode='reactive0',pox_port=6633,backend_port=41414)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -101,6 +106,12 @@ def main():
         options.mode = 'proactive0'
     elif options.mode == 'p1':
         options.mode = 'proactive1'
+    elif options.mode == 's':
+        options.mode = 'split'
+    if options.role == 'local':
+        options.role = LOCAL
+    elif options.role == 'global':
+        options.role = GLOBAL
     try:
         module_name = args[0]
     except IndexError:
@@ -159,8 +170,8 @@ def main():
     handler = util.QueueStreamHandler(logging_queue)
     logger.addHandler(handler)
     logger.setLevel(log_level)
-    
-    runtime = Runtime(Backend(),main,kwargs,options.mode,options.verbosity)
+     
+    runtime = Runtime(Backend(options.backend_port),main,kwargs,options.role,options.mode,options.verbosity)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
@@ -181,7 +192,10 @@ def main():
         # other log file descriptor if necessary
         of_client = subprocess.Popen([python, 
                                       pox_exec,
-                                      'of_client.pox_client' ],
+                                      'openflow.of_01',
+                                      '--port='+str(options.pox_port),
+                                      'of_client.pox_client',
+                                      '--port='+str(options.backend_port) ],
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
     
