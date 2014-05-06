@@ -20,7 +20,7 @@ class local_firewall(LocalDynamicPolicy):
         self.firewall = {}
         self.query = match('inport' = safezone_port) >> local_packets(1, ['srcmac', 'dstmac'])
         self.query.register_callback(self.learn_new_outgoing)
-        super(firewall,self).__init__(self.query)
+        super(local_firewall,self).__init__(self.query)
 
     def learn_new_outgoing(self, pkt):
         AddRule(pkt['srcmac'], pkt['dstmac'])
