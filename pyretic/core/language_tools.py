@@ -68,6 +68,7 @@ def localized_copy(parent, children, inside_local, curr_switch):
         else:
             return children[0]
     else:
+        print "Failed to localize %s.\n" % parent
         raise NotImplementedError
 
 def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
@@ -222,7 +223,8 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,parallel) or
           isinstance(policy,union) or
           isinstance(policy,sequential) or
-          isinstance(policy,intersection)):
+          isinstance(policy,intersection) or
+          isinstance(policy,DerivedPolicy)):
         acc = fun(acc,policy)
         for sub_policy in policy.policies:
             acc = ast_fold(fun,acc,sub_policy)
@@ -236,8 +238,7 @@ def ast_fold(fun, acc, policy):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
     else:
-        print("Printing ... ")
-        print policy
+        print "Failed to fold over %s.\n" % policy
         raise NotImplementedError
     
 def add_dynamic_sub_pols(acc, policy):
