@@ -1137,11 +1137,9 @@ class LocalDynamicPolicy(DynamicPolicy):
 
     def __getstate__(self):
         state  = self.__dict__.copy()
-        state['f'] = marshal.dumps(self.f.func_code)
         return state
 
     def __setstate__(self, state):
-        state['f'] = types.FunctionType(marshal.loads(state['f']), globals())
         self.__dict__.update(state)
         return state
 
