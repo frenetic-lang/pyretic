@@ -59,6 +59,8 @@ def localized_copy(parent, children, inside_local, curr_switch):
         # purposes, then just creating a derived policy with the child policy
         # object is enough.
         return DerivedPolicy(children[0])
+    elif isinstance(parent, query.local_packets):
+        return parent
     elif isinstance(parent,DynamicPolicy):
         # See explanation for query.packets above; applies here as well.
         if isinstance(parent, LocalDynamicPolicy):
@@ -69,6 +71,7 @@ def localized_copy(parent, children, inside_local, curr_switch):
             return children[0]
     else:
         print "Failed to localize %s.\n" % parent
+        print type(parent)
         raise NotImplementedError
 
 def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
@@ -109,6 +112,7 @@ def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
             children_pols.append(hackathon_ast_map(fun, policy.policy,
                                                    curr_switch, inside_local))
     else:
+        print type(parent)
         raise NotImplementedError
     # print policy, inside_local, current_policy_local
     return fun(policy, children_pols, current_policy_local, curr_switch)
