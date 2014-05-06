@@ -169,7 +169,11 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(log_level)
      
-    runtime = Runtime(Backend(options.backend_port),main,kwargs,options.role,options.mode,options.verbosity)
+    if options.role == 'global':
+        options.frontend_only = True
+        runtime = Runtime(None,main,kwargs,options.role,options.mode,options.verbosity)
+    else:
+        runtime = Runtime(Backend(options.backend_port),main,kwargs,options.role,options.mode,options.verbosity)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()

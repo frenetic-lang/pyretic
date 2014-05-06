@@ -33,10 +33,13 @@ from pyretic.core.language import *
 from pyretic.core.language_tools import *
 from pyretic.core.network import *
 from pyretic.core.packet import *
+from pyretic.core.twisted_server import *
+from pyretic.core.twisted_client import *
 
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
+import pickle
 
 TABLE_MISS_PRIORITY = 0
 GLOBAL, LOCAL = ("global", "local")
@@ -66,7 +69,8 @@ class Runtime(object):
         self.mode = mode
         self.role = role
         self.backend = backend
-        self.backend.runtime = self
+        if self.backend:
+            self.backend.runtime = self
         self.policy_lock = RLock()
         self.network_lock = Lock()
         self.switch_lock = Lock()
@@ -93,7 +97,34 @@ class Runtime(object):
             'handle_port_mod'    : self.handle_port_mod,
             'handle_port_part'   : self.handle_port_part,
             'handle_link_update' : self.handle_link_update}
-        
+        self.s = None
+        self.c = None
+        self.q = Queue()
+        if self.role == GLOBAL:
+            def f(q):
+                def printLine (client,line):
+                    print "received", repr(line)
+                s = ServerSocket(printLine)
+                q.put(s.factory.clients)
+                reactor.listenTCP(8000, s.factory)
+                reactor.run()
+            p = Process(target=f,args=(self.q,))
+            p.daemon = True
+            p.start()
+            self.s = self.q.get()
+        else:
+            def f(q):
+                def printLine (line):
+                    print "received", repr(line)
+                c = ClientSocket(printLine)
+                q.put(c.factory.client)
+                reactor.connectTCP('localhost', 8000, c.factory)
+                reactor.run()
+            p = Process(target=f,args=(self.q,))
+            p.daemon = True
+            p.start()
+            self.c = self.q.get()
+
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,
@@ -214,6 +245,9 @@ class Runtime(object):
         """
         classifier = None
         
+        if self.role == GLOBAL:
+            return
+
         if self.mode == 'reactive0':
             self.clear_all() 
 
@@ -892,8 +926,19 @@ class Runtime(object):
 
     def send_to_local(self,act,*args):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
-        print act, args
+        arg_list = [ i for i in args ] 
+        output = pickle.dumps([act] + arg_list)
 
+    ### THIS STUFF WILL BE DONE WHEN THE EVENT ARRIVES IN THE QUEUE
+        input_list = pickle.loads(output)
+        act = input_list[0]
+        if len(input_list) > 1:
+            args = input_list[1:]
+        else:
+            args = list()
+        print act 
+        print args
+    ### THEN WE CALL receive_from_* DEPENDING ON OUR ROLE 
 
     def receive_from_global(self,act,*args):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
@@ -909,7 +954,10 @@ class Runtime(object):
 
     def send_to_global(self,act,*args):
         ### PACKETS, TOPO EVENTS
-        print act, args
+        arg_list = [ i for i in args ] 
+        output = pickle.dumps([act] + arg_list)
+        print pickle.loads(output)
+        self.c.factory.client.sendLine(output)
 
 
     def receive_from_local(self,act,*args):
