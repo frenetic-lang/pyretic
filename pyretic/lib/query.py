@@ -165,7 +165,7 @@ class packets(DerivedPolicy):
         self.initialize()
 
 
-class local_packets(LocalPolicy, DerivedPolicy):
+class local_packets(LocalDynamicPolicy, DerivedPolicy):
     """A FwdBucket preceeded by a LimitFilter.
 
     :param limit: the number of packets to be matched in each grouping.

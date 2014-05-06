@@ -70,7 +70,7 @@ def main():
                      'limit' : 1 }
     init_policy = identity
 
-    a = LocalPolicy(f_limitFilter,
+    a = LocalDynamicPolicy(f_limitFilter,
                     init_context,
                     init_policy,
                     True,

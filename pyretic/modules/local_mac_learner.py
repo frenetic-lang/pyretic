@@ -43,7 +43,7 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
 
-class local_mac_learner(LocalPolicy):
+class local_mac_learner(LocalDynamicPolicy):
     """Standard MAC-learning logic"""
     def __init__(self):
         super(local_mac_learner,self).__init__()

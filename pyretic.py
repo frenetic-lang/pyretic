@@ -100,12 +100,24 @@ def main():
     (op, options, args, kwargs_to_pass) = parseArgs()
     if options.mode == 'i':
         options.mode = 'interpreted'
+        print 'Interactive mode not yet supported with local computation.'
+        print ''
+        op.print_usage()
+        sys.exit(1)
     elif options.mode == 'r0':
         options.mode = 'reactive0'
+        print 'Reactive 0 mode not yet supported with local computation.'
+        print ''
+        op.print_usage()
+        sys.exit(1)
     elif options.mode == 'p0':
         options.mode = 'proactive0'
     elif options.mode == 'p1':
         options.mode = 'proactive1'
+        print 'Proactive 1 mode not yet supported with local computation.'
+        print ''
+        op.print_usage()
+        sys.exit(1)
     if options.role == 'local':
         options.role = LOCAL
     elif options.role == 'global':

@@ -245,9 +245,6 @@ class Runtime(object):
         """
         classifier = None
         
-        if self.role == GLOBAL:
-            return
-
         if self.mode == 'reactive0':
             self.clear_all() 
 
@@ -712,28 +709,29 @@ class Runtime(object):
             :param classifier: the input classifer
             :type classifier: Classifier
             """
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
-            classifier = switchify(classifier,switches)
+            # HACKATHON HACK
+            # switch_attrs_tuples = self.network.topology.nodes(data=True)
+            # switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+            # switches = switch_to_attrs.keys()
+            s = self.switch
+            classifier = switchify(classifier,[s])
             classifier = concretize(classifier)
             classifier = check_OF_rules(classifier)
-            classifier = OF_inportize(classifier)
+            # HACKATHON HACK
+            # classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
 
-            for s in switches:
-                self.send_barrier(s)
-                self.send_clear(s)
-                self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+            self.send_barrier(s)
+            self.send_clear(s)
+            self.send_barrier(s)
+            self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
 
             for rule in new_rules:
                 self.install_rule(rule)
                 
-            for s in switches:
-                self.send_barrier(s)
-                if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
-                    self.request_flow_stats(s)
+            self.send_barrier(s)
+            if self.verbosity >= self.verbosity_numeric('please-make-it-stop'):
+                self.request_flow_stats(s)
 
         ### INCREMENTAL UPDATE LOGIC
 
@@ -755,12 +753,14 @@ class Runtime(object):
             """
             with self.old_rules_lock:
                 old_rules = self.old_rules
-                switch_attrs_tuples = self.network.topology.nodes(data=True)
-                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-                switches = switch_to_attrs.keys()
-                classifier = switchify(classifier,switches)
+                # HACKATHON HACK
+                # switch_attrs_tuples = self.network.topology.nodes(data=True)
+                # switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+                # switches = switch_to_attrs.keys()
+                classifier = switchify(classifier,[s])
                 classifier = concretize(classifier)
-                classifier = OF_inportize(classifier)
+                # HACKATHON HACK
+                # classifier = OF_inportize(classifier)
                 new_rules = prioritize(classifier)
 
                 # calculate diff
@@ -1031,6 +1031,7 @@ class Runtime(object):
         if self.role == LOCAL:
             ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
             self.send_to_global('handle_switch_join',switch_id)
+            self.switch = switch_id
         else:
             self.network.handle_switch_join(switch_id)
 

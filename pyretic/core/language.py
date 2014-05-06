@@ -1155,7 +1155,7 @@ class DynamicFilter(DynamicPolicy,Filter):
     pass
 
 
-class LocalDynamicFilter(LocalPolicy,Filter):
+class LocalDynamicFilter(LocalDynamicPolicy,Filter):
     """
     Abstract class for local dynamic filter policies.
     """
