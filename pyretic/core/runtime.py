@@ -975,7 +975,7 @@ class Runtime(object):
             elif act == 'packet':
                 self.send_packet(*args)
             elif act == 'policy':
-                self.policy = received_policy
+                self.policy = args[0]
                 self.update_dynamic_sub_pols()
                 self.update_switch_classifiers()
                 print "policy applied!!!!!!!!"
@@ -1076,6 +1076,7 @@ class Runtime(object):
             self.network.handle_port_part(switch, port_no)
 
     def handle_link_update(self, s1, p_no1, s2, p_no2):
+        print '------------ handle_link_update -----------------'
         if self.role == LOCAL:
             ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
             self.send_to_global('handle_link_update', switch, port_no)
