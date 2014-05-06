@@ -39,7 +39,6 @@ from pyretic.core.twisted_client import *
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
-import pickle
 
 TABLE_MISS_PRIORITY = 0
 GLOBAL, LOCAL = ("global", "local")
@@ -931,17 +930,14 @@ class Runtime(object):
     def send_to_local_switch(self,switch,act,*args):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
-        output = pickle.dumps([switch,act] + arg_list)
         print '---------- send_to_local_switch -------------'
-        print pickle.loads(output)
-        self.sq_send.put(output) 
-        #print pickle.loads(output)
+        self.sq_send.put((switch,[act] + arg_list)) 
         
+
     def receive_from_local(self):
         while True:
-            line = self.sq_recv.get()            
+            input_list = self.sq_recv.get()            
             print '------------ receive_from_local ------------'
-            input_list = pickle.loads(line)
             print input_list
             act = input_list[0]
             if len(input_list) > 1:
@@ -961,13 +957,11 @@ class Runtime(object):
 
     def send_to_global(self,act,*args):
         arg_list = [ i for i in args ] 
-        output = pickle.dumps([act] + arg_list)
-        self.cq_send.put(output)
+        self.cq_send.put([act] + arg_list)
 
     def receive_from_global(self):
         while True:
-            line = self.cq_recv.get()
-            input_list = pickle.loads(line)
+            input_list = self.cq_recv.get()
             act = input_list[0]
             if len(input_list) > 1:
                 args = input_list[1:]

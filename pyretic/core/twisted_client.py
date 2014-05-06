@@ -5,6 +5,7 @@ from twisted.internet import reactor
 from twisted.protocols import basic
 from multiprocessing import Queue
 import threading
+import pickle
 
 class Client(basic.LineReceiver):
     def connectionMade(self):
@@ -16,8 +17,10 @@ class Client(basic.LineReceiver):
         self.factory.client = None
         
     def lineReceived(self, line):
-        print line
-        self.factory.qrecv.put(line)
+        print '----------- lineReceived ---------'
+        input_list = pickle.loads(line)
+        print input_list
+        self.factory.qrecv.put(input_list)
 
 class ClientSocket():
     def __init__ (self, qsend, qrecv):
@@ -31,8 +34,11 @@ class ClientSocket():
     
     def dataSent(self, q):
         while True:
-            line = q.get()
-            self.factory.client.sendLine(line)
+            to_send_l = q.get()
+            to_send = pickle.dumps(to_send_l)
+            print '----------- dataSent --------------'
+            print pickle.loads(to_send)
+            self.factory.client.sendLine(to_send)
 
 
 # --- Client ---
