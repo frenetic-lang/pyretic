@@ -20,7 +20,7 @@ class Client(basic.LineReceiver):
         self.factory.qrecv.put(line)
 
 class ClientSocket():
-    def __init__ (self, qsend, qrevc):
+    def __init__ (self, qsend, qrecv):
         self.factory = ClientFactory()
         self.factory.client = None
         self.factory.protocol = Client
