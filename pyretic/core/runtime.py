@@ -214,11 +214,12 @@ class Runtime(object):
         Updates runtime behavior (both interpreter and switch classifiers)
         when the concrete network topology changes.
         """
+        print '------------ handle_network_change -----------------'
         with self.network_lock:
 
             # if the topology hasn't changed, ignore
-            if self.network.topology == self.prev_network.topology:
-                return
+#            if self.network.topology == self.prev_network.topology:
+#                return
 
             # otherwise copy the network object
             self.in_network_update = True
@@ -247,6 +248,8 @@ class Runtime(object):
         """
         classifier = None
         
+        print '------------- update_switch_classifiers ---------------------'
+
         if self.mode == 'reactive0' and not self.role == GLOBAL:
             self.clear_all() 
 
@@ -1040,6 +1043,7 @@ class Runtime(object):
 #######################
 
     def handle_switch_join(self,switch_id):
+        print '---------- handle_switch_join --------------'
         if self.role == LOCAL:
             ### HACK PASSTHROUGH TO CHANNEL TO GLOBAL
             self.send_to_global('handle_switch_join',switch_id)
@@ -1203,11 +1207,18 @@ class ConcreteNetwork(Network):
         self.runtime.inject_discovery_packet(dpid, port_no)
         
     def handle_switch_join(self, switch):
+        print '--------------- NETWORK handle switch join ----------------'
         self.debug_log.debug("handle_switch_joins")
         ## PROBABLY SHOULD CHECK TO SEE IF SWITCH ALREADY IN NEXT_TOPO
-        self.next_topo.add_switch(switch)
+#        self.next_topo.add_switch(switch)
+        import pickle
+        with open('Output.txt', 'r') as content_file:
+            content = content_file.read()
+        print pickle.loads(content)
+        self.next_topo = pickle.loads(content)
         self.log.info("OpenFlow switch %s connected" % switch)
         self.debug_log.debug(str(self.next_topo))
+        self.queue_update(self.get_update_no())
         
     def remove_associated_link(self,location):
         port = self.next_topo.node[location.switch]["ports"][location.port_no]

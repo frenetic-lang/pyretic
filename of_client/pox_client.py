@@ -417,16 +417,16 @@ class POXClient(revent.EventMixin):
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])                        
+#                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])                        
    
-        self.send_to_pyretic(['switch','join',event.dpid,'END'])
+#        self.send_to_pyretic(['switch','join',event.dpid,'END'])
 
                         
     def _handle_ConnectionDown(self, event):
         assert event.dpid in self.switches
 
         del self.switches[event.dpid]
-        self.send_to_pyretic(['switch','part',event.dpid])
+#        self.send_to_pyretic(['switch','part',event.dpid])
 
 
     def of_match_to_dict(self, m):
@@ -508,7 +508,7 @@ class POXClient(revent.EventMixin):
             flow_stat_dict['actions'] = actions
             return flow_stat_dict
         flow_stats = [handle_ofp_flow_stat(s) for s in event.stats]
-        self.send_to_pyretic(['flow_stats_reply',dpid,flow_stats])
+#        self.send_to_pyretic(['flow_stats_reply',dpid,flow_stats])
 
     def _handle_PortStatus(self, event):
         port = event.ofp.desc
@@ -518,17 +518,17 @@ class POXClient(revent.EventMixin):
                 #self.runtime.network.port_joins.signal((event.dpid, event.port))
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])
+#                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
                 except KeyError:
                     pass  # SWITCH ALREADY DELETED
-                self.send_to_pyretic(['port','part',event.dpid,event.port])
+#                self.send_to_pyretic(['port','part',event.dpid,event.port])
             elif event.modified:
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','mod',event.dpid, event.port, CONF_UP, STAT_UP])
+#                self.send_to_pyretic(['port','mod',event.dpid, event.port, CONF_UP, STAT_UP])
             else:
                 raise RuntimeException("Unknown port status event")
 
@@ -627,7 +627,7 @@ class POXClient(revent.EventMixin):
             # Just update timestamp
             self.adjacency[link] = time.time()
 
-        self.send_to_pyretic(['link',originatorDPID, originatorPort, event.dpid, event.port])            
+#        self.send_to_pyretic(['link',originatorDPID, originatorPort, event.dpid, event.port])            
         return # Probably nobody else needs this event
 
 
