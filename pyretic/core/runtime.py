@@ -97,33 +97,28 @@ class Runtime(object):
             'handle_port_mod'    : self.handle_port_mod,
             'handle_port_part'   : self.handle_port_part,
             'handle_link_update' : self.handle_link_update}
-        self.s = None
-        self.c = None
-        self.q = Queue()
         if self.role == GLOBAL:
-            def f(q):
-                def printLine (client,line):
-                    print "received", repr(line)
-                s = ServerSocket(printLine)
-                q.put(s.factory.clients)
+            self.sq_send = Queue()
+            self.sq_recv = Queue()
+
+            def f(qsend,qrecv):
+                s = ServerSocket(qsend,qrecv)
                 reactor.listenTCP(8000, s.factory)
                 reactor.run()
-            p = Process(target=f,args=(self.q,))
+            p = Process(target=f,args=(self.sq_send,self.sq_recv,))
             p.daemon = True
             p.start()
-            self.s = self.q.get()
         else:
-            def f(q):
-                def printLine (line):
-                    print "received", repr(line)
-                c = ClientSocket(printLine)
-                q.put(c.factory.client)
+            self.cq_send = Queue()
+            self.cq_recv = Queue()
+            
+            def f(qsend,qrecv):
+                c = ClientSocket(qsend,qrecv)
                 reactor.connectTCP('localhost', 8000, c.factory)
                 reactor.run()
-            p = Process(target=f,args=(self.q,))
+            p = Process(target=f,args=(self.cq_send,self.cq_recv,))
             p.daemon = True
             p.start()
-            self.c = self.q.get()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -939,6 +934,7 @@ class Runtime(object):
         print act 
         print args
     ### THEN WE CALL receive_from_* DEPENDING ON OUR ROLE 
+        self.sq_send.put("hello from server")
 
     def receive_from_global(self,act,*args):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
@@ -957,7 +953,7 @@ class Runtime(object):
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
         print pickle.loads(output)
-        self.c.factory.client.sendLine(output)
+        self.cq_send.put("hello from client")
 
 
     def receive_from_local(self,act,*args):

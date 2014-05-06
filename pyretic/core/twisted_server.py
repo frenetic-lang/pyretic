@@ -3,6 +3,8 @@
 from twisted.internet.protocol import Protocol, Factory
 from twisted.internet import reactor
 from twisted.protocols import basic
+from multiprocessing import Queue
+import threading
 
 class Server(basic.LineReceiver):
     def connectionMade(self):
@@ -14,14 +16,25 @@ class Server(basic.LineReceiver):
         self.factory.clients.remove(self)
 
     def lineReceived(self, line):
-        self.factory.callback(self, line)
+        print line
+        self.factory.qrecv.put(line)
+            
 
 class ServerSocket():
-    def __init__ (self, callback):
+    def __init__ (self, qsend, qrevc):
         self.factory = Factory()
-        self.factory.clients = []
-        self.factory.callback = callback
+        self.factory.clients = dict()
         self.factory.protocol = Server
+        self.factory.qsend = qsend
+        self.factory.qrecv = qrevc
+        p = threading.Thread(target=self.dataSent,args=(self.factory.qsend,))
+        p.start()
+    
+    def dataSent(self, q):
+        while True:
+            (dpid, line) = q.get()
+            if self.factory.clients[dpid]:
+                self.factory.clients[dpid].sendLine(line)
         
 
 # --- Server ---
