@@ -108,6 +108,9 @@ class Runtime(object):
             p = Process(target=f,args=(self.sq_send,self.sq_recv,))
             p.daemon = True
             p.start()
+            
+            p_r_frm_l = threading.Thread(target=self.receive_from_local)
+            p_r_frm_l.start()
         else:
             self.cq_send = Queue()
             self.cq_recv = Queue()
@@ -119,6 +122,9 @@ class Runtime(object):
             p = Process(target=f,args=(self.cq_send,self.cq_recv,))
             p.daemon = True
             p.start()
+            
+            p_r_frm_g = threading.Thread(target=self.receive_from_global)
+            p_r_frm_g.start()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -923,12 +929,14 @@ class Runtime(object):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
-        self.sq_send.put((0, "hello from server")) # get dpid
-        print pickle.loads(output)
+        self.sq_send.put((0, output)) 
+        #print pickle.loads(output)
         
-    def receive_from_local(self,act,*args):
+    def receive_from_local(self):
         while True:
             line = self.sq_recv.get()
+            
+            print line
             
             input_list = pickle.loads(line)
             act = input_list[0]
@@ -950,10 +958,10 @@ class Runtime(object):
     def send_to_global(self,act,*args):
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
-        self.cq_send.put("hello from client")
-        print pickle.loads(output)
+        self.cq_send.put(output)
+        #print pickle.loads(output)
 
-    def receive_from_global(self,act,*args):
+    def receive_from_global(self):
         while True:
             line = self.cq_recv.get()
             input_list = pickle.loads(line)
@@ -971,7 +979,6 @@ class Runtime(object):
                 self.send_packet(concrete_packet)
             else:
                 raise TypeError('Bad message type %s' % act)
-
 
 #######################
 # TO OPENFLOW         
