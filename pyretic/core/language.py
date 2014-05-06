@@ -1155,6 +1155,13 @@ class DynamicFilter(DynamicPolicy,Filter):
     pass
 
 
+class LocalDynamicFilter(LocalPolicy,Filter):
+    """
+    Abstract class for local dynamic filter policies.
+    """
+    pass
+
+
 class flood(DynamicPolicy):
     """
     Policy that floods packets on a minimum spanning tree, recalculated

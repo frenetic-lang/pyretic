@@ -68,6 +68,42 @@ class LimitFilter(DynamicFilter):
         return "LimitFilter\n%s" % repr(self.policy)
 
 
+class LocalLimitFilter(LocalDynamicFilter):
+    """A LocalDynamicFilter that matches the first limit packets in a specified grouping.
+
+    :param limit: the number of packets to be matched in each grouping.
+    :type limit: int
+    :param group_by: the fields by which to group packets.
+    :type group_by: list string
+    """
+    def __init__(self,limit=None,group_by=[]):
+        self.limit = limit
+        self.group_by = group_by
+        self.seen = {}
+        self.done = []
+        super(LocalLimitFilter,self).__init__(identity)
+
+    def update_policy(self,pkt):
+        if self.group_by:    # MATCH ON PROVIDED GROUP_BY
+            pred = match([(field,pkt[field]) for field in self.group_by])
+        else:              # OTHERWISE, MATCH ON ALL AVAILABLE GROUP_BY
+            pred = match([(field,pkt[field]) 
+                              for field in pkt.available_group_by()])
+        # INCREMENT THE NUMBER OF TIMES MATCHING PKT SEEN
+        try:
+            self.seen[pred] += 1
+        except KeyError:
+            self.seen[pred] = 1
+
+        if self.seen[pred] == self.limit:
+            val = {h : pkt[h] for h in self.group_by}
+            self.done.append(match(val))
+            self.policy = ~union(self.done)
+
+    def __repr__(self):
+        return "LocalLimitFilter\n%s" % repr(self.policy)
+
+
 class packets(DerivedPolicy):
     """A FwdBucket preceeded by a LimitFilter.
 
@@ -127,6 +163,68 @@ class packets(DerivedPolicy):
 
         self.__dict__.update(state)
         self.initialize()
+
+
+class local_packets(LocalPolicy, DerivedPolicy):
+    """A FwdBucket preceeded by a LimitFilter.
+
+    :param limit: the number of packets to be matched in each grouping.
+    :type limit: int
+    :param group_by: the fields by which to group packets.
+    :type group_by: list string
+    """
+    def __init__(self,limit=None,group_by=[]):
+        self.group_by = group_by
+        self.limit    = limit
+        self.callbacks = []
+        self.initialize()
+
+    def register_callback(self, func):
+        self.callbacks.append(func)
+
+    def notify(self, pkt):
+        for callback in self.callbacks:
+            callback(pkt)
+
+    def initialize(self):
+        limit    = self.limit
+        group_by = self.group_by 
+        self.fb = FwdBucket()
+
+        if limit is None:
+            super(local_packets,self).__init__(self.fb)
+        else:
+            self.limit_filter = LocalLimitFilter(limit,group_by)
+            self.fb.register_callback(self.limit_filter.update_policy)
+            self.fb.register_callback(self.notify)
+            super(packets,self).__init__(self.limit_filter >> self.fb)
+        
+    def __repr__(self):
+        return "packets\n%s" % repr(self.policy)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        def codify_func(c):
+            assert(len(c.func_code.co_freevars) == 0)
+            return marshal.dumps(c.func_code)
+
+        callbacks = map(codify_func, state['callbacks'])
+        state['callbacks'] = callbacks
+
+        del state['fb']
+        del state['limit_filter']
+        del state['policy']
+        return state
+    
+    def __setstate__(self, state):
+        state['callbacks'] = \
+            map(
+                lambda f: types.FunctionType(marshal.loads(f), globals()), 
+                state['callbacks'])
+
+        self.__dict__.update(state)
+        self.initialize()
+
 
 class AggregateFwdBucket(FwdBucket):
     """An abstract FwdBucket which calls back all registered routines every interval
