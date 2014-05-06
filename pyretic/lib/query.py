@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket, Query
+from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket, Query, LocalDynamicFilter, LocalDynamicPolicy
 import time
 import re
 import marshal, types
