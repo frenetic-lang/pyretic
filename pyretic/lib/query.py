@@ -29,6 +29,7 @@
 from pyretic.core.language import identity, match, union, DerivedPolicy, DynamicFilter, FwdBucket, Query
 import time
 import re
+import marshal, types
 from threading import Thread
 
 class LimitFilter(DynamicFilter):
@@ -76,18 +77,56 @@ class packets(DerivedPolicy):
     :type group_by: list string
     """
     def __init__(self,limit=None,group_by=[]):
+        self.group_by = group_by
+        self.limit    = limit
+        self.callbacks = []
+        self.initialize()
+
+    def register_callback(self, func):
+        self.callbacks.append(func)
+
+    def notify(self, pkt):
+        for callback in self.callbacks:
+            callback(pkt)
+
+    def initialize(self):
+        limit    = self.limit
+        group_by = self.group_by 
         self.fb = FwdBucket()
-        self.register_callback = self.fb.register_callback
+
         if limit is None:
             super(packets,self).__init__(self.fb)
         else:
             self.limit_filter = LimitFilter(limit,group_by)
             self.fb.register_callback(self.limit_filter.update_policy)
+            self.fb.register_callback(self.notify)
             super(packets,self).__init__(self.limit_filter >> self.fb)
         
     def __repr__(self):
         return "packets\n%s" % repr(self.policy)
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        def codify_func(c):
+            assert(len(c.func_code.co_freevars) == 0)
+            return marshal.dumps(c.func_code)
+
+        callbacks = map(codify_func, state['callbacks'])
+        state['callbacks'] = callbacks
+
+        del state['fb']
+        del state['limit_filter']
+        del state['policy']
+        return state
+    
+    def __setstate__(self, state):
+        state['callbacks'] = \
+            map(
+                lambda f: types.FunctionType(marshal.loads(f), globals()), 
+                state['callbacks'])
+
+        self.__dict__.update(state)
+        self.initialize()
 
 class AggregateFwdBucket(FwdBucket):
     """An abstract FwdBucket which calls back all registered routines every interval

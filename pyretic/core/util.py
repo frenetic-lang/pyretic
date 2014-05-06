@@ -61,6 +61,14 @@ class frozendict(object):
             self._dict.update(new_dict)
         self._dict.update(kwargs)
 
+    def __getstate__(self):
+        return {
+            '_dict': self._dict
+        }
+
+    def __setstate__(self, state):
+        self._dict        = state['_dict']
+
     def update(self, new_dict=None, **kwargs):
         d = self._dict.copy()
         

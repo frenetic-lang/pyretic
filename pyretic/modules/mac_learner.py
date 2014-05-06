@@ -59,7 +59,7 @@ class mac_learner(DynamicPolicy):
     def set_network(self,network):
         self.set_initial_state()
 
-    def update_policy(self):
+    def update_policy(self, q=None):
         """Update the policy based on current forward and query policies"""
         self.policy = self.forward + self.query
 
@@ -73,4 +73,7 @@ class mac_learner(DynamicPolicy):
        
 
 def main():
-    return mac_learner()
+    import pickle
+    policy = mac_learner()
+    q = pickle.loads(pickle.dumps(policy))
+    return q

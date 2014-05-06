@@ -132,7 +132,7 @@ class Classifier(object):
         for r in c.rules:
             if len(r.actions) == 0:
                 r.actions = {identity}
-            elif r.actions == {identity}:
+            elif len(r.actions) == 1 and list(r.actions)[0] == identity:
                 r.actions = set()
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
