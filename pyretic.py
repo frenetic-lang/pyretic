@@ -48,8 +48,9 @@ def signal_handler(signal, frame):
     print '\n----starting pyretic shutdown------'
     # for thread in threading.enumerate():
     #     print (thread,thread.isAlive())
-    print "attempting to kill of_client"
-    of_client.kill()
+    if of_client:
+        print "attempting to kill of_client"
+        of_client.kill()
     # print "attempting get output of of_client:"
     # output = of_client.communicate()[0]
     # print output

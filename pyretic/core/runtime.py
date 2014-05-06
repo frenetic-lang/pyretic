@@ -110,6 +110,7 @@ class Runtime(object):
             p.start()
             
             p_r_frm_l = threading.Thread(target=self.receive_from_local)
+            p_r_frm_l.daemon = True
             p_r_frm_l.start()
         else:
             self.cq_send = Queue()
@@ -124,6 +125,7 @@ class Runtime(object):
             p.start()
             
             p_r_frm_g = threading.Thread(target=self.receive_from_global)
+            p_r_frm_g.daemon = True
             p_r_frm_g.start()
 
     def verbosity_numeric(self,verbosity_option):
@@ -1188,6 +1190,7 @@ class ConcreteNetwork(Network):
             self.runtime.handle_network_change()
 
         p = threading.Thread(target=f,args=(this_update_no,))
+        p.daemon = True
         p.start()
 
     def get_update_no(self):
