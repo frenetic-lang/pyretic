@@ -219,14 +219,23 @@ class Runtime(object):
 
         # HACK, THIS MODE CHANGES IF WE ARE GLOBAL TODO COLE
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-            classifier = self.policy.compile()
-            self.log.debug(
-                '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                                              "generate classifier",
-                                              "policy="+repr(self.policy),
-                                              "classifier="+repr(classifier)))
-            self.install_classifier(classifier)
-
+            if self.role == LOCAL:
+                classifier = self.policy.compile()
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  "generate classifier",
+                                                  "policy="+repr(self.policy),
+                                                  "classifier="+repr(classifier)))
+                self.install_classifier(classifier)
+            else:
+                # TODO(): get switch_list
+                for s in switch_list:
+                    localize = lambda p, s: hackathon_ast_map(localized_copy,
+                                                              p, s, False)
+                    localized_policy = localize(self.policy, s)
+                    # TODO(): need a way to send the updated policy to local
+                    # controller corresponding to the switch s
+                    self.send_to_local_switch('policy', localized_policy, s)
 
     def update_dynamic_sub_pols(self):
         """
