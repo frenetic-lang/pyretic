@@ -23,7 +23,7 @@ class Server(basic.LineReceiver):
 class ServerSocket():
     def __init__ (self, qsend, qrevc):
         self.factory = Factory()
-        self.factory.clients = dict()
+        self.factory.clients = []
         self.factory.protocol = Server
         self.factory.qsend = qsend
         self.factory.qrecv = qrevc
@@ -32,9 +32,9 @@ class ServerSocket():
     
     def dataSent(self, q):
         while True:
-            (dpid, line) = q.get()
-            if self.factory.clients[dpid]:
-                self.factory.clients[dpid].sendLine(line)
+            (sid, line) = q.get()
+            self.factory.clients[sid].sendLine(line)
+            print "do ...."
         
 
 # --- Server ---

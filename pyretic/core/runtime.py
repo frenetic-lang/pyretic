@@ -920,52 +920,57 @@ class Runtime(object):
 #######################
 
     def send_to_local(self,act,*args):
-        ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
-
-    ### THIS STUFF WILL BE DONE WHEN THE EVENT ARRIVES IN THE QUEUE
-        input_list = pickle.loads(output)
-        act = input_list[0]
-        if len(input_list) > 1:
-            args = input_list[1:]
-        else:
-            args = list()
-        print act 
-        print args
-    ### THEN WE CALL receive_from_* DEPENDING ON OUR ROLE 
-        self.sq_send.put("hello from server")
-
-    def receive_from_global(self,act,*args):
-        ### DISCOVERY PACKETS, DATAPLANE PACKETS
-        if act == 'inject_discovery_packet':
-            (dpid,port) = args
-            self.inject_discovery_packet(dpid,port)
-        elif act == 'packet':
-            (concrete_packet) = args
-            self.send_packet(concrete_packet)
-        else:
-            raise TypeError('Bad message type %s' % act)
-
+        self.sq_send.put((0, "hello from server")) # get dpid
+        print pickle.loads(output)
+        
+    def receive_from_local(self,act,*args):
+        while True:
+            line = self.sq_recv.get()
+            
+            input_list = pickle.loads(line)
+            act = input_list[0]
+            if len(input_list) > 1:
+                args = input_list[1:]
+            else:
+                args = list()
+            
+            ### PACKETS, TOPO EVENTS
+            if act == 'packet':
+                (concrete_packet) = args
+                self.handle_packet_in(concrete_packet)
+            else:
+                try:
+                    self.topo_fns[act](*args)
+                except:
+                    raise TypeError('Bad action %s' % act)
 
     def send_to_global(self,act,*args):
-        ### PACKETS, TOPO EVENTS
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
-        print pickle.loads(output)
         self.cq_send.put("hello from client")
+        print pickle.loads(output)
 
+    def receive_from_global(self,act,*args):
+        while True:
+            line = self.cq_recv.get()
+            input_list = pickle.loads(line)
+            act = input_list[0]
+            if len(input_list) > 1:
+                args = input_list[1:]
+            else:
+                args = list()
+            
+            if act == 'inject_discovery_packet':
+                (dpid,port) = args
+                self.inject_discovery_packet(dpid,port)
+            elif act == 'packet':
+                (concrete_packet) = args
+                self.send_packet(concrete_packet)
+            else:
+                raise TypeError('Bad message type %s' % act)
 
-    def receive_from_local(self,act,*args):
-        ### PACKETS, TOPO EVENTS
-        if act == 'packet':
-            (concrete_packet) = args
-            self.handle_packet_in(concrete_packet)
-        else:
-            try:
-                self.topo_fns[act](*args)
-            except:
-                raise TypeError('Bad action %s' % act)
 
 #######################
 # TO OPENFLOW         
