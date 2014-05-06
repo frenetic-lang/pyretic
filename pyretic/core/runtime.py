@@ -261,7 +261,9 @@ class Runtime(object):
                                                   "classifier="+repr(classifier)))
                 self.install_classifier(classifier)
             else:
-                # TODO(): get switch_list
+                switch_attrs_tuples = self.network.topology.nodes(data=True)
+                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+                switch_list = switch_to_attrs.keys()
                 for s in switch_list:
                     print '---------- localizing %s --------------' % s
                     localize = lambda p, s: hackathon_ast_map(localized_copy,
