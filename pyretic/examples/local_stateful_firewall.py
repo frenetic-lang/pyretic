@@ -59,4 +59,4 @@ class local_firewall(LocalDynamicPolicy):
 
 def main ():
     # NOTE: we assume the topology is SAFE ZONE --- 1 SWITCH 2 --- INTERNET
-    return firewall(1) >> flood()
+    return local_firewall(1) >> flood()
