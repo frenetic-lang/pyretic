@@ -248,7 +248,7 @@ class Runtime(object):
         """
         classifier = None
         
-        if self.mode == 'reactive0':
+        if self.mode == 'reactive0' and not self.role == GLOBAL:
             self.clear_all() 
 
         # HACK, THIS MODE CHANGES IF WE ARE GLOBAL TODO COLE
