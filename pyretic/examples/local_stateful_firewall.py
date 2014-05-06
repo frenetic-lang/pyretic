@@ -9,7 +9,7 @@ from pox.lib.addresses import EthAddr
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
-from pyretic.modules.mac_learner import mac_learner
+from pyretic.lib.query import *
 
 class local_firewall(LocalDynamicPolicy):
 
@@ -18,9 +18,10 @@ class local_firewall(LocalDynamicPolicy):
         print "initializing firewall"      
         self.safezone_port = safezone_port
         self.firewall = {}
-        self.query = match('inport' = safezone_port) >> local_packets(1, ['srcmac', 'dstmac'])
+        self.query = local_packets(1, ['srcmac', 'dstmac'])
         self.query.register_callback(self.learn_new_outgoing)
-        super(local_firewall,self).__init__(self.query)
+        self.query_policy = match(inport=self.safezone_port) >> self.query
+        super(local_firewall,self).__init__(self.query_policy)
 
     def learn_new_outgoing(self, pkt):
         AddRule(pkt['srcmac'], pkt['dstmac'])
@@ -54,7 +55,7 @@ class local_firewall(LocalDynamicPolicy):
                                 match(srcmac=mac2)) 
                                for (mac1,mac2) 
                                in self.firewall.keys()])
-        self.policy = self.query + firewall_policy
+        self.policy = self.query_policy + firewall_policy
         print self.policy
 
 def main ():

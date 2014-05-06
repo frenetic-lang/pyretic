@@ -165,7 +165,7 @@ class packets(DerivedPolicy):
         self.initialize()
 
 
-class local_packets(LocalDynamicPolicy, DerivedPolicy):
+class local_packets(DerivedPolicy):
     """A FwdBucket preceeded by a LimitFilter.
 
     :param limit: the number of packets to be matched in each grouping.
@@ -197,7 +197,7 @@ class local_packets(LocalDynamicPolicy, DerivedPolicy):
             self.limit_filter = LocalLimitFilter(limit,group_by)
             self.fb.register_callback(self.limit_filter.update_policy)
             self.fb.register_callback(self.notify)
-            super(packets,self).__init__(self.limit_filter >> self.fb)
+            super(local_packets,self).__init__(self.limit_filter >> self.fb)
         
     def __repr__(self):
         return "packets\n%s" % repr(self.policy)

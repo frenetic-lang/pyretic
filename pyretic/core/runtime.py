@@ -261,7 +261,7 @@ class Runtime(object):
                     localized_policy = localize(self.policy, s)
                     # TODO(): need a way to send the updated policy to local
                     # controller corresponding to the switch s
-                    self.send_to_local_switch('policy', localized_policy, s)
+                    self.send_to_local_switch(s,'policy', localized_policy)
 
     def update_dynamic_sub_pols(self):
         """
@@ -919,7 +919,8 @@ class Runtime(object):
 # HACK, GLOBAL/LOCAL         
 #######################
 
-    def send_to_local(self,act,*args):
+    def send_to_local_switch(self,switch,act,*args):
+        ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
         self.sq_send.put((0, "hello from server")) # get dpid
@@ -979,7 +980,8 @@ class Runtime(object):
     def send_packet(self,concrete_packet):
         if self.role == GLOBAL:
             ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
-            self.send_to_local('packet',concrete_packet)
+            dpid = concrete_packet['switch']
+            self.send_to_local_switch(dpid,'packet',concrete_packet)
         else:
             self.backend.send_packet(concrete_packet)
 
@@ -987,7 +989,7 @@ class Runtime(object):
     def inject_discovery_packet(self,dpid, port):
         if self.role == GLOBAL:
             ### HACK PASSTHROUGH TO CHANNEL TO APPROPRIATE LOCAL 
-            self.send_to_local('inject_discovery_packet',dpid,port)
+            self.send_to_local_switch(dpid,'inject_discovery_packet',port)
         else:
             self.backend.inject_discovery_packet(dpid,port)
 
