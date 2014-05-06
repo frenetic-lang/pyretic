@@ -1076,26 +1076,14 @@ class DynamicPolicy(DerivedPolicy):
         return "[DynamicPolicy]\n%s" % repr(self.policy)
 
 
-class LocalPolicy(DynamicPolicy):
+class LocalDynamicPolicy(DynamicPolicy):
     """ Policies local to just one switches. """
     # (context -> pkt -> (policy * context)) -> context -> policy -> bool -> str
-    def __init__(self, f, context, policy, overwrite, name):
-        assert isinstance(context, dict)
-        assert isinstance(overwrite, bool)
-        assert isinstance(name, str)
-        self.f = f
-        self.context = context
-        self.overwrite = overwrite
-        self.name = name
-        super(LocalPolicy, self).__init__(policy)
-
-    def update_policy(self, pkt):
-        (new_pol, new_context) = self.f(self.context, pkt)
-        self.context = new_context
-        self.policy = new_pol
+    def __init__(self, policy=drop):
+        super(LocalDynamicPolicy, self).__init__(policy)
 
     def __repr__(self):
-        return "LocalPolicy:\n%s" % repr(self.policy)
+        return "LocalDynamicPolicy\n%s" % self.policy
 
 
 class DynamicFilter(DynamicPolicy,Filter):
