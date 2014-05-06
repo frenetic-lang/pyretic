@@ -16,9 +16,19 @@ class Server(basic.LineReceiver):
         del self.factory.clients[self]
 
     def lineReceived(self, line):
-        print line
+        import pickle
+#        print '----------- lineReceived ---------'
+        input_list = pickle.loads(line)
+#        print input_list
+        act = input_list[0]
+#        print act
+        if act == 'handle_switch_join':
+            switch = input_list[1]
+            self.factory.clients[self] = switch
+            self.factory.id_to_client[switch] = self 
         self.factory.qrecv.put(line)
-            
+        print '-------- curent id_to_client ------------'
+        print self.factory.id_to_client            
 
 class ServerSocket():
     def __init__ (self, qsend, qrevc):
@@ -33,9 +43,17 @@ class ServerSocket():
     
     def dataSent(self, q):
         while True:
-            (sid, line) = q.get()
+            to_send = q.get()
+            import pickle
+            to_send_l = pickle.loads(to_send)
+            sid = to_send_l[0]
+            to_send = pickle.dumps(to_send_l[1:])
+            print '----------- MESSAGE TO CLIENT --------------'
+            print sid
+            print pickle.loads(to_send)
+            
             try:
-                self.factory.id_to_client[sid].sendLine(line)
+                self.factory.id_to_client[sid].sendLine(to_send)
                 print "do ...."
             except KeyError:
                 print 'no client for %d yet' % sid

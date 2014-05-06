@@ -264,6 +264,7 @@ class Runtime(object):
             else:
                 # TODO(): get switch_list
                 for s in switch_list:
+                    print '---------- localizing %s --------------' % s
                     localize = lambda p, s: hackathon_ast_map(localized_copy,
                                                               p, s, False)
                     localized_policy = localize(self.policy, s)
@@ -930,17 +931,18 @@ class Runtime(object):
     def send_to_local_switch(self,switch,act,*args):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
-        output = pickle.dumps([act] + arg_list)
-        self.sq_send.put((0, output)) 
+        output = pickle.dumps([switch,act] + arg_list)
+        print '---------- send_to_local_switch -------------'
+        print pickle.loads(output)
+        self.sq_send.put(output) 
         #print pickle.loads(output)
         
     def receive_from_local(self):
         while True:
-            line = self.sq_recv.get()
-            
-            print line
-            
+            line = self.sq_recv.get()            
+            print '------------ receive_from_local ------------'
             input_list = pickle.loads(line)
+            print input_list
             act = input_list[0]
             if len(input_list) > 1:
                 args = input_list[1:]
@@ -961,7 +963,6 @@ class Runtime(object):
         arg_list = [ i for i in args ] 
         output = pickle.dumps([act] + arg_list)
         self.cq_send.put(output)
-        #print pickle.loads(output)
 
     def receive_from_global(self):
         while True:
@@ -974,11 +975,9 @@ class Runtime(object):
                 args = list()
             
             if act == 'inject_discovery_packet':
-                (dpid,port) = args
-                self.inject_discovery_packet(dpid,port)
+                self.inject_discovery_packet(self.switch,*args)
             elif act == 'packet':
-                (concrete_packet) = args
-                self.send_packet(concrete_packet)
+                self.send_packet(*args)
             else:
                 raise TypeError('Bad message type %s' % act)
 
