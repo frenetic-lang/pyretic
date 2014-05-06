@@ -24,7 +24,8 @@ def localized_copy(parent, children, inside_local):
     # lock sharing bugs that would arise otherwise
     elif isinstance(parent, FwdBucket):
         if inside_local:
-            return copy.deepcopy(parent)
+            return parent
+            # return copy.deepcopy(parent)
         else:
             return LocalToGlobalBucket()
     # Combinator policies are re-initialized with the constituent children
@@ -62,7 +63,7 @@ def hackathon_ast_map(fun, policy, inside_local=False):
     """ A total hack. """
     import pyretic.lib.query as query
     children_pols = []
-    current_policy_local = False
+    current_policy_local = inside_local
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -92,6 +93,7 @@ def hackathon_ast_map(fun, policy, inside_local=False):
                                                    inside_local))
     else:
         raise NotImplementedError
+    print policy, inside_local, current_policy_local
     return fun(policy, children_pols, current_policy_local)
 
 

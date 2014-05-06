@@ -1099,8 +1099,8 @@ class DynamicPolicy(DerivedPolicy):
 class LocalDynamicPolicy(DynamicPolicy):
     """ Policies local to just one switches. """
     # (context -> pkt -> (policy * context)) -> context -> policy -> bool -> str
-    def __init__(self, policy=drop):
-        super(LocalDynamicPolicy, self).__init__(policy)
+    def __init__(self):
+        super(LocalDynamicPolicy, self).__init__(policy=drop)
         self.is_local = False
 
     def eval(self, pkt):
@@ -1110,7 +1110,7 @@ class LocalDynamicPolicy(DynamicPolicy):
             return set()
 
     def __repr__(self):
-        return "LocalDynamicPolicy\n%s" % self.policy
+        return "LocalDynamicPolicy %s" % self.policy
 
 
 class DynamicFilter(DynamicPolicy,Filter):
