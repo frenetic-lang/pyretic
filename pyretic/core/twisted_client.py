@@ -8,11 +8,11 @@ import threading
 
 class Client(basic.LineReceiver):
     def connectionMade(self):
-        print "Got client!"
+        print "Got server!"
         self.factory.client = self
 
     def connectionLost(self, reason):
-        print "Lost client!"
+        print "Lost server!"
         self.factory.client = None
         
     def lineReceived(self, line):

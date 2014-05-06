@@ -9,11 +9,11 @@ import threading
 class Server(basic.LineReceiver):
     def connectionMade(self):
         print "Got new client!"
-        self.factory.clients.append(self)
+        self.factory.clients[self] = None
 
     def connectionLost(self, reason):
         print "Lost a client!"
-        self.factory.clients.remove(self)
+        del self.factory.clients[self]
 
     def lineReceived(self, line):
         print line
@@ -23,7 +23,8 @@ class Server(basic.LineReceiver):
 class ServerSocket():
     def __init__ (self, qsend, qrevc):
         self.factory = Factory()
-        self.factory.clients = []
+        self.factory.clients = dict()
+        self.factory.id_to_client = dict()
         self.factory.protocol = Server
         self.factory.qsend = qsend
         self.factory.qrecv = qrevc
@@ -33,8 +34,11 @@ class ServerSocket():
     def dataSent(self, q):
         while True:
             (sid, line) = q.get()
-            self.factory.clients[sid].sendLine(line)
-            print "do ...."
+            try:
+                self.factory.id_to_client[sid].sendLine(line)
+                print "do ...."
+            except KeyError:
+                print 'no client for %d yet' % sid
         
 
 # --- Server ---
