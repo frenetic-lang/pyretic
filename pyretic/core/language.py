@@ -1124,7 +1124,7 @@ class LocalDynamicPolicy(DynamicPolicy):
     """ Policies local to just one switches. """
     # (context -> pkt -> (policy * context)) -> context -> policy -> bool -> str
     def __init__(self):
-        super(LocalDynamicPolicy, self).__init__(policy=drop)
+        super(LocalDynamicPolicy, self).__init__()
         self.is_local = False
 
     def eval(self, pkt):

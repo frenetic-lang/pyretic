@@ -3,7 +3,7 @@ from pyretic.core.language import *
 ###############################################################################
 # Class hierarchy syntax tree traversal
 
-def localized_copy(parent, children, inside_local):
+def localized_copy(parent, children, inside_local, curr_switch):
     """Default mapping function for ast_map, which produces a copy of the input
     policy when provided to ast_map. The semantics of thenew policy that will be
     returned by ast_map() is that it is identical to the original policy from
@@ -16,10 +16,21 @@ def localized_copy(parent, children, inside_local):
     # Leaf-level policies
     if ( parent == identity or
          parent == drop or
-         isinstance(parent,match) or
          isinstance(parent,modify) or
          parent == Controller):
         return copy.deepcopy(parent)
+    elif isinstance(parent, match):
+        if 'switch' in parent.map and parent.map['switch'] == curr_switch:
+            new_match = dict(parent.map)
+            del new_match['switch']
+            if len(new_match.keys()) == 0:
+                return identity
+            else:
+                return match(new_match)
+        elif 'switch' in parent.map and parent.map['switch'] != curr_switch:
+            return drop
+        else:
+            return copy.deepcopy(parent)
     # Queries are special: we return the actual instance directly because of
     # lock sharing bugs that would arise otherwise
     elif isinstance(parent, FwdBucket):
@@ -59,7 +70,7 @@ def localized_copy(parent, children, inside_local):
     else:
         raise NotImplementedError
 
-def hackathon_ast_map(fun, policy, inside_local=False):
+def hackathon_ast_map(fun, policy, curr_switch, inside_local=False):
     """ A total hack. """
     import pyretic.lib.query as query
     children_pols = []
@@ -77,24 +88,27 @@ def hackathon_ast_map(fun, policy, inside_local=False):
           isinstance(policy,sequential) or
           isinstance(policy,intersection)):
         for sub_policy in policy.policies:
-            children_pols.append(hackathon_ast_map(fun, sub_policy, inside_local))
+            children_pols.append(hackathon_ast_map(fun, sub_policy, curr_switch,
+                                                   inside_local))
     elif (isinstance(policy,difference) or
           isinstance(policy,if_) or
           isinstance(policy,fwd) or
           isinstance(policy,xfwd) or
           isinstance(policy,query.packets)):
-        children_pols.append(hackathon_ast_map(fun, policy.policy, inside_local))
+        children_pols.append(hackathon_ast_map(fun, policy.policy, curr_switch,
+                                               inside_local))
     elif isinstance(policy,DynamicPolicy):
         if isinstance(policy, LocalDynamicPolicy):
             current_policy_local = True
-            children_pols.append(hackathon_ast_map(fun, policy.policy, True))
+            children_pols.append(hackathon_ast_map(fun, policy.policy,
+                                                   curr_switch, True))
         else:
             children_pols.append(hackathon_ast_map(fun, policy.policy,
-                                                   inside_local))
+                                                   curr_switch, inside_local))
     else:
         raise NotImplementedError
-    print policy, inside_local, current_policy_local
-    return fun(policy, children_pols, current_policy_local)
+    # print policy, inside_local, current_policy_local
+    return fun(policy, children_pols, current_policy_local, curr_switch)
 
 
 def default_mapper(parent, children):
