@@ -416,8 +416,8 @@ class _match(match):
         self.map = self.translate_virtual_fields()
 
     def generate_classifier(self):
-        r1 = Rule(self,[identity])
-        r2 = Rule(identity,[drop])
+        r1 = Rule(self,{identity})
+        r2 = Rule(identity,set())
         return Classifier([r1, r2])
 
     def eval(self,pkt):
@@ -496,7 +496,7 @@ class _modify(modify):
         self.map = self.translate_virtual_fields()
 
     def generate_classifier(self):
-        r = Rule(identity,[self])
+        r = Rule(identity,{self})
         return Classifier([r])
 
     def eval(self,pkt):
@@ -597,7 +597,7 @@ class PathBucket(FwdBucket):
         self.require_original_pkt = require_original_pkt
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,[self])])
+        return Classifier([Rule(identity,{self})])
 
     def apply(self, original_pkt=None):
         with self.bucket_lock:
