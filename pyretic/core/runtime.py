@@ -69,9 +69,10 @@ class Runtime(object):
             from pyretic.lib.path import pathcomp
             path_policies = path_main(**kwargs)
             self.policy = pathcomp.compile(path_policies, self.policy)
-
-        # Virtual field composition
-        self.policy = virtual_field_tagging() >> self.policy >> virtual_field_untagging()
+            # Virtual field composition
+            self.policy = (virtual_field_tagging() >>
+                           self.policy >>
+                           virtual_field_untagging())
 
         self.mode = mode
         self.backend = backend
