@@ -227,8 +227,17 @@ class Runtime(object):
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             print "Starting compilation..."
+            import cProfile, pstats, StringIO
+            pr = cProfile.Profile()
+            pr.enable()
             classifier = self.policy.compile()
+            pr.disable()
+            s = StringIO.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
             print "Finished compilation. Sending out installs..."
+            print s.getvalue()
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
