@@ -31,7 +31,7 @@ class Rule(object):
         """Based on syntactic equality of policies."""
         return ( id(self) == id(other)
             or ( self.match == other.match
-                 and self.actions == other.actions ) )
+                 and sorted(self.actions) == sorted(other.actions) ) )
 
     def __ne__(self, other):
         """Based on syntactic equality of policies."""

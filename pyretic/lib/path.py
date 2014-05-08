@@ -69,10 +69,7 @@ class classifier_utils(object):
 
     @classmethod
     def __is_not_drop_classifier__(cls, c):
-        for rule in c.rules:
-            if not drop in rule.actions:
-                return True
-        return False
+        return reduce(lambda a, r: a or len(r.actions) > 0, c.rules, False)
 
     @classmethod
     def is_not_drop(cls, p):
@@ -637,8 +634,6 @@ class pathcomp(object):
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
-                print "Got accepting expressions:", ords
-                print "for state", dst
                 for i in ords:
                     bucket = path_list[i].get_bucket()
                     capture += ((match_tag(src) & pred) >> bucket)
