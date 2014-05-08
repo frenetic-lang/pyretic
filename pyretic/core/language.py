@@ -566,12 +566,12 @@ class FwdBucket(Query):
             self.bucket.clear()
     
     def __repr__(self):
-        return "FwdBucket"
+        return "FwdBucket %s" % str(id(self))
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should
         # be on names.
-        return isinstance(other, FwdBucket)
+        return isinstance(other, FwdBucket) and id(self) == id(other)
 
 
 class PathBucket(FwdBucket):
