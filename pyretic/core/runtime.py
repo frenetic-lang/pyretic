@@ -234,7 +234,7 @@ class Runtime(object):
             classifier = self.policy.compile()
             pr.disable()
             s = StringIO.StringIO()
-            sortby = 'cumulative'
+            sortby = 'tottime'
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
             ps.print_stats()
             print "Finished compilation. Sending out installs..."
