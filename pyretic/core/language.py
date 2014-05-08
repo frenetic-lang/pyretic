@@ -45,6 +45,8 @@ from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
 
+NO_CACHE=False
+
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
 tagging_headers = ["vlan_id", "vlan_pcp"]
@@ -84,6 +86,8 @@ class Policy(object):
 
         :rtype: Classifier
         """
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         return self._classifier
 
     def __add__(self, pol):
@@ -212,12 +216,14 @@ class Singleton(Filter):
 
         :rtype: Classifier
         """
+        if NO_CACHE: 
+            self.__class__._classifier = self.generate_classifier()
         if self.__class__._classifier is None:
             self.__class__._classifier = self.generate_classifier()
         return self.__class__._classifier
 
     def generate_classifier(self):
-        return Classifier([Rule(identity, [self])])
+        return Classifier([Rule(identity, {self})])
 
 
 @singleton
@@ -263,6 +269,9 @@ class drop(Singleton):
         :rtype: set Packet
         """
         return set()
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity,set())])
 
     def intersect(self, other):
         return self
@@ -555,7 +564,7 @@ class FwdBucket(Query):
         self._classifier = self.generate_classifier()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,[Controller])])
+        return Classifier([Rule(identity,{Controller})])
 
     def apply(self):
         with self.bucket_lock:
@@ -699,7 +708,7 @@ class CountBucket(Query):
         return output
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,[self])])
+        return Classifier([Rule(identity,{self})])
 
     def apply(self):
         with self.bucket_lock:
@@ -993,6 +1002,8 @@ class CombinatorPolicy(Policy):
 
         :rtype: Classifier
         """
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         if not self._classifier:
             self._classifier = self.generate_classifier()
         return self._classifier
@@ -1027,16 +1038,7 @@ class negate(CombinatorPolicy,Filter):
 
     def generate_classifier(self):
         inner_classifier = self.policies[0].compile()
-        classifier = Classifier([])
-        for r in inner_classifier.rules:
-            action = r.actions[0]
-            if action == identity:
-                classifier.rules.append(Rule(r.match,[drop]))
-            elif action == drop:
-                classifier.rules.append(Rule(r.match,[identity]))
-            else:
-                raise TypeError  # TODO MAKE A CompileError TYPE
-        return classifier
+        return ~inner_classifier
 
 
 class parallel(CombinatorPolicy):
@@ -1242,9 +1244,14 @@ class DerivedPolicy(Policy):
 
         :rtype: Classifier
         """
+        if NO_CACHE: 
+            self._classifier = self.generate_classifier()
         if not self._classifier:
-            self._classifier = self.policy.compile()
+            self._classifier = self.generate_classifier()
         return self._classifier
+
+    def generate_classifier(self):
+        return self.policy.compile()
 
     def __repr__(self):
         return "[DerivedPolicy]\n%s" % repr(self.policy)

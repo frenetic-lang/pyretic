@@ -379,18 +379,8 @@ class Runtime(object):
 
         ### CLASSIFIER TRANSFORMS 
 
-        def remove_drop(classifier):
-            """
-            Removes drop policies from the action list.
-            
-            :param classifier: the input classifer
-            :type classifier: Classifier
-            :returns: the output classifier
-            :rtype: Classifier
-            """
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: a != drop,rule.actions))
-                              for rule in classifier.rules)
+        # TODO (josh) logic for detecting action sets that can't be compiled
+        # e.g., {modify(dstip='10.0.0.1',outport=1),modify(srcip='10.0.0.2',outport=2)]
 
         def remove_identity(classifier):
             """
@@ -401,8 +391,6 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            # DISCUSS (cole): convert identity to inport rather
-            # than drop?
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != identity,rule.actions))
                               for rule in classifier.rules)
@@ -667,6 +655,25 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
+        def check_OF_rules(classifier):
+            def check_OF_rule_has_outport(r):
+                for a in r.actions:
+                    if not 'outport' in a:
+                        raise TypeError('Invalid rule: concrete actions must have an outport',str(r))  
+            def check_OF_rule_has_compilable_action_list(r):
+                if len(r.actions)<2:
+                    pass
+                else:
+                    moded_fields = set(r.actions[0].keys())
+                    for a in r.actions:
+                        fields = set(a.keys())
+                        if fields - moded_fields:
+                            raise TypeError('Non-compilable rule',str(r))  
+            for r in classifier.rules:
+                check_OF_rule_has_outport(r)
+                check_OF_rule_has_compilable_action_list(r)
+            return Classifier(classifier.rules)
+
         def OF_inportize(classifier):
             """
             Specialize classifier to ensure that packets to be forwarded 
@@ -806,6 +813,7 @@ class Runtime(object):
 
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
+            classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
             new_rules = add_version(new_rules, curr_classifier_no)
@@ -941,7 +949,6 @@ class Runtime(object):
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
-        classifier = remove_drop(classifier)
         #classifier = send_drops_to_controller(classifier)
         classifier = remove_identity(classifier)
         classifier = remove_path_buckets(classifier)
