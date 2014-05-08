@@ -12,4 +12,10 @@ def main():
     b2 = FwdBucket()
     b1.register_callback(hello1)
     b2.register_callback(hello2)
-    return flood() + b1 + b2 
+    p = flood() + b1 + b2
+    print p
+    print p.compile()
+    q = flood() + b2 + b1
+    print q
+    print q.compile()
+    return (flood() + b1 + b2)
