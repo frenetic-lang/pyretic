@@ -36,6 +36,7 @@ from functools import wraps
 from multiprocessing import Lock
 from logging import StreamHandler
 import sys
+from ipaddr import IPv4Network, AddressValueError, IPv4Address
 
 
 def singleton(f):
@@ -168,3 +169,24 @@ class QueueStreamHandler(StreamHandler):
     def emit(self, record):
         '''Acquire the lock before emitting the record.'''
         self.queue.put(record)
+
+def string_to_network(ip_str):
+    """ Return an IPv4Network object from a dotted quad IP address/subnet. """
+    try:
+        return IPv4Network(ip_str)
+    except AddressValueError:
+        raise TypeError('Input not a valid IP address!')
+
+def string_to_IP(ip_str):
+    try:
+        return IPv4Address(ip_str)
+    except AddressValueError:
+        raise TypeError('Input not a valid IP address!')
+
+def network_to_string(ip_net):
+    """ Return a dotted quad IP address/subnet from an IPv4Network object. """
+    assert isinstance(ip_net, IPv4Network)
+    if ip_net.prefixlen < 32:
+        return str(ip_net.network) + '/' + str(ip_net.prefixlen)
+    else:
+        return str(ip_net.ip)
