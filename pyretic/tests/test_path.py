@@ -396,13 +396,14 @@ def test_path_compile_2():
                    ((match(path_tag=None) & pred_a) >> modify(path_tag=1)) +
                    ((match(path_tag=None) & pred_b) >> modify(path_tag=1)) +
                    ((match(path_tag=None) & pred_c) >> modify(path_tag=3)) +
-                   ~(pred_a | pred_c | pred_b))
+                   ~(pred_a | pred_b | pred_c))
     ref_capture = (drop +
                    ((match(path_tag=1) & pred_a) >> FwdBucket()) +
                    ((match(path_tag=1) & pred_c) >> FwdBucket()))
     ref_policy = (ref_tagging >> fwding) + ref_capture
 
     [x.compile() for x in [policy, ref_policy]]
+
     assert policy._classifier == ref_policy._classifier
 
 def test_empty_paths():
