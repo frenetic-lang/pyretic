@@ -310,10 +310,20 @@ class match(Filter):
     :param **kwargs: field matches in keyword-argument format
     """
     def __init__(self, *args, **kwargs):
-        #TODO(Josh, Cole): Why this check is here?
-        #if len(args) == 0 and len(kwargs) == 0:
-        #    raise TypeError
-        self.map = util.frozendict(dict(*args, **kwargs))
+
+        def _get_processed_map(*args, **kwargs):
+            map_dict = dict(*args, **kwargs)
+            for field in ['srcip', 'dstip']:
+                try:
+                    val = map_dict[field]
+                    map_dict.update({field: util.string_to_network(val)})
+                except KeyError:
+                    pass
+            return map_dict
+
+        if len(args) == 0 and len(kwargs) == 0:
+            raise TypeError
+        self.map = util.frozendict(_get_processed_map(*args, **kwargs))
         self._classifier = self.generate_classifier()
         super(match,self).__init__()
 
@@ -337,10 +347,12 @@ class match(Filter):
     def intersect(self, pol):
         def _intersect_ip(ipfx, opfx):
             most_specific = None
-            if (IPv4Network(ipfx) in IPv4Network(opfx)):
+            if ipfx in opfx:
                 most_specific = ipfx
-            elif (IPv4Network(opfx) in IPv4Network(ipfx)): 
+            elif opfx in ipfx:
                 most_specific = opfx
+            else:
+                most_specific = None
             return most_specific
 
         if pol == identity:
@@ -398,11 +410,12 @@ class match(Filter):
         if set(self.map.keys()) - set(other.map.keys()):
             return False
         for (f,v) in self.map.items():
+            other_v = other.map[f]
             if (f=='srcip' or f=='dstip'):
-                if(IPv4Network(v) != IPv4Network(other.map[f])):
-                    if(not IPv4Network(other.map[f]) in IPv4Network(v)):
+                if v != other_v:
+                    if not other_v in v:
                         return False
-            elif v != other.map[f]:
+            elif v != other_v:
                 return False
         return True
 
@@ -424,9 +437,14 @@ class _match(match):
         for field, pattern in self.map.iteritems():
             try:
                 v = pkt[field]
-                if pattern is None or pattern != v:
-                    return set()
-            except:
+                if not field in ['srcip', 'dstip']:
+                    if pattern is None or pattern != v:
+                        return set()
+                else:
+                    v = util.string_to_IP(v)
+                    if pattern is None or not v in pattern:
+                        return set()
+            except Exception, e:
                 if pattern is not None:
                     return set()
         return {pkt}
