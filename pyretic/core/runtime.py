@@ -853,21 +853,14 @@ class Runtime(object):
                 pass
         for header in native_headers + content_headers:
             try:
-                val = packet[header]
-                if not header in ['srcip', 'dstip']:
-                    concrete_packet[header] = val
-                else:
-                    concrete_packet[header] = util.string_from_network(val)
-            except:
+                concrete_packet[header] = packet[header]
+            except KeyError:
                 pass
         for header in packet.header:
             try:
                 if header in ['switch', 'inport', 'outport']: next
                 val = packet[header]
-                if not header in ['srcip', 'dstip']:
-                    headers[header] = val
-                else:
-                    headers[header] = util.string_from_network(val)
+                headers[header] = val
             except:
                 pass
         extended_values = extended_values_from(packet)
