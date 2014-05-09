@@ -321,8 +321,6 @@ class match(Filter):
                     pass
             return map_dict
 
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
         self.map = util.frozendict(_get_processed_map(*args, **kwargs))
         self._classifier = self.generate_classifier()
         super(match,self).__init__()
