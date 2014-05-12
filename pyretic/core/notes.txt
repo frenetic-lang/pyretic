@@ -1,0 +1,57 @@
+policy -> policy (i.e., LocalPolicy)
+
+# leaf nodes: both local and global
+id : id
+drop : drop
+match : copy the match.
+modify : copy the modify.
+Controller : Controller
+
+# rooted nodes
+# Derived Policies
+negate : transform the children and re-initialize with new children
+parallel : transform the children and re-initialize with new children
+union : transform the children and re-initialize with new children
+sequential : transform the children and re-initialize with new children
+intersection : transform the children and re-initialize with new children
+
+# other rooted nodes
+# combinator policies
+difference : transform the children and re-initialize with new children
+if_ : transform the children and re-initialize with new children
+fwd : transform the children and re-initialize with new children
+xfwd: transform the children and re-initialize with new children
+
+# not so straightforward
+DynamicPolicy : 
+      
+      if this IS a LocalDyanamicPolicy, then deep copy it and return the copy
+      (return type: LocalDynamicPolicy)
+
+      if NOT LocalDynamicPolicy: transform dp.policy; and return (transformed)
+      dp.policy (return type: type(self.policy)
+
+query.packets : transform the children and re-initialize with new children
+
+FwdBucket : 
+
+      if "inside" of a localDynamicPolicy, leave as is.
+
+      if "outside" of a localDynamicPolicy, replace by a LocalPassthroughQuery
+      with the same callback
+
+everything else:
+raise NotImplementedError
+
+
+============================
+GLOBAL
+policy -> policy
+
+DynamicPolicy:
+      if not LocalDynamicPolicy, then transform self.policy, return copy of self with
+      new policy
+      otherwise, if this IS a LocalDynamicPolicy, then return drop
+
+Everything else: transform children, make a copy, return it
+
