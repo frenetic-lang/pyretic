@@ -227,25 +227,13 @@ class Runtime(object):
             self.clear_all() 
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-            print "Starting compilation..."
-            import cProfile, pstats, StringIO
-            pr = cProfile.Profile()
-            pr.enable()
             classifier = self.policy.compile()
-            pr.disable()
-            s = StringIO.StringIO()
-            sortby = 'tottime'
-            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-            ps.print_stats()
-            print "Finished compilation. Sending out installs..."
-            print s.getvalue()
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
                                               "policy=\n"+repr(self.policy),
                                               "classifier=\n"+repr(classifier)))
             self.install_classifier(classifier)
-            print "Returned from install."
 
 
     def update_dynamic_sub_pols(self):

@@ -234,7 +234,7 @@ class re_tree_gen(object):
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
-        assert isinstance(at, atom)
+        assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
 
         ne_inters   = classifier_utils.has_nonempty_intersection
@@ -349,7 +349,7 @@ class path(Query):
     def __xor__(self, other):
         """Implementation of the path concatenation operator ('^')"""
         assert isinstance(other, path)
-        return path_concat([self, other])
+        return path_concat.smart_concat([self, other])
 
     def __pow__(self, other):
         """ Implementation of the 'concatenate anytime later' operator ('**').
@@ -357,7 +357,7 @@ class path(Query):
         x ** y is just a shorthand for x ^ identity* ^ y.
         """
         assert isinstance(other, path)
-        return path_concat([self, +atom(identity), other])
+        return path_concat.smart_concat([self, +atom(identity), other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
@@ -379,6 +379,22 @@ class path(Query):
         return path_inters([self, other])
 
 
+class path_epsilon(path):
+    """ Empty path object. """
+    def __init__(self):
+        self.re_tree = re_epsilon()
+        super(path_epsilon, self).__init__()
+
+    def __eq__(self, other):
+        if isinstance(other, path_epsilon):
+            return True
+        else:
+            return False
+
+    def __repr__(self):
+        return "path_epsilon"
+
+
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class
     where the token isn't initialized.
@@ -393,12 +409,19 @@ class abstract_atom(path, Filter):
         super(abstract_atom, self).__init__()
 
     def __and__(self, other):
-        assert isinstance(other, type(self))
-        return type(self)(self.policy & other.policy)
+        if isinstance(other, abstract_atom):
+            if not isinstance(other, type(self)):
+                raise TypeError("'&' operator on atoms of different types")
+            return type(self)(self.policy & other.policy)
+        elif isinstance(other, path):
+            return super(abstract_atom, self).__and__(other)
+        else:
+            raise TypeError
 
     def __or__(self, other):
         if isinstance(other, abstract_atom):
-            assert isinstance(other, type(self))
+            if not isinstance(other, type(self)):
+                raise TypeError("'|' operator on atoms of different types")
             return type(self)(self.policy | other.policy)
         elif isinstance(other, path):
             return super(abstract_atom, self).__or__(other)
@@ -415,6 +438,9 @@ class abstract_atom(path, Filter):
     def __eq__(self, other):
         return (type(self) == type(other) and
                 self.policy == other.policy)
+
+    def __repr__(self):
+        return repr(self.policy) + '; expression: ' + self.expr
 
 
 class atom(abstract_atom):
@@ -475,6 +501,8 @@ class hook(abstract_atom):
     def __invert__(self):
         return hook(~(self.policy), self.groupby)
 
+    def __repr__(self):
+        return super(hook, self).__repr__() + '; groupby:' + str(self.groupby)
 
 ### Path combinator classes ###
 
@@ -489,6 +517,19 @@ class path_combinator(path):
                 reduce(lambda acc, (x,y): acc and x == y,
                        zip(self.paths, other.paths),
                        True))
+
+    def __repr_pretty__(self, pre_spaces=''):
+        extra_ind = '    '
+        def get_repr(x):
+            try:
+                return x.__repr_pretty__(pre_spaces + extra_ind)
+            except AttributeError:
+                return pre_spaces + extra_ind + repr(x)
+        repr_paths = map(get_repr, self.paths)
+        return "%s%s:\n%s" % (pre_spaces, self.name(), '\n'.join(repr_paths))
+
+    def __repr__(self):
+        return self.__repr_pretty__()
 
 class path_alternate(path_combinator):
     """ Alternation of paths. """
@@ -531,6 +572,19 @@ class path_concat(path_combinator):
     def __check_type(self, paths):
         for p in paths:
             assert isinstance(p, path)
+
+    @classmethod
+    def smart_concat(cls, paths):
+        new_paths = []
+        for p in paths:
+            if not isinstance(p, path_epsilon):
+                new_paths.append(p)
+        if len(new_paths) > 1:
+            return path_concat(new_paths)
+        elif len(new_paths) == 1:
+            return new_paths[0]
+        else:
+            return path_epsilon()
 
     @property
     def re_tree(self):
