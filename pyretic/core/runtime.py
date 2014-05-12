@@ -275,6 +275,7 @@ class Runtime(object):
                     # TODO(): need a way to send the updated policy to local
                     # controller corresponding to the switch s
                     self.send_to_local_switch(s,'policy', localized_policy)
+                    print "Policy: " + repr(localized_policy)
 
     def update_dynamic_sub_pols(self):
         """
@@ -936,12 +937,15 @@ class Runtime(object):
         ### DISCOVERY PACKETS, DATAPLANE PACKETS
         arg_list = [ i for i in args ] 
         print '---------- send_to_local_switch -------------'
-        self.sq_send.put((switch,[act] + arg_list)) 
-        
+        import pickle
+        to_send = pickle.dumps([act] + arg_list)
+        self.sq_send.put((switch,to_send))
 
     def receive_from_local(self):
         while True:
-            input_list = self.sq_recv.get()            
+            line = self.sq_recv.get() 
+            import pickle
+            input_list = pickle.loads(line)         
             print '------------ receive_from_local ------------'
             print input_list
             act = input_list[0]
@@ -962,11 +966,15 @@ class Runtime(object):
 
     def send_to_global(self,act,*args):
         arg_list = [ i for i in args ] 
-        self.cq_send.put([act] + arg_list)
+        import pickle
+        to_send = pickle.dumps([act] + arg_list)
+        self.cq_send.put(to_send)
 
     def receive_from_global(self):
         while True:
-            input_list = self.cq_recv.get()
+            line = self.cq_recv.get()
+            import pickle
+            input_list = pickle.loads(line)
             act = input_list[0]
             if len(input_list) > 1:
                 args = input_list[1:]
@@ -981,7 +989,8 @@ class Runtime(object):
                 self.policy = args[0]
                 self.update_dynamic_sub_pols()
                 self.update_switch_classifiers()
-                print "policy applied!!!!!!!!"
+                print "policy applied!!!!!!!!" + repr(self.policy)
+                
             else:
                 raise TypeError('Bad message type %s' % act)
 

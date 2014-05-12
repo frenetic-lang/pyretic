@@ -18,9 +18,7 @@ class Client(basic.LineReceiver):
         
     def lineReceived(self, line):
         print '----------- lineReceived ---------'
-        input_list = pickle.loads(line)
-        print input_list
-        self.factory.qrecv.put(input_list)
+        self.factory.qrecv.put(line)
 
 class ClientSocket():
     def __init__ (self, qsend, qrecv):
@@ -35,10 +33,8 @@ class ClientSocket():
     def dataSent(self, q):
         while True:
             to_send_l = q.get()
-            to_send = pickle.dumps(to_send_l)
             print '----------- dataSent --------------'
-            print pickle.loads(to_send)
-            self.factory.client.sendLine(to_send)
+            self.factory.client.sendLine(to_send_l)
 
 
 # --- Client ---
