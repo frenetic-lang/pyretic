@@ -233,6 +233,43 @@ def test13():
     print specialize_main(((+g ^ a) | (b ^ +h)) ^ c, 
                           [pkt1, pkt2, pkt3, pkt4, pkt5])
 
+def test14():
+    cg.clear()
+    g = hook(match(srcip='10.0.0.1'), groupby=['switch'])
+    a = atom(match(dstip='10.0.0.2'))
+    b = atom(match(srcip='10.0.0.1'))
+    h = hook(match(dstip='10.0.0.2'), groupby=['switch'])
+    c = atom(match(srcip='10.0.0.3'))
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 1})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 2})
+    pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 3})
+    pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 4})
+    pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
+    print specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
+                          [pkt1, pkt2, pkt3, pkt4, pkt5])
+
+def test15():
+    cg.clear()
+    g = hook(match(srcip='10.0.0.1'), groupby=['switch'])
+    a = atom(match(dstip='10.0.0.4'))
+    b = atom(match(srcip='10.0.0.1'))
+    h = hook(match(dstip='10.0.0.2'), groupby=['switch'])
+    c = atom(match(srcip='10.0.0.3'))
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 1})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 2})
+    pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 3})
+    pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
+                                'switch': 4})
+    pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
+    print specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
+                          [pkt1, pkt2, pkt3, pkt4, pkt5])
 
 if __name__ == "__main__":
     test1()
@@ -248,4 +285,5 @@ if __name__ == "__main__":
     test11()
     test12()
     test13()
-
+    test14()
+    test15()
