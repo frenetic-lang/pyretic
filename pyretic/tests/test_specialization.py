@@ -23,95 +23,78 @@ def __sp_group__(group_atom, pkt):
     match_dict = {f: pkt[f] for f in groupby}
     return atom(pred & match(match_dict))
 
+def __sp_atom__(ast, c_ast, trj, sp_fun):
+    if len(trj) == 0:
+        return (False, None, [])
+    else:
+        first_pkt = trj[0]
+        pred = ast.policy
+        if len(pred.eval(first_pkt)) > 0:
+            (matches, sp_ast, rem_trj) = __continuation__(c_ast, trj[1:])
+            if matches:
+                return (True, sp_fun(ast, first_pkt) ^ sp_ast, rem_trj)
+            else:
+                return (False, None, [])
+        else:
+            return (False, None, [])
+
+def __sp_combinator__(ast_list, trj, c_ast, map_fun, reduce_fun):
+    assert len(ast_list) > 1
+    results_list = map(lambda p: map_fun(p, trj, c_ast), ast_list)
+    return reduce(reduce_fun, results_list)
+
 def specialize(ast, trj, c_ast):
     if isinstance(ast, atom):
-        if len(trj) == 0:
-            return (False, None, [])
-        else:
-            first_pkt = trj[0]
-            pred = ast.policy
-            if len(pred.eval(first_pkt)) > 0:
-                (matches, sp_ast, rem_trj) = __continuation__(c_ast, trj[1:])
-                if matches:
-                    return (True, ast ^ sp_ast, rem_trj)
-                else:
-                    return (False, None, [])
-            else:
-                return (False, None, [])
+        return __sp_atom__(ast, c_ast, trj, lambda x, y: x)
 
     elif isinstance(ast, hook):
-        # check hook predicate, and specialize
-        if len(trj) == 0:
-            return (False, None, [])
-        else:
-            first_pkt = trj[0]
-            pred = ast.policy
-            if len(pred.eval(first_pkt)) > 0:
-                (matches, sp_ast, rem_trj) = __continuation__(c_ast, trj[1:])
-                if matches:
-                    return (True, (__sp_group__(ast, first_pkt) ^
-                                   sp_ast), rem_trj)
-                else:
-                    return (False, None, [])
-            else:
-                return (False, None, [])
+        return __sp_atom__(ast, c_ast, trj, __sp_group__)
 
     elif isinstance(ast, path_epsilon):
         return __continuation__(c_ast, trj)
 
     elif isinstance(ast, path_concat):
-        paths = ast.paths
-        assert len(paths) > 1
-        p = paths[0]
-        rem_ast = reduce(lambda a, x: a ^ x, paths[1:])
-        (m,sp,rem_trj) = specialize(p, trj, rem_ast ^ c_ast)
-        if m:
-            return (True, sp, rem_trj)
-        else:
-            return (False, None, [])
+        assert len(ast.paths) > 1
+        cont_ast = reduce(lambda a, x: a ^ x, ast.paths[1:] + [c_ast])
+        return specialize(ast.paths[0], trj, cont_ast)
 
     elif isinstance(ast, path_alternate):
-        paths = ast.paths
-        assert len(paths) > 1
-        sp_paths = []
-        final_trj = None
-        matched = False
-        for p in paths:
+        def alter_map_fun(p, trj, c_ast):
             (m, sp, rem_trj) = specialize(p, trj, c_ast)
             if m:
-                matched = True
-                sp_paths.append(sp)
-                if final_trj:
-                    if len(final_trj) < len(rem_trj):
-                        final_trj = rem_trj
-                else:
-                    final_trj = rem_trj
+                return (True, sp, rem_trj)
             else:
-                sp_paths.append(p ^ c_ast)
-        final_sp_path = reduce(lambda a, x: a | x, sp_paths)
-        if matched:
-            return (True, final_sp_path, final_trj)
-        else:
-            return (False, None, [])
+                return (False, p ^ c_ast, [])
+
+        def alter_reduce_fun(acc, res):
+            max_len = lambda a, b: a if len(a) > len(b) else b
+            (m, sp, rem_trj) = acc
+            (m_res, sp_res, rem_trj_res) = res
+            return (m or m_res, sp | sp_res, max_len(rem_trj, rem_trj_res))
+
+        return __sp_combinator__(ast.paths, trj, c_ast,
+                                 alter_map_fun,
+                                 alter_reduce_fun)
+
+    elif isinstance(ast, path_inters):
+        def inters_reduce_fun(acc, res):
+            (m, sp, rem_trj) = acc
+            (m_res, sp_res, rem_trj_res) = res
+            return (m and m_res and rem_trj == rem_trj_res,
+                    sp & sp_res if sp and sp_res else None,
+                    rem_trj)
+
+        return __sp_combinator__(ast.paths, trj, c_ast,
+                                 specialize, inters_reduce_fun)
 
     elif isinstance(ast, path_star):
         assert len(ast.paths) == 1
-        p = ast.paths[0]
-        curr_path = path_epsilon()
-        (match_only_curr,_,_) = specialize(curr_path, trj, path_epsilon())
-        while match_only_curr:
-            (match_cont, sp, rem_trj) = specialize(curr_path, trj, c_ast)
-            if match_cont: # success!
-                return (True, sp, rem_trj)
-            else:
-                curr_path = curr_path ^ p
-                (match_only_curr,_,_) = specialize(curr_path, trj,
-                                                   path_epsilon())
-        assert not match_only_curr
-        return (False, None, [])
-
-    elif isinstance(ast, path_inters):
-        raise NotImplementedError("Intersection not implemented yet.")
+        # use the fact that p* == epsilon | (p ^ p*)
+        (m,sp,rem_trj) = specialize(path_epsilon(), trj, c_ast)
+        if m:
+            return (m, sp, rem_trj)
+        else:
+            return specialize(ast.paths[0], trj, ast ^ c_ast)
 
     elif isinstance(ast, path_negate):
         return NotImplementedError("Negation not implemented yet.")
