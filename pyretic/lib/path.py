@@ -578,7 +578,10 @@ class path_concat(path_combinator):
         new_paths = []
         for p in paths:
             if not isinstance(p, path_epsilon):
-                new_paths.append(p)
+                if not isinstance(p, path_concat):
+                    new_paths.append(p)
+                else:
+                    new_paths += p.paths
         if len(new_paths) > 1:
             return path_concat(new_paths)
         elif len(new_paths) == 1:

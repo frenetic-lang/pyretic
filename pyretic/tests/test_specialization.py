@@ -2,6 +2,7 @@ from pyretic.lib.path import *
 from pyretic.lib.re import *
 from pyretic.core.packet import *
 import copy
+import sys
 
 base_pkt = Packet({'raw': '\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x01\x81\x00\x00\x02\x08\x00E\x00\x00T\x00\x00@\x00@\x01&\xa6\n\x00\x00\x01\n\x00\x00\x03\x08\x00\xe4@\x11\x9e\x00\x01\xf77\x18S\xfd\x91\n\x00\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./01234567', 'switch': 2, 'inport': 1})
 base_pkt = base_pkt.modifymany(get_packet_processor().unpack(base_pkt['raw']))
@@ -109,19 +110,28 @@ def test1():
     cg.clear()
     a = atom(match(srcip='10.0.0.1'))
     pkt = base_pkt.modifymany({'srcip': '10.0.0.1'})
-    print specialize_main(a, [pkt])
+    (m, sp, trj) = specialize_main(a, [pkt])
+    assert m
+    assert sp == atom(match(srcip='10.0.0.1'))
+    assert trj == []
 
 def test2():
     cg.clear()
     a = atom(match(srcip='10.0.0.1'))
     pkt = base_pkt.modifymany({'srcip': '10.0.0.2'})
-    print specialize_main(a, [pkt])
+    (m, sp, trj) = specialize_main(a, [pkt])
+    assert not m
+    assert not sp
+    assert trj == []
 
 def test3():
     cg.clear()
     a = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
     pkt = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
-    print specialize_main(a, [pkt])
+    (m, sp, trj) = specialize_main(a, [pkt])
+    assert m
+    assert sp == atom(match(srcip='10.0.0.1', dstip='10.0.0.2'))
+    assert trj == []
 
 def test4():
     cg.clear()
@@ -129,7 +139,11 @@ def test4():
     b = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1'})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
-    print specialize_main(a ^ b, [pkt1, pkt2])
+    (m, sp, trj) = specialize_main(a ^ b, [pkt1, pkt2])
+    assert m
+    assert sp == (atom(match(srcip='10.0.0.1')) ^
+                  atom(match(srcip='10.0.0.1', dstip='10.0.0.2')))
+    assert trj == []
 
 def test5():
     cg.clear()
@@ -139,11 +153,19 @@ def test5():
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1'})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
     pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1'})
-    print specialize_main(a ^ b ^ c, [pkt1, pkt2, pkt3])
+    (m, sp, trj) = specialize_main(a ^ b ^ c, [pkt1, pkt2, pkt3])
+    assert m
+    assert sp == (atom(match(srcip='10.0.0.1')) ^
+                  atom(match(srcip='10.0.0.1', dstip='10.0.0.2')) ^
+                  atom(match(srcip='10.0.0.1')))
+    assert trj == []
 
 def test6():
     cg.clear()
-    print specialize_main(path_epsilon(), [base_pkt])
+    (m, sp, trj) = specialize_main(path_epsilon(), [base_pkt])
+    assert m
+    assert sp == path_epsilon()
+    assert trj == [base_pkt]
 
 def test7():
     cg.clear()
@@ -155,7 +177,12 @@ def test7():
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2', 'dstip': '10.0.0.1'})
     pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1'})
-    print specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
+    (m, sp, trj) = specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
+    assert m
+    f = atom(match(srcip='10.0.0.1', dstip='10.0.0.2'))
+    g = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
+    assert sp == (a ^ g ^ e) | (f ^ d ^ e)
+    assert trj == []
 
 def test8():
     cg.clear()
@@ -167,7 +194,11 @@ def test8():
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2', 'dstip': '10.0.0.1'})
     pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1'})
-    print specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
+    (m, sp, trj) = specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
+    b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
+    assert m
+    assert sp == (a ^ b_sp ^ e) | (c ^ d ^ e)
+    assert trj == []
 
 def test9():
     cg.clear()
@@ -178,14 +209,24 @@ def test9():
     pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 3})
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.2'})
-    print specialize_main(+g ^ a, [pkt1, pkt2, pkt3, pkt4, pkt5])
+    (m, sp, trj) = specialize_main(+g ^ a, [pkt1, pkt2, pkt3, pkt4, pkt5])
+    assert m
+    g1 = atom(match(srcip='10.0.0.1', switch=1))
+    g2 = atom(match(srcip='10.0.0.1', switch=2))
+    g3 = atom(match(srcip='10.0.0.1', switch=3))
+    g4 = atom(match(srcip='10.0.0.1', switch=4))
+    assert sp == g1 ^ g2 ^ g3 ^ g4 ^ a
+    assert trj == []
 
 def test10():
     cg.clear()
     g = hook(match(srcip='10.0.0.1'), groupby=['switch'])
     a = atom(match(srcip='10.0.0.2'))
     pkt = base_pkt.modifymany({'srcip': '10.0.0.2'})
-    print specialize_main(+g ^ a, [pkt])
+    (m, sp, trj) = specialize_main(+g ^ a, [pkt])
+    assert m
+    assert sp == a
+    assert trj == []
 
 def test11():
     cg.clear()
@@ -193,7 +234,10 @@ def test11():
     a = atom(match(srcip='10.0.0.3'))
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch':1})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2'})
-    print specialize_main(+g ^ a, [pkt1, pkt2])
+    (m, sp, trj) = specialize_main(+g ^ a, [pkt1, pkt2])
+    assert not m
+    assert not sp
+    assert not trj
 
 def test12():
     cg.clear()
@@ -211,8 +255,17 @@ def test12():
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
                                 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
-    print specialize_main(((+g ^ a) | (b ^ +h)) ^ c, 
-                          [pkt1, pkt2, pkt3, pkt4, pkt5])
+    (m, sp, trj) = specialize_main(((+g ^ a) | (b ^ +h)) ^ c, 
+                                   [pkt1, pkt2, pkt3, pkt4, pkt5])
+    assert m
+    g1 = atom(match(srcip='10.0.0.1', switch=1))
+    g2 = atom(match(srcip='10.0.0.1', switch=2))
+    g3 = atom(match(srcip='10.0.0.1', switch=3))
+    h2 = atom(match(dstip='10.0.0.2', switch=2))
+    h3 = atom(match(dstip='10.0.0.2', switch=3))
+    h4 = atom(match(dstip='10.0.0.2', switch=4))
+    assert sp == (g1 ^ g2 ^ g3 ^ a ^ c) | (b ^ h2 ^ h3 ^ h4 ^ c)
+    assert trj == []
 
 def test13():
     cg.clear()
@@ -230,8 +283,14 @@ def test13():
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
                                 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
-    print specialize_main(((+g ^ a) | (b ^ +h)) ^ c, 
-                          [pkt1, pkt2, pkt3, pkt4, pkt5])
+    (m, sp, trj) = specialize_main(((+g ^ a) | (b ^ +h)) ^ c, 
+                                   [pkt1, pkt2, pkt3, pkt4, pkt5])
+    assert m
+    h2 = atom(match(dstip='10.0.0.2', switch=2))
+    h3 = atom(match(dstip='10.0.0.2', switch=3))
+    h4 = atom(match(dstip='10.0.0.2', switch=4))
+    assert sp == (+g ^ a ^ c) | (b ^ h2 ^ h3 ^ h4 ^ c)
+    assert trj == []
 
 def test14():
     cg.clear()
@@ -249,8 +308,17 @@ def test14():
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
                                 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
-    print specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
-                          [pkt1, pkt2, pkt3, pkt4, pkt5])
+    (m, sp, trj) = specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
+                                   [pkt1, pkt2, pkt3, pkt4, pkt5])
+    assert m
+    g1 = atom(match(srcip='10.0.0.1', switch=1))
+    g2 = atom(match(srcip='10.0.0.1', switch=2))
+    g3 = atom(match(srcip='10.0.0.1', switch=3))
+    h2 = atom(match(dstip='10.0.0.2', switch=2))
+    h3 = atom(match(dstip='10.0.0.2', switch=3))
+    h4 = atom(match(dstip='10.0.0.2', switch=4))
+    assert sp == (g1 ^ g2 ^ g3 ^ a ^ c) & (b ^ h2 ^ h3 ^ h4 ^ c)
+    assert trj == []
 
 def test15():
     cg.clear()
@@ -268,8 +336,47 @@ def test15():
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2',
                                 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.3'})
-    print specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
-                          [pkt1, pkt2, pkt3, pkt4, pkt5])
+    (m, sp, trj) = specialize_main(((+g ^ a) & (b ^ +h)) ^ c,
+                                   [pkt1, pkt2, pkt3, pkt4, pkt5])
+    assert not m
+    assert not sp
+    assert not trj
+
+def test16():
+    cg.clear()
+    a = atom(match(srcip='10.0.0.1'))
+    b = hook(match(srcip='10.0.0.2'), groupby=['dstip'])
+    c = hook(match(srcip='10.0.0.2'), groupby=['dstip'])
+    d = atom(match(srcip='10.0.0.1'))
+    e = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.2'})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2', 'dstip': '10.0.0.1'})
+    pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1', 'dstip': '10.0.0.3'})
+    (m, sp, trj) = specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
+    b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
+    e_sp = atom(match(srcip='10.0.0.1', dstip='10.0.0.3'))
+    assert m
+    assert sp == (a ^ b_sp ^ e_sp) | (c ^ d ^ e)
+    assert trj == []
+
+def test17():
+    cg.clear()
+    g = hook(match(srcip='10.0.0.1'), groupby=['switch'])
+    a = atom(match(srcip='10.0.0.2'))
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 1})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 2})
+    pkt3 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 3})
+    pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 4})
+    pkt5 = base_pkt.modifymany({'srcip': '10.0.0.2'})
+    pkt6 = base_pkt
+    (m, sp, trj) = specialize_main(+g ^ a, [pkt1, pkt2, pkt3, pkt4, pkt5, pkt6])
+    assert m
+    g1 = atom(match(srcip='10.0.0.1', switch=1))
+    g2 = atom(match(srcip='10.0.0.1', switch=2))
+    g3 = atom(match(srcip='10.0.0.1', switch=3))
+    g4 = atom(match(srcip='10.0.0.1', switch=4))
+    assert sp == g1 ^ g2 ^ g3 ^ g4 ^ a
+    assert trj == [pkt6]
 
 if __name__ == "__main__":
     test1()
@@ -287,3 +394,5 @@ if __name__ == "__main__":
     test13()
     test14()
     test15()
+    test16()
+    test17()
