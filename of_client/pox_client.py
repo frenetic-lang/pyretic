@@ -40,6 +40,8 @@ from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
 
+import time
+
 def inport_value_hack(outport):
     if outport > 1:
         return 1
@@ -59,6 +61,8 @@ class BackendChannel(asynchat.async_chat):
         self.ac_in_buffer_size = 4096 * 3
         self.ac_out_buffer_size = 4096 * 3
         self.set_terminator(TERM_CHAR)
+        self.start_time = 0
+        self.interval = 0
         return
 
     def handle_connect(self):
@@ -89,8 +93,14 @@ class BackendChannel(asynchat.async_chat):
         with self.of_client.channel_lock:
             msg = deserialize(self.received_data)
 
+        # Set up time for starting rule installs.
+        if msg[0] == 'reset_install_time':
+            self.start_time = time.time()
+            print "Last rule interval:", self.interval
+            self.interval = 0
+
         # USE DESERIALIZED MSG
-        if msg[0] == 'inject_discovery_packet':
+        elif msg[0] == 'inject_discovery_packet':
             switch = msg[1]
             port = msg[2]
             self.of_client.inject_discovery_packet(switch,port)
@@ -106,6 +116,7 @@ class BackendChannel(asynchat.async_chat):
                 self.of_client.install_flow(pred,priority,actions,cookie)
             else:
                 self.of_client.modify_flow(pred,priority,actions,cookie)
+            self.interval = time.time() - self.start_time
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
             priority = int(msg[2])
@@ -131,6 +142,7 @@ class POXClient(revent.EventMixin):
         self.debug_packet_in = debug_packet_in
         self.packetno = 0
         self.channel_lock = threading.Lock()
+        self.send_time = 0.0
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)

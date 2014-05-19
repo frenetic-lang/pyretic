@@ -936,6 +936,7 @@ class Runtime(object):
         ### PROCESS THAT DOES INSTALL
 
         def f(diff_lists,curr_version_no):
+            self.send_reset_install_time()
             with self.switch_lock:
                 install_diff_lists(diff_lists,curr_version_no)
 
@@ -1113,6 +1114,9 @@ class Runtime(object):
 #######################
 # TO OPENFLOW         
 #######################
+
+    def send_reset_install_time(self):
+        self.backend.send_reset_install_time()
 
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)

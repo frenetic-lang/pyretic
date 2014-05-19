@@ -132,7 +132,10 @@ class Backend(object):
         self.al = self.asyncore_loop()
         self.al.daemon = True
         self.al.start()
-        
+
+    def send_reset_install_time(self):
+        self.send_to_OF_client(['reset_install_time'])
+
     def send_packet(self,packet):
         self.send_to_OF_client(['packet',packet])
 
