@@ -47,6 +47,7 @@ from datetime import datetime
 ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
+ip4 = IPAddr('10.0.0.4')
 
 static_fwding_chain_2_2 = (
     (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
@@ -199,10 +200,80 @@ def path_test_15():
 def path_test_16():
     return path_test_13() + path_test_14() + path_test_15()
 
+static_fwding_cycle_4_4_spanning_tree_1 = (
+    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                          (match(switch=2) >> fwd(1)) +
+                          (match(switch=3) >> fwd(1)) +
+                          (match(switch=4) >> fwd(1)))) +
+    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(3)) +
+                          (match(switch=3) >> fwd(1)) +
+                          (match(switch=4) >> fwd(1)))) +
+    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(3)) +
+                          (match(switch=4) >> fwd(1)))) +
+    (match(dstip=ip4) >> ((match(switch=1) >> fwd(1)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(2)) +
+                          (match(switch=4) >> fwd(3))))
+    )
+
+static_fwding_cycle_4_4_spanning_tree_2 = (
+    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(2)) +
+                          (match(switch=4) >> fwd(2)))) +
+    (match(dstip=ip2) >> ((match(switch=1) >> fwd(2)) +
+                          (match(switch=2) >> fwd(3)) +
+                          (match(switch=3) >> fwd(1)) +
+                          (match(switch=4) >> fwd(1)))) +
+    (match(dstip=ip3) >> ((match(switch=1) >> fwd(2)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(3)) +
+                          (match(switch=4) >> fwd(1)))) +
+    (match(dstip=ip4) >> ((match(switch=1) >> fwd(2)) +
+                          (match(switch=2) >> fwd(2)) +
+                          (match(switch=3) >> fwd(2)) +
+                          (match(switch=4) >> fwd(3))))
+    )
+
+def path_test_waypoint_violation():
+    """ This examples relies on the cycle,4,4 topology. Use one of the spanning
+    tree forwarding policies static_fwding_cycle_4_4_spanning_tree_{1|2} as the
+    main forwarding policy. S4 is a designed firewall switch, which must lie on
+    the trajectory of any packet entering and leaving the network. We try and
+    install a query below that catches packets between S1 and S3 that violate
+    this waypoint constraint.
+
+    Expected behaviour:
+
+    With static_fwding_cycle_4_4_spanning_tree_1, packets between h1 and h3 do
+    not go through S4, hence triggering callbacks as they hit S3/S1.
+
+    With static_fwding_cycle_4_4_spanning_tree_2, no callbacks are triggered for
+    packets between h1 and h3.
+
+    As such the query can be generalized to detect _all_ waypoint violations:
+
+    in_atom(ingress()) ^ +in_atom(~match(switch=4)) ^ out_atom(egress())
+
+    TODO(ngsrinivas): generalize query as above once out_atom is implemented in
+    full generality. =)
+    """
+    a = atom(match(switch=1))
+    b = atom(~match(switch=4))
+    c = atom(match(switch=3))
+    i = atom(identity)
+    p = (a ^ +b ^ c) | (c ^ +b ^ a)
+    p.register_callback(query_callback(16))
+    return [p]
+
 # type: unit -> path list
 def path_main():
-    return path_test_3()
+    return path_test_waypoint_violation()
 
 def main():
 #    return mac_learner()
-    return static_fwding_chain_3_3
+#    return static_fwding_chain_3_3
+    return static_fwding_cycle_4_4_spanning_tree_1
