@@ -3,6 +3,7 @@ from pyretic.lib.re import *
 from pyretic.core.packet import *
 import copy
 import sys
+import time
 
 base_pkt = Packet({'raw': '\x00\x00\x00\x00\x00\x03\x00\x00\x00\x00\x00\x01\x81\x00\x00\x02\x08\x00E\x00\x00T\x00\x00@\x00@\x01&\xa6\n\x00\x00\x01\n\x00\x00\x03\x08\x00\xe4@\x11\x9e\x00\x01\xf77\x18S\xfd\x91\n\x00\x08\t\n\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f !"#$%&\'()*+,-./01234567', 'switch': 2, 'inport': 1})
 base_pkt = base_pkt.modifymany(get_packet_processor().unpack(base_pkt['raw']))
@@ -378,6 +379,34 @@ def test17():
     assert sp == g1 ^ g2 ^ g3 ^ g4 ^ a
     assert trj == [pkt6]
 
+def test18():
+    cg.clear()
+    (m, sp, trj) = specialize_main(+path_epsilon(), [base_pkt])
+    assert m
+    assert sp == path_epsilon()
+    assert trj == [base_pkt]
+
+def test19():
+    cg.clear()
+    (m, sp, trj) = specialize_main(+path_epsilon(), [])
+    assert m
+    assert sp == path_epsilon()
+    assert trj == []
+
+def test20():
+    a = atom(match(srcip='10.0.0.1'))
+    b = atom(match(srcip='10.0.0.2'))
+    p = +(path_epsilon() | a) ^ b
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1'})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2'})
+    # this will fail with an infinite loop as of now.
+    print "About to start buggy infinite loop:"
+    time.sleep(2)
+    (m, sp, trj) = specialize_main(p, [pkt1, pkt2])
+    assert m
+    assert sp == (path_epsilon() | a) ^ b # this needs to change
+    assert trj == []
+
 if __name__ == "__main__":
     test1()
     test2()
@@ -396,3 +425,6 @@ if __name__ == "__main__":
     test15()
     test16()
     test17()
+    test18()
+    test19()
+    test20()
