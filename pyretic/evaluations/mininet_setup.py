@@ -7,6 +7,7 @@ from mininet.cli import CLI
 from extratopos import *
 import subprocess, shlex, time, signal, os, sys
 from threading import Timer
+import time
 import argparse
 
 ################################################################################
@@ -245,22 +246,18 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
                     per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
                     "&")
         else:
-            print ("Setting transfer", src, '--->', hosts_dst[i], "to very low"
-                   + "bandwidth, because the target input bandwidth is zero.")
-            transfer_bandwidth = "1.5K"
-            src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
-                    hosts_dst[i].IP() + " -u -p 5002 -i 5 -b " +
-                    transfer_bandwidth + " 2>&1 > " + src_client_file +
-                    "&")
+            print ("Avoiding transfer", src, '--->', hosts_dst[i], "because the"
+                   + "target input bandwidth is zero.")
     print "Client transfers initiated."
 
 def setup_overhead_statistics_global(overheads_filter, overheads_file,
                                      test_duration_sec, slack):
     cmd = ("tshark -q -i lo -z io,stat,0,'" + overheads_filter + "' -f " +
-           "'tcp port 6633'")
+           "'tcp port 6633' -a duration:" + str(test_duration_sec))
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
+    print '--->', cmd
     return ([p], [f])
 
 def run_tshark_full_traffic_measurement(internal_ints, external_ints,
@@ -277,8 +274,9 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
         return reduce(lambda r, intr: r + "-i " + intr + " ", intr_list, ' ')
 
     def get_tshark_cmd_file(interfaces, file_suffix):
-        cmd = ("tshark -q " + get_interfaces(interfaces) +
-               " -z io,stat,0")
+        cmd = ("tshark -f inbound -q " + get_interfaces(interfaces) +
+               " -z io,stat,0 -a duration:" + str(test_duration_sec))
+        print '--->', cmd
         fname = total_traffic_prefix + file_suffix
         return (cmd, fname)
 
@@ -295,9 +293,8 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
                                               stderr=subprocess.STDOUT))
         return processes, out_fds
 
-    (cmd_once,  file_once)  = get_tshark_cmd_file(external_ints,  '-once.txt')
-    (cmd_twice, file_twice) = get_tshark_cmd_file(internal_ints, '-twice.txt')
-    return get_fds_processes([cmd_once, cmd_twice], [file_once, file_twice])
+    (cmd, f) = get_tshark_cmd_file(external_ints + internal_ints, '.txt')
+    return get_fds_processes([cmd], [f])
 
 ################################################################################
 ### The main function.
@@ -319,7 +316,7 @@ def query_test():
     test = args.test
 
     # Global parameters not used elsewhere outside this function
-    overheads_file = adjust_path("tshark_output.txt")
+    overheads_file = adjust_path("overhead-traffic.txt")
     c_out = adjust_path("pyretic-stdout.txt")
     c_err = adjust_path("pyretic-stderr.txt")
     iperf_client_prefix = adjust_path("client-udp")
@@ -343,14 +340,15 @@ def query_test():
     print "Setting up topology"
     (net, hosts, switches) = setup_network(test, args)
 
+    print "Setting up workload configuration"
+    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, args, hosts)
+
     print "Setting up handlers for graceful experiment abort"
     tshark = None
     switch_stats = None
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
-                                                   tshark, switch_stats, net))
-
-    print "Setting up workload configuration"
-    (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, args, hosts)
+                                                   tshark, switch_stats, net,
+                                                   hosts_dst))
 
     print "Setting up switch rules"
     if controller_debug_mode:
@@ -366,7 +364,8 @@ def query_test():
 
     print "Resetting abort handler to tackle overhead stats"
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
-                                                   tshark, switch_stats, net))
+                                                   tshark, switch_stats, net,
+                                                   hosts_dst))
 
     # print "Testing network connectivity"
     # ping_flow_pairs(net, hosts_src, hosts_dst)
@@ -384,7 +383,7 @@ def query_test():
     print "Writing down experiment parameters for successful completion"
     write_expt_settings(args, params_file)
 
-    finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
+    finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst)
 
     if controller_debug_mode:
         CLI(net)
@@ -404,7 +403,7 @@ def write_expt_settings(params, params_file):
         f.write(k + " " + str(params_dict[k]) + "\n")
     f.close()
 
-def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
+def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst):
     def close_fds(fds, fd_str):
         for fd in fds:
             fd.close()
@@ -427,14 +426,19 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net):
         for p in procs:
             kill_process(p, "tshark switch statistics collection")
         close_fds(fds, "switch statistics")
+    # kill iperf servers
+    for h in hosts_dst:
+        h.cmd("killall iperf")
     # mininet network
     if not controller_debug_mode:
         net.stop()
         print "Killed mininet network"
 
-def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net):
+def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net,
+                      hosts_dst):
     def abort_handler(signum, frame):
-        finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net)
+        finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net,
+                  hosts_dst)
         sys.exit(0)
     return abort_handler
 

@@ -62,7 +62,8 @@ def sweep_waypoint_fractions(args):
 
     sweep(args,
           "waypoint",
-          map(lambda i: str(0.10 * i), range(1,11)),
+          # map(lambda i: str(0.10 * i), range(1,11)),
+          map(lambda i: str(0.50 * i), range(0,3)),
           "waypoint violating fraction",
           mininet_waypoint_test_params,
           ["h1"],
@@ -245,17 +246,15 @@ def get_single_run_stats(results_folder, queried_hosts):
     specific output files which this function understands.
     """
     adjust_path = get_adjust_path(results_folder)
-    overheads_file = adjust_path("tshark_output.txt")
+    overheads_file = adjust_path("overhead-traffic.txt")
     total_traffic_prefix = adjust_path("total-traffic")
-    once_file  = total_traffic_prefix + '-once.txt'
-    twice_file = total_traffic_prefix + '-twice.txt'
+    total_traffic_file = total_traffic_prefix + '.txt'
     iperf_client_prefix = adjust_path("client-udp")
     pyretic_stderr = adjust_path("pyretic-stderr.txt")
 
     if not has_pyretic_error(pyretic_stderr):
         ovhead_bytes = get_tshark_bytes(overheads_file)
-        total_bytes = (get_tshark_bytes(once_file) +
-                       (get_tshark_bytes(twice_file)/2.0))
+        total_bytes = get_tshark_bytes(total_traffic_file)
         queried_bytes = 0
         for host in queried_hosts:
             client_file = iperf_client_prefix + '-' + host + '.txt'
