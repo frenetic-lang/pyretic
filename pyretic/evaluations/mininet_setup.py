@@ -237,17 +237,18 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
     print "Finished starting up iperf servers..."
 
     # start iperf client transfers
+    iperf_min = 1.63 * 1000 * 8
     for i in range(0, len(hosts_src)):
         src = hosts_src[i]
         src_client_file = client_prefix + '-' + src.name + '.txt'
-        if per_transfer_bandwidth[i] > 0.0:
+        if int(per_transfer_bandwidth[i]) >= iperf_min:
             src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
                     hosts_dst[i].IP() + " -u -p 5002 -b " +
                     per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
                     "&")
         else:
-            print ("Avoiding transfer", src, '--->', hosts_dst[i], "because the"
-                   + "target input bandwidth is zero.")
+            print ("Avoiding transfer %s ---> %s because target bandwidth is too"
+                   " low" % (src.name, hosts_dst[i].name))
     print "Client transfers initiated."
 
 def setup_overhead_statistics_global(overheads_filter, overheads_file,
