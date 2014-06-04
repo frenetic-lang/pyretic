@@ -966,6 +966,8 @@ class Runtime(object):
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
+        print "Number of rules in classifier:", len(new_rules)
+        print new_rules
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
