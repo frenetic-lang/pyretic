@@ -63,6 +63,7 @@ class BackendChannel(asynchat.async_chat):
         self.set_terminator(TERM_CHAR)
         self.start_time = 0
         self.interval = 0
+        self.total_interval = 0
         return
 
     def handle_connect(self):
@@ -96,7 +97,9 @@ class BackendChannel(asynchat.async_chat):
         # Set up time for starting rule installs.
         if msg[0] == 'reset_install_time':
             self.start_time = time.time()
-            print "Last rule interval:", self.interval
+            print "[path_queries] Last rule interval:", self.interval,
+            self.total_interval += self.interval
+            print "total:", self.total_interval
             self.interval = 0
 
         # USE DESERIALIZED MSG

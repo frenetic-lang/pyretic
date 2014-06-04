@@ -973,7 +973,6 @@ class Runtime(object):
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
         print "[path_queries] Number of rules in classifier:", len(new_rules)
-        print new_rules
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
