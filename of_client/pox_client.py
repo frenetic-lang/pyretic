@@ -64,6 +64,7 @@ class BackendChannel(asynchat.async_chat):
         self.start_time = 0
         self.interval = 0
         self.total_interval = 0
+        self.num_intervals  = 0
         return
 
     def handle_connect(self):
@@ -99,7 +100,9 @@ class BackendChannel(asynchat.async_chat):
             self.start_time = time.time()
             print "[path_queries] Last rule interval:", self.interval,
             self.total_interval += self.interval
-            print "total:", self.total_interval
+            self.num_intervals  += 1
+            print "total:", self.total_interval,
+            print "num:", self.num_intervals
             self.interval = 0
 
         # USE DESERIALIZED MSG

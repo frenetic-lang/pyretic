@@ -103,6 +103,7 @@ class Runtime(object):
         self.classifier_version_lock = Lock()
         self.default_cookie = 0
         self.packet_in_time = 0
+        self.num_packet_ins = 0
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -124,6 +125,7 @@ class Runtime(object):
         :type limit: payload of an OpenFlow packet_in message.
         """
         start_time = time.time()
+        self.num_packet_ins += 1
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
@@ -153,7 +155,8 @@ class Runtime(object):
         map(self.send_packet,concrete_output)
 
         self.packet_in_time += (time.time() - start_time)
-        print "[path_queries] handle_packet_in cumulative:", self.packet_in_time
+        print "[path_queries] handle_packet_in cumulative:", self.packet_in_time,
+        print self.num_packet_ins
 
         # if in reactive mode and no packets are forwarded to buckets, install microflow
         # Note: lack of forwarding to bucket implies no bucket-trigger update could have occured
