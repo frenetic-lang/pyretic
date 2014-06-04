@@ -910,12 +910,18 @@ class Runtime(object):
             switches = switch_to_attrs.keys()
 
             # If the controller just came up, clear out the switches.
-            if classifier_version_no == 1:
+            if classifier_version_no == 1 or self.mode == 'proactive0':
                 for s in switches:
                     self.send_barrier(s)
                     self.send_clear(s)
                     self.send_barrier(s)
                     self.install_defaults(s)
+
+            # There's no need to delete rules if nuclear install:
+            if self.mode == 'proactive0':
+                to_delete = list()
+                to_modify = list()
+                to_stay   = list()
 
             if to_delete:
                 for rule in to_delete:
@@ -966,7 +972,7 @@ class Runtime(object):
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
-        print "Number of rules in classifier:", len(new_rules)
+        print "[path_queries] Number of rules in classifier:", len(new_rules)
         print new_rules
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
