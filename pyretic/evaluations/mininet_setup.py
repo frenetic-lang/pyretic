@@ -426,9 +426,6 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst)
         for p in procs:
             kill_process(p, "tshark switch statistics collection")
         close_fds(fds, "switch statistics")
-    # kill iperf servers
-    for h in hosts_dst:
-        h.cmd("killall iperf")
     # mininet network
     if not controller_debug_mode:
         net.stop()
