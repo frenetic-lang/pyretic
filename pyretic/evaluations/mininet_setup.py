@@ -294,8 +294,9 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
                                               stderr=subprocess.STDOUT))
         return processes, out_fds
 
-    (cmd, f) = get_tshark_cmd_file(external_ints + internal_ints, '.txt')
-    return get_fds_processes([cmd], [f])
+    (cmd_ext, f_ext) = get_tshark_cmd_file(external_ints, '-ext.txt')
+    (cmd_int, f_int) = get_tshark_cmd_file(internal_ints, '-int.txt')
+    return get_fds_processes([cmd_ext, cmd_int], [f_ext, f_int])
 
 ################################################################################
 ### The main function.
@@ -345,11 +346,11 @@ def query_test():
     (hosts_src, hosts_dst, per_flow_bw) = setup_workload(test, args, hosts)
 
     print "Setting up handlers for graceful experiment abort"
-    tshark = None
+    ovhead_stats = None
     switch_stats = None
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
-                                                   tshark, switch_stats, net,
-                                                   hosts_dst))
+                                                   ovhead_stats, switch_stats,
+                                                   net, hosts_dst))
 
     print "Setting up switch rules"
     if controller_debug_mode:
@@ -357,16 +358,17 @@ def query_test():
     wait_switch_rules_installed(switches)
 
     print "Setting up overhead statistics measurements"
-    tshark = setup_overhead_statistics(test, overheads_file, test_duration_sec,
-                                       slack_factor)
+    ovhead_stats = setup_overhead_statistics(test, overheads_file,
+                                             test_duration_sec,
+                                             slack_factor)
 
     print "Setting up collectors for total traffic"
     switch_stats = setup_full_traffic_measurement(test, args, switches)
 
     print "Resetting abort handler to tackle overhead stats"
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
-                                                   tshark, switch_stats, net,
-                                                   hosts_dst))
+                                                   ovhead_stats, switch_stats,
+                                                   net, hosts_dst))
 
     # print "Testing network connectivity"
     # ping_flow_pairs(net, hosts_src, hosts_dst)
@@ -384,7 +386,8 @@ def query_test():
     print "Writing down experiment parameters for successful completion"
     write_expt_settings(args, params_file)
 
-    finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst)
+    finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats, net,
+              hosts_dst)
 
     if controller_debug_mode:
         CLI(net)
@@ -404,7 +407,8 @@ def write_expt_settings(params, params_file):
         f.write(k + " " + str(params_dict[k]) + "\n")
     f.close()
 
-def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst):
+def finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats, net,
+              hosts_dst):
     def close_fds(fds, fd_str):
         for fd in fds:
             fd.close()
@@ -417,8 +421,8 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst)
         kill_process(p, "controller")
         close_fds(fds, "controller")
     # overhead statistics tshark
-    if tshark:
-        ([p], fds) = tshark
+    if ovhead_stats:
+        ([p], fds) = ovhead_stats
         kill_process(p, "tshark overhead statistics collection")
         close_fds(fds, "overhead statistics")
     # switch statistics
@@ -432,11 +436,11 @@ def finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net, hosts_dst)
         net.stop()
         print "Killed mininet network"
 
-def get_abort_handler(controller_debug_mode, ctlr, tshark, switch_stats, net,
-                      hosts_dst):
+def get_abort_handler(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
+                      net, hosts_dst):
     def abort_handler(signum, frame):
-        finish_up(controller_debug_mode, ctlr, tshark, switch_stats, net,
-                  hosts_dst)
+        finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
+                  net, hosts_dst)
         sys.exit(0)
     return abort_handler
 
