@@ -61,6 +61,16 @@ def setup_overhead_statistics(test, overheads_file, test_duration_sec, slack):
         print "Unknown test case for overhead statistics measurement!"
         sys.exit(0)
 
+def setup_optimal_overheads_global(test, optimal_prefix, test_duration_sec,
+                                   slack):
+    if test == "waypoint":
+        return setup_waypoint_optimal_overheads(optimal_prefix,
+                                                 test_duration_sec, slack)
+    elif test == "tm":
+        return None
+    else:
+        print "Unknown test case for optimal overhead statistics measurement!"
+
 ### Helper functions for getting hosts and switches from a network
 def get_hosts(net, num_hosts):
     """ Get a list of host objects from the network object """
@@ -166,6 +176,15 @@ def setup_waypoint_full_traffic_measurement(params,
                                                test_duration_sec,
                                                total_traffic_prefix, slack)
 
+def setup_waypoint_optimal_overheads(optimal_prefix, test_duration_sec, slack):
+    """ Setup tshark collectors for optimal traffic measurement """
+    interfaces = [["s3-eth1"], ["s1-eth1"]]
+    filters = ["'host 10.0.0.1 and inbound'",
+               "'host 10.0.0.2 and inbound'"]
+    return setup_optimal_overhead_statistics(filters, interfaces,
+                                             optimal_prefix,
+                                             test_duration_sec, slack)
+
 ################################################################################
 #### Diagnostics
 ################################################################################
@@ -252,15 +271,51 @@ def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
                    " low" % (src.name, hosts_dst[i].name))
     print "Client transfers initiated."
 
+def get_interfaces(intr_list):
+    """ Helper function to get tshark interface argument for a switch sw, whose
+    interfaces in interface_list must be captured."""
+    return reduce(lambda r, intr: r + "-i " + intr + " ", intr_list, ' ')
+
+def get_fds_processes(cmds, files):
+    """ Helper function to get the processes and output files of commands
+    specified in `cmds`, with corresponding output/error streams written to
+    entries in `files`."""
+    out_fds = []
+    processes = []
+    assert len(cmds) == len(files)
+    for i in range(0, len(cmds)):
+        f = files[i]
+        cmd = cmds[i]
+        out_fds.append(open(f, 'w'))
+        processes.append(subprocess.Popen(shlex.split(cmd),
+                                          stdout=out_fds[-1],
+                                          stderr=subprocess.STDOUT))
+    return processes, out_fds
+
 def setup_overhead_statistics_global(overheads_filter, overheads_file,
                                      test_duration_sec, slack):
     cmd = ("tshark -q -i lo -z io,stat,0,'" + overheads_filter + "' -f " +
-           "'tcp port 6633' -a duration:" + str(test_duration_sec))
+           "'tcp port 6633' -a duration:" + str(test_duration_sec+1))
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
     print '--->', cmd
     return ([p], [f])
+
+def setup_optimal_overhead_statistics(filters, interfaces, files_prefix,
+                                      test_duration_sec, slack):
+    """ Capture tshark statistics to calculate "optimal" overheads. """
+    assert len(filters) == len(interfaces)
+    cmds_list = []
+    f_list = []
+    for i in range(0, len(filters)):
+        cmd = ("tshark -q -f " + filters[i] + ' ' +
+               get_interfaces(interfaces[i]) +
+               " -z io,stat,0 -a duration:" + str(test_duration_sec+1))
+        print '--->', cmd
+        f_list.append('%s-%d.txt' % (files_prefix, i))
+        cmds_list.append(cmd)
+    return get_fds_processes(cmds_list, f_list)
 
 def run_tshark_full_traffic_measurement(internal_ints, external_ints,
                                         test_duration_sec, total_traffic_prefix,
@@ -270,30 +325,12 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
     the links in the network (separate traffic counted once and twice for later
     merging). This function is generic across test cases.
     """
-    def get_interfaces(intr_list):
-        """ Get tshark interface argument for a switch sw, whose interfaces in
-        interface_list must be captured. """
-        return reduce(lambda r, intr: r + "-i " + intr + " ", intr_list, ' ')
-
     def get_tshark_cmd_file(interfaces, file_suffix):
         cmd = ("tshark -f inbound -q " + get_interfaces(interfaces) +
-               " -z io,stat,0 -a duration:" + str(test_duration_sec))
+               " -z io,stat,0 -a duration:" + str(test_duration_sec+1))
         print '--->', cmd
         fname = total_traffic_prefix + file_suffix
         return (cmd, fname)
-
-    def get_fds_processes(cmds, files):
-        out_fds = []
-        processes = []
-        assert len(cmds) == len(files)
-        for i in range(0, len(cmds)):
-            f = files[i]
-            cmd = cmds[i]
-            out_fds.append(open(f, 'w'))
-            processes.append(subprocess.Popen(shlex.split(cmd),
-                                              stdout=out_fds[-1],
-                                              stderr=subprocess.STDOUT))
-        return processes, out_fds
 
     def get_ints_grouped_list(ints_list, k=4):
         """ Capture k interfaces at a time to avoid kernel OOM killer """
@@ -349,6 +386,7 @@ def query_test():
 
     # Global parameters not used elsewhere outside this function
     overheads_file = adjust_path("overhead-traffic.txt")
+    optimal_files_prefix = adjust_path("optimal-overhead")
     c_out = adjust_path("pyretic-stdout.txt")
     c_err = adjust_path("pyretic-stderr.txt")
     iperf_client_prefix = adjust_path("client-udp")
@@ -378,9 +416,10 @@ def query_test():
     print "Setting up handlers for graceful experiment abort"
     ovhead_stats = None
     switch_stats = None
+    opt_stats    = None
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
                                                    ovhead_stats, switch_stats,
-                                                   net, hosts_dst))
+                                                   opt_stats, net, hosts_dst))
 
     print "Setting up switch rules"
     if controller_debug_mode:
@@ -392,13 +431,19 @@ def query_test():
                                              test_duration_sec,
                                              slack_factor)
 
+    print "Setting optimal overheads measurements"
+    opt_stats = setup_optimal_overheads_global(test,
+                                               optimal_files_prefix,
+                                               test_duration_sec,
+                                               slack_factor)
+
     print "Setting up collectors for total traffic"
     switch_stats = setup_full_traffic_measurement(test, args, switches)
 
     print "Resetting abort handler to tackle overhead stats"
     signal.signal(signal.SIGINT, get_abort_handler(controller_debug_mode, ctlr,
                                                    ovhead_stats, switch_stats,
-                                                   net, hosts_dst))
+                                                   opt_stats, net, hosts_dst))
 
     # print "Testing network connectivity"
     # ping_flow_pairs(net, hosts_src, hosts_dst)
@@ -416,8 +461,8 @@ def query_test():
     print "Writing down experiment parameters for successful completion"
     write_expt_settings(args, params_file)
 
-    finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats, net,
-              hosts_dst)
+    finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
+              opt_stats, net, hosts_dst)
 
     if controller_debug_mode:
         CLI(net)
@@ -437,8 +482,8 @@ def write_expt_settings(params, params_file):
         f.write(k + " " + str(params_dict[k]) + "\n")
     f.close()
 
-def finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats, net,
-              hosts_dst):
+def finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
+              opt_stats, net, hosts_dst):
     def close_fds(fds, fd_str):
         for fd in fds:
             fd.close()
@@ -461,16 +506,22 @@ def finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats, net,
         for p in procs:
             kill_process(p, "tshark switch statistics collection")
         close_fds(fds, "switch statistics")
+    # optimal overhead statistics
+    if opt_stats:
+        (procs, fds) = opt_stats
+        for p in procs:
+            kill_process(p, "tshark optimal overhead statistics")
+        close_fds(fds, "optimal overhead statistics")
     # mininet network
     if not controller_debug_mode:
         net.stop()
         print "Killed mininet network"
 
 def get_abort_handler(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
-                      net, hosts_dst):
+                      opt_stats, net, hosts_dst):
     def abort_handler(signum, frame):
         finish_up(controller_debug_mode, ctlr, ovhead_stats, switch_stats,
-                  net, hosts_dst)
+                  opt_stats, net, hosts_dst)
         sys.exit(0)
     return abort_handler
 
