@@ -9,6 +9,7 @@ import subprocess, shlex, time, signal, os, sys
 from threading import Timer
 import time
 import argparse
+import copy
 
 ################################################################################
 #### Test-case-specific functions
@@ -294,9 +295,38 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
                                               stderr=subprocess.STDOUT))
         return processes, out_fds
 
-    (cmd_ext, f_ext) = get_tshark_cmd_file(external_ints, '-ext.txt')
-    (cmd_int, f_int) = get_tshark_cmd_file(internal_ints, '-int.txt')
-    return get_fds_processes([cmd_ext, cmd_int], [f_ext, f_int])
+    def get_ints_grouped_list(ints_list, k=4):
+        """ Capture k interfaces at a time to avoid kernel OOM killer """
+        assert isinstance(k, int) and k > 0
+        assert len(ints_list) > 1
+        curr_k = 0
+        curr_list = []
+        all_ints = []
+        for i in ints_list:
+            curr_k += 1
+            if curr_k < (k+1):
+                curr_list.append(i)
+            else: # create a new sublist of interfaces, appending the current
+                  # one to "all interfaces" list
+                all_ints.append(copy.copy(curr_list))
+                curr_list = [i]
+                curr_k = 1
+        assert curr_k <= k
+        all_ints.append(curr_list)
+        assert len(all_ints) == len(ints_list) / 4
+        assert (len(all_ints[-1]) % k) == (len(ints_list) % k)
+        return all_ints
+
+    int_groups = get_ints_grouped_list(external_ints + internal_ints, 4)
+    group_num = 1
+    cmds_list = []
+    f_list = []
+    for group in int_groups:
+        (cmd, f) = get_tshark_cmd_file(group, '-%d.txt' % group_num)
+        group_num += 1
+        cmds_list.append(cmd)
+        f_list.append(f)
+    return get_fds_processes(cmds_list, f_list)
 
 ################################################################################
 ### The main function.
