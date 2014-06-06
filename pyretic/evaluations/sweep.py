@@ -113,7 +113,7 @@ def create_folder_if_not_exists(folder):
 def write_stats(stats, stats_file):
     """ Write stats into a data file for plotting. """
     f = open(stats_file, 'w')
-    f.write('# frac overhead_bytes total_bytes queried_bytes(iperf)\n')
+    f.write('# frac overhead_bytes total_bytes queried_bytes(iperf) optimal_ovhead_bytes\n')
     for (frac, byte_stats) in stats:
         f.write(str(frac) + ' ' + repr(byte_stats) + '\n')
     f.close()
@@ -216,7 +216,11 @@ def get_iperf_client_bytes(client_file):
     cmd = ("grep -B 2 Sent " + client_file + " | grep '0.0-' | tail -1  | awk "
            + " '{print $5}'")
     kbytes = subprocess.check_output(cmd, shell=True)
-    return float(kbytes.strip()) * 1000
+    if kbytes:
+        return float(kbytes.strip()) * 1000
+    else:
+        print "No iperf output found in %s!" % client_file
+        return 0.0
 
 def has_pyretic_error(error_file):
     """ Detect if pyretic controller had an error output. """
@@ -225,15 +229,18 @@ def has_pyretic_error(error_file):
     return int(error_lines.strip()) > 0
 
 class run_stat:
-    def __init__(self, overhead_bytes, total_bytes, queried_bytes):
+    def __init__(self, overhead_bytes, total_bytes, queried_bytes,
+                 optimal_ovhead):
         self.overhead_bytes = overhead_bytes
         self.total_bytes = total_bytes
         self.queried_bytes = queried_bytes
+        self.optimal_ovhead = optimal_ovhead
 
     def __repr__(self):
         return (str(self.overhead_bytes) + ' ' +
                 str(self.total_bytes) + ' ' +
-                str(self.queried_bytes) )
+                str(self.queried_bytes) + ' ' +
+                str(self.optimal_ovhead))
 
 def get_single_run_stats(results_folder, queried_hosts):
     """ Get statistics of interest for a single run of an experiment. 
@@ -249,17 +256,31 @@ def get_single_run_stats(results_folder, queried_hosts):
     overheads_file = adjust_path("overhead-traffic.txt")
     total_traffic_prefix = adjust_path("total-traffic")
     total_traffic_file = total_traffic_prefix + '.txt'
+    optimal_ovhead_prefix = adjust_path("optimal-overhead")
     iperf_client_prefix = adjust_path("client-udp")
     pyretic_stderr = adjust_path("pyretic-stderr.txt")
 
+    def get_tshark_bytes_from_sequence(file_prefix):
+        def get_num_files_with_prefix(pfx):
+            cmd = "ls %s-*.txt | wc -l" % pfx
+            return int(subprocess.check_output(cmd, shell=True))
+        num_files = get_num_files_with_prefix(file_prefix)
+        total_bytes = 0
+        for i in range(1, num_files+1):
+            f = '%s-%d.txt' % (file_prefix, i)
+            total_bytes += get_tshark_bytes(f)
+        return total_bytes
+
     if not has_pyretic_error(pyretic_stderr):
         ovhead_bytes = get_tshark_bytes(overheads_file)
-        total_bytes = get_tshark_bytes(total_traffic_file)
+        total_bytes = get_tshark_bytes_from_sequence(total_traffic_prefix)
+        optimal_ovhead = get_tshark_bytes_from_sequence(optimal_ovhead_prefix)
         queried_bytes = 0
         for host in queried_hosts:
             client_file = iperf_client_prefix + '-' + host + '.txt'
             queried_bytes += get_iperf_client_bytes(client_file)
-        return run_stat(ovhead_bytes, total_bytes, queried_bytes)
+        return run_stat(ovhead_bytes, total_bytes, queried_bytes,
+                        optimal_ovhead)
     else:
         return None # signals an error in pyretic during the experiment run!
 
