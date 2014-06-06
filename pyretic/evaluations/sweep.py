@@ -225,8 +225,10 @@ def get_iperf_client_bytes(client_file):
 def has_pyretic_error(error_file):
     """ Detect if pyretic controller had an error output. """
     cmd = "wc -l " + error_file + " | awk '{print $1}'"
+    shut_err = "grep 'interpreter shutdown' " + error_file + " | wc -l"
     error_lines = subprocess.check_output(cmd, shell=True)
-    return int(error_lines.strip()) > 0
+    shut_lines  = subprocess.check_output(shut_err, shell=True)
+    return int(error_lines.strip()) > 0 and not int(shut_lines.strip()) > 0
 
 class run_stat:
     def __init__(self, overhead_bytes, total_bytes, queried_bytes,
