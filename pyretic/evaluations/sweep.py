@@ -62,8 +62,7 @@ def sweep_waypoint_fractions(args):
 
     sweep(args,
           "waypoint",
-          # map(lambda i: str(0.10 * i), range(1,11)),
-          map(lambda i: str(0.50 * i), range(0,3)),
+          map(lambda i: str(0.10 * i), range(1,11)),
           "waypoint violating fraction",
           mininet_waypoint_test_params,
           ["h1"],
