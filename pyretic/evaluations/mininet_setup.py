@@ -313,7 +313,7 @@ def setup_optimal_overhead_statistics(filters, interfaces, files_prefix,
                get_interfaces(interfaces[i]) +
                " -z io,stat,0 -a duration:" + str(test_duration_sec+1))
         print '--->', cmd
-        f_list.append('%s-%d.txt' % (files_prefix, i))
+        f_list.append('%s-%d.txt' % (files_prefix, i+1))
         cmds_list.append(cmd)
     return get_fds_processes(cmds_list, f_list)
 
