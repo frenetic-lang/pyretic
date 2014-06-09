@@ -62,7 +62,7 @@ def sweep_waypoint_fractions(args):
 
     sweep(args,
           "waypoint",
-          map(lambda i: str(0.10 * i), range(1,11)),
+          map(lambda i: str(0.10 * i), range(0,11)),
           "waypoint violating fraction",
           mininet_waypoint_test_params,
           ["h1"],
@@ -151,10 +151,10 @@ def plot_one_quantity(stats_file, plot_output_file, plot_script, x_label,
                '--xrange "' + x_range + '" ' +
                '--yrange "' + y_range + '" ' +
                '--bmargin 8.5 --rmargin 5 --lmargin 17 ' +
-#               stats_file + ' "naive \'all packets\'" "' + '1:(\$1/\$1)' + '" ' +
-#               stats_file + ' "this paper" "' + fields_str + '" ' +
-               stats_file + ' "" "' + fields_str + '" ' +
-#               stats_file + ' "optimal" "' + '1:(\$1/4)' + '" ' +
+               stats_file + ' "naive \'all packets\'" "' + '1:(\$3/\$3)' + '" ' +
+               stats_file + ' "this paper" "' + fields_str + '" ' +
+#               stats_file + ' "" "' + fields_str + '" ' +
+               stats_file + ' "optimal" "' + '1:(\$5/\$3)' + '" ' +
                ' | gnuplot')
     out = subprocess.check_output(cmd, shell=True)
     pdf_cmd = 'epstopdf ' + plot_output_file + ' --autorotate=All'

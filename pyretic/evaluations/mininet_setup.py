@@ -295,7 +295,7 @@ def get_fds_processes(cmds, files):
 def setup_overhead_statistics_global(overheads_filter, overheads_file,
                                      test_duration_sec, slack):
     cmd = ("tshark -q -i lo -z io,stat,0,'" + overheads_filter + "' -f " +
-           "'tcp port 6633' -a duration:" + str(test_duration_sec+1))
+           "'tcp port 6633' -a duration:" + str(test_duration_sec+3))
     f = open(overheads_file, "w")
     p = subprocess.Popen(shlex.split(cmd), stdout=f, stderr=subprocess.STDOUT)
     print "Started tshark process"
@@ -311,7 +311,7 @@ def setup_optimal_overhead_statistics(filters, interfaces, files_prefix,
     for i in range(0, len(filters)):
         cmd = ("tshark -q -f " + filters[i] + ' ' +
                get_interfaces(interfaces[i]) +
-               " -z io,stat,0 -a duration:" + str(test_duration_sec+1))
+               " -z io,stat,0 -a duration:" + str(test_duration_sec+3))
         print '--->', cmd
         f_list.append('%s-%d.txt' % (files_prefix, i+1))
         cmds_list.append(cmd)
@@ -327,7 +327,7 @@ def run_tshark_full_traffic_measurement(internal_ints, external_ints,
     """
     def get_tshark_cmd_file(interfaces, file_suffix):
         cmd = ("tshark -f inbound -q " + get_interfaces(interfaces) +
-               " -z io,stat,0 -a duration:" + str(test_duration_sec+1))
+               " -z io,stat,0 -a duration:" + str(test_duration_sec+3))
         print '--->', cmd
         fname = total_traffic_prefix + file_suffix
         return (cmd, fname)
@@ -392,6 +392,7 @@ def query_test():
     iperf_client_prefix = adjust_path("client-udp")
     iperf_server_prefix = adjust_path("server-udp")
     params_file = adjust_path("params.txt")
+    tshark_wait_slack_sec = 3
 
     # Explicit spelling-out of testwise parameters for pyretic controller
     testwise_params = get_testwise_params(test, args)
@@ -447,6 +448,10 @@ def query_test():
 
     # print "Testing network connectivity"
     # ping_flow_pairs(net, hosts_src, hosts_dst)
+
+    # Wait for tshark to start up
+    print "Waiting for tshark to start up..."
+    time.sleep(tshark_wait_slack_sec)
 
     print "Starting iperf tests"
     run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec, per_flow_bw,
