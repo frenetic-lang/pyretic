@@ -54,7 +54,7 @@ class monitor(DynamicPolicy):
 
         @transition
         def mon(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy_trans(self):

@@ -68,7 +68,7 @@ class traffic_lb(DynamicPolicy):
         ### SET UP TRANSITION FUNCTIONS
         @transition
         def lb(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):

@@ -35,7 +35,7 @@ class auth(DynamicPolicy):
 
         @transition
         def authenticated(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):

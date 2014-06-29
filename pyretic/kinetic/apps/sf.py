@@ -4,7 +4,7 @@ from pyretic.lib.std import *
 
 from pyretic.kinetic.fsm_policy import *
 from pyretic.kinetic.drivers.json_event import JSONEvent
-from pyretic.kinetic.smv.translate import *
+from pyretic.kinetic.smv.model_checker import *
 
 
 class sf(DynamicPolicy):
@@ -36,7 +36,7 @@ class sf(DynamicPolicy):
 
         @transition
         def outgoing(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):

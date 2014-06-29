@@ -204,12 +204,12 @@ class is_true(test_eq):
     def model(self):
         return self.l.model()
 
-class occured(test_ne):
+class occurred(test_ne):
     def __init__(self,event):
-        super(occured,self).__init__(event,C(None))
+        super(occurred,self).__init__(event,C(None))
 
     def __str__(self):
-        return 'occured(' + str(self.l) + ')'
+        return 'occurred(' + str(self.l) + ')'
 
     def model(self):
         return 'TRUE'
@@ -291,7 +291,7 @@ def events(i):
         return set()
     elif isinstance(i,TrueTest):
         return set()
-    elif isinstance(i,occured):
+    elif isinstance(i,occurred):
         return events(i.l)
     elif isinstance(i,is_true):
         return events(i.l)
@@ -315,7 +315,7 @@ def variables(i):
         return set()
     elif isinstance(i,TrueTest):
         return set()
-    elif isinstance(i,occured):
+    elif isinstance(i,occurred):
         return set()
     elif isinstance(i,is_true):
         return variables(i.l)
@@ -386,7 +386,7 @@ def fsm_def_to_smv_model(fsm_def):
 
     ## Add comment about policy_name to actual_policy mapping
     mapping_str = ' \n\n=====================================================================\n'
-    mapping_str = mapping_str + 'PolicyName (used in NuSMV) to ActualPolicy (used in Pyreric) Mapping\n'
+    mapping_str = mapping_str + 'PolicyName (used in NuSMV) to ActualPolicy (used in Pyretic) Mapping\n'
     mapping_str = mapping_str + '=====================================================================\n'
     sorted_tuple = sorted(policy_to_name_map.iteritems(), key=operator.itemgetter(1))
   

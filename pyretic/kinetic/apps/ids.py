@@ -42,7 +42,7 @@ class ids(DynamicPolicy):
         def infected(self):
             # Return the variable's own value. 
             # If True, return True. If False, return False.
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):
@@ -100,13 +100,8 @@ def main():
     # Save NuSMV file
     mc.save_as_smv_file()
 
-    # This is for measuring how long it takes for verifying properties
-    import datetime as dt
-    n1=dt.datetime.now()
+    # Verify
     mc.verify()
-    n2=dt.datetime.now()
-
-    print (n2-n1).microseconds
 
     # Return DynamicPolicy. 
     # flood() will take for of forwarding for this simple example.

@@ -69,7 +69,7 @@ class rate_limiter(DynamicPolicy):
 
         @transition
         def rate(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):

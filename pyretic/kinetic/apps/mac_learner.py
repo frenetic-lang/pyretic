@@ -43,12 +43,12 @@ class mac_learner(DynamicPolicy):
 
         @transition
         def topo_change(self):
-            self.case(occured(self.event),self.event)
+            self.case(occurred(self.event),self.event)
             self.default(C(False))
 
         @transition
         def port(self):
-            self.case(occured(self.event) & (V('port')==C(0)),self.event)
+            self.case(occurred(self.event) & (V('port')==C(0)),self.event)
             self.case(is_true(V('topo_change')),C(0))
 
         @transition
