@@ -381,7 +381,8 @@ def fsm_def_to_smv_model(fsm_def):
             tmp_list = list(t.dom)
             for p in t.dom:
                 policy_to_hash(policy_set, p)
-    for idx,p in enumerate(policy_set):
+    sorted_list = sorted(list(policy_set))
+    for idx,p in enumerate(sorted_list):
         policy_to_name_map[p] = 'policy_'+str(idx+1)
 
     # Start        

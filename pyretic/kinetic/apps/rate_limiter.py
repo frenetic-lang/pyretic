@@ -103,8 +103,8 @@ def main():
 
     ## Add specs 
     mc.add_spec("SPEC AG (rate=1 -> AX policy=policy_1)")
-    mc.add_spec("SPEC AG (rate=2 -> AX policy=policy_3)")
-    mc.add_spec("SPEC AG (rate=3 -> AX policy=policy_2)")
+    mc.add_spec("SPEC AG (rate=2 -> AX policy=policy_2)")
+    mc.add_spec("SPEC AG (rate=3 -> AX policy=policy_3)")
     mc.add_spec("SPEC AG (EF policy=policy_1)")
     mc.add_spec("SPEC policy=policy_1 -> EX policy=policy_1")
     mc.add_spec("SPEC AG (policy=policy_1 -> EF policy=policy_2)")
