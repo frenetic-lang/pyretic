@@ -183,6 +183,23 @@ class test_and(CaseTest):
             return self.r.model()
         return self.r.model() 
 
+class test_and_true(CaseTest):
+    def __init__(self,l,r):
+        self.l = l
+        self.r = r
+
+    def __call__(self,state,event):
+        return self.l(state,event)==True and self.r(state,event)==True
+
+    def __str__(self):
+        return str(self.l) + ' & ' + str(self.r)
+
+    def model(self):
+        l_model = self.l.model()
+        if l_model == 'TRUE':
+            return self.r.model()
+        return self.l.model() + ' & ' + self.r.model()
+
 
 class TrueTest(test_eq):
     def __init__(self):
