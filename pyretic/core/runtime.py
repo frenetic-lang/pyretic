@@ -562,7 +562,15 @@ class Runtime(object):
                     elif pred == true:
                         return {}
                     elif isinstance(pred, match):
-                        return { k:v for (k,v) in pred.map.items() }
+                        concrete_match = { k:v for (k,v) in pred.map.items() }
+                        net_to_str = util.network_to_string
+                        for field in ['srcip', 'dstip']:
+                            try:
+                                val = net_to_str(concrete_match[field])
+                                concrete_match.update({field: val})
+                            except KeyError:
+                                pass
+                        return concrete_match
                 def concretize_action(a):
                     if a == Controller:
                         return {'outport' : OFPP_CONTROLLER}
@@ -876,9 +884,8 @@ class Runtime(object):
                 pass
         for header in native_headers + content_headers:
             try:
-                val = packet[header]
-                concrete_packet[header] = val
-            except:
+                concrete_packet[header] = packet[header]
+            except KeyError:
                 pass
         for header in packet.header:
             try:
