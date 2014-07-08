@@ -42,6 +42,8 @@ OFPP_CONTROLLER = 0xfffd
 LLDP_TYPE = 0x88cc
 ARP_TYPE = 0x806
 IP_TYPE  = 0x800
+TCP_PROTO= 6
+UDP_PROTO= 17
 
 ################################################################################
 # Fixed width stuff

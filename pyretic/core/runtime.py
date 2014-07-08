@@ -429,6 +429,28 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
+        def layer_4_specialize(classifier):
+            specialized_rules = []
+            for rule in classifier.rules:
+                if ( isinstance(rule.match, match) and
+                     ( 'srcport' in rule.match.map or
+                       'dstport' in rule.match.map ) and
+                     ( not 'ethtype' in rule.match.map or
+                       not 'protocol'   in rule.match.map )):
+
+                    if 'ethtype' not in rule.match.map:
+                        rule = Rule(rule.match & match(ethtype=IP_TYPE), rule.actions)
+
+                    if 'protocol' not in rule.match.map:
+                        for proto in [TCP_PROTO, UDP_PROTO]:
+                            specialized_rules.append(Rule(rule.match & match(protocol=proto), rule.actions))
+                    else:
+                        specialized_rules.append(rule)
+                else:
+                    specialized_rules.append(rule)
+
+            return Classifier(specialized_rules)
+
         def bookkeep_buckets(classifier):
             """
             Whenever rules are associated with counting buckets,
@@ -646,8 +668,14 @@ class Runtime(object):
                 tuple_rules.append((rule.match,priority[s],rule.actions))
             return tuple_rules
 
-        ### UPDATE LOGIC
 
+        def optimize(classifier):
+            """ Optimize the classifier by removing extra rules """
+
+            classifier = classifier.optimize()
+            return classifier
+
+        ### UPDATE LOGIC
         def nuclear_install(classifier):
             """
             Delete all rules currently installed on switches and then
@@ -660,6 +688,7 @@ class Runtime(object):
             switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
             switches = switch_to_attrs.keys()
             classifier = switchify(classifier,switches)
+            classifier = optimize(classifier)
             classifier = concretize(classifier)
             classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
@@ -703,6 +732,7 @@ class Runtime(object):
                 switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
                 switches = switch_to_attrs.keys()
                 classifier = switchify(classifier,switches)
+                classifier = optimize(classifier)
                 classifier = concretize(classifier)
                 classifier = OF_inportize(classifier)
                 new_rules = prioritize(classifier)
@@ -758,7 +788,8 @@ class Runtime(object):
         classifier = remove_identity(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
-        classifier = vlan_specialize(classifier)
+        classifier = layer_4_specialize(classifier)
+        # classifier = vlan_specialize(classifier)
         bookkeep_buckets(classifier)
         classifier = remove_buckets(classifier)
 
