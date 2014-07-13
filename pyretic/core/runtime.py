@@ -360,10 +360,10 @@ class Runtime(object):
                            [{'outport' : OFPP_CONTROLLER}],
                            self.default_cookie))
         # Drop all IPv6 packets by default.
-        # self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE, 'protocol':58},
-        #                    TABLE_START_PRIORITY + 1,
-        #                    [],
-        #                    self.default_cookie))
+        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE, 'protocol':58},
+                           TABLE_START_PRIORITY + 1,
+                           [],
+                           self.default_cookie))
 
     def install_classifier(self, classifier):
         """

@@ -732,7 +732,7 @@ class CountBucket(Query):
                 self.log.info('In CountBucket ' + str(id(self)) + ' apply():'
                                + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
-                self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
+                self.byte_count_persistent += pkt['payload_len']
             self.bucket.clear()
         self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
                        'persistent packet count is ' +
