@@ -850,15 +850,17 @@ class CountBucket(Query):
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            k = self.match_entry(match, priority, version)
+            k = self.match_entry(self.str_convert_match(match),
+                                 priority, version)
             if k in self.matches:
+                self.log.debug("Deleted flow exists in the bucket's matches")
                 status = self.matches[k]
                 assert status.to_be_deleted
                 if not status.existing_rule: # Note: If pre-existing rule was
                     # removed, then forget that this rule ever
                     # existed. We don't count it.
                     if packet_count > 0:
-                        self.log.debug(("Adding persistent pkt count %d"
+                        self.log.info(("Adding persistent pkt count %d"
                                         + " to bucket %d") % (
                                 packet_count, id(self) ) )
                         self.log.debug(("persistent count is now %d" %
@@ -921,6 +923,17 @@ class CountBucket(Query):
     def add_outstanding_switch_query(self,switch):
         self.outstanding_switches.append(switch)
 
+    def str_convert_match(self, m):
+        """ Convert incoming flow stat matches into a form compatible with
+        stored match entries. """
+        new_dict = {}
+        for k,v in m.iteritems():
+            if not (k == 'srcip' or k == 'dstip'):
+                new_dict[k] = v
+            else:
+                new_dict[k] = str(v)
+        return new_dict
+
     def handle_flow_stats_reply(self,switch,flow_stats):
         """
         Given a flow_stats_reply from switch s, collect only those
@@ -940,18 +953,11 @@ class CountBucket(Query):
         def stat_in_bucket(flow_stat, s):
             """Return a matching entry for the given flow_stat in
             bucket.matches."""
-            def str_convert(m):
-                new_dict = {}
-                for k,v in m.iteritems():
-                    if not (k == 'srcip' or k == 'dstip'):
-                        new_dict[k] = v
-                    else:
-                        new_dict[k] = str(v)
-                return new_dict
             import copy
             f = copy.copy(flow_stat['match'])
             f['switch'] = s
-            fme = self.match_entry(str_convert(f), flow_stat['priority'],
+            fme = self.match_entry(self.str_convert_match(f),
+                                   flow_stat['priority'],
                                    flow_stat['cookie'])
             if fme in self.matches.keys():
                 return fme

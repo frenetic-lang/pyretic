@@ -37,6 +37,7 @@ from pyretic.core.packet import *
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
+import copy
 
 TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
@@ -1257,6 +1258,16 @@ class Runtime(object):
                            str(self.global_outstanding_queries) )
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
+        def str_convert_match(m):
+            """ Convert incoming flow stat matches into a form compatible with
+            stored match entries. """
+            new_dict = {}
+            for k,v in m.iteritems():
+                if not (k == 'srcip' or k == 'dstip'):
+                    new_dict[k] = v
+                else:
+                    new_dict[k] = str(v.ip)
+            return new_dict
         flow_stat = { f : self.ofp_convert(f,v)
                       for (f,v) in flow_stat_dict.items() }
         self.log.debug(
@@ -1265,7 +1276,8 @@ class Runtime(object):
              self.flow_stat_str(flow_stat)))
         with self.global_outstanding_deletes_lock:
             f = flow_stat
-            rule_match = match(f['match']).intersect(match(switch=dpid)).map
+            rule_match = str_convert_match(
+                match(f['match']).intersect(match(switch=dpid)).map)
             priority = f['priority']
             version = f['cookie']
             match_entry = (util.frozendict(rule_match), priority, version)
@@ -1273,14 +1285,16 @@ class Runtime(object):
                 self.log.debug("Got removed flow\n%s with counts %d %d" %
                                (str(match_entry), f['packet_count'],
                                 f['byte_count']) )
-            self.log.debug('Printing global structure for deleted rules:')
-            for k,v in self.global_outstanding_deletes.iteritems():
-                self.log.debug(str(k) + " : " + str(v))
-            self.log.debug('Printing current match being checked:')
-            self.log.debug(str(match_entry))
+                self.log.debug('Printing global structure for deleted rules:')
+                for k,v in self.global_outstanding_deletes.iteritems():
+                    self.log.debug(str(k) + " : " + str(v))
             if match_entry in self.global_outstanding_deletes:
+                if f['packet_count'] > 0:
+                    self.log.debug("Membership test passed; non-zero # packets!")
                 bucket_list = self.global_outstanding_deletes[match_entry]
                 for bucket in bucket_list:
+                    self.log.debug("Sending bucket %d a flow removed msg" %
+                                  id(bucket))
                     bucket.handle_flow_removed(rule_match, priority, version, f)
                 del self.global_outstanding_deletes[match_entry]
 
