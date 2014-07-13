@@ -813,8 +813,7 @@ class Runtime(object):
             def add_version(rules, version):
                 new_rules = []
                 for r in rules:
-                    new_rules.append(r + (0,))
-                    # new_rules.append(r + (version,))
+                    new_rules.append(r + (version,))
                 return new_rules
 
             switch_attrs_tuples = self.network.topology.nodes(data=True)

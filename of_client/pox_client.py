@@ -370,23 +370,14 @@ class POXClient(revent.EventMixin):
             inport = None
         match = self.build_of_match(switch,inport,pred)
         of_actions = self.build_of_actions(inport,action_list)
-        if cookie != 0:
-            msg = of.ofp_flow_mod(command=command,
-                                  priority=priority,
-                                  idle_timeout=of.OFP_FLOW_PERMANENT,
-                                  hard_timeout=of.OFP_FLOW_PERMANENT,
-                                  match=match,
-                                  flags=of.OFPFF_SEND_FLOW_REM,
-                                  cookie=cookie,
-                                  actions=of_actions)
-        else:
-            msg = of.ofp_flow_mod(command=command,
-                                  priority=priority,
-                                  idle_timeout=of.OFP_FLOW_PERMANENT,
-                                  hard_timeout=of.OFP_FLOW_PERMANENT,
-                                  match=match,
-                                  flags=of.OFPFF_SEND_FLOW_REM,
-                                  actions=of_actions)
+        msg = of.ofp_flow_mod(command=command,
+                              priority=priority,
+                              idle_timeout=of.OFP_FLOW_PERMANENT,
+                              hard_timeout=of.OFP_FLOW_PERMANENT,
+                              match=match,
+                              flags=of.OFPFF_SEND_FLOW_REM,
+                              cookie=cookie,
+                              actions=of_actions)
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
