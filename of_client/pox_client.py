@@ -98,11 +98,12 @@ class BackendChannel(asynchat.async_chat):
         # Set up time for starting rule installs.
         if msg[0] == 'reset_install_time':
             self.start_time = time.time()
-            print "[path_queries] Last rule interval:", self.interval,
+            # TODO(): need logging levels in of client also!
+            # print "[path_queries] Last rule interval:", self.interval,
             self.total_interval += self.interval
             self.num_intervals  += 1
-            print "total:", self.total_interval,
-            print "num:", self.num_intervals
+            # print "total:", self.total_interval,
+            # print "num:", self.num_intervals
             self.interval = 0
 
         # USE DESERIALIZED MSG

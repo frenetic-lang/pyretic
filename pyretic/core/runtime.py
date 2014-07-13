@@ -155,8 +155,8 @@ class Runtime(object):
         map(self.send_packet,concrete_output)
 
         self.packet_in_time += (time.time() - start_time)
-        print "[path_queries] handle_packet_in cumulative:", self.packet_in_time,
-        print self.num_packet_ins
+        self.log.debug("handle_packet_in cumulative: %f %d"
+                       % (self.packet_in_time, self.num_packet_ins))
 
         # if in reactive mode and no packets are forwarded to buckets, install microflow
         # Note: lack of forwarding to bucket implies no bucket-trigger update could have occured
@@ -981,7 +981,7 @@ class Runtime(object):
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
         new_rules = get_new_rules(classifier, curr_version_no)
-        print "[path_queries] Number of rules in classifier:", len(new_rules)
+        self.log.debug("Number of rules in classifier: %d" % len(new_rules))
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
