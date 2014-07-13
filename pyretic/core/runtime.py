@@ -675,8 +675,12 @@ class Runtime(object):
                         if fields - moded_fields:
                             raise TypeError('Non-compilable rule',str(r))  
             for r in classifier.rules:
-                check_OF_rule_has_outport(r)
-                check_OF_rule_has_compilable_action_list(r)
+                r_minus_queries = Rule(r.match,
+                                       filter(lambda x:
+                                              not isinstance(x, Query),
+                                              r.actions))
+                check_OF_rule_has_outport(r_minus_queries)
+                check_OF_rule_has_compilable_action_list(r_minus_queries)
             return Classifier(classifier.rules)
 
         def OF_inportize(classifier):

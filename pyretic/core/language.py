@@ -930,12 +930,29 @@ class CountBucket(Query):
         byte counts from rules that have a match that is in the set of
         matches this bucket is interested in.
         """
+        def entries_print_helper(pfx_string=""):
+            """ Pretty print bucket match entries. """
+            out = ""
+            for k in self.matches.keys():
+                out += pfx_string + str(k) + "\n"
+            return out
+
         def stat_in_bucket(flow_stat, s):
-            """Return a matching entry for the given flow_stat in bucket.matches."""
+            """Return a matching entry for the given flow_stat in
+            bucket.matches."""
+            def str_convert(m):
+                new_dict = {}
+                for k,v in m.iteritems():
+                    if not (k == 'srcip' or k == 'dstip'):
+                        new_dict[k] = v
+                    else:
+                        new_dict[k] = str(v)
+                return new_dict
             import copy
             f = copy.copy(flow_stat['match'])
             f['switch'] = s
-            fme = self.match_entry(f,flow_stat['priority'],flow_stat['cookie'])
+            fme = self.match_entry(str_convert(f), flow_stat['priority'],
+                                   flow_stat['cookie'])
             if fme in self.matches.keys():
                 return fme
             return None
@@ -951,6 +968,13 @@ class CountBucket(Query):
                         me = stat_in_bucket(f, switch)
                         extracted_pkts = f['packet_count']
                         extracted_bytes = f['byte_count']
+                        if extracted_pkts > 0 and not me:
+                            self.log.debug("Packet not counted: \n%s %s %s" %
+                                           (str(f['match']),
+                                            "priority=%d" % f['priority'],
+                                            "version=%d" % f['cookie']))
+                            self.log.debug("Existing keys: \n%s" %
+                                           entries_print_helper())
                         if me:
                             if extracted_pkts > 0:
                                 self.log.debug('In bucket ' + str(id(self)) +
