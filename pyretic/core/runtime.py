@@ -977,7 +977,7 @@ class Runtime(object):
         # installation issues later on. Can be removed in the future if there
         # are no obvious issues.
 
-        classifier = vlan_specialize(classifier)
+        # classifier = vlan_specialize(classifier)
 
         # Get diffs of rules to install from the old (versioned) classifier. The
         # bookkeeping and removing of bucket actions happens at the end of the
