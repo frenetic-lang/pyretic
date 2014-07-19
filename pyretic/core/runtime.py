@@ -1081,7 +1081,8 @@ class ConcreteNetwork(Network):
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.next_topo))
-            self.queue_update(this_update_no)
+
+        self.queue_update(this_update_no)
             
     def handle_port_part(self, switch, port_no):
         self.debug_log.debug("handle_port_parts")
