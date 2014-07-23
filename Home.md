@@ -1,3 +1,8 @@
+---
+author: "John Smith"
+layout: "project"
+---
+
 Welcome to the pyretic wiki!
 
 * [Project Homepage](http://frenetic-lang.org/pyretic/)   
