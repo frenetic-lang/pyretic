@@ -108,6 +108,8 @@ class BackendChannel(asynchat.async_chat):
             self.backend.runtime.handle_packet_in(packet)
         elif msg[0] == 'flow_stats_reply':
             self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])
+        elif msg[0] == 'flow_removed':
+            self.backend.runtime.handle_flow_removed(msg[1], msg[2])
         else:
             print 'ERROR: Unknown msg from backend %s' % msg
         return
@@ -130,12 +132,18 @@ class Backend(object):
         self.al = self.asyncore_loop()
         self.al.daemon = True
         self.al.start()
-        
+
+    def send_reset_install_time(self):
+        self.send_to_OF_client(['reset_install_time'])
+
     def send_packet(self,packet):
         self.send_to_OF_client(['packet',packet])
 
-    def send_install(self,pred,priority,action_list):
-        self.send_to_OF_client(['install',pred,priority,action_list])
+    def send_install(self,pred,priority,action_list,cookie):
+        self.send_to_OF_client(['install',pred,priority,action_list,cookie])
+
+    def send_modify(self,pred,priority,action_list,cookie):
+        self.send_to_OF_client(['modify',pred,priority,action_list,cookie])
 
     def send_delete(self,pred,priority):
         self.send_to_OF_client(['delete',pred,priority])

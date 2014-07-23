@@ -31,7 +31,7 @@ class Rule(object):
         """Based on syntactic equality of policies."""
         return ( id(self) == id(other)
             or ( self.match == other.match
-                 and self.actions == other.actions ) )
+                 and sorted(self.actions) == sorted(other.actions) ) )
 
     def __ne__(self, other):
         """Based on syntactic equality of policies."""
@@ -172,7 +172,9 @@ class Classifier(object):
     ### SEQUENTIAL COMPOSITION
 
     def __rshift__(c1, c2):
-        from pyretic.core.language import match, modify, drop, identity, Controller, CountBucket, DerivedPolicy
+        from pyretic.core.language import (match, modify, drop, identity,
+                                           Controller, CountBucket,
+                                           DerivedPolicy, PathBucket)
         # given a test b and an action p, return a test
         # b' such that p >> b == b' >> p.
         def _commute_test(act, pkts):
@@ -180,7 +182,8 @@ class Classifier(object):
                 act = act.policy
             if act == identity:
                 return pkts
-            elif act == Controller or isinstance(act, CountBucket):
+            elif (act == Controller or isinstance(act, CountBucket) or
+                  isinstance(act, PathBucket)):
                 return identity
             elif isinstance(act, modify):
                 new_match_dict = {}
@@ -207,7 +210,8 @@ class Classifier(object):
             while isinstance(a1, DerivedPolicy):
                 a1 = a1.policy
             # TODO: be uniform about returning copied or modified objects.
-            if a1 == Controller or isinstance(a1, CountBucket):
+            if (a1 == Controller or isinstance(a1, CountBucket) or 
+                isinstance(a1, PathBucket)):
                 return {a1}
             elif a1 == identity:
                 return copy.copy(as2)
@@ -216,7 +220,8 @@ class Classifier(object):
                 for a2 in as2:
                     while isinstance(a2, DerivedPolicy):
                         a2 = a2.policy
-                    if a2 == Controller or isinstance(a2, CountBucket): 
+                    if (a2 == Controller or isinstance(a2, CountBucket) or
+                        isinstance(a2, PathBucket)):
                         new_actions.add(a2)
                     elif a2 == identity:
                         new_actions.add(a1)

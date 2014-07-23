@@ -37,8 +37,10 @@ from pyretic.core.packet import *
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
 from datetime import datetime
+import copy
 
 TABLE_MISS_PRIORITY = 0
+TABLE_START_PRIORITY = 60000
 
 class Runtime(object):
     """
@@ -56,12 +58,23 @@ class Runtime(object):
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
     """
-    def __init__(self, backend, main, kwargs, mode='interpreted', verbosity='normal'):
+    def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
+                 verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+
+        if path_main:
+            from pyretic.lib.path import pathcomp
+            path_policies = path_main(**kwargs)
+            self.policy = pathcomp.compile(path_policies, self.policy)
+            # Virtual field composition
+            self.policy = (virtual_field_tagging() >>
+                           self.policy >>
+                           virtual_field_untagging())
+
         self.mode = mode
         self.backend = backend
         self.backend.runtime = self
@@ -79,11 +92,19 @@ class Runtime(object):
         self.bucket_triggered_policy_update = False
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
+        self.global_outstanding_deletes_lock = Lock()
+        self.global_outstanding_deletes = {}
         self.manager = Manager()
         self.old_rules_lock = Lock()
-        self.old_rules = self.manager.list()
+        # self.old_rules = self.manager.list() # not multiprocess state anymore!
+        self.old_rules = []
         self.update_rules_lock = Lock()
         self.update_buckets_lock = Lock()
+        self.classifier_version_no = 0
+        self.classifier_version_lock = Lock()
+        self.default_cookie = 0
+        self.packet_in_time = 0
+        self.num_packet_ins = 0
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -104,6 +125,8 @@ class Runtime(object):
         :param concrete_packet: the packet to be interpreted.
         :type limit: payload of an OpenFlow packet_in message.
         """
+        start_time = time.time()
+        self.num_packet_ins += 1
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
@@ -116,7 +139,10 @@ class Runtime(object):
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
             for q in queries:
-                q.apply()
+                if isinstance(q, PathBucket):
+                    q.apply(pyretic_pkt)
+                else:
+                    q.apply()
             self.in_bucket_apply = False
             
             # if the query changed the policy, update the controller and switch state
@@ -128,6 +154,10 @@ class Runtime(object):
         # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
         map(self.send_packet,concrete_output)
+
+        self.packet_in_time += (time.time() - start_time)
+        self.log.debug("handle_packet_in cumulative: %f %d"
+                       % (self.packet_in_time, self.num_packet_ins))
 
         # if in reactive mode and no packets are forwarded to buckets, install microflow
         # Note: lack of forwarding to bucket implies no bucket-trigger update could have occured
@@ -210,8 +240,8 @@ class Runtime(object):
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
-                                              "policy="+repr(self.policy),
-                                              "classifier="+repr(classifier)))
+                                              "policy=\n"+repr(self.policy),
+                                              "classifier=\n"+repr(classifier)))
             self.install_classifier(classifier)
 
 
@@ -219,7 +249,6 @@ class Runtime(object):
         """
         Updates the set of active dynamic sub-policies in self.policy
         """
-        import copy
         old_dynamic_sub_pols = copy.copy(self.dynamic_sub_pols)
         self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, set(), self.policy)
         for p in (old_dynamic_sub_pols - self.dynamic_sub_pols):
@@ -284,7 +313,7 @@ class Runtime(object):
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (concrete_pred,0,action_list)
+            return (concrete_pred,0,action_list,self.default_cookie)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -311,12 +340,29 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (concrete_pred,0,action_list)
-
+        return (concrete_pred,0,action_list,self.default_cookie)
 
 #########################
 # PROACTIVE COMPILATION 
 #########################
+
+    def install_defaults(self, s):
+        """ Install backup rules on switch s by default. """
+        # Fallback "send to controller" rule under table miss
+        self.install_rule(({'switch' : s},
+                           TABLE_MISS_PRIORITY,
+                           [{'outport' : OFPP_CONTROLLER}],
+                           self.default_cookie))
+        # Send all LLDP packets to controller for topology maintenance
+        self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
+                           TABLE_START_PRIORITY + 2,
+                           [{'outport' : OFPP_CONTROLLER}],
+                           self.default_cookie))
+        # Drop all IPv6 packets by default.
+        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE, 'protocol':58},
+                           TABLE_START_PRIORITY + 1,
+                           [],
+                           self.default_cookie))
 
     def install_classifier(self, classifier):
         """
@@ -345,7 +391,32 @@ class Runtime(object):
             return Classifier(Rule(rule.match,
                                    filter(lambda a: a != identity,rule.actions))
                               for rule in classifier.rules)
-                
+
+        def remove_path_buckets(classifier):
+            """
+            Removes "path buckets" from the action list. Also hooks up runtime
+            functions to the path bucket objects to query for latest policy and
+            topology transfer functions.
+
+            :param classifier: the input classifier
+            :type classifier: Classifier
+            :returns the output classifier.
+            :rtype: Classifier
+            """
+            new_rules = []
+            for rule in classifier.rules:
+                new_acts = []
+                for act in rule.actions:
+                    if isinstance(act, PathBucket):
+                        act.set_topology_policy_fun(self.get_topology_policy)
+                        act.set_fwding_policy_fun(self.get_fwding_policy)
+                        act.set_egress_policy_fun(self.get_egress_policy)
+                        new_acts.append(Controller)
+                    else:
+                        new_acts.append(act)
+                new_rules.append(Rule(rule.match, new_acts))
+            return Classifier(new_rules)
+
         def controllerify(classifier):
             """
             Replaces each rule whose actions includes a send to controller action
@@ -381,7 +452,7 @@ class Runtime(object):
             :rtype: Classifier
             """
             specialized_rules = []
-            default_vlan_match = match(vlan_id=0xFFFF, vlan_pcp=0)
+            default_vlan_match = match(vlan_id=0xffff)
             for rule in classifier.rules:
                 if ( ( isinstance(rule.match, match) and
                        not 'vlan_id' in rule.match.map ) or
@@ -404,8 +475,6 @@ class Runtime(object):
             :rtype: Classifier
             """
             specialized_rules = []
-            # Add a rule that routes the LLDP messages to the controller for topology maintenance.
-            specialized_rules.append(Rule(match(ethtype=LLDP_TYPE),[Controller]))
             for rule in classifier.rules:
                 if ( isinstance(rule.match, match) and
                      ( 'srcip' in rule.match.map or 
@@ -451,7 +520,7 @@ class Runtime(object):
 
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(classifier):
+        def bookkeep_buckets(diff_lists):
             """
             Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
@@ -470,28 +539,39 @@ class Runtime(object):
                 """
                 bucket_list = {}
                 for rule in rules:
-                    for act in rule.actions:
+                    (_,_,actions,_) = rule
+                    for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
                                 bucket_list[id(act)] = act
                 return bucket_list
 
-            def start_update(bucket_list):
-                for b in bucket_list.values():
-                    b.start_update()
-
-            def hook_buckets_to_rule(rule):
-                for act in rule.actions:
+            def update_rules_for_buckets(rule, op):
+                (match, priority, actions, version) = rule
+                hashable_match = util.frozendict(match)
+                rule_key = (hashable_match, priority, version)
+                for act in actions:
                     if isinstance(act, CountBucket):
-                        act.add_match(rule.match)
+                        if op == "add":
+                            act.add_match(match, priority, version)
+                        elif op == "delete":
+                            act.delete_match(match, priority, version)
+                            self.add_global_outstanding_delete(rule_key, act)
+                        elif op == "stay" or op == "modify":
+                            if act.is_new_bucket():
+                                act.add_match(match, priority, version,
+                                              existing_rule=True)
 
-            def hook_buckets_to_pull_stats(bucket_list):
-                for b in bucket_list.values():
-                    b.add_pull_stats(self.pull_stats_for_bucket(b))
-
-            def finish_update(bucket_list):
-                for b in bucket_list.values():
-                    b.finish_update()
+                # debug: check the existence of entries in outstanding_deletes
+                # for all buckets in actions list, if op is deleting the rule.
+                if op == "delete":
+                    with self.global_outstanding_deletes_lock:
+                        for act in actions:
+                            if isinstance(act, CountBucket):
+                                assert (rule_key in
+                                        self.global_outstanding_deletes)
+                                assert (act in
+                                        self.global_outstanding_deletes[rule_key])
 
             with self.update_buckets_lock:
                 """The start_update and finish_update functions per bucket guard
@@ -499,26 +579,41 @@ class Runtime(object):
                 "update buckets" lock guards against inconsistent classifier
                 match state *across* buckets.
                 """
-                bucket_list = collect_buckets(classifier.rules)
-                start_update(bucket_list)
-                map(hook_buckets_to_rule, classifier.rules)
-                hook_buckets_to_pull_stats(bucket_list)
-                finish_update(bucket_list)
+                (to_add, to_delete, to_modify, to_stay) = diff_lists
+                all_rules = to_add + to_delete + to_modify + to_stay
+                bucket_list = collect_buckets(all_rules)
+                map(lambda x: x.start_update(), bucket_list.values())
+                map(lambda x: update_rules_for_buckets(x, "add"), to_add)
+                map(lambda x: update_rules_for_buckets(x, "delete"), to_delete)
+                map(lambda x: update_rules_for_buckets(x, "stay"), to_stay)
+                map(lambda x: update_rules_for_buckets(x, "modify"), to_modify)
+                map(lambda x: x.add_pull_stats(self.pull_stats_for_bucket(x)),
+                    bucket_list.values())
+                map(lambda x: x.add_pull_existing_stats(
+                        self.pull_existing_stats_for_bucket(x)),
+                    bucket_list.values())
+                map(lambda x: x.finish_update(), bucket_list.values())
         
-        def remove_buckets(classifier):
+        def remove_buckets(diff_lists):
             """
             Remove CountBucket policies from classifier rule actions.
             
-            :param classifier: the input classifer
-            :type classifier: Classifier
-            :returns: the output classifier
-            :rtype: Classifier
+            :param diff_lists: difference lists between new and old classifier
+            :type diff_lists: 4 tuple of rule lists.
+            :returns: new difference lists with bucket actions removed
+            :rtype: 4 tuple of rule lists.
             """
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: 
-                                          not isinstance(a, CountBucket),
-                                          rule.actions))
-                              for rule in classifier.rules)
+            new_diff_lists = []
+            for lst in diff_lists:
+                new_lst = []
+                for rule in lst:
+                    (match,priority,acts,version) = rule
+                    new_acts = filter(lambda x: not isinstance(x, CountBucket),
+                                      acts)
+                    new_rule = (match, priority, new_acts, version)
+                    new_lst.append(new_rule)
+                new_diff_lists.append(new_lst)
+            return new_diff_lists
 
         def switchify(classifier,switches):
             """
@@ -575,7 +670,7 @@ class Runtime(object):
                     if a == Controller:
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
-                        return { k:v for (k,v) in a.map.items() }
+                        return { k:v for (k,v) in a.map.iteritems() }
                     else: # default
                         return a
                 m = concretize_match(rule.match)
@@ -603,27 +698,40 @@ class Runtime(object):
                         if fields - moded_fields:
                             raise TypeError('Non-compilable rule',str(r))  
             for r in classifier.rules:
-                check_OF_rule_has_outport(r)
-                check_OF_rule_has_compilable_action_list(r)
+                r_minus_queries = Rule(r.match,
+                                       filter(lambda x:
+                                              not isinstance(x, Query),
+                                              r.actions))
+                check_OF_rule_has_outport(r_minus_queries)
+                check_OF_rule_has_compilable_action_list(r_minus_queries)
             return Classifier(classifier.rules)
 
         def OF_inportize(classifier):
             """
             Specialize classifier to ensure that packets to be forwarded 
             out the inport on which they arrived are handled correctly.
-            
+
             :param classifier: the input classifer
+            :param switch_to_attrs: switch to attributes map
             :type classifier: Classifier
+            :type switch_to_attrs: dictionary switch to attrs
             :returns: the output classifier
             :rtype: Classifier
             """
-            import copy
             def specialize_actions(actions,outport):
-                new_actions = copy.deepcopy(actions)
+                new_actions = []
+                for act in actions:
+                    if not isinstance(act, CountBucket):
+                        new_actions.append(copy.deepcopy(act))
+                    else:
+                        new_actions.append(act) # can't make copies of
+                                                # CountBuckets without
+                                                # forking
                 for action in new_actions:
                     try:
-                        if action['outport'] == outport:
-                            action['outport'] = OFPP_IN_PORT
+                        if not isinstance(action, CountBucket):
+                            if action['outport'] == outport:
+                                action['outport'] = OFPP_IN_PORT
                     except:
                         raise TypeError  # INVARIANT: every set of actions must go out a port
                                          # this may not hold when we move to OF 1.3
@@ -631,7 +739,8 @@ class Runtime(object):
 
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: (a['outport'] != OFPP_CONTROLLER 
+                phys_actions = filter(lambda a: (not isinstance(a, CountBucket)
+                                                 and a['outport'] != OFPP_CONTROLLER
                                                  and a['outport'] != OFPP_IN_PORT),
                                       rule.actions)
                 outports_used = map(lambda a: a['outport'], phys_actions)
@@ -672,10 +781,9 @@ class Runtime(object):
                 try:
                     priority[s] -= 1
                 except KeyError:
-                    priority[s] = 60000
+                    priority[s] = TABLE_START_PRIORITY
                 tuple_rules.append((rule.match,priority[s],rule.actions))
             return tuple_rules
-
 
         def optimize(classifier):
             """ Optimize the classifier by removing extra rules """
@@ -684,29 +792,32 @@ class Runtime(object):
             return classifier
 
         ### UPDATE LOGIC
-        def nuclear_install(classifier):
-            """
-            Delete all rules currently installed on switches and then
-            install input classifier from scratch.
-            
+
+        def nuclear_install(new_rules, curr_classifier_no):
+            """Delete all rules currently installed on switches and then install
+            input classifier from scratch. This function installs the new
+            classifier through send_clear's first followed by install_rule's,
+            instead of the (safer) rule deletes and rule adds. However it's
+            retained here in case it's needed later for performance.
+
+            The main trouble with clearing a switch flow table with a send_clear
+            instead of a rule-by-rule send_delete is that there are no flow
+            removed messages which get to the controller. These flow removed
+            messages are important to accurately count buckets as rules get
+            deleted due to classifier revisions.
+
             :param classifier: the input classifer
             :type classifier: Classifier
             """
             switch_attrs_tuples = self.network.topology.nodes(data=True)
             switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
             switches = switch_to_attrs.keys()
-            classifier = switchify(classifier,switches)
-            classifier = optimize(classifier)
-            classifier = concretize(classifier)
-            classifier = check_OF_rules(classifier)
-            classifier = OF_inportize(classifier)
-            new_rules = prioritize(classifier)
 
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_defaults(s)
 
             for rule in new_rules:
                 self.install_rule(rule)
@@ -726,123 +837,276 @@ class Runtime(object):
                     return rule
             return None
 
-        def install_diff_rules(classifier):
-            """
-            Calculate and install the difference between the input classifier
-            and the current switch tables.
-            
-            :param classifier: the input classifer
-            :type classifier: Classifier
+        def get_new_rules(classifier, curr_classifier_no):
+            def add_version(rules, version):
+                new_rules = []
+                for r in rules:
+                    new_rules.append(r + (version,))
+                return new_rules
+
+            switch_attrs_tuples = self.network.topology.nodes(data=True)
+            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+            switches = switch_to_attrs.keys()
+
+            classifier = switchify(classifier,switches)
+            classifier = optimize(classifier)
+            classifier = concretize(classifier)
+            classifier = check_OF_rules(classifier)
+            classifier = OF_inportize(classifier)
+            new_rules = prioritize(classifier)
+            new_rules = add_version(new_rules, curr_classifier_no)
+            return new_rules
+
+        def get_nuclear_diff(new_rules):
+            """Compute diff lists for a nuclear install, i.e., when all rules
+            are removed and the full new classifier is installed afresh.
             """
             with self.old_rules_lock:
-                old_rules = self.old_rules
-                switch_attrs_tuples = self.network.topology.nodes(data=True)
-                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-                switches = switch_to_attrs.keys()
-                classifier = switchify(classifier,switches)
-                classifier = optimize(classifier)
-                classifier = concretize(classifier)
-                classifier = OF_inportize(classifier)
-                new_rules = prioritize(classifier)
+                to_delete = copy.copy(self.old_rules)
+                to_add = new_rules
+                to_modify = list()
+                to_stay = list()
+                self.old_rules = new_rules
+            return (to_add, to_delete, to_modify, to_stay)
 
+        def get_incremental_diff(new_rules):
+            """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
+            (versioned) classifier."""
+            def different_actions(old_acts, new_acts):
+                def buckets_removed(acts):
+                    return filter(lambda a: not isinstance(a, CountBucket),
+                                  acts)
+                return buckets_removed(old_acts) != buckets_removed(new_acts)
+
+            with self.old_rules_lock:
                 # calculate diff
+                old_rules = self.old_rules
                 to_add = list()
                 to_delete = list()
                 to_modify = list()
+                to_modify_old = list() # old counterparts of modified rules
+                to_stay = list()
                 for old in old_rules:
                     new = find_same_rule(old, new_rules)
                     if new is None:
                         to_delete.append(old)
                     else:
-                        if old[2] != new[2]:
-                            to_modify.append(new)
-    
+                        (new_match,new_priority,new_actions,_) = new
+                        (_,_,old_actions,old_version) = old
+                        if different_actions(old_actions, new_actions):
+                            modified_rule = (new_match, new_priority,
+                                             new_actions, old_version)
+                            to_modify.append(modified_rule)
+                            to_modify_old.append(old)
+                            # We also add the new and old rules to the to_add
+                            # and to_delete lists (resp.) to keep track of the
+                            # changes to be made to old_rules. These are later
+                            # removed from to_add and to_delete when returning.
+                            to_add.append(modified_rule)
+                            to_delete.append(old)
+                        else:
+                            to_stay.append(old)
+
                 for new in new_rules:
                     old = find_same_rule(new, old_rules)
                     if old is None:
                         to_add.append(new)
-    
-                # install diff
-                if not to_add is None:
-                    for rule in to_add:
-                        self.install_rule(rule)
-                for rule in to_delete:
-                    if rule[0]['switch'] in switches:
-                        self.delete_rule((rule[0], rule[1]))
-                for rule in to_modify:
-                    self.delete_rule((rule[0], rule[1]))
-                    self.install_rule(rule)
-    
-                # update old_rule
-                del old_rules[0:len(old_rules)]
-                for rule in new_rules:
-                    old_rules.append(rule)
 
+                # update old_rules to reflect changes in the classifier
+                for rule in to_delete:
+                    self.old_rules.remove(rule)
+                for rule in to_add:
+                    self.old_rules.append(rule)
+                # see note above where to_modify* lists are populated.
+                for rule in to_modify:
+                    to_add.remove(rule)
+                for rule in to_modify_old:
+                    to_delete.remove(rule)
+
+            return (to_add, to_delete, to_modify, to_stay)
+
+        def get_diff_lists(new_rules):
+            assert self.mode in ['proactive0', 'proactive1']
+            if self.mode == 'proactive0':
+                return get_nuclear_diff(new_rules)
+            elif self.mode == 'proactive1':
+                return get_incremental_diff(new_rules)
+
+        def install_diff_lists(diff_lists, classifier_version_no):
+            """Install the difference between the input classifier and the
+            current switch tables. The function takes the set of rules (added,
+            deleted, modified, untouched), and does necessary flow
+            installs/deletes/modifies.
+            
+            :param diff_lists: list of rules to add, delete, modify, stay.
+            :type diff_lists: 4 tuple of rule lists
+            :param classifier_version_no: version of the classifier after
+            controller bootup
+            :type classifier_version_no: int
+            """
+            (to_add, to_delete, to_modify, to_stay) = diff_lists
+            switch_attrs_tuples = self.network.topology.nodes(data=True)
+            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
+            switches = switch_to_attrs.keys()
+
+            # If the controller just came up, clear out the switches.
+            if classifier_version_no == 1 or self.mode == 'proactive0':
                 for s in switches:
                     self.send_barrier(s)
+                    self.send_clear(s)
+                    self.send_barrier(s)
+                    self.install_defaults(s)
+
+            # There's no need to delete rules if nuclear install:
+            if self.mode == 'proactive0':
+                to_delete = list()
+                to_modify = list()
+                to_stay   = list()
+
+            if to_delete:
+                for rule in to_delete:
+                    (match_dict,priority,_,_) = rule
+                    if match_dict['switch'] in switches:
+                        self.delete_rule((match_dict, priority))
+            if to_add:
+                for rule in to_add:
+                    self.install_rule(rule)
+            if to_modify:
+                for rule in to_modify:
+                    self.modify_rule(rule)
+            for s in switches:
+                self.send_barrier(s)
+            self.log.debug('\n-----\n\n\ninstalled new set of rules\n\n\n----')
+
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(classifier):
+        def f(diff_lists,curr_version_no):
+            self.send_reset_install_time()
             with self.switch_lock:
-                if self.mode == 'proactive0':
-                    nuclear_install(classifier)
-                elif self.mode == 'proactive1':
-                    install_diff_rules(classifier)
+                install_diff_lists(diff_lists,curr_version_no)
+
+        curr_version_no = None
+        with self.classifier_version_lock:
+            self.classifier_version_no += 1
+            curr_version_no = self.classifier_version_no
 
         # Process classifier to an openflow-compatible format before
         # sending out rule installs
         #classifier = send_drops_to_controller(classifier)
         classifier = remove_identity(classifier)
+        classifier = remove_path_buckets(classifier)
         classifier = controllerify(classifier)
         classifier = layer_3_specialize(classifier)
         classifier = layer_4_specialize(classifier)
-        # classifier = vlan_specialize(classifier)
-        bookkeep_buckets(classifier)
-        classifier = remove_buckets(classifier)
 
-        p = Process(target=f,args=(classifier,))
+        # TODO(ngsrinivas): As of OVS 1.9, vlan_specialize seems unnecessary to
+        # keep track of rules that match packets without a VLAN, to the best of
+        # my knowledge. I'm retaining this here just in case there are VLAN rule
+        # installation issues later on. Can be removed in the future if there
+        # are no obvious issues.
+
+        # classifier = vlan_specialize(classifier)
+
+        # Get diffs of rules to install from the old (versioned) classifier. The
+        # bookkeeping and removing of bucket actions happens at the end of the
+        # whole pipeline, because buckets need very precise mappings to the
+        # rules installed by the runtime.
+        new_rules = get_new_rules(classifier, curr_version_no)
+        self.log.debug("Number of rules in classifier: %d" % len(new_rules))
+        diff_lists = get_diff_lists(new_rules)
+        bookkeep_buckets(diff_lists)
+        diff_lists = remove_buckets(diff_lists)
+
+        self.log.info('================================')
+        self.log.info('Final classifier to be installed:')
+        for rule in new_rules:
+            self.log.info(str(rule))
+        self.log.info('================================')
+
+        p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
         p.start()
-
 
 ###################
 # QUERYING SUPPORT
 ###################
+
+    def pull_switches_for_preds(self, concrete_preds, bucket):
+        """Given a list of concrete predicates, query the list of switches
+        corresponding to the switches where these predicates apply.
+        """
+        switch_list = []
+        if not concrete_preds:
+            return False
+        self.log.debug('-------------------------------------------------------------')
+        self.log.debug('--- In pull_switches_for_preds: printing concrete predicates:')
+        for concrete_pred in concrete_preds:
+            self.log.debug(str(concrete_pred))
+        self.log.debug('-------------------------------------------------------------')
+        for concrete_pred in concrete_preds:
+            if 'switch' in concrete_pred:
+                switch_id = concrete_pred['switch']
+                if not switch_id in switch_list:
+                    switch_list.append(switch_id)
+            else:
+                switch_list = self.network.topology.nodes()
+                break
+        self.log.info('Pulling stats from switches '
+                      + str(switch_list) + ' for bucket ' +
+                      str(id(bucket)))
+        for s in switch_list:
+            bucket.add_outstanding_switch_query(s)
+            already_queried = self.add_global_outstanding_query(s, bucket)
+            if not already_queried:
+                self.request_flow_stats(s)
+                self.log.debug('in pull_stats: sent out stats query to switch '
+                               + str(s))
+            else:
+                self.log.debug("in pull_stats: didn't send stats req to switch"
+                               + str(s))
+        return True
 
     def pull_stats_for_bucket(self,bucket):
         """
         Returns a function that can be used by counting buckets to
         issue queries from the runtime."""
         def pull_bucket_stats():
-            switch_list = []
-            for m in bucket.matches:
-                if m == identity:
-                    concrete_pred = {}
-                else:
-                    assert(isinstance(m, match))
-                    concrete_pred = { k:v for (k,v) in m.map.items() }
-                if 'switch' in concrete_pred:
-                    switch_list.append(concrete_pred['switch'])
-                else:
-                    switch_list = self.network.topology.nodes()
-                    break
-            for s in switch_list:
-                bucket.add_outstanding_switch_query(s)
-                already_queried = self.add_global_outstanding_query(s, bucket)
-                if not already_queried:
-                    self.request_flow_stats(s)
+            preds = [me.match for me in bucket.matches.keys()]
+            return self.pull_switches_for_preds(preds, bucket)
         return pull_bucket_stats
 
-    def add_global_outstanding_query(self, s, bucket):
-        already_queried = False
-        with self.global_outstanding_queries_lock:
-            if not s in self.global_outstanding_queries:
-                self.global_outstanding_queries[s] = [bucket]
+    def pull_existing_stats_for_bucket(self,bucket):
+        """Returns a function that is called by new counting buckets which have
+        at least one rule that was already created in an earlier classifier.
+        """
+        def pull_existing_bucket_stats():
+            preds = [me.match for me,ms in bucket.matches.items() if ms.existing_rule]
+            return self.pull_switches_for_preds(preds, bucket)
+        return pull_existing_bucket_stats
+
+    def add_global_outstanding(self, global_dict, global_lock, key, val):
+        """Helper function for adding a mapping for an outstanding query or rule
+        to objects (i.e., buckets) which are waiting for them."""
+        entry_found = False
+        with global_lock:
+            if not key in global_dict:
+                global_dict[key] = [val]
             else:
-                self.global_outstanding_queries[s].append(bucket)
-                already_queried = True
-        return already_queried
+                if not val in global_dict[key]:
+                    global_dict[key].append(val)
+                entry_found = True
+        return entry_found
+
+    def add_global_outstanding_query(self, s, bucket):
+        return self.add_global_outstanding(self.global_outstanding_queries,
+                                           self.global_outstanding_queries_lock,
+                                           s, bucket)
+
+    def add_global_outstanding_delete(self, rule, bucket):
+        return self.add_global_outstanding(self.global_outstanding_deletes,
+                                           self.global_outstanding_deletes_lock,
+                                           rule, bucket)
 
 
 ####################################
@@ -862,15 +1126,11 @@ class Runtime(object):
                 return IP(val)
             else:
                 return val
-        try:
-            vlan_id = packet['vlan_id']
-            vlan_pcp = packet['vlan_pcp']
-            extended_values = self.decode_extended_values(vlan_id, vlan_pcp)
-        except KeyError:
-            extended_values = util.frozendict()       
-        pyretic_packet = Packet(extended_values)
-        d = { h : convert(h,v) for (h,v) in packet.items() if not h in ['vlan_id','vlan_pcp'] }
+
+        pyretic_packet = Packet(util.frozendict())
+        d = { h : convert(h,v) for (h,v) in packet.items() }
         return pyretic_packet.modifymany(d)
+
     def pyretic2concrete(self,packet):
         concrete_packet = {}
         headers         = {}
@@ -894,11 +1154,8 @@ class Runtime(object):
                 headers[header] = val
             except:
                 pass
-        extended_values = extended_values_from(packet)
-        if extended_values:
-            vlan_id, vlan_pcp = self.encode_extended_values(extended_values)
-            concrete_packet['vlan_id'] = vlan_id
-            concrete_packet['vlan_pcp'] = vlan_pcp
+
+        concrete_packet = dict(concrete_packet.items() + virtual_field.expand(headers).items())
         concrete_packet['raw'] = get_packet_processor().pack(headers)
         return concrete_packet
 
@@ -906,15 +1163,22 @@ class Runtime(object):
 # TO OPENFLOW         
 #######################
 
+    def send_reset_install_time(self):
+        self.backend.send_reset_install_time()
+
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
-    def install_rule(self,(concrete_pred,priority,action_list)):
+    def install_rule(self,(concrete_pred,priority,action_list,cookie)):
         self.log.debug(
             '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
                 "sending openflow rule:",
-                (str(priority) + " " + repr(concrete_pred) + " "+ repr(action_list))))
-        self.backend.send_install(concrete_pred,priority,action_list)
+                (str(priority) + " " + repr(concrete_pred) + " "+
+                 repr(action_list) + " " + repr(cookie))))
+        self.backend.send_install(concrete_pred,priority,action_list,cookie)
+
+    def modify_rule(self, (concrete_pred,priority,action_list,cookie)):
+        self.backend.send_modify(concrete_pred,priority,action_list,cookie)
 
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
@@ -932,7 +1196,7 @@ class Runtime(object):
                 self.send_barrier(s)
                 self.send_clear(s)
                 self.send_barrier(s)
-                self.install_rule(({'switch' : s},TABLE_MISS_PRIORITY,[{'outport' : OFPP_CONTROLLER}]))
+                self.install_defaults(s)
         p = Process(target=f)
         p.daemon = True
         p.start()
@@ -966,44 +1230,135 @@ class Runtime(object):
     def handle_link_update(self, s1, p_no1, s2, p_no2):
         self.network.handle_link_update(s1, p_no1, s2, p_no2)
 
+    def ofp_convert(self,f,val):
+        """Helper to parse the match structure received from the backend."""
+        if f == 'match':
+            import ast
+            val = ast.literal_eval(val)
+            return { g : self.ofp_convert(g,v) for g,v in val.items() }
+        if f == 'actions':
+            import ast
+            vals = ast.literal_eval(val)
+            return [ { g : self.ofp_convert(g,v) for g,v in val.items() }
+                     for val in vals ]
+        if f in ['srcmac','dstmac']:
+            return MAC(val)
+        elif f in ['srcip','dstip']:
+            return IP(val)
+        else:
+            return val
+
+    def flow_stat_str(self, flow_stat):
+        """Helper to print flow stats as strings."""
+        output = str(flow_stat['priority']) + ':\t'
+        output += str(flow_stat['match']) + '\n\t->'
+        output += str(flow_stat.get('actions', [])) + '\n\t'
+        output += 'packet_count=' + str(flow_stat['packet_count'])
+        output += '\tbyte_count=' + str(flow_stat['byte_count'])
+        output += '\n\t cookie: \t' + str(flow_stat['cookie'])
+        return output
+
     def handle_flow_stats_reply(self, switch, flow_stats):
-        def convert(f,val):
-            if f == 'match':
-                import ast
-                val = ast.literal_eval(val)
-                return { g : convert(g,v) for g,v in val.items() }
-            if f == 'actions':
-                import ast
-                vals = ast.literal_eval(val)
-                return [ { g : convert(g,v) for g,v in val.items() }
-                         for val in vals ]
-            if f in ['srcmac','dstmac']:
-                return MAC(val)
-            elif f in ['srcip','dstip']:
-                return IP(val)
-            else:
-                return val
-        flow_stats = [ { f : convert(f,v) 
+        self.log.info('received a flow stats reply from switch ' + str(switch))
+        flow_stats = [ { f : self.ofp_convert(f,v)
                          for (f,v) in flow_stat.items() }
                        for flow_stat in flow_stats       ]
         flow_stats = sorted(flow_stats, key=lambda d: -d['priority'])
-        def flow_stat_str(flow_stat):
-            output = str(flow_stat['priority']) + ':\t' 
-            output += str(flow_stat['match']) + '\n\t->'
-            output += str(flow_stat['actions']) + '\n\t'
-            output += 'packet_count=' + str(flow_stat['packet_count']) 
-            output += '\tbyte_count=' + str(flow_stat['byte_count'])
-            return output
         self.log.debug(
             '|%s|\n\t%s\n' % (str(datetime.now()),
                 '\n'.join(['flow table for switch='+repr(switch)] + 
-                    [flow_stat_str(f) for f in flow_stats])))
+                    [self.flow_stat_str(f) for f in flow_stats])))
+        # Debug prints whenever some flow has non-zero counters
+        for f in flow_stats:
+            extracted_pkts = f['packet_count']
+            extracted_bytes = f['byte_count']
+            if extracted_pkts > 0:
+                self.log.debug('in stats_reply: found a non-zero stats match:\n' +
+                               str(f))
+                self.log.debug('packets: ' + str(extracted_pkts) + ' bytes: ' +
+                               str(extracted_bytes))
         with self.global_outstanding_queries_lock:
             if switch in self.global_outstanding_queries:
                 for bucket in self.global_outstanding_queries[switch]:
                     bucket.handle_flow_stats_reply(switch, flow_stats)
                 del self.global_outstanding_queries[switch]
-            
+            self.log.debug('in stats_reply: outstanding switches is now:' +
+                           str(self.global_outstanding_queries) )
+
+    def handle_flow_removed(self, dpid, flow_stat_dict):
+        def str_convert_match(m):
+            """ Convert incoming flow stat matches into a form compatible with
+            stored match entries. """
+            new_dict = {}
+            for k,v in m.iteritems():
+                if not (k == 'srcip' or k == 'dstip'):
+                    new_dict[k] = v
+                else:
+                    new_dict[k] = str(v.ip)
+            return new_dict
+        flow_stat = { f : self.ofp_convert(f,v)
+                      for (f,v) in flow_stat_dict.items() }
+        self.log.debug(
+            '|%s|\n\t%s\n\t%s' %
+            (str(datetime.now()), "flow removed message: rule:",
+             self.flow_stat_str(flow_stat)))
+        with self.global_outstanding_deletes_lock:
+            f = flow_stat
+            rule_match = str_convert_match(
+                match(f['match']).intersect(match(switch=dpid)).map)
+            priority = f['priority']
+            version = f['cookie']
+            match_entry = (util.frozendict(rule_match), priority, version)
+            if f['packet_count'] > 0:
+                self.log.debug("Got removed flow\n%s with counts %d %d" %
+                               (str(match_entry), f['packet_count'],
+                                f['byte_count']) )
+                self.log.debug('Printing global structure for deleted rules:')
+                for k,v in self.global_outstanding_deletes.iteritems():
+                    self.log.debug(str(k) + " : " + str(v))
+            if match_entry in self.global_outstanding_deletes:
+                if f['packet_count'] > 0:
+                    self.log.debug("Membership test passed; non-zero # packets!")
+                bucket_list = self.global_outstanding_deletes[match_entry]
+                for bucket in bucket_list:
+                    self.log.debug("Sending bucket %d a flow removed msg" %
+                                  id(bucket))
+                    bucket.handle_flow_removed(rule_match, priority, version, f)
+                del self.global_outstanding_deletes[match_entry]
+
+################################################################################
+# Topology Transfer and Full Policy Functions
+################################################################################
+    def get_topology_policy(self):
+        switch_edges = self.network.topology.edges(data=True)
+        pol = drop
+        for (s1, s2, ports) in switch_edges:
+            p1 = ports[s1]
+            p2 = ports[s2]
+            link_transfer_policy = ((match(switch=s1,outport=p1) >>
+                                     modify(switch=s2,inport=p2,outport=None)) +
+                                    (match(switch=s2,outport=p2) >>
+                                     modify(switch=s1,inport=p1,outport=None)))
+            if pol == drop:
+                pol = link_transfer_policy
+            else:
+                pol += link_transfer_policy
+        return pol
+
+    def get_egress_policy(self):
+        pol = drop
+        for p in self.network.topology.egress_locations():
+            sw_no = p.switch
+            port_no = p.port_no
+            egress_match = match(switch=sw_no,outport=port_no)
+            if pol == drop:
+                pol = egress_match
+            else:
+                pol += egress_match
+        return pol
+
+    def get_fwding_policy(self):
+        return self.policy
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
@@ -1031,7 +1386,8 @@ class Runtime(object):
 def extended_values_from(packet):
     extended_values = {}
     for k, v in packet.header.items():
-        if k not in basic_headers + content_headers + location_headers and v:
+        if ((k not in basic_headers + content_headers + location_headers) and
+            (not v is None)):
             extended_values[k] = v
     return util.frozendict(extended_values)
 
@@ -1217,3 +1573,88 @@ class ConcreteNetwork(Network):
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         self.debug_log.debug(self.next_topo)
         self.queue_update(self.get_update_no())
+
+################################################################################
+# Virtual Fields
+################################################################################
+class virtual_field:
+    def __init__(self, name, values, type="string"):
+        self.name   = name
+        self.values = values
+        # We need a None value as well
+        self.cardinality = len(values) + 1
+        self.type   = type
+        virtual_field.fields[name] = self
+
+    def index(self,key):
+        try:
+            return self.values.index(key) + 1
+        except ValueError as e:
+            if key == None:
+                return 0
+            raise e
+
+    def value(self,index):
+        try:
+            return self.values[index-1]
+        except ValueError as e:
+            if index == 0:
+                return None
+            raise e
+
+    @classmethod
+    def compress(cls,fields):
+        virtual_fields = virtual_field.fields
+        vf_names       = virtual_fields.keys()
+
+        def vhs_to_num(fields):
+            vheaders = dict(filter(lambda a: a[0] in vf_names, fields.iteritems()))
+            # If we there are no virtual_fields specified we wouldn't want to match on them at all
+            # Just return -1 so that calling function knows that the predicate doesn't have any virtual
+            # fields on it
+            if len(vheaders) == 0: return -1
+
+            for n in vf_names:
+                if n not in vheaders:
+                    vheaders[n] = None
+            ret,temp = 0,1
+            for n,vf in virtual_fields.iteritems():
+                ret *= temp
+                ret += vf.index(vheaders[n])
+                temp = vf.cardinality
+
+            return ret
+        return vhs_to_num(fields)
+
+    @classmethod
+    def expand(cls,fields):
+        if 'vlan_id' not in fields:
+            return {}
+
+        virtual_fields = virtual_field.fields
+        vf_names       = virtual_fields.keys()
+        num = fields['vlan_pcp'] << 12 + fields['vlan_id']
+
+        def num_to_vhs(num):
+            # If we there are no virtual_fields specified we wouldn't want to match on them at all
+            # Just return -1 so that calling function knows that the predicate doesn't have any virtual
+            # fields on it
+            vfs = {}
+            tmp = num
+            for n,vf in reversed(virtual_fields.items()):
+                val    = tmp % vf.cardinality
+                tmp    = tmp / vf.cardinality
+                vfs[n] = vf.value(val)
+
+            return vfs
+        return num_to_vhs(num)
+
+    @classmethod
+    def map_to_vlan(cls,num):
+        if num == -1: return {}
+        return {
+           "vlan_id" : 0b000111111111111 & num,
+           "vlan_pcp": 0b111000000000000 & num
+        }
+
+virtual_field.fields = {}

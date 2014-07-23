@@ -2,7 +2,7 @@ import os
 import sys
 import pyretic
 
-VENDOR_LIBS = [ 'vendor/ryu' ]
+VENDOR_LIBS = [ 'vendor/ryu', 'vendor/pydot' ]
 PYRETIC_PATH = os.path.dirname(pyretic.__file__)
 
 # Load the vendor libs

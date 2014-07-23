@@ -38,6 +38,7 @@ from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.query import *
 from pyretic.modules.mac_learner import mac_learner
+from datetime import datetime
 
 def packet_count_printer(counts):
     print "----counts------"
@@ -57,10 +58,24 @@ def byte_counts():
   q.register_callback(byte_count_printer)
   return q
 
+def proactive_counts():
+    q = counts(2.5,['srcip','dstip'])
+    q.register_callback(proactive_counts_printer)
+    return q
+
+def proactive_counts_printer(counts):
+    print "----proactive counts----"
+    print datetime.now().time().isoformat()
+    if counts:
+        for pred, pkt_byte_count in counts.iteritems():
+            print pred, ':', pkt_byte_count
+    else:
+        print '{}'
 
 ### Main ###
 
 def main():
-    return (packet_counts() + 
-            byte_counts() + 
-            mac_learner())
+#    return (packet_counts() +
+#            byte_counts() +
+#            mac_learner())
+    return (proactive_counts() + mac_learner())

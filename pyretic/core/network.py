@@ -44,6 +44,8 @@ ARP_TYPE = 0x806
 IP_TYPE  = 0x800
 TCP_PROTO= 6
 UDP_PROTO= 17
+IPV6_TYPE = 0x86dd
+
 
 ################################################################################
 # Fixed width stuff

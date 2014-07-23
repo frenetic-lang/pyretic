@@ -34,11 +34,12 @@
 # pyretic: pyretic.py pyretic.examples.bucket -m p0                            #
 # test:    `h_i ping h_j` produce increasing (packet/byte) counts every        #
 #          10 seconds in buckets b_i.                                          #
-#          In i/r0 modes, reported counts from switches are always 0.          #
+#          Check under each test function for specific testing instructions.   #
 ################################################################################
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
+from pyretic.modules.mac_learner import mac_learner
 
 import time
 from datetime import datetime
@@ -66,25 +67,111 @@ class QueryTest(CountBucket):
         """Thread that issues stats queries every 10 seconds."""
         interval = 2.5
         while True:
-            output = str(datetime.now()) + "| bucket " + str(id(self)) + ": print matches\n"
-            for m in self.matches:
-                output += str(m) + '\n'
+            output = str(datetime.now()) + "| bucket " + str(id(self))
+            output += ": print matches\n"
+            output += self.get_matches()
+            # print output
             self.pull_stats()
-            output += 'issued query, going to sleep for %f' % interval
-            print output
+            print ">>>", str(datetime.now()), ('issued query %d, sleeping for %f' %
+                                               (id(self), interval))
             time.sleep(interval)
 
     def query_callback(self, counts):
-        print "*** In user callback for bucket", id(self)
+        print "***", str(datetime.now()), "| In user callback for bucket",
+        print id(self)
         print "(packet, byte) counts:", counts
+        print "-----------------------------------"
 
-def test_main1():
-    """Tests a single match that is counted."""
+def test0():
+    """Tests a single bucket that counts all packets.
+
+    Check correctness of bucket counts with the following wireshark capture
+    filters after starting capture on the _any_ interface. You may have to
+    change the x11 port in the filter below (typically 6010, but may vary --
+    verify from outputs of netstat or lsof on the terminal).
+
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) )
+
+    The expected number of packets/bytes printed from the buckets is same as the
+    number of packets/bytes displayed by wireshark or tshark with these
+    filters. They are designed to work under topology and policy updates.
+    """
     test_bucket = QueryTest()
-    return (match(srcip=ip1) >> test_bucket) + fwding
+    return test_bucket
 
-def test_main2():
-    """Tests buckets containing multiple matches for traffic."""
+def test1():
+    """Tests a single match that is counted.
+
+    Display filter for checking correctness:
+
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src ==
+    10.0.0.1 || (arp && arp.src.proto_ipv4 == 10.0.0.1) )
+    """
+    test_bucket = QueryTest()
+    return (match(srcip=ip1) >> test_bucket)
+
+def test2():
+    """Tests buckets containing multiple matches for traffic.
+
+    Display filters for checking correctness:
+
+    bucket 0:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src == 10.0.0.1 ||
+    ip.src == 10.0.0.3 )
+
+    bucket 1:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src ==
+    10.0.0.2 )
+    """
+    b = [] # counting buckets
+    for i in range(0,2):
+        b.append(QueryTest())
+        time.sleep(0.2)
+
+    pol1 = (match(ethtype=IP_TYPE) & match(srcip=ip1)) >> b[0]
+    pol2 = (match(ethtype=IP_TYPE) & match(srcip=ip2)) >> b[1]
+    pol3 = (match(ethtype=IP_TYPE) & match(srcip=ip3)) >> b[0]
+
+    return pol1 + pol2 + pol3
+
+def test3():
+    """Tests buckets containing multiple matches for traffic.
+
+    Display filters for checking correctness:
+
+    bucket 0:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src == 10.0.0.1 ||
+    ip.src == 10.0.0.3 || (arp && (arp.src.proto_ipv4 == 10.0.0.1 ||
+    arp.src.proto_ipv4 == 10.0.0.3 ) ) )
+
+    bucket 1:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src ==
+    10.0.0.2 || (arp && arp.src.proto_ipv4 == 10.0.0.2) )
+    """
     b = [] # counting buckets
     for i in range(0,2):
         b.append(QueryTest())
@@ -94,11 +181,31 @@ def test_main2():
     pol2 = match(srcip=ip2) >> b[1]
     pol3 = match(srcip=ip3) >> b[0]
 
-    return pol1 + pol2 + pol3 + fwding
+    return pol1 + pol2 + pol3
 
-def test_main3():
+def test4():
     """Test if the same traffic feeding into multiple buckets gets accounted
     correctly.
+
+    Display filters for checking correctness:
+
+    Buckets 0 and 1:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( (ip.src == 10.0.0.1
+    and ip.dst == 10.0.0.2) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    arp.dst.proto_ipv4 == 10.0.0.2 ) )
+
+    Bucket 2:
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( (ip.src == 10.0.0.1
+    and ip.dst == 10.0.0.3) || (arp && arp.src.proto_ipv4 == 10.0.0.1 &&
+    arp.dst.proto_ipv4 == 10.0.0.3 ) )
     """
     b = [] # counting buckets
     for i in range(0,3):
@@ -109,21 +216,63 @@ def test_main3():
     query2 = match(srcip=ip1) >> match(dstip=ip2) >> b[1]
     query3 = match(srcip=ip1) >> match(dstip=ip3) >> b[2]
 
-    return fwding + query1 + query2 + query3
+    return query1 + query2 + query3
 
-def test_main4():
-    """Test policy negation, but only for IP traffic."""
+def test5():
+    """Test policy negation, but only for IP traffic.
+
+    Display filter for checking correctness:
+
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ( (not ip.src ==
+    10.0.0.1) and ( ip.dst == 10.0.0.1 || ip.dst == 10.0.0.2 || ip.dst ==
+    10.0.0.3) ) || (arp && (not arp.src.proto_ipv4 == 10.0.0.1) &&
+    (arp.dst.proto_ipv4 == 10.0.0.1 || arp.dst.proto_ipv4 == 10.0.0.2 ||
+    arp.dst.proto_ipv4 == 10.0.0.3) ) )
+    """
     test_bucket = QueryTest()
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
                         (~match(srcip=ip1) & match(dstip=ip3)) +
                         (~match(srcip=ip1) & match(dstip=ip1)) )
-    return (matched_traffic >> test_bucket) + fwding
+    return (matched_traffic >> test_bucket)
 
-def test_main5():
-    """Test policy negation covering all other traffic."""
+def test6():
+    """Test policy negation covering all other traffic.
+
+    Display filter for checking correctness:
+
+    (not (ip.addr==192.168.0.0/16 or (arp and (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or (of
+    and not of.pktin) or ip.addr == 10.0.2.0/24 or (arp && ( arp.src.proto_ipv4
+    == 10.0.2.0/24 or arp.dst.proto_ipv4 == 10.0.2.0/24 ) ) or ipv6 ) ) and (not
+    ( (ip && ip.src == 10.0.0.1 ) or (arp && arp.src.proto_ipv4 == 10.0.0.1) or
+    ipv6))
+    """
     test_bucket = QueryTest()
     matched_traffic = ~match(srcip=ip1)
-    return (matched_traffic >> test_bucket) + fwding
+    return (matched_traffic >> test_bucket)
+
+def test7():
+    """Ensure no double counting of packets destined to controller.
+
+    Display filter for checking correctness:
+
+    (not (of or ip.addr==192.168.0.0/16 or (arp && (arp.src.proto_ipv4 ==
+    192.168.0.0/16 or arp.dst.proto_ipv4 == 192.168.0.0/16) ) or tcp.port==6011
+    or (tcp.port==6633 and not of) or tcp.port==41414 or sll.pkttype==4 or
+    ip.addr == 10.0.2.0/24 or (arp && (arp.src.proto_ipv4 == 10.0.2.0/24 or
+    arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and (ip.dst == 10.0.0.1 ||
+    (arp && (arp.dst.proto_ipv4 == 10.0.0.1 ) ) )
+    """
+    return ( (match(dstip=ip1) >> QueryTest()) +
+             (match(dstip=ip1) >> Controller) )
 
 def main():
-    return test_main1()
+    # examples:
+    # return test0() + fwding
+    # return test2() + mac_learner()
+    return mac_learner()

@@ -40,6 +40,8 @@ from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
 
+import time
+
 def inport_value_hack(outport):
     if outport > 1:
         return 1
@@ -59,6 +61,10 @@ class BackendChannel(asynchat.async_chat):
         self.ac_in_buffer_size = 4096 * 3
         self.ac_out_buffer_size = 4096 * 3
         self.set_terminator(TERM_CHAR)
+        self.start_time = 0
+        self.interval = 0
+        self.total_interval = 0
+        self.num_intervals  = 0
         return
 
     def handle_connect(self):
@@ -89,19 +95,35 @@ class BackendChannel(asynchat.async_chat):
         with self.of_client.channel_lock:
             msg = deserialize(self.received_data)
 
+        # Set up time for starting rule installs.
+        if msg[0] == 'reset_install_time':
+            self.start_time = time.time()
+            # TODO(): need logging levels in of client also!
+            # print "[path_queries] Last rule interval:", self.interval,
+            self.total_interval += self.interval
+            self.num_intervals  += 1
+            # print "total:", self.total_interval,
+            # print "num:", self.num_intervals
+            self.interval = 0
+
         # USE DESERIALIZED MSG
-        if msg[0] == 'inject_discovery_packet':
+        elif msg[0] == 'inject_discovery_packet':
             switch = msg[1]
             port = msg[2]
             self.of_client.inject_discovery_packet(switch,port)
         elif msg[0] == 'packet':
             packet = self.dict2OF(msg[1])
             self.of_client.send_to_switch(packet)
-        elif msg[0] == 'install':
+        elif msg[0] == 'install' or msg[0] == 'modify':
             pred = self.dict2OF(msg[1])
             priority = int(msg[2])
             actions = map(self.dict2OF,msg[3])
-            self.of_client.install_flow(pred,priority,actions)
+            cookie = int(msg[4])
+            if msg[0] == 'install':
+                self.of_client.install_flow(pred,priority,actions,cookie)
+            else:
+                self.of_client.modify_flow(pred,priority,actions,cookie)
+            self.interval = time.time() - self.start_time
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
             priority = int(msg[2])
@@ -127,6 +149,7 @@ class POXClient(revent.EventMixin):
         self.debug_packet_in = debug_packet_in
         self.packetno = 0
         self.channel_lock = threading.Lock()
+        self.send_time = 0.0
 
         if core.hasComponent("openflow"):
             self.listenTo(core.openflow)
@@ -339,7 +362,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def install_flow(self,pred,priority,action_list):
+    def flow_mod_action(self,pred,priority,action_list,cookie,command):
         switch = pred['switch']
         if 'inport' in pred:        
             inport = pred['inport']
@@ -347,11 +370,13 @@ class POXClient(revent.EventMixin):
             inport = None
         match = self.build_of_match(switch,inport,pred)
         of_actions = self.build_of_actions(inport,action_list)
-        msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
+        msg = of.ofp_flow_mod(command=command,
                               priority=priority,
                               idle_timeout=of.OFP_FLOW_PERMANENT,
                               hard_timeout=of.OFP_FLOW_PERMANENT,
                               match=match,
+                              flags=of.OFPFF_SEND_FLOW_REM,
+                              cookie=cookie,
                               actions=of_actions)
         try:
             self.switches[switch]['connection'].send(msg)
@@ -359,6 +384,12 @@ class POXClient(revent.EventMixin):
             print "WARNING:install_flow: %s to switch %d" % (str(e),switch)
         except KeyError, e:
             print "WARNING:install_flow: No connection to switch %d available" % switch
+
+    def install_flow(self,pred,priority,action_list,cookie):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD)
+
+    def modify_flow(self,pred,priority,action_list,cookie):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT)
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
@@ -388,7 +419,11 @@ class POXClient(revent.EventMixin):
         sr.body.match = match
         sr.body.table_id = 0xff
         sr.body.out_port = of.OFPP_NONE
-        self.switches[switch]['connection'].send(sr) 
+        try:
+            self.switches[switch]['connection'].send(sr)
+        except KeyError, e:
+            print ( ("ERROR:flow_stats_request: No connection to switch %d" +
+                     " available") % switch )
     
     def clear(self,switch=None):
         if switch is None:
@@ -532,6 +567,23 @@ class POXClient(revent.EventMixin):
             else:
                 raise RuntimeException("Unknown port status event")
 
+    def _handle_FlowRemoved(self, event):
+        dpid = event.connection.dpid
+        ofp = event.ofp
+        flow_stat_dict = {}
+        flow_stat_dict['match'] = self.of_match_to_dict(ofp.match)
+        flow_stat_dict['cookie'] = ofp.cookie
+        flow_stat_dict['priority'] = ofp.priority
+        flow_stat_dict['timeout'] = event.timeout
+        flow_stat_dict['hard_timeout'] = event.hardTimeout
+        flow_stat_dict['idle_timeout'] = event.idleTimeout
+        flow_stat_dict['deleted'] = event.deleted
+        flow_stat_dict['duration_sec'] = ofp.duration_sec
+        flow_stat_dict['duration_nsec'] = ofp.duration_nsec
+        flow_stat_dict['idle_timeout'] = ofp.idle_timeout
+        flow_stat_dict['packet_count'] = ofp.packet_count
+        flow_stat_dict['byte_count'] = ofp.byte_count
+        self.send_to_pyretic(['flow_removed', dpid, flow_stat_dict])
 
     def handle_lldp(self,packet,event):
         import pox.lib.packet as pkt

@@ -36,6 +36,7 @@ import struct
 import time
 from ipaddr import IPv4Network
 from bitarray import bitarray
+import logging
 
 from pyretic.core import util
 from pyretic.core.network import *
@@ -199,6 +200,10 @@ class Filter(Policy):
         """
         return negate([self])
 
+    def __hash__(self):
+        """ Hash function for using Filters in sets and dictionaries. """
+        return hash(repr(self))
+
 
 class Singleton(Filter):
     """Abstract policy from which Singletons descend"""
@@ -296,7 +301,6 @@ class Controller(Singleton):
     def __repr__(self):
         return "Controller"
     
-
 class match(Filter):
     """
     Match on all specified fields.
@@ -317,8 +321,6 @@ class match(Filter):
                     pass
             return map_dict
 
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
         self.map = util.frozendict(_get_processed_map(*args, **kwargs))
         self._classifier = self.generate_classifier()
         super(match,self).__init__()
@@ -331,33 +333,16 @@ class match(Filter):
         :type pkt: Packet
         :rtype: set Packet
         """
-
-        for field, pattern in self.map.iteritems():
-            try:
-                v = pkt[field]
-                if not field in ['srcip', 'dstip']:
-                    if pattern is None or pattern != v:
-                        return set()
-                else:
-                    v = util.string_to_IP(v)
-                    if pattern is None or not v in pattern:
-                        return set()
-            except Exception, e:
-                if pattern is not None:
-                    return set()
-        return {pkt}
+        return _match(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        r1 = Rule(self,{identity})
-        r2 = Rule(identity,set())
-        return Classifier([r1, r2])
+        return _match(**self.map).generate_classifier()
 
     def __eq__(self, other):
         return ( (isinstance(other, match) and self.map == other.map)
             or (other == identity and len(self.map) == 0) )
 
     def intersect(self, pol):
-
         def _intersect_ip(ipfx, opfx):
             most_specific = None
             if ipfx in opfx:
@@ -435,6 +420,49 @@ class match(Filter):
     def __repr__(self):
         return "match: %s" % ' '.join(map(str,self.map.items()))
 
+class _match(match):
+    def __init__(self, *args, **kwargs):
+        super(_match,self).__init__(*args, **kwargs)
+
+        self.map = self.translate_virtual_fields()
+
+    def generate_classifier(self):
+        r1 = Rule(self,{identity})
+        r2 = Rule(identity,set())
+        return Classifier([r1, r2])
+
+    def eval(self,pkt):
+        for field, pattern in self.map.iteritems():
+            try:
+                v = pkt[field]
+                if not field in ['srcip', 'dstip']:
+                    if pattern is None or pattern != v:
+                        return set()
+                else:
+                    v = util.string_to_IP(v)
+                    if pattern is None or not v in pattern:
+                        return set()
+            except Exception, e:
+                if pattern is not None:
+                    return set()
+        return {pkt}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map.update(
+          virtual_field.map_to_vlan(
+            virtual_field.compress(_vf)))
+
+        return util.frozendict(**_map)
 
 class modify(Policy):
     """
@@ -445,8 +473,9 @@ class modify(Policy):
     """
     ### init : List (String * FieldVal) -> List KeywordArg -> unit
     def __init__(self, *args, **kwargs):
-        if len(args) == 0 and len(kwargs) == 0:
-            raise TypeError
+        #TODO(Josh, Cole): why this check is here?
+        #if len(args) == 0 and len(kwargs) == 0:
+        #    raise TypeError
         self.map = dict(*args, **kwargs)
         self.has_virtual_headers = not \
             reduce(lambda acc, f:
@@ -464,14 +493,10 @@ class modify(Policy):
         :type pkt: Packet
         :rtype: set Packet
         """
-        return {pkt.modifymany(self.map)}
+        return _modify(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        if self.has_virtual_headers:
-            r = Rule(identity,{Controller})
-        else:
-            r = Rule(identity,{self})
-        return Classifier([r])
+        return _modify(**self.map).generate_classifier()
 
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))
@@ -480,6 +505,35 @@ class modify(Policy):
         return ( isinstance(other, modify)
            and (self.map == other.map) )
 
+class _modify(modify):
+    def __init__(self, *args, **kwargs):
+        super(_modify,self).__init__(*args, **kwargs)
+        # Translate virtual-fields
+        self.map = self.translate_virtual_fields()
+
+    def generate_classifier(self):
+        r = Rule(identity,{self})
+        return Classifier([r])
+
+    def eval(self,pkt):
+        return {pkt.modifymany(self.map)}
+
+    def translate_virtual_fields(self):
+        from pyretic.core.runtime import virtual_field
+        _map = {}
+        _vf  = {}
+
+        for field, pattern in self.map.iteritems():
+            if field in compilable_headers:
+                _map[field] = pattern
+            else:
+                _vf[field] = pattern
+
+        _map.update(
+          virtual_field.map_to_vlan(
+            virtual_field.compress(_vf)))
+
+        return _map
 
 # FIXME: Srinivas =).
 class Query(Filter):
@@ -521,8 +575,9 @@ class FwdBucket(Query):
     the controller.
     """
     def __init__(self):
+        super(FwdBucket, self).__init__()
+        self.log = logging.getLogger('%s.FwdBucket' % __name__)
         self._classifier = self.generate_classifier()
-        super(FwdBucket,self).__init__()
 
     def generate_classifier(self):
         return Classifier([Rule(identity,{Controller})])
@@ -530,17 +585,104 @@ class FwdBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
+                self.log.info('In FwdBucket apply(): packet is:\n' + str(pkt))
                 for callback in self.callbacks:
                     callback(pkt)
             self.bucket.clear()
     
     def __repr__(self):
-        return "FwdBucket"
+        return "FwdBucket %s" % str(id(self))
 
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should
         # be on names.
-        return isinstance(other, FwdBucket)
+        return isinstance(other, FwdBucket) and id(self) == id(other)
+
+
+class PathBucket(FwdBucket):
+    """
+    Class for registering callbacks on individual packets sent to controller,
+    but in addition to the packet, the entire trajectory of the packet is also
+    provided to the callbacks.
+    """
+    def __init__(self, require_original_pkt=False):
+        super(PathBucket, self).__init__()
+        self.runtime_topology_policy_fun = None
+        self.runtime_fwding_policy_fun = None
+        self.runtime_egress_policy_fun = None
+        self.require_original_pkt = require_original_pkt
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity,{self})])
+
+    def apply(self, original_pkt=None):
+        with self.bucket_lock:
+            packet_set = set()
+            if self.require_original_pkt and original_pkt:
+                packet_set.add(original_pkt)
+            else:
+                packet_set = self.bucket
+            for pkt in packet_set:
+                self.log.info('In PathBucket apply(): packet is:\n' + str(pkt))
+                paths = self.get_trajectories(pkt)
+                for callback in self.callbacks:
+                    callback(pkt, paths)
+            self.bucket.clear()
+
+    def set_topology_policy_fun(self, topo_pol_fun):
+        self.runtime_topology_policy_fun = topo_pol_fun
+
+    def set_fwding_policy_fun(self, fwding_pol_fun):
+        self.runtime_fwding_policy_fun = fwding_pol_fun
+
+    def set_egress_policy_fun(self, egress_pol_fun):
+        self.runtime_egress_policy_fun = egress_pol_fun
+
+    def get_trajectories(self, pkt):
+        from pyretic.core.language_tools import ast_map, default_mapper
+
+        def data_plane_mapper(parent, children):
+            if isinstance(parent, Query):
+                return drop
+            else:
+                return default_mapper(parent, children)
+
+        def packet_paths(pkt, topo, fwding, egress):
+            """Takes a packet, a topology policy, a forwarding policy, and a
+            filter to detect network egress, and returns a list of "packet
+            paths". A "packet path" is just an ordered list of located packets
+            denoting the trajectory of the input packet at switch ingresses,
+            except for the last element of the packet path which denotes packet
+            state at network egress.
+            """
+            at_egress = egress.eval(pkt)
+            if len(at_egress) == 1: # the pkt is already at network egress
+                return [pkt]
+
+            # Move packet one hop, then recursively enumerate paths.
+            pkts_moved = (fwding >> topo).eval(pkt)
+            full_paths = []
+            for p in pkts_moved:
+                suffix_paths = packet_paths(p, topo, fwding, egress)
+                for sp in suffix_paths:
+                    full_paths.append([pkt] + sp)
+
+            # Move packet one hop, then terminate paths if necessary
+            pkts_egressed = (fwding >> egress).eval(pkt)
+            for p in pkts_egressed:
+                full_paths.append([pkt, p])
+
+            return full_paths
+
+        if (self.runtime_topology_policy_fun and self.runtime_fwding_policy_fun
+            and self.runtime_egress_policy_fun):
+            topo = self.runtime_topology_policy_fun()
+            fwding = ast_map(data_plane_mapper,
+                             self.runtime_fwding_policy_fun())
+            egress = self.runtime_egress_policy_fun()
+            return packet_paths(pkt, topo, fwding, egress)
+        else:
+            return []
 
 
 class CountBucket(Query):
@@ -550,8 +692,9 @@ class CountBucket(Query):
     """
     def __init__(self):
         super(CountBucket, self).__init__()
-        self.matches = set([])
+        self.matches = {}
         self.runtime_stats_query_fun = None
+        self.runtime_existing_stats_query_fun = None
         self.outstanding_switches = []
         self.packet_count = 0
         self.byte_count = 0
@@ -559,20 +702,26 @@ class CountBucket(Query):
         self.byte_count_persistent = 0
         self.in_update_cv = Condition()
         self.in_update = False
+        self.new_bucket = True
+        # TODO(ngsrinivas) find a way to avoid having a log *per* bucket
+        self.log = logging.getLogger('%s.CountBucket' % __name__)
         self._classifier = self.generate_classifier()
-        
+
     def __repr__(self):
-        return "CountBucket"
+        return "CountBucket " + str(id(self))
 
-    def eval(self, pkt):
-        """
-        evaluate this policy on a single packet
+    def is_new_bucket(self):
+        return self.new_bucket
 
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        return set()
+    def get_matches(self):
+        """ Return matches contained in bucket as a string """
+        output = ""
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            for m in self.matches:
+                output += str(m) + '\n'
+        return output
 
     def generate_classifier(self):
         return Classifier([Rule(identity,{self})])
@@ -580,9 +729,14 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
+                self.log.info('In CountBucket ' + str(id(self)) + ' apply():'
+                               + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
-                self.byte_count_persistent += pkt['header_len'] + pkt['payload_len']
+                self.byte_count_persistent += pkt['payload_len']
             self.bucket.clear()
+        self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
+                       'persistent packet count is ' +
+                       str(self.packet_count_persistent))
 
     def start_update(self):
         """
@@ -608,41 +762,150 @@ class CountBucket(Query):
         """
         with self.in_update_cv:
             self.in_update = True
-            self.matches = set([])
             self.runtime_stats_query_fun = None
             self.outstanding_switches = []
 
     def finish_update(self):
         with self.in_update_cv:
             self.in_update = False
+            if self.new_bucket:
+                self.pull_existing_stats()
+                self.new_bucket = False
             self.in_update_cv.notify_all()
-        
-    def add_match(self, m):
+        self.log.info("Updated bucket %d" % id(self))
+       
+
+    class match_entry(object):
+        def __init__(self,match,priority,version):
+            self.match = util.frozendict(match)
+            self.priority = priority
+            self.version = version
+
+        def __hash__(self):
+            return hash(self.match) ^ hash(self.priority) ^ hash(self.version)
+
+        def __eq__(self,other):
+            try:
+                return (self.match == other.match and 
+                        self.priority == other.priority and 
+                        self.version == other.version)
+            except:
+                return False
+
+        def __repr__(self):
+            return ('(match=' + repr(self.match) + 
+                    ',priority=' + repr(self.priority) + 
+                    ',version=' + repr(self.version) + ')')
+
+    class match_status(object):
+        def __init__(self,to_be_deleted=False,existing_rule=False):
+            self.to_be_deleted = to_be_deleted
+            self.existing_rule = existing_rule
+
+        def __hash__(self):
+            return hash(self.to_be_deleted) ^ hash(self.existing_rule)
+
+        def __eq__(self,other):
+            try:
+                return (self.to_be_deleted == other.to_be_deleted and 
+                        self.existing_rule == other.existing_rule)
+            except:
+                return False
+            
+        def __repr__(self):
+            return '(to_be_deleted=%s,existing_rule=%s)' % \
+                (self.to_be_deleted,self.existing_rule)
+
+    def add_match(self, match, priority, version):
+        """Add a match to list of classifier rules to be queried for counts,
+        corresponding to a given version of the classifier.
         """
-        Add a match m to list of classifier rules to be queried for
-        counts.
+        k = self.match_entry(match, priority, version)
+        if not k in self.matches:
+            self.matches[k] = self.match_status() 
+
+    def delete_match(self, match, priority, version, to_be_deleted=False,
+                     existing_rule=False):
+        """If a rule is deleted from the classifier, mark this rule (until we
+        get the flow_removed message with the counters on it).
         """
-        if not m in self.matches:
-            self.matches.add(m)
+        k = self.match_entry(match, priority,version)
+        if k in self.matches:
+            self.matches[k].to_be_deleted = True
+
+    def handle_flow_removed(self, match, priority, version, flow_stat):
+        """Act on a flow removed message pertaining to a bucket by
+           1. removing the rule from the matches structure, and
+           2. adding its counters into the bucket's persistent counts.
+        """
+        packet_count = flow_stat['packet_count']
+        byte_count   = flow_stat['byte_count']
+        if packet_count > 0:
+            self.log.debug(("In bucket %d handle_flow_removed\n" +
+                            "got counts %d %d\n" +
+                            "match %s") %
+                           (id(self), packet_count, byte_count,
+                            str(match) + ' ' + str(priority) + ' ' +
+                            str(version)) )
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            k = self.match_entry(self.str_convert_match(match),
+                                 priority, version)
+            if k in self.matches:
+                self.log.debug("Deleted flow exists in the bucket's matches")
+                status = self.matches[k]
+                assert status.to_be_deleted
+                if not status.existing_rule: # Note: If pre-existing rule was
+                    # removed, then forget that this rule ever
+                    # existed. We don't count it.
+                    if packet_count > 0:
+                        self.log.info(("Adding persistent pkt count %d"
+                                        + " to bucket %d") % (
+                                packet_count, id(self) ) )
+                        self.log.debug(("persistent count is now %d" %
+                                        (self.packet_count_persistent +
+                                         packet_count) ) )
+                    self.packet_count_persistent += packet_count
+                    self.byte_count_persistent += byte_count
+                # Note that there is no else action. We just forget
+                # that this rule was ever associated with the bucket
+                # if we get a "flow removed" message before we got
+                # the first ever stats reply from an existing rule.
+                del self.matches[k]
 
     def add_pull_stats(self, fun):
         """
         Point to function that issues stats queries in the
         runtime.
         """
-        if not self.runtime_stats_query_fun:
-            self.runtime_stats_query_fun = fun
+        self.runtime_stats_query_fun = fun
 
-    def pull_stats(self):
-        """Issue stats queries from the runtime"""
+    def add_pull_existing_stats(self, fun):
+        """Point to function that issues stats queries *only for rules already
+        existing when the bucket was created* in the runtime.
+        """
+        self.runtime_existing_stats_query_fun = fun
+
+    def pull_helper(self, pull_function):
+        """Issue stats queries from the runtime using a provided runtime stats
+        pulling function."""
         queries_issued = False
         with self.in_update_cv:
             while self.in_update: # ensure buckets not updated concurrently
                 self.in_update_cv.wait()
-            if not self.runtime_stats_query_fun is None:
+            if pull_function:
+                # Note: If a query is already in progress, this will wipe out
+                # all its intermediate results for it.
                 self.outstanding_switches = []
-                queries_issued = True
-                self.runtime_stats_query_fun()
+                queries_issued = pull_function() # return value denotes whether
+                                                 # we expect a stats_reply in
+                                                 # future
+        return queries_issued
+
+    def pull_stats(self):
+        """Issue stats queries from the runtime on user program's request."""
+        queries_issued = self.pull_helper(self.runtime_stats_query_fun)
         # If no queries were issued, then no matches, so just call userland
         # registered callback routines
         if not queries_issued:
@@ -651,8 +914,25 @@ class CountBucket(Query):
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
 
+    def pull_existing_stats(self):
+        """Issue stats queries from the runtime to track counters on rules
+        already on switches.
+        """
+        self.pull_helper(self.runtime_existing_stats_query_fun)
+
     def add_outstanding_switch_query(self,switch):
         self.outstanding_switches.append(switch)
+
+    def str_convert_match(self, m):
+        """ Convert incoming flow stat matches into a form compatible with
+        stored match entries. """
+        new_dict = {}
+        for k,v in m.iteritems():
+            if not (k == 'srcip' or k == 'dstip'):
+                new_dict[k] = v
+            else:
+                new_dict[k] = str(v)
+        return new_dict
 
     def handle_flow_stats_reply(self,switch,flow_stats):
         """
@@ -663,12 +943,25 @@ class CountBucket(Query):
         byte counts from rules that have a match that is in the set of
         matches this bucket is interested in.
         """
+        def entries_print_helper(pfx_string=""):
+            """ Pretty print bucket match entries. """
+            out = ""
+            for k in self.matches.keys():
+                out += pfx_string + str(k) + "\n"
+            return out
+
         def stat_in_bucket(flow_stat, s):
-            table_match = match(f['match']).intersect(match(switch=s))
-            network_match = match(f['match'])
-            if table_match in self.matches or network_match in self.matches:
-                return True
-            return False
+            """Return a matching entry for the given flow_stat in
+            bucket.matches."""
+            import copy
+            f = copy.copy(flow_stat['match'])
+            f['switch'] = s
+            fme = self.match_entry(self.str_convert_match(f),
+                                   flow_stat['priority'],
+                                   flow_stat['cookie'])
+            if fme in self.matches.keys():
+                return fme
+            return None
 
         with self.in_update_cv:
             while self.in_update:
@@ -678,19 +971,59 @@ class CountBucket(Query):
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
-                        if stat_in_bucket(f, switch):
-                            self.packet_count += f['packet_count']
-                            self.byte_count   += f['byte_count']
+                        me = stat_in_bucket(f, switch)
+                        extracted_pkts = f['packet_count']
+                        extracted_bytes = f['byte_count']
+                        if extracted_pkts > 0 and not me:
+                            self.log.debug("Packet not counted: \n%s %s %s" %
+                                           (str(f['match']),
+                                            "priority=%d" % f['priority'],
+                                            "version=%d" % f['cookie']))
+                            self.log.debug("Existing keys: \n%s" %
+                                           entries_print_helper())
+                        if me:
+                            if extracted_pkts > 0:
+                                self.log.debug('In bucket ' + str(id(self)) +
+                                               ': found matching stats_reply:')
+                                self.log.debug(str(me))
+                                self.log.debug('packets: ' +
+                                               str(extracted_pkts) + ' bytes: '
+                                               + str(extracted_bytes))
+                            if not self.matches[me].existing_rule:
+                                self.packet_count += extracted_pkts
+                                self.byte_count   += extracted_bytes
+                            else: # pre-existing rule when bucket was created
+                                self.log.debug(('In bucket %d: removing' +
+                                                'pre-existing rule counts %d' +
+                                                ' %d') % id(self))
+                                self.packet_count_persistent -= extracted_pkts
+                                self.byte_count_persistent -= extracted_bytes
+                                self.clear_existing_rule_flag(me)
+                    else:
+                        raise RuntimeError("weird flow entry")
                 self.outstanding_switches.remove(switch)
         # If have all necessary data, call user-land registered callbacks
+        self.log.info( ('*** Bucket %d flow_stats_reply\n' % id(self)) +
+                        ('table pktcount %d persistent pktcount %d total %d' % (
+                    self.packet_count - self.packet_count_persistent,
+                    self.packet_count_persistent, self.packet_count ) ) )
         if not self.outstanding_switches:
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
 
+    def clear_existing_rule_flag(self, entry):
+        """Clear the "existing rule" flag for the provided entry in
+        self.matches. This method should only be called in the context of
+        holding the bucket's in_update_cv since it updates the matches
+        structure.
+        """
+        assert k in self.matches
+        self.matches[k].existing_rule = False
+
     def __eq__(self, other):
         # TODO: if buckets eventually have names, equality should
         # be on names.
-        return isinstance(other, CountBucket)
+        return id(self) == id(other)
 
 ################################################################################
 # Combinator Policies                                                          #
@@ -1177,3 +1510,23 @@ class egress_network(DynamicFilter):
 
     def __repr__(self):
         return "egress_network"
+
+def virtual_field_tagging():
+    from pyretic.core.runtime import virtual_field
+    vf_matches = {}
+    for name in virtual_field.fields.keys():
+        vf_matches[name] = None
+        
+    return ((
+        ingress_network() >> modify(**vf_matches))+
+        (~ingress_network()))
+
+def virtual_field_untagging():
+    from pyretic.core.runtime import virtual_field
+    vf_matches = {}
+    for name in virtual_field.fields.keys():
+        vf_matches[name] = None
+
+    return ((
+        egress_network() >> _modify(vlan_id=None, vlan_pcp=None))+
+        (~egress_network()))
