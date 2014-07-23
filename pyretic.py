@@ -84,7 +84,7 @@ def parseArgs():
                    default = 'low',
                    help = '|'.join( ['low','normal','high','please-make-it-stop'] )  )
 
-    op.set_defaults(frontend_only=False,mode='reactive0')
+    op.set_defaults(frontend_only=False,mode='proactive0')
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
