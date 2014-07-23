@@ -1,6 +1,5 @@
 ---
-author: "John Smith"
-layout: "project"
+layout: "default"
 ---
 
 Welcome to the pyretic wiki!
