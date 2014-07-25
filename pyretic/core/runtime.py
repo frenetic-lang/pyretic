@@ -360,7 +360,7 @@ class Runtime(object):
                            [{'outport' : OFPP_CONTROLLER}],
                            self.default_cookie))
         # Drop all IPv6 packets by default.
-        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE, 'protocol':58},
+        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
                            TABLE_START_PRIORITY + 1,
                            [],
                            self.default_cookie))
