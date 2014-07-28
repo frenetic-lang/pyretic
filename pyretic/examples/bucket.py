@@ -273,6 +273,7 @@ def test7():
 
 def main():
     # examples:
-    # return test0() + fwding
+#     return test0() + fwding
+    return test0() + flood()
     # return test2() + mac_learner()
-    return mac_learner()
+
