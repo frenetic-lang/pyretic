@@ -695,7 +695,8 @@ class CountBucket(Query):
         self.matches = {}
         self.runtime_stats_query_fun = None
         self.runtime_existing_stats_query_fun = None
-        self.outstanding_switches = []
+        self.outstanding_switches = set()
+        self.switches_in_query = set()
         self.packet_count = 0
         self.byte_count = 0
         self.packet_count_persistent = 0
@@ -763,7 +764,8 @@ class CountBucket(Query):
         with self.in_update_cv:
             self.in_update = True
             self.runtime_stats_query_fun = None
-            self.outstanding_switches = []
+            self.outstanding_switches = set()
+            self.switches_in_query = set()
 
     def finish_update(self):
         with self.in_update_cv:
@@ -897,7 +899,8 @@ class CountBucket(Query):
             if pull_function:
                 # Note: If a query is already in progress, this will wipe out
                 # all its intermediate results for it.
-                self.outstanding_switches = []
+                self.outstanding_switches = set()
+                self.switches_to_query = set()
                 queries_issued = pull_function() # return value denotes whether
                                                  # we expect a stats_reply in
                                                  # future
@@ -921,7 +924,8 @@ class CountBucket(Query):
         self.pull_helper(self.runtime_existing_stats_query_fun)
 
     def add_outstanding_switch_query(self,switch):
-        self.outstanding_switches.append(switch)
+        self.outstanding_switches.add(switch)
+        self.switches_in_query.add(switch)
 
     def str_convert_match(self, m):
         """ Convert incoming flow stat matches into a form compatible with
@@ -966,8 +970,9 @@ class CountBucket(Query):
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            self.packet_count = self.packet_count_persistent
-            self.byte_count = self.byte_count_persistent
+            if len(self.outstanding_switches) == len(self.switches_in_query):
+                self.packet_count = self.packet_count_persistent
+                self.byte_count = self.byte_count_persistent
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
