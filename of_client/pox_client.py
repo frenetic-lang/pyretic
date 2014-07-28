@@ -119,10 +119,11 @@ class BackendChannel(asynchat.async_chat):
             priority = int(msg[2])
             actions = map(self.dict2OF,msg[3])
             cookie = int(msg[4])
+            notify = bool(msg[5])
             if msg[0] == 'install':
-                self.of_client.install_flow(pred,priority,actions,cookie)
+                self.of_client.install_flow(pred,priority,actions,cookie,notify)
             else:
-                self.of_client.modify_flow(pred,priority,actions,cookie)
+                self.of_client.modify_flow(pred,priority,actions,cookie,notify)
             self.interval = time.time() - self.start_time
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
@@ -362,7 +363,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def flow_mod_action(self,pred,priority,action_list,cookie,command):
+    def flow_mod_action(self,pred,priority,action_list,cookie,command,notify):
         switch = pred['switch']
         if 'inport' in pred:        
             inport = pred['inport']
@@ -370,12 +371,15 @@ class POXClient(revent.EventMixin):
             inport = None
         match = self.build_of_match(switch,inport,pred)
         of_actions = self.build_of_actions(inport,action_list)
+        flags = 0
+        if notify:
+            flags = of.OFPFF_SEND_FLOW_REM
         msg = of.ofp_flow_mod(command=command,
                               priority=priority,
                               idle_timeout=of.OFP_FLOW_PERMANENT,
                               hard_timeout=of.OFP_FLOW_PERMANENT,
                               match=match,
-                              flags=of.OFPFF_SEND_FLOW_REM,
+                              flags=flags,
                               cookie=cookie,
                               actions=of_actions)
         try:
@@ -385,11 +389,11 @@ class POXClient(revent.EventMixin):
         except KeyError, e:
             print "WARNING:install_flow: No connection to switch %d available" % switch
 
-    def install_flow(self,pred,priority,action_list,cookie):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD)
+    def install_flow(self,pred,priority,action_list,cookie,notify):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD,notify)
 
-    def modify_flow(self,pred,priority,action_list,cookie):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT)
+    def modify_flow(self,pred,priority,action_list,cookie,notify):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT,notify)
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']

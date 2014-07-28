@@ -353,17 +353,20 @@ class Runtime(object):
         self.install_rule(({'switch' : s},
                            TABLE_MISS_PRIORITY,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie))
+                           self.default_cookie,
+                           False))
         # Send all LLDP packets to controller for topology maintenance
         self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
                            TABLE_START_PRIORITY + 2,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie))
+                           self.default_cookie,
+                           False))
         # Drop all IPv6 packets by default.
         self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
                            TABLE_START_PRIORITY + 1,
                            [],
-                           self.default_cookie))
+                           self.default_cookie,
+                           False))
 
     def install_classifier(self, classifier):
         """
@@ -588,7 +591,10 @@ class Runtime(object):
                     (match,priority,acts,version) = rule
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
-                    new_rule = (match, priority, new_acts, version)
+                    if len(new_acts) < len(acts):
+                        new_rule = (match, priority, new_acts, version, True)
+                    else:
+                        new_rule = (match, priority, new_acts, version, False)
                     new_lst.append(new_rule)
                 new_diff_lists.append(new_lst)
             return new_diff_lists
@@ -1141,16 +1147,16 @@ class Runtime(object):
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
-    def install_rule(self,(concrete_pred,priority,action_list,cookie)):
+    def install_rule(self,(concrete_pred,priority,action_list,cookie,notify)):
         self.log.debug(
             '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
                 "sending openflow rule:",
                 (str(priority) + " " + repr(concrete_pred) + " "+
                  repr(action_list) + " " + repr(cookie))))
-        self.backend.send_install(concrete_pred,priority,action_list,cookie)
+        self.backend.send_install(concrete_pred,priority,action_list,cookie,notify)
 
-    def modify_rule(self, (concrete_pred,priority,action_list,cookie)):
-        self.backend.send_modify(concrete_pred,priority,action_list,cookie)
+    def modify_rule(self, (concrete_pred,priority,action_list,cookie,notify)):
+        self.backend.send_modify(concrete_pred,priority,action_list,cookie,notify)
 
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
