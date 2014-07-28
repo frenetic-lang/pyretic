@@ -766,6 +766,7 @@ class CountBucket(Query):
             self.runtime_stats_query_fun = None
             self.outstanding_switches = set()
             self.switches_in_query = set()
+            self.clear_transient_counters()
 
     def finish_update(self):
         with self.in_update_cv:
@@ -912,8 +913,7 @@ class CountBucket(Query):
         # If no queries were issued, then no matches, so just call userland
         # registered callback routines
         if not queries_issued:
-            self.packet_count = self.packet_count_persistent
-            self.byte_count = self.byte_count_persistent
+            self.clear_transient_counters()
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
 
@@ -937,6 +937,10 @@ class CountBucket(Query):
             else:
                 new_dict[k] = str(v)
         return new_dict
+
+    def clear_transient_counters(self):
+        self.packet_count = self.packet_count_persistent
+        self.byte_count   = self.byte_count_persistent
 
     def handle_flow_stats_reply(self,switch,flow_stats):
         """
@@ -970,9 +974,6 @@ class CountBucket(Query):
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            if len(self.outstanding_switches) == len(self.switches_in_query):
-                self.packet_count = self.packet_count_persistent
-                self.byte_count = self.byte_count_persistent
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
@@ -1015,6 +1016,7 @@ class CountBucket(Query):
         if not self.outstanding_switches:
             for f in self.callbacks:
                 f([self.packet_count, self.byte_count])
+            self.clear_transient_counters()
 
     def clear_existing_rule_flag(self, entry):
         """Clear the "existing rule" flag for the provided entry in
