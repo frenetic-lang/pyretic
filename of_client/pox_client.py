@@ -31,6 +31,7 @@
 import threading
 
 import pox.openflow.libopenflow_01 as of
+import pox.openflow.nicira as nx
 from pox.core import core
 from pox.lib import revent, addresses as packetaddr, packet as packetlib
 from pox.lib.packet.ethernet      import ethernet
@@ -301,14 +302,22 @@ class POXClient(revent.EventMixin):
 
     def build_of_match(self,switch,inport,pred):
         ### BUILD OF MATCH
-        match = of.ofp_match()
-        match.in_port = inport
+        if 'ethtype' in pred and pred['ethtype']==0x86dd:
+            match = nx.nx_match()
+            if inport:
+                match.in_port = inport
+            if 'ethtype' in pred:
+                match.eth_type = pred['ethtype']
+        else:
+            match = of.ofp_match()
+            match.in_port = inport
+            if 'ethtype' in pred:
+                match.dl_type = pred['ethtype']
+
         if 'srcmac' in pred:
             match.dl_src = pred['srcmac']
         if 'dstmac' in pred:
             match.dl_dst = pred['dstmac']
-        if 'ethtype' in pred:
-            match.dl_type = pred['ethtype']
         if 'vlan_id' in pred:
             match.dl_vlan = pred['vlan_id']
         if 'vlan_pcp' in pred:
@@ -374,14 +383,25 @@ class POXClient(revent.EventMixin):
         flags = 0
         if notify:
             flags = of.OFPFF_SEND_FLOW_REM
-        msg = of.ofp_flow_mod(command=command,
-                              priority=priority,
-                              idle_timeout=of.OFP_FLOW_PERMANENT,
-                              hard_timeout=of.OFP_FLOW_PERMANENT,
-                              match=match,
-                              flags=flags,
-                              cookie=cookie,
-                              actions=of_actions)
+
+        if 'ethtype' in pred and pred['ethtype']==0x86dd:
+            msg = nx.nx_flow_mod(command=command,
+                                 priority=priority,
+                                 idle_timeout=of.OFP_FLOW_PERMANENT,
+                                 hard_timeout=of.OFP_FLOW_PERMANENT,
+                                 match=nx.nx_match(match),
+                                 flags=flags,
+                                 cookie=cookie,
+                                 actions=of_actions)
+        else:
+            msg = of.ofp_flow_mod(command=command,
+                                  priority=priority,
+                                  idle_timeout=of.OFP_FLOW_PERMANENT,
+                                  hard_timeout=of.OFP_FLOW_PERMANENT,
+                                  match=match,
+                                  flags=flags,
+                                  cookie=cookie,
+                                  actions=of_actions)
         try:
             self.switches[switch]['connection'].send(msg)
         except RuntimeError, e:
