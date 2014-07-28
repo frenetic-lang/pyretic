@@ -41,6 +41,7 @@ import copy
 
 TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
+STATS_REQUERY_THRESHOLD_SEC = 10
 
 class Runtime(object):
     """
@@ -92,6 +93,8 @@ class Runtime(object):
         self.bucket_triggered_policy_update = False
         self.global_outstanding_queries_lock = Lock()
         self.global_outstanding_queries = {}
+        self.last_queried_time_lock = Lock()
+        self.last_queried_time = {}
         self.global_outstanding_deletes_lock = Lock()
         self.global_outstanding_deletes = {}
         self.manager = Manager()
@@ -1025,7 +1028,8 @@ class Runtime(object):
         for concrete_pred in concrete_preds:
             if 'switch' in concrete_pred:
                 switch_id = concrete_pred['switch']
-                if not switch_id in switch_list:
+                if ((not switch_id in switch_list) and
+                    (switch_id in self.network.topology.nodes())):
                     switch_list.append(switch_id)
             else:
                 switch_list = self.network.topology.nodes()
@@ -1033,11 +1037,27 @@ class Runtime(object):
         self.log.info('Pulling stats from switches '
                       + str(switch_list) + ' for bucket ' +
                       str(id(bucket)))
+        if not switch_list:
+            """ This means no switch will actually be queried. This happens if
+            none of the switches associated with any of the concrete_preds is
+            actually _up_ in the network currently. These data plane counts can
+            be transiently or permanently lost as they are fate-shared with
+            switches."""
+            return False
         for s in switch_list:
             bucket.add_outstanding_switch_query(s)
             already_queried = self.add_global_outstanding_query(s, bucket)
-            if not already_queried:
+            need_to_query = not already_queried
+            """ Also check if some time has passed since the switch was last
+            queried. """
+            if already_queried:
+                with self.last_queried_time_lock:
+                    assert s in self.last_queried_time
+                    need_to_query = ((time.time() - self.last_queried_time[s])
+                                       > STATS_REQUERY_THRESHOLD_SEC)
+            if need_to_query:
                 self.request_flow_stats(s)
+                self.add_last_queried_time(s)
                 self.log.debug('in pull_stats: sent out stats query to switch '
                                + str(s))
             else:
@@ -1086,6 +1106,9 @@ class Runtime(object):
                                            self.global_outstanding_deletes_lock,
                                            rule, bucket)
 
+    def add_last_queried_time(self, s):
+        with self.last_queried_time_lock:
+            self.last_queried_time[s] = time.time()
 
 ####################################
 # PACKET MARSHALLING/UNMARSHALLING 
