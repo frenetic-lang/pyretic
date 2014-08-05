@@ -172,7 +172,7 @@ class Runtime(object):
         with self.network_lock:
 
             # if the topology hasn't changed, ignore
-            if self.network.topology == self.prev_network.topology:
+            if self.network == self.prev_network:
                 return
 
             # otherwise copy the network object
@@ -656,9 +656,7 @@ class Runtime(object):
             :param classifier: the input classifer
             :type classifier: Classifier
             """
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switches()
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
             classifier = check_OF_rules(classifier)
@@ -699,9 +697,7 @@ class Runtime(object):
             """
             with self.old_rules_lock:
                 old_rules = self.old_rules
-                switch_attrs_tuples = self.network.topology.nodes(data=True)
-                switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-                switches = switch_to_attrs.keys()
+                switches = self.network.switches()
                 classifier = switchify(classifier,switches)
                 classifier = concretize(classifier)
                 classifier = OF_inportize(classifier)
@@ -786,7 +782,7 @@ class Runtime(object):
                 if 'switch' in concrete_pred:
                     switch_list.append(concrete_pred['switch'])
                 else:
-                    switch_list = self.network.topology.nodes()
+                    switch_list = self.network.switches()
                     break
             for s in switch_list:
                 bucket.add_outstanding_switch_query(s)
@@ -889,7 +885,7 @@ class Runtime(object):
 
     def clear_all(self):
         def f():
-            switches = self.network.topology.nodes()
+            switches = self.network.switches()
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)

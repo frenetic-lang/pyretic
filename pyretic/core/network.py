@@ -242,6 +242,13 @@ class Topology(nx.Graph):
             return e1 == e2
         return nx.is_isomorphic(self,other,node_match=exact_node_match,edge_match=exact_edge_match)
 
+    def switches(self,with_ports=False):
+        if with_ports:
+            return [(switch,attrs['ports'].keys()) 
+                    for switch,attrs in self.nodes(data=True)]
+        else:
+            return self.nodes()
+
     def add_switch(self,switch):
         self.add_node(switch, name=switch, ports={})  
 
@@ -475,3 +482,6 @@ class Network(object):
         network = Network(topology)
         network.inject_packet = self.inject_packet
         return network
+
+    def switches(self,**kwargs):
+        return self.topology.switches(**kwargs)
