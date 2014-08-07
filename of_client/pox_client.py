@@ -417,7 +417,8 @@ class POXClient(revent.EventMixin):
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])                        
+                PORT_TYPE = self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
    
         self.send_to_pyretic(['switch','join',event.dpid,'END'])
 
@@ -518,7 +519,8 @@ class POXClient(revent.EventMixin):
                 #self.runtime.network.port_joins.signal((event.dpid, event.port))
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])
+                PORT_TYPE =  self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
@@ -528,7 +530,8 @@ class POXClient(revent.EventMixin):
             elif event.modified:
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','mod',event.dpid, event.port, CONF_UP, STAT_UP])
+                PORT_TYPE = self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
             else:
                 raise RuntimeException("Unknown port status event")
 

@@ -94,9 +94,9 @@ class BackendChannel(asynchat.async_chat):
                 print "ERROR: Bad switch event"
         elif msg[0] == 'port':
             if msg[1] == 'join':
-                self.backend.runtime.handle_port_join(msg[2],msg[3],msg[4],msg[5])
+                self.backend.runtime.handle_port_join(msg[2],msg[3],msg[4],msg[5],msg[6])
             elif msg[1] == 'mod':
-                self.backend.runtime.handle_port_mod(msg[2],msg[3],msg[4],msg[5])
+                self.backend.runtime.handle_port_mod(msg[2],msg[3],msg[4],msg[5],msg[6])
             elif msg[1] == 'part':
                 self.backend.runtime.handle_port_part(msg[2],msg[3])
             else:
