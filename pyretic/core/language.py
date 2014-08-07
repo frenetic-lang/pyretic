@@ -1110,7 +1110,7 @@ class flood(DynamicPolicy):
                 match(switch=switch) >>
                 parallel(map(xfwd,ports))
                 for switch,ports 
-                in self.mst.switches(with_ports=True)])
+                in self.mst.switch_with_port_ids_list()])
                 
     def __repr__(self):
         try:
