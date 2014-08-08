@@ -36,19 +36,27 @@ class sf(DynamicPolicy):
 
         @transition
         def outgoing(self):
+            self.case(is_true(V('timeout')),C(False))
+            self.case(occurred(self.event),self.event)
+
+        @transition
+        def timeout(self):
             self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):
+            self.case(is_true(V('timeout')),C(ih_prd))
             self.case(is_true(V('outgoing')),C(identity))
             self.default(C(ih_prd))
 
         ### SET UP THE FSM DESCRIPTION
-
         self.fsm_def = FSMDef(
             outgoing=FSMVar(type=BoolType(), 
                             init=False, 
                             trans=outgoing),
+            timeout=FSMVar(type=BoolType(), 
+                            init=False, 
+                            trans=timeout),
             policy=FSMVar(type=Type(Policy,[identity,ih_prd]),
                           init=ih_prd,
                           trans=policy))
@@ -66,7 +74,9 @@ class sf(DynamicPolicy):
         fsm_pol = FSMPolicy(lpec,self.fsm_def)
         q = FwdBucket()
         q.register_callback(q_callback)
-
+        json_event = JSONEvent()
+        json_event.register_callback(fsm_pol.event_handler)
+ 
         super(sf,self).__init__(fsm_pol + (ih_prd >> q))
 
 
@@ -78,6 +88,29 @@ def main():
     print fsm_def_to_smv_model(pol.fsm_def)
 
     # For NuSMV
-#    mc = ModelChecker(pol)  
+    smv_str = fsm_def_to_smv_model(pol.fsm_def)
+    mc = ModelChecker(smv_str,'sf')  
+
+    ## Add specs
+    mc.add_spec("FAIRNESS\n  outgoing;")
+    mc.add_spec("FAIRNESS\n  timeout;")
+
+    ### If outgoing event is true and times is not up, next policy state is 'identity'
+    mc.add_spec("SPEC AG (outgoing &!timeout -> AX policy=policy_1)")
+
+    ### If outgoing event is true but also times is up, next policy state is 'match filter'
+    mc.add_spec("SPEC AG (outgoing & timeout -> AX policy=policy_2)")
+
+    ### If outgoing event is false, next policy state is 'match filter'
+    mc.add_spec("SPEC AG (!outgoing -> AX policy=policy_2)")
+
+#    ### Policy state is 'match filter' until outgoing is true.
+#    mc.add_spec("SPEC A [ policy=policy_2 U (outgoing & !timeout) ]")
+
+    # Save NuSMV file
+    mc.save_as_smv_file()
+
+    # Verify
+    mc.verify()
 
     return pol >> flood()

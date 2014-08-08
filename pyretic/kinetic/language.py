@@ -1,4 +1,6 @@
 from pyretic.lib.corelib import *
+from random import choice
+from threading import Lock
 import hashlib
 import operator
 
@@ -16,8 +18,8 @@ def policy_to_hash(policy_set, p):
         return 'flood'
     elif isinstance(p,fwd):
         return '_'.join(str(p).split())
-    elif isinstance(p,union):
-        return 'union'
+#    elif isinstance(p,union):
+#        return 'union'
     
     s = str(p) 
     if s=='False':
@@ -34,9 +36,12 @@ def to_smv(i):
         return 'flood'
     elif isinstance(i,fwd):
         return '_'.join(str(i).split())
-    elif isinstance(i,union):
-        return 'union'
-    
+    elif isinstance(i,NonDetermPolicy):
+        policy_list = []
+        for p in i.getList():
+            policy_list.append(to_smv(p))
+        return ' union '.join(policy_list)
+        
     s = str(i) 
     if s=='False':
         return 'FALSE'
@@ -45,6 +50,7 @@ def to_smv(i):
     elif s.isdigit():
         return s
     else: 
+        print 'hahahaha: ',type(i)
         return policy_to_name_map[s]
 
 ### Types
@@ -121,8 +127,9 @@ class C(CaseAtom):
             return 'C(flood)'
         elif isinstance(self.val,fwd):
             return 'C(' + '_'.join(str(self.val).split()) + ')'
+        elif isinstance(self.val,NonDetermPolicy):
+            return 'C(' + ' union '.join(self.val.getList())
         else:
-#            return 'C(' + str(self.val) + ')'
             policynum = int(hashlib.md5(str(self.val)).hexdigest(), 16)
             return 'C(' + 'policy_' + str(policynum) + ')'
 
@@ -149,7 +156,7 @@ class test_eq(CaseTest):
     def __str__(self):
         return '(' + str(self.l) + '=' + str(self.r) + ')'
 
-    def __str__(self):
+    def model(self):
         return '(' + self.l.model() + '=' + self.r.model() + ')'
 
 class test_ne(CaseTest):
@@ -181,7 +188,8 @@ class test_and(CaseTest):
         l_model = self.l.model()
         if l_model == 'TRUE':
             return self.r.model()
-        return self.r.model() 
+#        return self.r.model() 
+        return self.l.model() + ' & ' + self.r.model()
 
 class test_and_true(CaseTest):
     def __init__(self,l,r):
@@ -368,6 +376,18 @@ class FSMVar(dict):
 class FSMDef(object):
     def __init__(self,**kwargs):
         self.map = dict(**kwargs)
+
+
+### Nondeterminstic Policy 
+class NonDetermPolicy(DynamicPolicy):
+    def __init__(self, policy_list):
+        self.policy_list = policy_list
+        self.initial_policy = policy_list[choice(range(len(policy_list)))]
+        self.lock = Lock()
+        super(NonDetermPolicy,self).__init__(self.initial_policy)
+
+    def getList(self):
+        return list([str(i) for i in self.policy_list])
 
 def fsm_def_to_smv_model(fsm_def):
 

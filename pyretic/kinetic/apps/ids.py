@@ -97,6 +97,9 @@ def main():
     ### Policy state is 'allow' until infected is true.
     mc.add_spec("SPEC A [ policy=policy_2 U infected ]")
 
+    ### It is always possible to go back to 'allow'
+    mc.add_spec("SPEC AG EF policy=policy_2")
+
     # Save NuSMV file
     mc.save_as_smv_file()
 

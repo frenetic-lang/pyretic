@@ -47,6 +47,7 @@ class LpecFSM(DynamicPolicy):
             # update policy, if appropriate
             if var_name == 'policy':
                 self.policy = self.state['policy']
+                print self.policy
 
             # cascade the changes
             for v in self.dependencies[var_name]:
