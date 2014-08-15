@@ -31,9 +31,16 @@ class ModelChecker(object):
         print self.smv_str
         print '========================== NuSMV OUTPUT ==========================\n'
 
+        import datetime as dt
+        n1=dt.datetime.now()
+
         p = subprocess.Popen([self.exec_cmd, '-r', self.filename], stdout=subprocess.PIPE) 
         out, err = p.communicate()
 
+        n2=dt.datetime.now()
+        print "\n=== Verification takes (ms): ",float((n2-n1).microseconds)/1000.0,"==="
+        print "=== Verification takes (s): ",float((n2-n1).seconds),"===\n"
+ 
         print out
 
         print '======================== NuSMV OUTPUT END ========================\n'

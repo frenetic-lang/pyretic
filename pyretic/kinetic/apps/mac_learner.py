@@ -48,8 +48,8 @@ class mac_learner(DynamicPolicy):
 
         @transition
         def port(self):
-            self.case(occurred(self.event) & (V('port')==C(0)),self.event)
             self.case(is_true(V('topo_change')),C(0))
+            self.case(occurred(self.event) & (V('port')==C(0)),self.event)
 
         @transition
         def policy(self):
@@ -94,24 +94,22 @@ def main():
     smv_str = fsm_def_to_smv_model(pol.fsm_def)
     mc = ModelChecker(smv_str,'mac_learner')  
 
-    ## Add specs
     mc.add_spec("FAIRNESS\n  topo_change;")
-    mc.add_spec("SPEC AG (port=0 -> AG EF port>0)")
-    mc.add_spec("SPEC ! AG A [ port>0 U topo_change ]")
-    mc.add_spec("SPEC AG (port>0 -> A [ port>0 U topo_change ] )")
-    mc.add_spec("SPEC AG (port=1 -> A [ port=1 U topo_change ] )")
-    mc.add_spec("SPEC ! AG (port=2 -> A [ port=1 U topo_change ] )")
-    mc.add_spec("SPEC ! AG (port=1 -> EX port=2)")
-    mc.add_spec("SPEC AG (port=1 -> EF port=2)")
-    mc.add_spec("SPEC AG (port=1 -> A [ !(port=2) U port=0 ])")
-    mc.add_spec("SPEC AG (port=1 -> A [ !(port=2) U topo_change ])")
+
+    for i in range(1):
+        ## Add specs
+        mc.add_spec("SPEC AG (topo_change -> AX port=0)")
+        mc.add_spec("SPEC AG (port=0 -> AG EF port>0)")
+        mc.add_spec("SPEC ! AG (port=1 -> EX port=2)")
+        mc.add_spec("SPEC AG (port>0 -> A [ port>0 U topo_change ] )")
+#        mc.add_spec("SPEC ! AG A [ port>0 U topo_change ]")
+#        mc.add_spec("SPEC AG (port=1 -> A [ port=1 U topo_change ] )")
+#        mc.add_spec("SPEC ! AG (port=2 -> A [ port=1 U topo_change ] )")
+#        mc.add_spec("SPEC AG (port=1 -> EF port=2)")
+#        mc.add_spec("SPEC AG (port=1 -> A [ !(port=2) U port=0 ])")
+#        mc.add_spec("SPEC AG (port=1 -> A [ !(port=2) U topo_change ])")
 
     mc.save_as_smv_file()
-    import datetime as dt
-    n1=dt.datetime.now()
     mc.verify()
-    n2=dt.datetime.now()
-
-    print (n2-n1).microseconds
-
+ 
     return pol
