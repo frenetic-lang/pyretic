@@ -1,6 +1,7 @@
 import subprocess
 import platform
 import os
+import sys
 
 class ModelChecker(object):
     
@@ -8,7 +9,8 @@ class ModelChecker(object):
         arch_str = platform.architecture()
         if arch_str:
             if not os.environ.has_key('KINETICPATH'):
-                print 'KINETICPATH env variable not set. Set it with export command.'
+                print 'KINETICPATH env variable not set. Set it with export command.\n'
+                sys.exit()
                 return
             kinetic_path_str = os.environ['KINETICPATH']
             if arch_str[0].startswith('32'):  
