@@ -20,10 +20,10 @@ def policy_to_hash(p_named_set,policy_set, p):
     elif isinstance(p,fwd):
         p_named_set.add('_'.join(str(p).split()))
         return '_'.join(str(p).split())
-    elif p.compile() == drop.compile():
+    elif isinstance(p, Policy) and p.compile() == drop.compile():
         p_named_set.add('drop')
         return 'drop'
-    elif p.compile() == identity.compile():
+    elif isinstance(p, Policy) and p.compile() == identity.compile():
         p_named_set.add('identity')
         return 'identity'
 #    elif isinstance(p,union):
@@ -545,7 +545,7 @@ def fsm_def_to_smv_model(fsm_def):
     # First, see if there are complex policies. 
     # If so, number them, and save info.
     policy_set = set()
-    p_naemd_set = set()
+    p_named_set = set()
     for k,v in fsm_def.map.items():
         t = v['type']
         if t.py_type!=bool:
