@@ -50,11 +50,13 @@ class mac_learner(DynamicPolicy):
         def port(self):
             self.case(is_true(V('topo_change')),C(0))
             self.case(occurred(self.event) & (V('port')==C(0)),self.event)
+            self.default(C(0))
 
         @transition
         def policy(self):
             for i in port_range:
                 self.case(V('port')==C(i),C(int_to_policy(i)))
+            self.default(C(flood()))
 
         ### SET UP THE FSM DESCRIPTION
 

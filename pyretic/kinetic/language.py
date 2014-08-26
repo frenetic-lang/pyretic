@@ -3,9 +3,12 @@ from random import choice
 from threading import Lock
 import hashlib
 import operator
+import copy
+import sys
 
 ## Used globally
 policy_to_name_map = {}
+complexPolicyStr_to_actualPolicy = {}
 
 
 def as_comment(s):
@@ -13,7 +16,13 @@ def as_comment(s):
     s = s.replace('\n', '\n-- ')
     return s
 
-def policy_to_hash(p_named_set,policy_set, p):
+def policy_to_hash(p_named_set,policy_set,p):
+    if isinstance(p,sequential):
+        newp = sequential(p.policies)
+        for c in range(newp.policies.count(identity)):
+            if newp.policies!=[identity]:
+                newp.policies.remove(identity)
+        p = newp
     if isinstance(p,flood):
         p_named_set.add('flood')
         return 'flood'
@@ -23,11 +32,11 @@ def policy_to_hash(p_named_set,policy_set, p):
     elif isinstance(p, Policy) and p.compile() == drop.compile():
         p_named_set.add('drop')
         return 'drop'
-    elif isinstance(p, Policy) and p.compile() == identity.compile():
-        p_named_set.add('identity')
-        return 'identity'
-#    elif isinstance(p,union):
-#        return 'union'
+#    elif isinstance(p, Policy) and p.compile() == identity.compile():
+#        p_named_set.add('identity')
+#        return 'identity'
+    elif isinstance(p,union):
+        return 'union'
     s = str(p) 
     if s=='False':
         return 'FALSE'
@@ -36,9 +45,17 @@ def policy_to_hash(p_named_set,policy_set, p):
     elif s.isdigit():
         return s
     else: 
+        complexPolicyStr_to_actualPolicy[s] = p
         policy_set.add(s)
 
 def to_smv(i):
+    if isinstance(i,sequential):
+        newp = sequential(i.policies)
+        for c in range(newp.policies.count(identity)):
+            if newp.policies!=[identity]:
+                newp.policies.remove(identity)
+        i = newp
+ 
     if isinstance(i,flood):
         return 'flood'
     elif isinstance(i,fwd):
@@ -50,8 +67,8 @@ def to_smv(i):
         return ' union '.join(policy_list)
     elif isinstance(i,Policy) and i.compile() == drop.compile():
         return 'drop'
-    elif isinstance(i,Policy) and i.compile() == identity.compile():
-        return 'identity'
+#    elif isinstance(i,Policy) and i.compile() == identity.compile():
+#        return 'identity'
     s = str(i) 
     if s=='False':
         return 'FALSE'
@@ -59,8 +76,14 @@ def to_smv(i):
         return 'TRUE'
     elif s.isdigit():
         return s
-    else: 
-        return policy_to_name_map[s]
+    else:
+        if policy_to_name_map.has_key(s):
+            return policy_to_name_map[s]
+        else:
+            print "Given policy is:",str(i)
+            print policy_to_name_map.keys()
+            return policy_to_name_map[s]
+
 
 ### Types
 
@@ -138,8 +161,6 @@ class C(CaseAtom):
             return 'C(' + '_'.join(str(self.val).split()) + ')'
         elif isinstance(self.val,NonDetermPolicy):
             return 'C(' + ' union '.join(self.val.getList())
-        elif isinstance(self.val,drop):
-            return 'C(drop)'
         else:
 #            policynum = int(hashlib.md5(str(self.val)).hexdigest(), 16)
 #            return 'C(' + 'policy_' + str(policynum) + ')'
@@ -401,7 +422,162 @@ class NonDetermPolicy(DynamicPolicy):
     def getList(self):
         return list([str(i) for i in self.policy_list])
 
+def fsm_def_compose(fsm_def_1,fsm_def_2,comp_op_str):
 
+    # first, define.
+    composed_fsm_def = FSMDef()
+
+    # Put variables except policy from fsm1
+    for k,v in fsm_def_1.map.items():
+        t=v['type']
+        if t.py_type!=Policy:
+            composed_fsm_def.map[k] = v
+
+    # Put variables except policy from fsm2 
+    for k,v in fsm_def_2.map.items():
+        t=v['type']
+        if t.py_type!=Policy:
+            composed_fsm_def.map[k] = v
+
+    # Build Policy 
+    policy_fsmvar_map={}
+
+    policy_set = set()
+    p_named_set = set()
+    for k1,v1 in fsm_def_1.map.items():
+        t1 = v1['type']
+        for k2,v2 in fsm_def_2.map.items():
+            t2 = v2['type']
+            if t1.py_type==Policy and t2.py_type==Policy:
+                for p1 in t1.dom:
+                    for p2 in t2.dom:
+                        if comp_op_str=='>>':
+                            policy_to_hash(p_named_set,policy_set, p1>>p2)
+                        elif comp_op_str=='+':
+                            policy_to_hash(p_named_set,policy_set, p1+p2)
+                        else:
+                            print 'Unknown composition operator. Abort'
+                            sys.exit()
+    sorted_list = sorted(list(policy_set))
+    for idx,p in enumerate(sorted_list):
+        policy_to_name_map[p] = 'policy_'+str(idx+1)
+
+    ### Policy's type and possible values
+    real = set()
+    pols_list = policy_to_name_map.values()
+    pols_list.extend(list(p_named_set))
+    for i in pols_list:
+        if i.startswith('policy'):
+            for j in policy_to_name_map:
+                if policy_to_name_map[j] == i:
+                    real.add(complexPolicyStr_to_actualPolicy[j])
+        else:
+            real.add(eval(i))
+    p_type_defined = Type(Policy, real)
+    policy_fsmvar_map['type'] = p_type_defined 
+
+    ### Policy init
+    for k,v in fsm_def_1.map.items():
+        t = v['type']
+        if t.py_type==Policy:
+            f1_init = v['init']
+    for k,v in fsm_def_2.map.items():
+        t = v['type']
+        if t.py_type==Policy:
+            f2_init = v['init']
+    if comp_op_str=='>>':
+        policy_fsmvar_map['init'] = f1_init >> f2_init
+    elif comp_op_str=='+':  
+        policy_fsmvar_map['init'] = f1_init + f2_init
+    else:
+        print 'Unknown composition operator. Abort'
+        sys.exit()
+ 
+    ### Policy trans
+    trans_p = Transition('policy')
+    for k,v in fsm_def_1.map.items():
+        t = v['type']
+        if t.py_type==Policy:
+            f1_trans = v['trans']
+    for k,v in fsm_def_2.map.items():
+        t = v['type']
+        if t.py_type==Policy:
+            f2_trans = v['trans']
+
+
+    #### Combined transition
+    tests_and_results = {}
+    for c1 in f1_trans.cases:
+        for c2 in f2_trans.cases:
+            if type(c1.tst)==TrueTest and type(c2.tst)==TrueTest:
+                this_tst = TrueTest()
+                test_str = 'TRUE'
+            elif type(c1.tst)==TrueTest:
+                this_tst = c2.tst
+                test_str = str(c2.tst.model()) 
+            elif type(c2.tst)==TrueTest:
+                this_tst = c1.tst
+                test_str = str(c1.tst.model()) 
+            else: 
+                this_tst = c1.tst & c2.tst
+                test_str = str(c1.tst.model()) + ' & ' + str(c2.tst.model())
+            c1val = None
+            c2val = None
+            if isinstance(c1.rslt,V):
+                print 'Default value not given. Cannot deal with that now. Put it default for each variable.'
+                sys.exit()
+                for k,v in fsm_def_1.map.items():
+                    if k==c1.rslt.name:
+                        c1val = v['init']
+                        break
+            if isinstance(c2.rslt,V):
+                print 'Default value not given. Cannot deal with that now. Put it default for each variable.'
+                sys.exit()
+                for k,v in fsm_def_1.map.items():
+                    if k==c2.rslt.name:
+                        c2val = v['init']
+                        break
+            if c1val==None:
+                c1val = c1.rslt.val
+            if c2val==None:
+                c2val = c2.rslt.val
+            if comp_op_str=='>>':
+                this_result = C(c1val >> c2val)
+            elif comp_op_str=='+':
+                this_result = C(c1val + c2val)
+            else:
+                print 'Unknown composition operator. Abort'
+                sys.exit()
+            tests_and_results[this_tst] = this_result
+
+    ## sort
+    keys = tests_and_results.keys()
+    key_operator_count_map = {}
+    for k in keys:
+        key_operator_count_map[k] = str(k).count(' & ')
+        if isinstance(k,TrueTest):
+            key_operator_count_map[k] = -1
+    for sk in sorted(key_operator_count_map.iteritems(), key=operator.itemgetter(1),reverse=True):
+        trans_p.case(sk[0],tests_and_results[sk[0]])
+
+    # Trans value
+    policy_fsmvar_map['trans'] = trans_p
+    composed_fsm_def.map['policy'] = policy_fsmvar_map
+
+
+    print '========RETURN======'
+    for k,v in composed_fsm_def.map.items():
+        t=v['type']
+        if t.py_type==Policy:
+            print k
+            print v['trans']
+    print '=============='
+
+
+
+
+
+    return composed_fsm_def, fsm_def_to_smv_model(composed_fsm_def)
 
 def fsm_def_to_smv_model_compose(fsm_def_1,fsm_def_2,comp_op_str):
     # First, see if there are complex policies. 
@@ -548,7 +724,7 @@ def fsm_def_to_smv_model(fsm_def):
     p_named_set = set()
     for k,v in fsm_def.map.items():
         t = v['type']
-        if t.py_type!=bool:
+        if t.py_type==Policy:
             for p in t.dom:
                 policy_to_hash(p_named_set,policy_set, p)
     sorted_list = sorted(list(policy_set))
