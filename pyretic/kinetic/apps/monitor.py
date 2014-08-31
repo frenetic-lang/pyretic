@@ -15,7 +15,7 @@ BYTES_FOR_RATE2 = 5000
 BYTES_FOR_RATE3 = 10000
 
 class monitor(DynamicPolicy):
-    def __init__(self):
+    def __init__(self,port=50001):
 
         self.q = count_bytes(1,['srcip','dstip'])
         self.set_rate_2 = False 
@@ -32,12 +32,12 @@ class monitor(DynamicPolicy):
                 dip = str(m)[idx2:].lstrip("dstip', ").rstrip(")")
  
                 if counts[m] > BYTES_FOR_RATE2 and BYTES_FOR_RATE3 > counts[m] and self.set_rate_2 is False:
-                    cmd = BASE_CMD + ' 2 --flow="{srcip=' + sip +',dstip='+dip+'}" -a 127.0.0.1 -p 50001'
+                    cmd = BASE_CMD + ' 2 --flow="{srcip=' + sip +',dstip='+dip+'}" -a 127.0.0.1 -p ' + str(port)
                     p1 = subprocess.Popen([cmd], shell=True)
                     p1.communicate()
                     self.set_rate_2 = True
                 elif counts[m] > BYTES_FOR_RATE3 and self.set_rate_3 is False:
-                    cmd = BASE_CMD + ' 3 --flow="{srcip=' + sip +',dstip='+dip+'}" -a 127.0.0.1 -p 50001'
+                    cmd = BASE_CMD + ' 3 --flow="{srcip=' + sip +',dstip='+dip+'}" -a 127.0.0.1 -p ' + str(port)
                     p1 = subprocess.Popen([cmd], shell=True)
                     p1.communicate()
                     self.set_rate_3 = True

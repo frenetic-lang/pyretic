@@ -89,22 +89,25 @@ def main():
     mc.add_spec("FAIRNESS\n  infected;")
 
     ### If infected event is true, next policy state is 'drop'
-    mc.add_spec("SPEC AG (infected -> AX policy=policy_1)")
+    mc.add_spec("SPEC AG (infected -> AX policy=drop)")
 
     ### If infected event is false, next policy state is 'allow'
-    mc.add_spec("SPEC AG (!infected -> AX policy=policy_2)")
+    mc.add_spec("SPEC AG (!infected -> AX policy=policy_1)")
 
     ### Policy state is 'allow' until infected is true.
-    mc.add_spec("SPEC A [ policy=policy_2 U infected ]")
+    mc.add_spec("SPEC A [ policy=policy_1 U infected ]")
 
     ### It is always possible to go back to 'allow'
-    mc.add_spec("SPEC AG EF policy=policy_2")
+    mc.add_spec("SPEC AG EF policy=policy_1")
 
     # Save NuSMV file
     mc.save_as_smv_file()
 
     # Verify
     mc.verify()
+
+    # Ask deployment
+    ask_deploy()
 
     # Return DynamicPolicy. 
     # flood() will take for of forwarding for this simple example.

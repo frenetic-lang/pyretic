@@ -75,6 +75,10 @@ class rate_limiter(DynamicPolicy):
         def policy(self):
             for i in rates:
                 self.case(V('rate')==C(i), C(rate_limit_policy(i+1)))
+            # Default policy
+            self.default(C(rate_limit_policy(2)))
+
+
 
         ### SET UP THE FSM DESCRIPTION
     
@@ -112,6 +116,10 @@ def main():
     mc.save_as_smv_file()
     mc.verify()
 
+    # Ask deployment
+    ask_deploy()
+
 #    return pol
     return pol >> monitor()
+
 

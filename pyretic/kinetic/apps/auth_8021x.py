@@ -9,7 +9,7 @@ from pyretic.kinetic.smv.model_checker import *
 
 #####################################################################################################
 # * App launch
-#   - pyretic.py pyretic.kinetic.apps.auth
+#   - pyretic.py pyretic.kinetic.apps.auth_8021x
 #
 # * Mininet Generation (in "~/pyretic/pyretic/kinetic" directory)
 #   - sudo mn --controller=remote,ip=127.0.0.1 --mac --arp --switch ovsk --link=tc --topo=single,3
@@ -18,12 +18,12 @@ from pyretic.kinetic.smv.model_checker import *
 #   - mininet> h1 ping h2
 #
 # * Events to allow traffic "h1 ping h2" (in "~/pyretic/pyretic/kinetic" directory)
-#   - python json_sender.py -n auth -l True --flow="{srcip=10.0.0.1}" -a 127.0.0.1 -p 50001
-#   - python json_sender.py -n auth -l True --flow="{srcip=10.0.0.2}" -a 127.0.0.1 -p 50001
+#   - python json_sender.py -n authenticated_1x -l True --flow="{srcip=10.0.0.1}" -a 127.0.0.1 -p 50001
+#   - python json_sender.py -n authenticated_1x -l True --flow="{srcip=10.0.0.2}" -a 127.0.0.1 -p 50001
 #####################################################################################################
 
 
-class auth(DynamicPolicy):
+class auth_8021x(DynamicPolicy):
     def __init__(self):
 
        ### DEFINE THE LPEC FUNCTION
@@ -34,20 +34,20 @@ class auth(DynamicPolicy):
         ## SET UP TRANSITION FUNCTIONS
 
         @transition
-        def authenticated(self):
+        def authenticated_1x(self):
             self.case(occurred(self.event),self.event)
 
         @transition
         def policy(self):
-            self.case(is_true(V('authenticated')),C(identity))
+            self.case(is_true(V('authenticated_1x')),C(identity))
             self.default(C(drop))
 
         ### SET UP THE FSM DESCRIPTION
 
         self.fsm_def = FSMDef( 
-            authenticated=FSMVar(type=BoolType(), 
+            authenticated_1x=FSMVar(type=BoolType(), 
                             init=False, 
-                            trans=authenticated),
+                            trans=authenticated_1x),
             policy=FSMVar(type=Type(Policy,{drop,identity}),
                           init=drop,
                           trans=policy))
@@ -58,36 +58,37 @@ class auth(DynamicPolicy):
         json_event = JSONEvent()
         json_event.register_callback(fsm_pol.event_handler)
 
-        super(auth,self).__init__(fsm_pol)
+        super(auth_8021x,self).__init__(fsm_pol)
 
 
 def main():
-    pol = auth()
+    pol = auth_8021x()
 
     # For NuSMV
     smv_str = fsm_def_to_smv_model(pol.fsm_def)
-    mc = ModelChecker(smv_str,'auth')  
+    mc = ModelChecker(smv_str,'auth_8021x')  
 
 
     ## Add specs 
-    mc.add_spec("FAIRNESS\n  authenticated;")
+    mc.add_spec("FAIRNESS\n  authenticated_1x;")
 
     ### If authentication event is true, next policy state is 'allow'
-    mc.add_spec("SPEC AG (authenticated -> AX policy=policy_1)")
+    mc.add_spec("SPEC AG (authenticated_1x -> AX policy=policy_1)")
 
     ### If authentication event is false, next policy state is 'drop'
-    mc.add_spec("SPEC AG (!authenticated -> AX policy=drop)")
+    mc.add_spec("SPEC AG (!authenticated_1x -> AX policy=drop)")
 
     ### It is always possible for the policy state to go to 'allow'
     mc.add_spec("SPEC AG (EF policy=policy_1)")
 
     ### Policy state is 'drop' until authentication is true. 
-    mc.add_spec("SPEC A [ policy=drop U authenticated ]")
+    mc.add_spec("SPEC A [ policy=drop U authenticated_1x ]")
 
     mc.save_as_smv_file()
     mc.verify()
-    
+
     # Ask deployment
     ask_deploy()
+
 
     return pol >> flood()

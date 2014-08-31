@@ -114,4 +114,7 @@ def main():
     mc.save_as_smv_file()
     mc.verify()
  
+    # Ask deployment
+    ask_deploy()
+
     return pol

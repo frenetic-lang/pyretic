@@ -10,6 +10,16 @@ import sys
 policy_to_name_map = {}
 complexPolicyStr_to_actualPolicy = {}
 
+def ask_deploy():
+    var = raw_input("Deploy? (yes/no): ")
+    print "You entered: ", var   
+    if var.lower()=='yes' or var.lower()=='y':
+        return
+    elif var.lower()=='no' or var.lower()=='n':
+        sys.exit()
+    else:
+        print 'Unknown answer. Please enter "yes" or "no".'
+        ask_deploy()
 
 def as_comment(s):
     s = '-- ' + s
@@ -80,9 +90,11 @@ def to_smv(i):
         if policy_to_name_map.has_key(s):
             return policy_to_name_map[s]
         else:
-            print "Given policy is:",str(i)
-            print policy_to_name_map.keys()
-            return policy_to_name_map[s]
+            print "Cannot find this polcy. Given policy is:\n",str(i)
+            print "Keys in policy_to_name_map: "
+            for k in policy_to_name_map.keys():
+                print k
+            sys.exit()
 
 
 ### Types
@@ -565,14 +577,14 @@ def fsm_def_compose(fsm_def_1,fsm_def_2,comp_op_str):
     composed_fsm_def.map['policy'] = policy_fsmvar_map
 
 
-    print '========RETURN======'
-    for k,v in composed_fsm_def.map.items():
-        t=v['type']
-        if t.py_type==Policy:
-            print k
-            print v['trans']
-    print '=============='
-
+#    print '========RETURN======'
+#    for k,v in composed_fsm_def.map.items():
+#        t=v['type']
+#        if t.py_type==Policy:
+#            print k
+#            print v['trans']
+#    print '=============='
+#
 
 
 

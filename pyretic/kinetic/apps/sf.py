@@ -113,4 +113,7 @@ def main():
     # Verify
     mc.verify()
 
+    # Ask deployment
+    ask_deploy()
+
     return pol >> flood()
