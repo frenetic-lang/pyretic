@@ -44,6 +44,8 @@ if __name__ == '__main__':
     for k in value_number_map:
         percentage = (float(value_number_map[k])/float(total_responses) ) * 100.0
         line_str = '' 
-        line_str += k + ' & ' + str(value_number_map[k]) + ' & ' + "%.2f" % percentage
+        line_str += k + ' & ' + str(value_number_map[k]) + ' & ' + "%.2f" % percentage + '\\\\' 
         print line_str
+    print '\hline'
+    print 'Total & ' + str(total_responses) + ' & 100\\\\'
     print '\n'
