@@ -804,6 +804,25 @@ class disjoint(CombinatorPolicy):
         if len(policies) == 0:
             raise TypeError
         super(disjoint, self).__init__(policies)
+        
+    def eval(self, pkt):
+        """
+        evaluates to the set union of the evaluation
+        of self.policies on pkt
+
+        :param pkt: the packet on which to be evaluated
+        :type pkt: Packet
+        :rtype: set Packet
+        """
+        # Very similar to Parallel, only difference that it will only have one output pkt.
+        # Todo: Assert that it return only one packet as output
+        output = set()
+        for policy in self.policies:
+            output |= (policy.eval(pkt))
+        #print self.policies, pkt
+        
+        #print output
+        return output
     
     def compile(self):
         """
@@ -823,16 +842,27 @@ class disjoint(CombinatorPolicy):
 
         for policy in self.policies:
             start=time.time()           
-            tmp_rules=policy.compile().rules                                    
+            tmp_rules=policy.compile().rules   
+            #print tmp_rules, len(tmp_rules)                                 
             last_rule=[tmp_rules[len(tmp_rules)-1]]
-            aggr_rules+=tmp_rules[:len(tmp_rules)-1]                
+            tmp_rule_list = []
+            ctr = 0
+            for obj in tmp_rules:
+                
+                if ctr == len(tmp_rules)-1:
+                    break
+                else:
+                    tmp_rule_list.append(obj)
+                    ctr += 1
+                    
+            aggr_rules+=tmp_rule_list               
             
         if compile_debug==True: 
             print "Time to compile disjoint policies: ",time.time()-start
                  
         aggr_rules+=last_rule
         start=time.time()
-        classifiers=aggr_rules        
+        classifiers=aggr_rules       
         return classifiers
         
         
