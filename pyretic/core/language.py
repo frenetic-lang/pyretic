@@ -697,8 +697,8 @@ class CountBucket(Query):
         self.runtime_existing_stats_query_fun = None
         self.outstanding_switches = set()
         self.switches_in_query = set()
-        self.packet_count = 0
-        self.byte_count = 0
+        self.packet_count_table = 0
+        self.byte_count_table = 0
         self.packet_count_persistent = 0
         self.byte_count_persistent = 0
         self.in_update_cv = Condition()
@@ -771,10 +771,10 @@ class CountBucket(Query):
     def finish_update(self):
         with self.in_update_cv:
             self.in_update = False
-            if self.new_bucket:
-                self.pull_existing_stats()
-                self.new_bucket = False
             self.in_update_cv.notify_all()
+        if self.new_bucket:
+            self.pull_existing_stats()
+            self.new_bucket = False
         self.log.info("Updated bucket %d" % id(self))
        
 
@@ -914,8 +914,9 @@ class CountBucket(Query):
         # registered callback routines
         if not queries_issued:
             self.clear_transient_counters()
+            self.log.info("Didn't issue stat queries; directly returning!")
             for f in self.callbacks:
-                f([self.packet_count, self.byte_count])
+                f([self.packet_count_persistent, self.byte_count_persistent])
 
     def pull_existing_stats(self):
         """Issue stats queries from the runtime to track counters on rules
@@ -939,8 +940,8 @@ class CountBucket(Query):
         return new_dict
 
     def clear_transient_counters(self):
-        self.packet_count = self.packet_count_persistent
-        self.byte_count   = self.byte_count_persistent
+        self.packet_count_table = 0
+        self.byte_count_table   = 0
 
     def handle_flow_stats_reply(self,switch,flow_stats):
         """
@@ -971,9 +972,13 @@ class CountBucket(Query):
                 return fme
             return None
 
+        self.log.debug("Got a reply from switch %s" % switch)
         with self.in_update_cv:
             while self.in_update:
+                self.log.debug("Waiting for update to finish.")
                 self.in_update_cv.wait()
+            self.log.debug("Current set of outstanding switches is:")
+            self.log.debug(str(self.outstanding_switches))
             if switch in self.outstanding_switches:
                 for f in flow_stats:
                     if 'match' in f:
@@ -996,8 +1001,8 @@ class CountBucket(Query):
                                                str(extracted_pkts) + ' bytes: '
                                                + str(extracted_bytes))
                             if not self.matches[me].existing_rule:
-                                self.packet_count += extracted_pkts
-                                self.byte_count   += extracted_bytes
+                                self.packet_count_table += extracted_pkts
+                                self.byte_count_table   += extracted_bytes
                             else: # pre-existing rule when bucket was created
                                 self.log.debug(('In bucket %d: removing' +
                                                 'pre-existing rule counts %d' +
@@ -1008,14 +1013,19 @@ class CountBucket(Query):
                     else:
                         raise RuntimeError("weird flow entry")
                 self.outstanding_switches.remove(switch)
+                self.log.debug("Current set of outstanding switches is:")
+                self.log.debug(str(self.outstanding_switches))
         # If have all necessary data, call user-land registered callbacks
         self.log.info( ('*** Bucket %d flow_stats_reply\n' % id(self)) +
                         ('table pktcount %d persistent pktcount %d total %d' % (
-                    self.packet_count - self.packet_count_persistent,
-                    self.packet_count_persistent, self.packet_count ) ) )
+                    self.packet_count_table,
+                    self.packet_count_persistent,
+                    self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
+            self.log.debug("No outstanding switches; calling callbacks")
             for f in self.callbacks:
-                f([self.packet_count, self.byte_count])
+                f([self.packet_count_table + self.packet_count_persistent,
+                   self.byte_count_table   + self.byte_count_persistent])
             self.clear_transient_counters()
 
     def clear_existing_rule_flag(self, entry):

@@ -65,7 +65,7 @@ class QueryTest(CountBucket):
 
     def query_thread(self):
         """Thread that issues stats queries every 10 seconds."""
-        interval = 2.5
+        interval = 5.0
         while True:
             output = str(datetime.now()) + "| bucket " + str(id(self))
             output += ": print matches\n"

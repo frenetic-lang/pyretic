@@ -999,11 +999,11 @@ class Runtime(object):
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
 
-        self.log.info('================================')
-        self.log.info('Final classifier to be installed:')
+        self.log.debug('================================')
+        self.log.debug('Final classifier to be installed:')
         for rule in new_rules:
-            self.log.info(str(rule))
-        self.log.info('================================')
+            self.log.debug(str(rule))
+        self.log.debug('================================')
 
         p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
@@ -1044,6 +1044,7 @@ class Runtime(object):
             be transiently or permanently lost as they are fate-shared with
             switches."""
             return False
+        self.log.debug('Non-empty query switch list.')
         for s in switch_list:
             bucket.add_outstanding_switch_query(s)
             already_queried = self.add_global_outstanding_query(s, bucket)
@@ -1278,13 +1279,15 @@ class Runtime(object):
                                str(f))
                 self.log.debug('packets: ' + str(extracted_pkts) + ' bytes: ' +
                                str(extracted_bytes))
+        buckets_list = []
         with self.global_outstanding_queries_lock:
             if switch in self.global_outstanding_queries:
-                for bucket in self.global_outstanding_queries[switch]:
-                    bucket.handle_flow_stats_reply(switch, flow_stats)
+                buckets_list = self.global_outstanding_queries[switch]
                 del self.global_outstanding_queries[switch]
             self.log.debug('in stats_reply: outstanding switches is now:' +
                            str(self.global_outstanding_queries) )
+        for bucket in buckets_list:
+            bucket.handle_flow_stats_reply(switch, flow_stats)
 
     def handle_flow_removed(self, dpid, flow_stat_dict):
         def str_convert_match(m):
