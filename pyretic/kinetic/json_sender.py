@@ -107,7 +107,7 @@ def main():
  
     # Receive return value
     recvdata = s.recv(1024)
-    print recvdata
+    print 'return: ' + recvdata
 
     s.close()
     

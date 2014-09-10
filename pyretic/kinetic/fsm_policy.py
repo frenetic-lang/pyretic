@@ -121,13 +121,20 @@ class FSMPolicy(DynamicPolicy):
         super(FSMPolicy,self).__init__(self.initial_policy)
 
     def event_handler(self,event):
-        
+        global measures_list 
         print len(measures_list)
+
         if event.name=='endofworld':
             pickle_fd = open('./measure_data.p','wb')
             pickle.dump(measures_list,pickle_fd)
             pickle_fd.close() 
-            
+            measures_list = []
+        if event.name=='endofworld_ex':
+            pickle_fd = open('./measure_data_ext.p','wb')
+            pickle.dump(measures_list,pickle_fd)
+            pickle_fd.close() 
+            measures_list = []
+
         n1=dt.datetime.now()
         # Events that apply to a single lpec
         if event.flow:
@@ -164,12 +171,15 @@ class FSMPolicy(DynamicPolicy):
 
                 self.policy.compile()
                 n2=dt.datetime.now()
-                measures_list.append(float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds))
+                compile_time = float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds)
+                measures_list.append(compile_time)
 #                print '=== Compile takes: ',float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds),'===\n'
 #                print self.policy
- 
+            return compile_time
         # Events that apply to all lpecs
         else:
             with self.lock:
                 for lpec_fsm in self.lpec_to_fsm.values():
                     lpec_fsm.handle_event(event.name,event.value)
+
+            return '-1'

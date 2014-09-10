@@ -2,6 +2,7 @@ from threading import Thread
 import socket
 import SocketServer
 import json
+import select 
 
 from pyretic.lib.corelib import *
 from pyretic.kinetic.fsm_policy import Event
@@ -46,17 +47,20 @@ class JSONEvent():
     
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setblocking(0)
         s.bind((self.addr, self.port))
         s.listen(1)
         
         while 1:
             message = ''
             
-            conn, addr = s.accept()
-            print 'Received connection from', addr
+            ready = select.select([s], [], [], 0.0)
+#            conn, addr = s.accept()
+#            print 'Received connection from', addr
             
-            while 1:
-                data = conn.recv(1024)
+            if ready[0]:
+#                    data = conn.recv(1024)
+                data = s.recv(1024)
                 
                 if not data: 
                     conn.close()
@@ -84,9 +88,10 @@ class JSONEvent():
                           k,v in ascii_dict['flow'].items() 
                           if v } )
             
+                return_value = '-1'
                 if self.handler:
-                    self.handler(Event(name,value,flow))
-                return_value = 'ok'
+                    return_value = str(self.handler(Event(name,value,flow)))
+#                return_value = 'ok'
                 conn.sendall(return_value)
 
 
