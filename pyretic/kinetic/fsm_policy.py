@@ -5,11 +5,14 @@ from threading import Lock
 import re
 import inspect
 import textwrap
+import datetime as dt
+import pickle
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.kinetic.language import *
 
+measures_list = []
 
 class Event(object):
     def __init__(self,name,value,flow):
@@ -118,7 +121,14 @@ class FSMPolicy(DynamicPolicy):
         super(FSMPolicy,self).__init__(self.initial_policy)
 
     def event_handler(self,event):
-
+        
+        print len(measures_list)
+        if event.name=='endofworld':
+            pickle_fd = open('./measure_data.p','wb')
+            pickle.dump(measures_list,pickle_fd)
+            pickle_fd.close() 
+            
+        n1=dt.datetime.now()
         # Events that apply to a single lpec
         if event.flow:
             try:
@@ -152,6 +162,12 @@ class FSMPolicy(DynamicPolicy):
                 if lpec_new:
                     self.policy = if_(lpec,lpec_fsm,self.policy)
 
+                self.policy.compile()
+                n2=dt.datetime.now()
+                measures_list.append(float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds))
+#                print '=== Compile takes: ',float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds),'===\n'
+#                print self.policy
+ 
         # Events that apply to all lpecs
         else:
             with self.lock:
