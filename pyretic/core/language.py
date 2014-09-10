@@ -43,7 +43,7 @@ from pyretic.core.network import *
 from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
-from multiprocessing import Condition
+from multiprocessing import Lock, Condition
 
 NO_CACHE=False
 
@@ -704,6 +704,8 @@ class CountBucket(Query):
         self.in_update_cv = Condition()
         self.in_update = False
         self.new_bucket = True
+        self.max_num_callbacks = 0
+        self.max_num_callbacks_lock = Lock()
         # TODO(ngsrinivas) find a way to avoid having a log *per* bucket
         self.log = logging.getLogger('%s.CountBucket' % __name__)
         self._classifier = self.generate_classifier()
@@ -910,13 +912,29 @@ class CountBucket(Query):
     def pull_stats(self):
         """Issue stats queries from the runtime on user program's request."""
         queries_issued = self.pull_helper(self.runtime_stats_query_fun)
+        self.increment_max_num_callbacks()
         # If no queries were issued, then no matches, so just call userland
         # registered callback routines
         if not queries_issued:
             self.clear_transient_counters()
             self.log.info("Didn't issue stat queries; directly returning!")
-            for f in self.callbacks:
-                f([self.packet_count_persistent, self.byte_count_persistent])
+            self.call_callbacks([self.packet_count_persistent,
+                                 self.byte_count_persistent])
+
+    def call_callbacks(self, args):
+        """ Pace callbacks according to pull_stats issued by application. """
+        self.log.debug("Max # callback responses left: %d" %
+                        self.max_num_callbacks)
+        with self.max_num_callbacks_lock:
+            if self.max_num_callbacks > 0:
+                self.max_num_callbacks -= 1
+                for f in self.callbacks:
+                    f(args)
+
+    def increment_max_num_callbacks(self):
+        """ Pace callbacks according to pull_stats issued by application. """
+        with self.max_num_callbacks_lock:
+            self.max_num_callbacks += 1
 
     def pull_existing_stats(self):
         """Issue stats queries from the runtime to track counters on rules
@@ -1023,9 +1041,10 @@ class CountBucket(Query):
                     self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
             self.log.debug("No outstanding switches; calling callbacks")
-            for f in self.callbacks:
-                f([self.packet_count_table + self.packet_count_persistent,
-                   self.byte_count_table   + self.byte_count_persistent])
+            self.call_callbacks([(self.packet_count_table +
+                                  self.packet_count_persistent),
+                                 (self.byte_count_table   +
+                                  self.byte_count_persistent)])
             self.clear_transient_counters()
 
     def clear_existing_rule_flag(self, entry):
