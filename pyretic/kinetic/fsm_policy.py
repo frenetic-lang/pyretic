@@ -109,6 +109,7 @@ class FSMPolicy(DynamicPolicy):
         self.exogenous = dict()
         self.deps = defaultdict(set)
         self.lpec_fn = lpec_fn
+        self.list_of_fsm_policies = list()
 
         loadwith_varname =  ''
         loadwith_varvalue = True
@@ -174,14 +175,20 @@ class FSMPolicy(DynamicPolicy):
                 lpec_fsm.handle_event(event.name,event.value)
 
                 # if the lpec is new, update the policy
-                if lpec_new:
-                    self.policy = if_(lpec,lpec_fsm,self.policy)
+#                if lpec_new:
+#                    self.policy = if_(lpec,lpec_fsm,self.policy)
 
+                if lpec_new: 
+                    self.list_of_fsm_policies.append(lpec >> lpec_fsm)
+                    self.policy = parallel(self.list_of_fsm_policies)
+#                    self.policy = self.policy + (lpec >> lpec_fsm)
+                    
                 self.policy.compile()
                 n2=dt.datetime.now()
-                measures_list.append(float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds))
-#                print self.policy
-#                print '=== Compile takes: ',float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds),'===\n'
+                compile_time = float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds)
+                measures_list.append(compile_time)
+                print self.policy
+#                print '=== Compile takes: ',compile_time,'===\n'
  
         # Events that apply to all lpecs
         else:
@@ -231,8 +238,20 @@ class FSMPolicy(DynamicPolicy):
             if str(src_ip_real).endswith('0') or str(src_ip_real).endswith('255'):
                 src_ip_real = src_ip_real + 1
             src_ip = IPAddr(str(src_ip_real))
-        print "Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
 
+        self.list_of_fsm_policies = list_of_fsm_policies
+
+        ### Parallel or Disjoint
+#        self.policy = disjoint(list_of_fsm_policies)
         self.policy = parallel(list_of_fsm_policies)
-        print self.policy
+
+        print '\nInitiate policy compilation. This can take time...\n'
+        n1=dt.datetime.now()
+        self.policy.compile()
+        n2=dt.datetime.now()
+        compile_time = (float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds))
+       
+        print "** Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
+        print "** Compilation time: " + str(compile_time) + " seconds.\n"
+        
 
