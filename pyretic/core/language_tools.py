@@ -95,6 +95,7 @@ def on_recompile_path(acc,pol_id,policy):
           isinstance(policy,parallel) or
           isinstance(policy,union) or
           isinstance(policy,sequential) or
+          isinstance(policy,disjoint) or
           isinstance(policy,intersection)):
         sub_acc = set()
         for sub_policy in policy.policies:

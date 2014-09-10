@@ -180,7 +180,7 @@ class FSMPolicy(DynamicPolicy):
 
                 if lpec_new: 
                     self.list_of_fsm_policies.append(lpec >> lpec_fsm)
-                    self.policy = parallel(self.list_of_fsm_policies)
+                    self.policy = disjoint(self.list_of_fsm_policies)
 #                    self.policy = self.policy + (lpec >> lpec_fsm)
                     
                 self.policy.compile()
@@ -199,7 +199,7 @@ class FSMPolicy(DynamicPolicy):
         print "Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
 
     def load_LPEC(self,num_of_fsms,event_name,event_value):
-        src_ip_real = ipaddr.IPAddress('1.1.1.1')
+        src_ip_real = ipaddr.IPAddress('10.0.0.1')
         src_ip = IPAddr(str(src_ip_real))
         list_of_fsm_policies = []
 
@@ -242,8 +242,8 @@ class FSMPolicy(DynamicPolicy):
         self.list_of_fsm_policies = list_of_fsm_policies
 
         ### Parallel or Disjoint
-#        self.policy = disjoint(list_of_fsm_policies)
-        self.policy = parallel(list_of_fsm_policies)
+        self.policy = disjoint(list_of_fsm_policies)
+#        self.policy = parallel(list_of_fsm_policies)
 
         print '\nInitiate policy compilation. This can take time...\n'
         n1=dt.datetime.now()
@@ -253,5 +253,7 @@ class FSMPolicy(DynamicPolicy):
        
         print "** Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
         print "** Compilation time: " + str(compile_time) + " seconds.\n"
+
+        print self.policy
         
 
