@@ -45,7 +45,12 @@ from pyretic.core.util import frozendict, singleton
 from multiprocessing import Condition
 
 NO_CACHE=False
-compile_debug = True
+compile_debug = False
+use_disjoint_cache = True
+
+
+disjoint_cache={}
+
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
@@ -841,11 +846,21 @@ class disjoint(CombinatorPolicy):
         last_rule=None       
 
         for policy in self.policies:
-            start=time.time()           
-            tmp_rules=policy.compile().rules   
-            #print tmp_rules, len(tmp_rules)                                 
-            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            start=time.time()  
             tmp_rule_list = []
+            
+            if use_disjoint_cache:
+                hash_d = policy.__repr__()
+                if hash_d in disjoint_cache:
+                    tmp_rules=disjoint_cache[hash_d]
+                else:
+                    tmp_rules=policy.compile().rules
+                    disjoint_cache[hash_d]=tmp_rules  
+            else:                      
+                tmp_rules=policy.compile().rules  
+                                                
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            
             ctr = 0
             for obj in tmp_rules:
                 
@@ -862,7 +877,9 @@ class disjoint(CombinatorPolicy):
                  
         aggr_rules+=last_rule
         start=time.time()
-        classifiers=aggr_rules       
+        classifiers=aggr_rules  
+        
+        #print "Cache state: ", disjoint_cache    
         return classifiers
         
         
