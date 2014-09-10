@@ -45,6 +45,7 @@ from pyretic.core.util import frozendict, singleton
 from multiprocessing import Condition
 
 NO_CACHE=False
+compile_debug = True
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
@@ -781,6 +782,60 @@ class parallel(CombinatorPolicy):
             return drop.compile()
         classifiers = map(lambda p: p.compile(), self.policies)
         return reduce(lambda acc, c: acc + c, classifiers)
+    
+
+class disjoint(CombinatorPolicy):
+    """
+    Combinator for several disjoint policies.
+
+    :param policies: the policies to be combined.
+    :type policies: list Policy
+    """
+    def __new__(self, policies=[]):
+        # Hackety hack.
+        if len(policies) == 0:
+            return identity
+        else:
+            rv = super(disjoint, self).__new__(disjoint, policies)
+            rv.__init__(policies)
+            return rv
+
+    def __init__(self, policies=[]):
+        if len(policies) == 0:
+            raise TypeError
+        super(disjoint, self).__init__(policies)
+    
+    def compile(self):
+        """
+        Produce a Classifier for this policy
+
+        :rtype: Classifier
+        """
+        #print "lower policies: ",self.lower
+        if compile_debug==True: 
+            print "Disjoint Policies compiler called: ",len(self.policies)
+        start=time.time()
+   
+        # Make sure that there are policies to compile
+        assert(len(self.policies) > 0)
+        aggr_rules=[]
+        last_rule=None       
+
+        for policy in self.policies:
+            start=time.time()           
+            tmp_rules=policy.compile().rules                                    
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            aggr_rules+=tmp_rules[:len(tmp_rules)-1]                
+            
+        if compile_debug==True: 
+            print "Time to compile disjoint policies: ",time.time()-start1
+                 
+        aggr_rules+=last_rule
+        start=time.time()
+        classifiers=aggr_rules        
+        return classifiers
+        
+        
 
 
 class union(parallel,Filter):
