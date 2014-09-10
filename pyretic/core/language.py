@@ -828,7 +828,7 @@ class disjoint(CombinatorPolicy):
             aggr_rules+=tmp_rules[:len(tmp_rules)-1]                
             
         if compile_debug==True: 
-            print "Time to compile disjoint policies: ",time.time()-start1
+            print "Time to compile disjoint policies: ",time.time()-start
                  
         aggr_rules+=last_rule
         start=time.time()
