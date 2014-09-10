@@ -1,0 +1,35 @@
+MODULE main
+  VAR
+    policy	: {policy_1,drop};
+    authenticated	: boolean;
+  ASSIGN
+    init(policy) := drop;
+    init(authenticated) := FALSE;
+    next(policy) :=
+	case
+		authenticated	: policy_1;
+		TRUE	: drop;
+	esac;
+    next(authenticated) :=
+	case
+		TRUE	: {FALSE,TRUE};
+		TRUE	: authenticated;
+	esac;
+--  
+-- 
+-- =====================================================================
+-- PolicyName (used in NuSMV) to ActualPolicy (used in Pyretic) Mapping
+-- =====================================================================
+-- ---------------------------------------------
+-- policy_1: (shown below)
+-- ---------------------------------------------
+-- identity
+-- ---------------------------------------------
+-- 
+-- 
+FAIRNESS
+  authenticated;
+SPEC AG (authenticated -> AX policy=policy_1)
+SPEC AG (!authenticated -> AX policy=drop)
+SPEC AG (EF policy=policy_1)
+SPEC A [ policy=drop U authenticated ]

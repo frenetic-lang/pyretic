@@ -1,0 +1,10 @@
+=========================
+Set $KINETICPATH 
+=========================
+
+* Write command below in Linux command line:
+$ export KINETICPATH=$HOME/pyretic/pyretic/kinetic
+
+* Put this in "~/.profile" to make it execute every time to log in.
+Log off and log in again.
+
