@@ -14,9 +14,7 @@ from pyretic.kinetic.language import *
 import ipaddr
 
 measures_list = []
-
-
-
+howmany = 0
 
 class Event(object):
     def __init__(self,name,value,flow):
@@ -53,8 +51,9 @@ class LpecFSM(DynamicPolicy):
 
             # update policy, if appropriate
             if var_name == 'policy':
-                self.policy = self.state['policy']
+#                self.policy = self.state['policy']
 #                print self.policy
+                pass
 
             # cascade the changes
             for v in self.dependencies[var_name]:
@@ -138,13 +137,15 @@ class FSMPolicy(DynamicPolicy):
         self.load_LPEC(int(num_of_fsms), loadwith_varname,loadwith_varvalue)
 
     def event_handler(self,event):
-        
+        global measures_list
+        global howmany
+        compile_time = -1
+
         if event.name=='endofworld':
             pickle_fd = open('./measure_data.p','wb')
             pickle.dump(measures_list,pickle_fd)
             pickle_fd.close() 
             
-        n1=dt.datetime.now()
         # Events that apply to a single lpec
         if event.flow:
             try:
@@ -181,13 +182,15 @@ class FSMPolicy(DynamicPolicy):
                 if lpec_new: 
                     self.list_of_fsm_policies.append(lpec >> lpec_fsm)
                     self.policy = disjoint(self.list_of_fsm_policies)
-#                    self.policy = self.policy + (lpec >> lpec_fsm)
+#                    self.policy = parallel(self.list_of_fsm_policies)
                     
+                n1=dt.datetime.now()
                 self.policy.compile()
                 n2=dt.datetime.now()
                 compile_time = float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds)
                 measures_list.append(compile_time)
-                print self.policy
+                howmany = howmany +1
+#                print self.policy
 #                print '=== Compile takes: ',compile_time,'===\n'
  
         # Events that apply to all lpecs
@@ -195,8 +198,11 @@ class FSMPolicy(DynamicPolicy):
             with self.lock:
                 for lpec_fsm in self.lpec_to_fsm.values():
                     lpec_fsm.handle_event(event.name,event.value)
+
+#        print "Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
+#        print howmany
+        return compile_time
         
-        print "Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
 
     def load_LPEC(self,num_of_fsms,event_name,event_value):
         src_ip_real = ipaddr.IPAddress('10.0.0.1')
@@ -254,6 +260,6 @@ class FSMPolicy(DynamicPolicy):
         print "** Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
         print "** Compilation time: " + str(compile_time) + " seconds.\n"
 
-        print self.policy
+#        print self.policy
         
 

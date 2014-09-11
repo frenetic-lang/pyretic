@@ -2,6 +2,8 @@ from threading import Thread
 import socket
 import SocketServer
 import json
+import datetime as dt
+import select 
 
 from pyretic.lib.corelib import *
 from pyretic.kinetic.fsm_policy import Event
@@ -47,46 +49,47 @@ class JSONEvent():
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((self.addr, self.port))
-        s.listen(1)
+        s.listen(2048)
         
         while 1:
             message = ''
             
-            conn, addr = s.accept()
-            print 'Received connection from', addr
-            
-            while 1:
-                data = conn.recv(1024)
-                
-                if not data: 
-                    conn.close()
-                    break
-                
-                message = message + data
-                unicode_dict = parse_json(message)
-                ascii_dict = unicode_dict_to_ascii(unicode_dict)
+            ready_r, ready_w, in_error = select.select([s], [], [], 60)
 
-                def convert(field,value):
-                    if field == 'srcip' or field == 'dstip':
-                        return IPAddr(value)
-                    elif field == 'srcmac' or field == 'dstmac':
-                        return EthAddr(value)
+            for s in ready_r:
+                conn, addr = s.accept()
+#                print 'Received connection from', addr
+                while 1:
+                    data = conn.recv(1024)
+                    
+                    if not data: 
+                        conn.close()
+                        break
+                    
+                    message = message + data
+                    unicode_dict = parse_json(message)
+                    ascii_dict = unicode_dict_to_ascii(unicode_dict)
+    
+                    def convert(field,value):
+                        if field == 'srcip' or field == 'dstip':
+                            return IPAddr(value)
+                        elif field == 'srcmac' or field == 'dstmac':
+                            return EthAddr(value)
+                        else:
+                            return int(value)
+    
+                    name = ascii_dict['name']
+                    value = ascii_dict['value']
+                    if not 'flow' in ascii_dict:
+                        flow = None
                     else:
-                        return int(value)
-
-                name = ascii_dict['name']
-                value = ascii_dict['value']
-                if not 'flow' in ascii_dict:
-                    flow = None
-                else:
-                    flow = frozendict(
-                        { k : convert(k,v) for 
-                          k,v in ascii_dict['flow'].items() 
-                          if v } )
-            
-                if self.handler:
-                    self.handler(Event(name,value,flow))
-                return_value = 'ok'
-                conn.sendall(return_value)
-
-
+                        flow = frozendict(
+                            { k : convert(k,v) for 
+                              k,v in ascii_dict['flow'].items() 
+                              if v } )
+                
+                    return_value = -1
+    
+                    if self.handler:
+                        return_value = self.handler(Event(name,value,flow))
+                    conn.sendall(str(return_value))

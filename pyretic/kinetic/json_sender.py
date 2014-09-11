@@ -107,12 +107,12 @@ def main():
  
     # Receive return value
     recvdata = s.recv(1024)
-    print recvdata
+    print 'return: ' + recvdata
 
     s.close()
     
 def parse_flow_str(flow_dict, flow_str):
-    print "\nFlow_Str = " + flow_str
+#    print "\nFlow_Str = " + flow_str
     m = re.search("inport=(\d+)\s*",flow_str)
     if m:
         flow_dict['inport'] = m.group(1)
@@ -161,7 +161,7 @@ def parse_flow_str(flow_dict, flow_str):
     if m:
         flow_dict['vlan_pcp'] = m.group(1)
 
-    print "\nData Payload = " + str(flow_dict) + '\n'
+#    print "\nData Payload = " + str(flow_dict) + '\n'
 
 # main ######
 if __name__ == '__main__':
