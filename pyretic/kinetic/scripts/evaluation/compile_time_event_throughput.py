@@ -77,7 +77,6 @@ def send_event(rate, num_exp, measure_map):
         process_list = []
         wait_time = 1.0/float(rate[0])
         timeout = rate[1]
-        rate_in_str = rate[2]
         queue = Queue.Queue()
         
         for n in range(int(num_exp)):
@@ -136,7 +135,11 @@ def main():
     op.add_option( '--num', '-n', action="store", \
                    dest="num_exp", help = "Specify how many times to run the experiment." )
 
-    if len(sys.argv) != 3:
+    op.add_option( '--fsm', '-f', action="store", \
+                   dest="nfsm", help = "Number of FSMs loaded" )
+
+
+    if len(sys.argv) != 5:
         print "Wrong number of arguments"
         op.print_help()
         sys.exit()
@@ -153,9 +156,13 @@ def main():
     # Rate_list
     rate_list = []
 #    rate_list.append( (nevents, timeout, rate_in_str) )
-    rate_list.append( (1, 1, '1 events/sec') )
-    rate_list.append( (10, 1, '10 events/sec') )
-    rate_list.append( (100, 1, '100 events/sec') )
+    rate_list.append( (1, 1) )
+    rate_list.append( (10, 1) )
+    rate_list.append( (20, 1) )
+    rate_list.append( (40, 1) )
+    rate_list.append( (60, 1) )
+    rate_list.append( (60, 1) )
+    rate_list.append( (100, 1) )
 #    rate_list.append( (1000, 1, '1000 events/sec') )
 
     # Events and values
@@ -189,7 +196,7 @@ def main():
 
     # Save map
     print 'Done sending. Save data.'
-    pickle_fd = open('./measure_map_event.p','wb')
+    pickle_fd = open('./measure_map_event_' + options.nfsm + '.p','wb')
     pickle.dump(measure_map,pickle_fd)
     pickle_fd.close()
 
