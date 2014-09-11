@@ -170,13 +170,13 @@ def main():
     global json_message_list_false
     global json_message_list_true
     the_IP = ipaddr.IPAddress('10.0.0.1')
-    for i in range(1000):
+    for i in range(5000):
         json_message_list_false.append(forge_json('srcip='+str(the_IP), ev_tuple_list[0][0], ev_tuple_list[0][1]))
         the_IP = the_IP + 1
         if str(the_IP).endswith('0') or str(the_IP).endswith('255'):
             the_IP = the_IP + 1
     the_IP = ipaddr.IPAddress('10.0.0.1')
-    for i in range(100000):
+    for i in range(5000):
         json_message_list_true.append(forge_json('srcip='+str(the_IP), ev_tuple_list[1][0], ev_tuple_list[1][1]))
         the_IP = the_IP + 1
         if str(the_IP).endswith('0') or str(the_IP).endswith('255'):
