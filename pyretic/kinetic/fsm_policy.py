@@ -109,6 +109,7 @@ class FSMPolicy(DynamicPolicy):
         self.deps = defaultdict(set)
         self.lpec_fn = lpec_fn
         self.list_of_fsm_policies = list()
+        self.dict_of_fsm_policies  = {}
 
         loadwith_varname =  ''
         loadwith_varvalue = True
@@ -218,6 +219,7 @@ class FSMPolicy(DynamicPolicy):
         dst_ip = IPAddr(str(dst_ip_real))
  
         list_of_fsm_policies = []
+        dict_of_fsm_policies = {}
 
         for i in range(num_of_fsms):
             # Only works for srcip,dstip
@@ -247,7 +249,10 @@ class FSMPolicy(DynamicPolicy):
                 # if the lpec is new, update the policy
                 if lpec_new:
                     this_p = lpec >> lpec_fsm
+                    #print "lpec:", lpec
+                    #print "lpec_fsm: ", lpec_fsm
                     list_of_fsm_policies.append(this_p)
+                    dict_of_fsm_policies[lpec] = this_p
 #                    self.policy = if_(lpec,lpec_fsm,self.policy)
 
             src_ip_real = src_ip_real + 1
@@ -262,6 +267,7 @@ class FSMPolicy(DynamicPolicy):
 
 
         self.list_of_fsm_policies = list_of_fsm_policies
+        self.dict_of_fsm_policies = dict_of_fsm_policies
 
         ### Parallel or Disjoint
         self.policy = disjoint(list_of_fsm_policies)
