@@ -41,8 +41,10 @@ import os
 import logging
 from multiprocessing import Queue, Process
 import pyretic.core.util as util
+import yappi
 
 of_client = None
+enable_profile = False
 
 def signal_handler(signal, frame):
     print '\n----starting pyretic shutdown------'
@@ -54,6 +56,12 @@ def signal_handler(signal, frame):
     # output = of_client.communicate()[0]
     # print output
     print "pyretic.py done"
+    # Print profile information if enabled
+    if enable_profile:
+        funcstats = yappi.get_func_stats()
+        funcstats.sort("tsub")
+        funcstats.print_all(columns={0:("name",32), 1:("tsub",8), 2:("ncall",8),
+                                     3:("tavg",8), 4:("ttot",8)})
     sys.exit(0)
 
 
@@ -83,15 +91,18 @@ def parseArgs():
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
                    help = '|'.join( ['low','normal','high','please-make-it-stop'] )  )
+    op.add_option( '--enable_profile', '-p', action="store_true",
+                   dest="enable_profile",
+                   help = 'enable yappi multithreaded profiler' )
 
-    op.set_defaults(frontend_only=False,mode='reactive0')
+    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
 
 
 def main():
-    global of_client
+    global of_client, enable_profile
     (op, options, args, kwargs_to_pass) = parseArgs()
     if options.mode == 'i':
         options.mode = 'interpreted'
@@ -188,7 +199,10 @@ def main():
                                       'of_client.pox_client' ],
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
-    
+
+    if options.enable_profile:
+        enable_profile = True
+        yappi.start()
     signal.signal(signal.SIGINT, signal_handler)
     signal.pause()
 
