@@ -44,6 +44,7 @@ from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Lock, Condition
+import copy
 
 NO_CACHE=False
 
@@ -340,7 +341,7 @@ class match(Filter):
 
     def __eq__(self, other):
         return ( (isinstance(other, match) and self.map == other.map)
-            or (other == identity and len(self.map) == 0) )
+                 or (len(self.map) == 0 and other == identity) )
 
     def intersect(self, pol):
         def _intersect_ip(ipfx, opfx):
@@ -399,22 +400,24 @@ class match(Filter):
     def covers(self,other):
         # Return identity if self matches every packet that other matches (and maybe more).
         # eg. if other is specific on any field that self lacks.
-        if other == identity and len(self.map.keys()) > 0:
-            return False
-        elif other == identity:
-            return True
-        elif other == drop:
-            return True
-        if set(self.map.keys()) - set(other.map.keys()):
-            return False
-        for (f,v) in self.map.items():
-            other_v = other.map[f]
-            if (f=='srcip' or f=='dstip'):
-                if v != other_v:
-                    if not other_v in v:
-                        return False
-            elif v != other_v:
+        try:
+            if set(self.map.keys()) - set(other.map.keys()):
                 return False
+            for (f,v) in self.map.items():
+                other_v = other.map[f]
+                if (f=='srcip' or f=='dstip'):
+                    if v != other_v:
+                        if not other_v in v:
+                            return False
+                    elif v != other_v:
+                        return False
+        except AttributeError:
+            if len(self.map.keys()) == 0:
+                return True
+            elif other == identity:
+                return False
+            elif other == drop:
+                return True
         return True
 
     def __repr__(self):
@@ -980,7 +983,6 @@ class CountBucket(Query):
         def stat_in_bucket(flow_stat, s):
             """Return a matching entry for the given flow_stat in
             bucket.matches."""
-            import copy
             f = copy.copy(flow_stat['match'])
             f['switch'] = s
             fme = self.match_entry(self.str_convert_match(f),
