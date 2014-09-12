@@ -10,6 +10,7 @@ import datetime as dt
 import pickle
 import threading
 import Queue
+import random
 from pyretic.kinetic.json_sender import *
 
 #python json_sender.py -n authenticated -l True  --flow="{srcip=10.0.0.2}" -a 127.0.0.1 -p 50001
@@ -68,7 +69,7 @@ def send_message(json_message,queue):
     queue.put(recvdata)
 
 
-def send_event(rate, num_exp, measure_map):
+def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
 
     global json_message_list_false
     global json_message_list_true
@@ -82,12 +83,18 @@ def send_event(rate, num_exp, measure_map):
         for n in range(int(num_exp)):
             i = 0;
             thread_list = []
+            json_message_list = []
     
-            if (n%2==0):
-                json_message_list = json_message_list_false
-            else:
-                json_message_list = json_message_list_true
+#            if (n%2==0):
+#                json_message_list = json_message_list_false
+#            else:
+#                json_message_list = json_message_list_true
     
+            for b in range(5000):
+                which_event1 = random.randint(0,variation-1)
+                which_event2 = random.randint(0,4999)
+                json_message_list.append(event_msgs_list[which_event1][which_event2])
+
             for n in range(rate[0]):
                 t = threading.Thread(target=send_message,args=(json_message_list[i],queue))
                 thread_list.append(t)
@@ -158,17 +165,22 @@ def main():
 #    rate_list.append( (nevents, timeout, rate_in_str) )
     rate_list.append( (1, 1) )
     rate_list.append( (10, 1) )
-    rate_list.append( (20, 1) )
-    rate_list.append( (40, 1) )
-    rate_list.append( (60, 1) )
-    rate_list.append( (60, 1) )
-    rate_list.append( (100, 1) )
+#    rate_list.append( (20, 1) )
+#    rate_list.append( (40, 1) )
+#    rate_list.append( (60, 1) )
+#    rate_list.append( (60, 1) )
+#    rate_list.append( (100, 1) )
 #    rate_list.append( (1000, 1, '1000 events/sec') )
 
     # Events and values
     ev_tuple_list = []
     ev_tuple_list.append(('authenticated','False'))
     ev_tuple_list.append(('authenticated','True'))
+    ev_tuple_list.append(('rate','1'))
+    ev_tuple_list.append(('rate','2'))
+    ev_tuple_list.append(('rate','3'))
+    ev_tuple_list.append(('ids','False'))
+    ev_tuple_list.append(('ids','True'))
       
     measure_map = {} ### {rate : list of (join_time, total)}
 
@@ -176,23 +188,31 @@ def main():
     print 'Creating messages...'
     global json_message_list_false
     global json_message_list_true
-    the_IP = ipaddr.IPAddress('10.0.0.1')
-    for i in range(5000):
-        json_message_list_false.append(forge_json('srcip='+str(the_IP), ev_tuple_list[0][0], ev_tuple_list[0][1]))
-        the_IP = the_IP + 1
-        if str(the_IP).endswith('0') or str(the_IP).endswith('255'):
-            the_IP = the_IP + 1
-    the_IP = ipaddr.IPAddress('10.0.0.1')
-    for i in range(5000):
-        json_message_list_true.append(forge_json('srcip='+str(the_IP), ev_tuple_list[1][0], ev_tuple_list[1][1]))
-        the_IP = the_IP + 1
-        if str(the_IP).endswith('0') or str(the_IP).endswith('255'):
-            the_IP = the_IP + 1
+    src_IP = ipaddr.IPAddress('10.0.0.1')
+    dst_IP = ipaddr.IPAddress('10.0.0.2')
 
+    event_msgs_list = []
+    json_message_list = []
+
+    for e in ev_tuple_list:
+        json_message_list = []
+        for i in range(5000):
+            json_message_list.append(forge_json('srcip='+str(src_IP)+',dstip='+str(dst_IP), e[0], e[1]))
+            src_IP = src_IP + 1
+            dst_IP = dst_IP + 1
+            if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
+                src_IP = src_IP + 1
+            if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
+                dst_IP = dst_IP + 1
+        event_msgs_list.append(json_message_list)
+
+        src_IP = ipaddr.IPAddress('10.0.0.1')
+        dst_IP = ipaddr.IPAddress('10.0.0.2')
+ 
     # Send
     print 'Done creating messages. Now sending...'
     for r in rate_list:
-        send_event(r, options.num_exp, measure_map)
+        send_event(r, options.num_exp, measure_map, len(ev_tuple_list),event_msgs_list)
 
     # Save map
     print 'Done sending. Save data.'

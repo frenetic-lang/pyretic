@@ -67,13 +67,13 @@ class ids(DynamicPolicy):
         ### 4. SET UP POLICY AND EVENT STREAMS
 
         ### This part pretty much remains same for any application
-        fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms)
+        self.fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms)
         json_event = JSONEvent()
-        json_event.register_callback(fsm_pol.event_handler)
+        json_event.register_callback(self.fsm_pol.event_handler)
         ### This part pretty much remains same for any application
 
         # Specify application class name here. (e.g., "ids")
-        super(ids,self).__init__(fsm_pol)
+        super(ids,self).__init__(self.fsm_pol)
 
 
 def main():

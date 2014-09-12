@@ -24,7 +24,7 @@ from pyretic.kinetic.smv.model_checker import *
 
 
 class auth_web(DynamicPolicy):
-    def __init__(self):
+    def __init__(self,num_of_fsms=0):
 
        ### DEFINE THE LPEC FUNCTION
 
@@ -54,15 +54,16 @@ class auth_web(DynamicPolicy):
 
         ### SET UP POLICY AND EVENT STREAMS
 
-        fsm_pol = FSMPolicy(lpec,self.fsm_def)
+        self.fsm_pol = FSMPolicy(lpec,self.fsm_def, num_of_fsms)
         json_event = JSONEvent()
-        json_event.register_callback(fsm_pol.event_handler)
+        json_event.register_callback(self.fsm_pol.event_handler)
 
-        super(auth_web,self).__init__(fsm_pol)
+        super(auth_web,self).__init__(self.fsm_pol)
 
 
 def main():
-    pol = auth_web()
+    num_of_fsms = sys.argv[2]
+    pol = auth_web(num_of_fsms)
 
     # For NuSMV
     smv_str = fsm_def_to_smv_model(pol.fsm_def)

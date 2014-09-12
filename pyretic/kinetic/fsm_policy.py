@@ -123,6 +123,13 @@ class FSMPolicy(DynamicPolicy):
                     loadwith_varvalue = False
                 else:
                     loadwith_varvalue = True
+            elif var_def['type'].py_type==int:
+                loadwith_varname = var_name
+                vs = var_def['type'].dom.copy()
+                loadwith_varvalue = vs.pop()
+                if var_def['init']==v:
+                    loadwith_varvalue = vs.pop()
+ 
             for e in events(var_def['trans']):
                 e.add_type(var_def['type'])
                 self.exogenous[var_name] = True
@@ -207,12 +214,15 @@ class FSMPolicy(DynamicPolicy):
     def load_LPEC(self,num_of_fsms,event_name,event_value):
         src_ip_real = ipaddr.IPAddress('10.0.0.1')
         src_ip = IPAddr(str(src_ip_real))
+        dst_ip_real = ipaddr.IPAddress('10.0.0.2')
+        dst_ip = IPAddr(str(dst_ip_real))
+ 
         list_of_fsm_policies = []
 
         for i in range(num_of_fsms):
-            # Only works for srcip
+            # Only works for srcip,dstip
             try:
-                lpec = self.lpec_fn({'srcip':src_ip})
+                lpec = self.lpec_fn({'srcip':src_ip,'dstip':dst_ip})
             except KeyError:
                 print 'Error: event flow must contain all fields used in lpec_relation.  Ignoring.'
                 return
@@ -244,6 +254,12 @@ class FSMPolicy(DynamicPolicy):
             if str(src_ip_real).endswith('0') or str(src_ip_real).endswith('255'):
                 src_ip_real = src_ip_real + 1
             src_ip = IPAddr(str(src_ip_real))
+
+            dst_ip_real = dst_ip_real + 1
+            if str(dst_ip_real).endswith('0') or str(dst_ip_real).endswith('255'):
+                dst_ip_real = dst_ip_real + 1
+            dst_ip = IPAddr(str(dst_ip_real))
+
 
         self.list_of_fsm_policies = list_of_fsm_policies
 

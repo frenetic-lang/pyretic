@@ -25,7 +25,7 @@ from pyretic.kinetic.smv.model_checker import *
 
 class auth(DynamicPolicy):
     def __init__(self,num_of_fsms=0):
-
+    
        ### DEFINE THE LPEC FUNCTION
 
         def lpec(f):
@@ -54,11 +54,11 @@ class auth(DynamicPolicy):
 
         ### SET UP POLICY AND EVENT STREAMS
 
-        fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms)
+        self.fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms)
         json_event = JSONEvent()
-        json_event.register_callback(fsm_pol.event_handler)
+        json_event.register_callback(self.fsm_pol.event_handler)
 
-        super(auth,self).__init__(fsm_pol)
+        super(auth,self).__init__(self.fsm_pol)
 
 
 def main():

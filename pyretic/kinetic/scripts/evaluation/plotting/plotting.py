@@ -14,16 +14,17 @@ import pickle
 import numpy as np
 
 def plot_the_event(input_dir, output_dir, saveAsFileName, plot_title):
-    xa = [1,10,100]
+    xa = [1,10,20,40,60,100]
     ymap = {}
     
     files = os.listdir(input_dir)
-
     # for different number of FSMs loaded,
     for f in files:
         fd = open(input_dir + f,'rb')
         data = pickle.load(fd)
         fd.close()
+
+        print data.keys()
 
         nfsm = str(f).lstrip('measure_map_event').rstrip('.p')
         ymap[nfsm] = []
