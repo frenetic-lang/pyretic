@@ -400,17 +400,22 @@ class match(Filter):
     def covers(self,other):
         # Return identity if self matches every packet that other matches (and maybe more).
         # eg. if other is specific on any field that self lacks.
-        try:
-            if set(self.map.keys()) - set(other.map.keys()):
+        def map_check(a, b):
+            """ Return true if match 'a' contains match 'b'."""
+            if set(a.keys()) - set(b.keys()):
                 return False
-            for (f,v) in self.map.items():
-                other_v = other.map[f]
+            for (f,v) in a.items():
+                other_v = b[f]
                 if (f=='srcip' or f=='dstip'):
                     if v != other_v:
                         if not other_v in v:
                             return False
-                    elif v != other_v:
-                        return False
+                elif v != other_v:
+                    return False
+            return True
+
+        try:
+            return map_check(self.map, other.map)
         except AttributeError:
             if len(self.map.keys()) == 0:
                 return True
@@ -1482,6 +1487,7 @@ class flood(DynamicPolicy):
     """
     def __init__(self):
         self.mst = None
+        self.log = logging.getLogger('%s.flood' % __name__)
         super(flood,self).__init__()
 
     def set_network(self, network):
@@ -1496,6 +1502,7 @@ class flood(DynamicPolicy):
                 self.mst = updated_mst
                 changed = True
         if changed:
+            self.log.debug("Printing updated MST:\n %s" % str(updated_mst))
             self.policy = parallel([
                     match(switch=switch) >>
                         parallel(map(xfwd,attrs['ports'].keys()))
