@@ -317,7 +317,7 @@ class Runtime(object):
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (concrete_pred,0,action_list,self.default_cookie)
+            return (concrete_pred,0,action_list,self.default_cookie,False)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -344,7 +344,7 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (concrete_pred,0,action_list,self.default_cookie)
+        return (concrete_pred,0,action_list,self.default_cookie,False)
 
 #########################
 # PROACTIVE COMPILATION 
