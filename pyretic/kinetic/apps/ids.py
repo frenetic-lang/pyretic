@@ -26,7 +26,7 @@ from pyretic.kinetic.smv.model_checker import *
 
 ### Define a class for the application, subclassed from DynamicPolicy
 class ids(DynamicPolicy):
-    def __init__(self,num_of_fsms=0):
+    def __init__(self,num_of_fsms=0, event_queue = None):
 
         ### 1. DEFINE THE LPEC FUNCTION
 
@@ -67,7 +67,7 @@ class ids(DynamicPolicy):
         ### 4. SET UP POLICY AND EVENT STREAMS
 
         ### This part pretty much remains same for any application
-        self.fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms)
+        self.fsm_pol = FSMPolicy(lpec,self.fsm_def,num_of_fsms, event_queue)
         json_event = JSONEvent()
         json_event.register_callback(self.fsm_pol.event_handler)
         ### This part pretty much remains same for any application

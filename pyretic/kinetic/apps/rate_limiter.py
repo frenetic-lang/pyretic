@@ -36,7 +36,7 @@ from pyretic.kinetic.apps.monitor import *
 
 
 class rate_limiter(DynamicPolicy):
-    def __init__(self,num_of_fsms=0):
+    def __init__(self,num_of_fsms=0, event_queue = None):
 
         ### DEFINE INTERNAL METHODS
         
@@ -91,7 +91,7 @@ class rate_limiter(DynamicPolicy):
                            trans=policy))
 
         # Instantiate FSMPolicy, start/register JSON handler.
-        self.fsm_pol = FSMPolicy(lpec, self.fsm_def, num_of_fsms)
+        self.fsm_pol = FSMPolicy(lpec, self.fsm_def, num_of_fsms, event_queue)
         json_event = JSONEvent()
         json_event.register_callback(self.fsm_pol.event_handler)
         

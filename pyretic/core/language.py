@@ -50,7 +50,7 @@ from multiprocessing import Queue
 
 
 NO_CACHE=False
-compile_debug = True
+compile_debug = False
 use_disjoint_cache = True
 
 

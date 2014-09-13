@@ -148,7 +148,8 @@ def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
 
             join_time = float(mtime.microseconds)/1000.0/1000.0 + float(mtime.seconds)
             for d in range(queue.qsize()):
-                total = total + float(queue.get())
+                #total = total + float(queue.get())
+                total = 0
 
             print '== Sent: ' + str(j*50) + ' events.'
             print "   Join time: ", join_time
@@ -200,9 +201,10 @@ def main():
 #    rate_list.append( (40, 1) )
 #    rate_list.append( (60, 1) )
 #    rate_list.append( (80, 1) )
-    rate_list.append( (50, 1) )
     rate_list.append( (100, 1) )
     rate_list.append( (200, 1) )
+    rate_list.append( (300, 1) )
+    """
     rate_list.append( (300, 1) )
     rate_list.append( (400, 1) )
     rate_list.append( (500, 1) )
@@ -211,6 +213,7 @@ def main():
     rate_list.append( (800, 1) )
     rate_list.append( (900, 1) )
     rate_list.append( (1000, 1) )
+    """
 #    rate_list.append( (120, 1) )
 #    rate_list.append( (140, 1) )
 #    rate_list.append( (150, 1) )
@@ -223,8 +226,8 @@ def main():
 
     # Events and values
     ev_tuple_list = []
-    ev_tuple_list.append(('authenticated','False'))
-    ev_tuple_list.append(('authenticated','True'))
+    ev_tuple_list.append(('authenticated_web','False'))
+    ev_tuple_list.append(('authenticated_web','True'))
 #    ev_tuple_list.append(('rate','1'))
 #    ev_tuple_list.append(('rate','2'))
 #    ev_tuple_list.append(('rate','3'))
@@ -263,8 +266,8 @@ def main():
     for r in rate_list:
         send_event(r, options.num_exp, measure_map, len(ev_tuple_list),event_msgs_list)
         # Save map
-        endmsg = forge_json('srcip=10.0.0.1,dstip=10.0.0.2','endofworld',str(r[0]))
-        send_message(endmsg,None) 
+        #endmsg = forge_json('srcip=10.0.0.1,dstip=10.0.0.2','endofworld',str(r[0]))
+        #send_message(endmsg,None) 
         time.sleep(5)
 
 #    print 'Done sending. Save data.'

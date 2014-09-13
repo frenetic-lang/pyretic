@@ -7,6 +7,8 @@ import inspect
 import textwrap
 import datetime as dt
 import pickle
+from threading import Thread, Event
+from multiprocessing import Process,Queue
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
@@ -104,7 +106,7 @@ class LpecFSM(DynamicPolicy):
 
 
 class FSMPolicy(DynamicPolicy):
-    def __init__(self,lpec_fn,fsm_description,num_of_fsms=0):
+    def __init__(self,lpec_fn,fsm_description,num_of_fsms=0, event_queue=None):
         self.type = dict()
         self.state = dict()
         self.trans = dict()
@@ -117,8 +119,9 @@ class FSMPolicy(DynamicPolicy):
 #        self.timer_thread = threading.Timer(1.0, perform_batch)
         self.timer_thread = TimerReset(1.0, self.dead)
         self.started = True
-        self.timer_thread.start()
+        #self.timer_thread.start()
         self.num_of_fsms = num_of_fsms
+        self.event_queue = event_queue
 
         loadwith_varname =  ''
         loadwith_varvalue = True
@@ -199,6 +202,10 @@ class FSMPolicy(DynamicPolicy):
             with self.lock:
                 for lpec_fsm in self.lpec_to_fsm.values():
                     lpec_fsm.handle_event(event.name,event.value)
+                    
+        # Add an element in event_queue after handling the event
+        #print "Updating the event_queue, size: ", self.event_queue.qsize()
+        self.event_queue.put(time.time())
 
     def dead(self): 
         print 'Times up!!~'
@@ -232,6 +239,8 @@ class FSMPolicy(DynamicPolicy):
 
 
     def event_handler(self,event):
+        self.single_event_handle(event)
+        """
         global measures_list
         global howmany
         global BATCH_AMOUNT
@@ -244,12 +253,14 @@ class FSMPolicy(DynamicPolicy):
             self.started = True
 
         if event.name=='endofworld':
+            
             time.sleep(2.0)
             print 'Save result. Number of FSMs:',self.num_of_fsms
             pickle_fd = open('./measure_data_'+self.num_of_fsms+'_'+ event.value+'.p','wb')
             pickle.dump(measures_list,pickle_fd)
             pickle_fd.close() 
             measures_list = []
+            
             return 0
 
         self.timer_thread.reset()
@@ -266,6 +277,7 @@ class FSMPolicy(DynamicPolicy):
         else:
             compile_time = self.perform_batch()
             return compile_time
+        """
 
 
     def load_LPEC(self,num_of_fsms,event_name,event_value):
@@ -329,6 +341,8 @@ class FSMPolicy(DynamicPolicy):
         self.policy = disjoint(list_of_fsm_policies)
 #        self.policy = parallel(list_of_fsm_policies)
 
+        """
+
         print '\nInitiate policy compilation. This can take time...\n'
         n1=dt.datetime.now()
         self.policy.compile()
@@ -337,6 +351,7 @@ class FSMPolicy(DynamicPolicy):
        
         print "** Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
         print "** Compilation time: " + str(compile_time) + " seconds.\n"
+        """
 
 #        print self.policy
         
