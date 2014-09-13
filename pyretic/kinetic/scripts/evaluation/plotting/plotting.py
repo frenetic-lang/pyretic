@@ -14,7 +14,7 @@ import pickle
 import numpy as np
 
 def plot_the_event(input_dir, output_dir, saveAsFileName, plot_title):
-    xa = [1,10,20,40,60,100]
+    xa = [1,10,20,40,60,80,100]
     ymap = {}
     
     files = os.listdir(input_dir)

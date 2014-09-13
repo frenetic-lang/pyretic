@@ -43,6 +43,11 @@ from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton
 
 from multiprocessing import Condition
+from multiprocessing import Process
+from multiprocessing import Manager
+from multiprocessing import cpu_count
+from multiprocessing import Queue
+
 
 NO_CACHE=False
 compile_debug = False
@@ -59,6 +64,7 @@ native_headers = basic_headers + tagging_headers
 location_headers = ["switch", "inport", "outport"]
 compilable_headers = native_headers + location_headers
 content_headers = [ "raw", "header_len", "payload_len"]
+
 
 ################################################################################
 # Policy Language                                                              #
@@ -845,44 +851,111 @@ class disjoint(CombinatorPolicy):
         aggr_rules=[]
         last_rule=None       
 
-        for policy in self.policies:
-            start=time.time()  
-            tmp_rule_list = []
-            
-            if use_disjoint_cache:
-                hash_d = policy.__repr__()
-                if hash_d in disjoint_cache:
-                    tmp_rules=disjoint_cache[hash_d]
-                else:
-                    tmp_rules=policy.compile().rules
-                    disjoint_cache[hash_d]=tmp_rules  
-            else:                      
-                tmp_rules=policy.compile().rules  
-                                                
-            last_rule=[tmp_rules[len(tmp_rules)-1]]
-            
-            ctr = 0
-            for obj in tmp_rules:
+        ## Processes will store return values here (Synchronized with lock)
+        job_returns = Queue()
+        manager = Manager()
+        last_rule_entry = manager.list()
+        from multiprocessing import Lock
+        djLock = Lock()
+
+        # Processes list
+        jobs = []
+
+        from multiprocessing import Pool
+        pool = Pool(processes=8)    
+        do_multi_process = False
+
+
+        # Spawn processes based on number of CPUs
+        if do_multi_process is True:
+            for policy in self.policies:
+                p=Process(target=self.mp_for_each_policy,\
+                          args=(djLock,policy,job_returns,last_rule_entry))
+                p.start()
+                jobs.append(p)
+ 
+            # Wait until every process is done            
+            for j in jobs:
+                j.join()
+        
+            print job_returns.qsize()
+
+            # Create aggr_rules from all returned lists
+            for r in job_returns:
+                aggr_rules += r
+
+            if last_rule_entry[0] != None:        
+                aggr_rules+=last_rule_entry[0]
+
+        else:
+            for policy in self.policies:
+                start=time.time()  
+                tmp_rule_list = []
                 
-                if ctr == len(tmp_rules)-1:
-                    break
-                else:
-                    tmp_rule_list.append(obj)
-                    ctr += 1
+                if use_disjoint_cache:
+                    hash_d = policy.__repr__()
+                    if hash_d in disjoint_cache:
+                        tmp_rules=disjoint_cache[hash_d]
+                    else:
+                        tmp_rules=policy.compile().rules
+                        disjoint_cache[hash_d]=tmp_rules  
+                else:                      
+                    tmp_rules=policy.compile().rules  
+                                                    
+                last_rule=[tmp_rules[len(tmp_rules)-1]]
+                
+                ctr = 0
+                for obj in tmp_rules:
                     
-            aggr_rules+=tmp_rule_list               
-            
+                    if ctr == len(tmp_rules)-1:
+                        break
+                    else:
+                        tmp_rule_list.append(obj)
+                        ctr += 1
+                        
+                aggr_rules+=tmp_rule_list               
+            aggr_rules+=last_rule 
+
         if compile_debug==True: 
             print "Time to compile disjoint policies: ",time.time()-start
-                 
-        aggr_rules+=last_rule
         start=time.time()
         classifiers=aggr_rules  
-        
+ 
         #print "Cache state: ", disjoint_cache    
         return classifiers
+
+    def mp_for_each_policy(self, djLock,policy,job_returns,last_rule_entry):
+        return
+        start=time.time()  
+        tmp_rule_list = []
         
+        if use_disjoint_cache:
+            hash_d = policy.__repr__()
+            if hash_d in disjoint_cache:
+                tmp_rules=disjoint_cache[hash_d]
+            else:
+                tmp_rules=policy.compile().rules
+                disjoint_cache[hash_d]=tmp_rules  
+        else:                      
+            tmp_rules=policy.compile().rules  
+                                            
+        last_rule=[tmp_rules[len(tmp_rules)-1]]
         
+        ctr = 0
+        for obj in tmp_rules:
+            
+            if ctr == len(tmp_rules)-1:
+                break
+            else:
+                tmp_rule_list.append(str(obj))
+#                print obj.match
+                ctr += 1
+
+        with djLock:
+#            job_returns.put(tmp_rule_list)
+            pass
+#            last_rule_entry[0] = last_rule
+ 
 
 
 class union(parallel,Filter):

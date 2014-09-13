@@ -165,22 +165,22 @@ def main():
 #    rate_list.append( (nevents, timeout, rate_in_str) )
     rate_list.append( (1, 1) )
     rate_list.append( (10, 1) )
-#    rate_list.append( (20, 1) )
-#    rate_list.append( (40, 1) )
-#    rate_list.append( (60, 1) )
-#    rate_list.append( (60, 1) )
-#    rate_list.append( (100, 1) )
+    rate_list.append( (20, 1) )
+    rate_list.append( (40, 1) )
+    rate_list.append( (60, 1) )
+    rate_list.append( (80, 1) )
+    rate_list.append( (100, 1) )
 #    rate_list.append( (1000, 1, '1000 events/sec') )
 
     # Events and values
     ev_tuple_list = []
     ev_tuple_list.append(('authenticated','False'))
     ev_tuple_list.append(('authenticated','True'))
-    ev_tuple_list.append(('rate','1'))
-    ev_tuple_list.append(('rate','2'))
-    ev_tuple_list.append(('rate','3'))
-    ev_tuple_list.append(('ids','False'))
-    ev_tuple_list.append(('ids','True'))
+#    ev_tuple_list.append(('rate','1'))
+#    ev_tuple_list.append(('rate','2'))
+#    ev_tuple_list.append(('rate','3'))
+#    ev_tuple_list.append(('ids','False'))
+#    ev_tuple_list.append(('ids','True'))
       
     measure_map = {} ### {rate : list of (join_time, total)}
 
