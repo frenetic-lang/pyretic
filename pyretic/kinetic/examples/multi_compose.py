@@ -11,9 +11,9 @@ from pyretic.kinetic.apps.gardenwall import *
 from pyretic.kinetic.apps.mac_learner import *
 from pyretic.kinetic.apps.rate_limiter import *
 from pyretic.kinetic.apps.monitor import *
-DATAFILE = 'compilation_results.txt'
+DATAFILE = 'compilation_results'
 
-def dynamic_policy_compiler(event_queue, composed_aggregate_policies):
+def dynamic_policy_compiler(event_queue, composed_aggregate_policies, mode, number_of_fsms):
     print 'Dynamic compiler started'
     time_list = list()
     data = {}
@@ -40,7 +40,7 @@ def dynamic_policy_compiler(event_queue, composed_aggregate_policies):
             time_list = list()
         except:
             print 'Dumping the data file ...'
-            with open(DATAFILE, 'w') as outfile:
+            with open(DATAFILE+'_'+mode+'_'+str(number_of_fsms)+'.txt', 'w') as outfile:
                 json.dump(data, outfile, ensure_ascii=True, encoding='ascii')
             print 'data dumping successful'
             sys.exit()
@@ -87,7 +87,8 @@ def main():
     else:
         auth_w_obj = auth_web(number_of_fsms, event_queue)
         composed_aggregate_policies = auth_w_obj.policy
-    dynamic_update_policy_thread = Thread(target=dynamic_policy_compiler, args=(event_queue, composed_aggregate_policies))
+    
+    dynamic_update_policy_thread = Thread(target=dynamic_policy_compiler, args=(event_queue, composed_aggregate_policies, mode, number_of_fsms))
     dynamic_update_policy_thread.daemon = True
     dynamic_update_policy_thread.start()
     start = time.time()

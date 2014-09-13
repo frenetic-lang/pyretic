@@ -202,8 +202,8 @@ def main():
 #    rate_list.append( (60, 1) )
 #    rate_list.append( (80, 1) )
     rate_list.append( (100, 1) )
-    rate_list.append( (200, 1) )
-    rate_list.append( (300, 1) )
+    #rate_list.append( (200, 1) )
+    #rate_list.append( (300, 1) )
     """
     rate_list.append( (300, 1) )
     rate_list.append( (400, 1) )
