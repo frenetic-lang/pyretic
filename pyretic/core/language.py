@@ -863,14 +863,18 @@ class disjoint(CombinatorPolicy):
         jobs = []
 
         from multiprocessing import Pool
-        pool = Pool(processes=8)    
-        do_multi_process = True
+        from multiprocessing import cpu_count
+        pool = Pool(processes=cpu_count())    
+        do_multi_process = False
 
 
         # Spawn processes based on number of CPUs
         if do_multi_process is True:
             start_time = time.time()
-            batch = 500
+            if len(self.policies) < 1000:
+                batch = 1000
+            else: 
+                batch = len(self.policies) / cpu_count()
             nProc = len(self.policies) / batch
             last_end = 0
             for n in range(nProc):
@@ -884,17 +888,15 @@ class disjoint(CombinatorPolicy):
                 p.start()
                 jobs.append(p)
 
-            print 'da'
-            # Wait until every process is done            
-            for j in jobs:
-                j.join()
-        
-            print 'Qsize: ',job_returns.qsize()
+
+            # Wait until done
+            while job_returns.qsize()!=nProc:
+                continue
 
             # Create aggr_rules from all returned lists
             while not job_returns.empty():
                 try:
-                    elem = job_returns.get(block=False)
+                    elem = job_returns.get()
                     aggr_rules+=elem
                 except:
                     print 'Exception'
@@ -960,10 +962,13 @@ class disjoint(CombinatorPolicy):
         
         this_aggr_list,last_rule = self.do_each_sequentially(policy_list)
 
-        with djLock:
-            job_returns.put(str(this_aggr_list))
-            last_rule_entry[0] = str(last_rule)
-            pass
+        job_returns.put(str(this_aggr_list))
+        last_rule_entry[0] = str(last_rule)
+
+#        with djLock:
+#            job_returns.put(str(this_aggr_list))
+#            last_rule_entry[0] = str(last_rule)
+#            pass
  
 
 
