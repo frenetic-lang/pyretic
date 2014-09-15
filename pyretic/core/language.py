@@ -50,7 +50,7 @@ from multiprocessing import Queue
 
 
 NO_CACHE=False
-compile_debug = False
+compile_debug = True
 use_disjoint_cache = True
 
 
@@ -855,6 +855,7 @@ class disjoint(CombinatorPolicy):
         job_returns = Queue()
         manager = Manager()
         last_rule_entry = manager.list()
+        last_rule_entry.append(None)
         from multiprocessing import Lock
         djLock = Lock()
 
@@ -863,98 +864,106 @@ class disjoint(CombinatorPolicy):
 
         from multiprocessing import Pool
         pool = Pool(processes=8)    
-        do_multi_process = False
+        do_multi_process = True
 
 
         # Spawn processes based on number of CPUs
         if do_multi_process is True:
-            for policy in self.policies:
+            start_time = time.time()
+            batch = 500
+            nProc = len(self.policies) / batch
+            last_end = 0
+            for n in range(nProc):
+                start = n*batch
+                end = (n+1)*batch
+                last_end = end
+                policy_list = self.policies[start:end]
+                
                 p=Process(target=self.mp_for_each_policy,\
-                          args=(djLock,policy,job_returns,last_rule_entry))
+                          args=(djLock,policy_list,job_returns,last_rule_entry))
                 p.start()
                 jobs.append(p)
- 
+
+            print 'da'
             # Wait until every process is done            
             for j in jobs:
                 j.join()
         
-            print job_returns.qsize()
+            print 'Qsize: ',job_returns.qsize()
 
             # Create aggr_rules from all returned lists
-            for r in job_returns:
-                aggr_rules += r
+            while not job_returns.empty():
+                try:
+                    elem = job_returns.get(block=False)
+                    aggr_rules+=elem
+                except:
+                    print 'Exception'
+ 
+            # Remaining   
+            if len(self.policies)-nProc*batch <= 0:
+                policy_list = self.policies[last_end:(len(self.policies)-nProc*batch)]
+                this_aggr_list, last_rule = self.do_each_sequentially(policy_list)
 
-            if last_rule_entry[0] != None:        
-                aggr_rules+=last_rule_entry[0]
+                this_aggr_list+=last_rule
+                aggr_rules+=str(this_aggr_list)
 
+            else:
+                if last_rule_entry[0] != None:        
+                    aggr_rules+=str(last_rule_entry[0])
+  
         else:
-            for policy in self.policies:
-                start=time.time()  
-                tmp_rule_list = []
-                
-                if use_disjoint_cache:
-                    hash_d = policy.__repr__()
-                    if hash_d in disjoint_cache:
-                        tmp_rules=disjoint_cache[hash_d]
-                    else:
-                        tmp_rules=policy.compile().rules
-                        disjoint_cache[hash_d]=tmp_rules  
-                else:                      
-                    tmp_rules=policy.compile().rules  
-                                                    
-                last_rule=[tmp_rules[len(tmp_rules)-1]]
-                
-                ctr = 0
-                for obj in tmp_rules:
-                    
-                    if ctr == len(tmp_rules)-1:
-                        break
-                    else:
-                        tmp_rule_list.append(obj)
-                        ctr += 1
-                        
-                aggr_rules+=tmp_rule_list               
+            start_time = time.time()
+            aggr_rules, last_rule = self.do_each_sequentially(self.policies)
             aggr_rules+=last_rule 
 
         if compile_debug==True: 
-            print "Time to compile disjoint policies: ",time.time()-start
-        start=time.time()
+            print "Time to compile disjoint policies: ",time.time()-start_time
+        start_time=time.time()
         classifiers=aggr_rules  
  
         #print "Cache state: ", disjoint_cache    
         return classifiers
 
-    def mp_for_each_policy(self, djLock,policy,job_returns,last_rule_entry):
-        return
-        start=time.time()  
+    def do_each_sequentially(self,policy_list):
+        aggr_rules = []
         tmp_rule_list = []
-        
-        if use_disjoint_cache:
-            hash_d = policy.__repr__()
-            if hash_d in disjoint_cache:
-                tmp_rules=disjoint_cache[hash_d]
-            else:
-                tmp_rules=policy.compile().rules
-                disjoint_cache[hash_d]=tmp_rules  
-        else:                      
-            tmp_rules=policy.compile().rules  
-                                            
-        last_rule=[tmp_rules[len(tmp_rules)-1]]
-        
-        ctr = 0
-        for obj in tmp_rules:
+        last_rule = [None,]
+        for policy in policy_list:
+            tmp_rule_list = []
             
-            if ctr == len(tmp_rules)-1:
-                break
-            else:
-                tmp_rule_list.append(str(obj))
-#                print obj.match
-                ctr += 1
+            if use_disjoint_cache:
+                hash_d = policy.__repr__()
+                if hash_d in disjoint_cache:
+                    tmp_rules=disjoint_cache[hash_d]
+                else:
+                    tmp_rules=policy.compile().rules
+                    disjoint_cache[hash_d]=tmp_rules  
+            else:                      
+                tmp_rules=policy.compile().rules  
+                                                
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            
+            ctr = 0
+            for obj in tmp_rules:
+                
+                if ctr == len(tmp_rules)-1:
+                    break
+                else:
+                    tmp_rule_list.append(obj)
+                    ctr += 1
+                    
+            aggr_rules+=tmp_rule_list                 
+
+        return aggr_rules,last_rule
+
+    def mp_for_each_policy(self, djLock,policy_list,job_returns,last_rule_entry):
+        
+        this_aggr_list,last_rule = self.do_each_sequentially(policy_list)
 
         with djLock:
-#            job_returns.put(tmp_rule_list)
+            job_returns.put(str(this_aggr_list))
+            last_rule_entry[0] = str(last_rule)
             pass
-#            last_rule_entry[0] = last_rule
  
 
 
