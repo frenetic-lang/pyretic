@@ -60,8 +60,8 @@ def signal_handler(signal, frame):
     if enable_profile:
         funcstats = yappi.get_func_stats()
         funcstats.sort("tsub")
-        funcstats.print_all(columns={0:("name",32), 1:("tsub",8), 2:("ncall",8),
-                                     3:("tavg",8), 4:("ttot",8)})
+        funcstats.print_all(columns={0:("name",38), 1:("ncall",8), 2:("tsub",8),
+                                     3:("ttot",8), 4:("tavg", 8)})
     sys.exit(0)
 
 
