@@ -110,7 +110,8 @@ def specialize(ast, trj, c_ast):
     elif isinstance(ast, path_negate):
         assert len(ast.paths) == 1
         p = ast.paths[0]
-        for k in range(0, len(trj)):
+        """ Whenever trj != [], do part by part match. """
+        for k in range(0, len(trj)+1):
             (m_pre, sp_pre, _) = specialize(p, trj[0:k], path_epsilon())
             (m_cont, sp_cont, trj_cont) = specialize(c_ast, trj[k:],
                                                      path_epsilon())
@@ -439,6 +440,56 @@ def test21():
     assert sp == a ^ b
     assert trj == []
 
+def test22():
+    a = atom(match(srcip='10.0.0.1'))
+    a_h = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
+    a_sp = atom(match(srcip='10.0.0.1', dstip='10.0.0.2'))
+    b = atom(match(srcip='10.0.0.2'))
+    b_h = hook(match(srcip='10.0.0.2'), groupby=['dstip'])
+    b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
+    c = atom(match(srcip='10.0.0.3'))
+    e = path_epsilon()
+    p1 = base_pkt.modifymany({'srcip':'10.0.0.1', 'dstip':'10.0.0.2'})
+    p2 = base_pkt.modifymany({'srcip':'10.0.0.2', 'dstip':'10.0.0.1'})
+    p3 = base_pkt.modifymany({'srcip':'10.0.0.3'})
+
+    q1 = path_negate(a) ^ b
+    (m1, sp1, _) = specialize_main(q1, [p1, p2])
+    assert not m1
+    (m2, sp2, _) = specialize_main(q1, [p2])
+    assert m2
+    assert sp2 == q1
+    (m3, sp3, _) = specialize_main(q1, [p3, p3, p1, p2])
+    assert m3
+    assert sp3 == q1
+
+    q2 = path_negate(e)
+    (m4, sp4, _) = specialize_main(q2, [p1, p3])
+    assert m4
+    assert sp4 == q2
+    (m5, sp5, _) = specialize_main(q2, [])
+    assert not m5
+
+    q3 = ~(a ^ c) ^ b
+    (m6, sp6, _) = specialize_main(q3, [p1, p3, p2])
+    assert not m6
+    (m7, sp7, _) = specialize_main(q3, [p2])
+    assert m7
+    assert sp7 == q3
+    (m8, sp8, _) = specialize_main(q3, [p1, p2])
+    assert m8
+    assert sp8 == q3
+
+    q4 = a ^ path_negate(b) ^ c
+    (m9, sp9, _) = specialize_main(q4, [p1, p2, p2, p3])
+    assert m9
+    assert sp9 == q4
+    (m10, sp10, _) = specialize_main(q4, [p1, p2, p3])
+    assert not m10
+    (m11, sp11, _) = specialize_main(q4, [p1, p3])
+    assert m11
+    assert sp11 == q4
+
 if __name__ == "__main__":
     test1()
     test2()
@@ -463,3 +514,4 @@ if __name__ == "__main__":
     #test19()
     #test20()
     #test21()
+    test22()
