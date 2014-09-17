@@ -10,13 +10,14 @@ import sys
 policy_to_name_map = {}
 complexPolicyStr_to_actualPolicy = {}
 
-def ask_deploy(fsm_pol):
+def ask_deploy(fsm_pol=None):
     var = raw_input("Deploy? (yes/no): ")
     print "You entered: ", var   
     if var.lower()=='yes' or var.lower()=='y':
         return
     elif var.lower()=='no' or var.lower()=='n':
-        fsm_pol.timer_thread.cancel()
+        if (fsm_pol != None):
+            fsm_pol.timer_thread.cancel()
         sys.exit()
     else:
         print 'Unknown answer. Please enter "yes" or "no".'
