@@ -49,6 +49,30 @@ def forge_json(flow_str, event_name, event_value):
 
     return json_message
 
+def send_message_list(json_message_list,queue):
+
+    for jsonmsg in json_message_list:
+        send_message(jsonmsg,queue)
+#    # Create socket
+#    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#
+#    # Connect to server
+#    s.connect(('127.0.0.1', int('50001')))
+#    bufsize = len(json_message)
+#
+#    # Send data
+#    totalsent = 0
+#    s.sendall(json.dumps(json_message))
+# 
+#    # Receive return value
+#    recvdata = s.recv(1024)
+#
+#    s.close()
+#    if queue != None:
+#        queue.put(recvdata)
+
+
+
 
 def send_message(json_message,queue):
     # Create socket
@@ -66,7 +90,8 @@ def send_message(json_message,queue):
     recvdata = s.recv(1024)
 
     s.close()
-    queue.put(recvdata)
+    if queue != None:
+        queue.put(recvdata)
 
 
 def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
@@ -95,9 +120,13 @@ def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
                 which_event2 = random.randint(0,4999)
                 json_message_list.append(event_msgs_list[which_event1][which_event2])
 
-            for n in range(rate[0]):
-                t = threading.Thread(target=send_message,args=(json_message_list[i],queue))
+            
+#            for n in range(rate[0]):
+            for n in range(rate[0]/50):
+#                t = threading.Thread(target=send_message,args=(json_message_list[i],queue))
+                t = threading.Thread(target=send_message_list,args=(json_message_list[i:i+50],queue))
                 thread_list.append(t)
+
             j = 0 
             oldtime = time.time()
             while True:
@@ -121,7 +150,7 @@ def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
             for d in range(queue.qsize()):
                 total = total + float(queue.get())
 
-            print '== Sent: ' + str(j) + ' events.'
+            print '== Sent: ' + str(j*50) + ' events.'
             print "   Join time: ", join_time
             print "   Total time: ", total
 
@@ -130,6 +159,8 @@ def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
                 measure_map[rate].append( (join_time, total) )
             else:
                 measure_map[rate] = [ (join_time, total) , ]
+
+            time.sleep(5)
     
 
 def main():
@@ -163,14 +194,31 @@ def main():
     # Rate_list
     rate_list = []
 #    rate_list.append( (nevents, timeout, rate_in_str) )
-    rate_list.append( (1, 1) )
+#   rate_list.append( (1, 1) )
     rate_list.append( (10, 1) )
     rate_list.append( (20, 1) )
     rate_list.append( (40, 1) )
     rate_list.append( (60, 1) )
     rate_list.append( (80, 1) )
     rate_list.append( (100, 1) )
-#    rate_list.append( (1000, 1, '1000 events/sec') )
+    rate_list.append( (200, 1) )
+    rate_list.append( (300, 1) )
+    rate_list.append( (400, 1) )
+    rate_list.append( (500, 1) )
+    rate_list.append( (600, 1) )
+    rate_list.append( (700, 1) )
+    rate_list.append( (800, 1) )
+    rate_list.append( (900, 1) )
+    rate_list.append( (1000, 1) )
+#    rate_list.append( (120, 1) )
+#    rate_list.append( (140, 1) )
+#    rate_list.append( (150, 1) )
+##    rate_list.append( (180, 1) )
+#    rate_list.append( (200, 1) )
+##    rate_list.append( (250, 1) )
+#    rate_list.append( (500, 1) )
+#   rate_list.append( (700, 1) )
+#   rate_list.append( (1000, 1) )
 
     # Events and values
     ev_tuple_list = []
@@ -198,12 +246,12 @@ def main():
         json_message_list = []
         for i in range(5000):
             json_message_list.append(forge_json('srcip='+str(src_IP)+',dstip='+str(dst_IP), e[0], e[1]))
-            src_IP = src_IP + 1
-            dst_IP = dst_IP + 1
-            if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
-                src_IP = src_IP + 1
-            if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
-                dst_IP = dst_IP + 1
+#            src_IP = src_IP + 1
+#            dst_IP = dst_IP + 1
+#            if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
+#                src_IP = src_IP + 1
+#            if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
+#                dst_IP = dst_IP + 1
         event_msgs_list.append(json_message_list)
 
         src_IP = ipaddr.IPAddress('10.0.0.1')
@@ -213,12 +261,15 @@ def main():
     print 'Done creating messages. Now sending...'
     for r in rate_list:
         send_event(r, options.num_exp, measure_map, len(ev_tuple_list),event_msgs_list)
+        # Save map
+        endmsg = forge_json('srcip=10.0.0.1,dstip=10.0.0.2','endofworld',str(r[0]))
+        send_message(endmsg,None) 
+        time.sleep(5)
 
-    # Save map
-    print 'Done sending. Save data.'
-    pickle_fd = open('./measure_map_event_' + options.nfsm + '.p','wb')
-    pickle.dump(measure_map,pickle_fd)
-    pickle_fd.close()
+#    print 'Done sending. Save data.'
+#    pickle_fd = open('./measure_map_event_' + options.nfsm + '.p','wb')
+#    pickle.dump(measure_map,pickle_fd)
+#    pickle_fd.close()
 
 
 if __name__ == '__main__':

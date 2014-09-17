@@ -13,6 +13,45 @@ import sys
 import pickle
 import numpy as np
 
+def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
+
+    files = os.listdir(input_dir)
+
+    set_of_fsms = set()
+    set_of_rates = set()
+
+    for f in files:
+        s_split = f.split('_')
+        set_of_fsms.add(s_split[2])
+        set_of_rates.add(int(s_split[3].rstrip('.p')))
+
+    xa = sorted(list(set_of_rates))
+    print xa
+    print set_of_fsms
+#    xa = [1,10,20,40,60,80,100,500,1000]
+    ymap = {}
+    
+    files = os.listdir(input_dir)
+    # for different number of FSMs loaded,
+    for fsm in set_of_fsms:
+        ymap[fsm] = []
+        # for each rate,
+        for x in xa:
+            fd = open(input_dir + 'measure_data_'+fsm+'_'+str(x)+'.p','rb')
+            data = pickle.load(fd)
+            fd.close()
+            ymap[fsm].append(data)
+            
+    print xa
+    print ymap
+
+    #### Do your stuff
+
+    plot_lib.plot_multiline_dist(xa, ymap, output_dir, saveAsFileName, plot_title)
+
+    return   
+
+
 def plot_the_event(input_dir, output_dir, saveAsFileName, plot_title):
     xa = [1,10,20,40,60,80,100]
     ymap = {}
@@ -94,7 +133,7 @@ def main():
         # Get data from input directory 
         saveAsFileName = 'nevent.png'  # Add file extension yourself.
         plot_title = 'Event processing time'
-        plot_the_event(input_t, output_dir, saveAsFileName, plot_title)
+        plot_the_event2(input_t, output_dir, saveAsFileName, plot_title)
 
     elif options.type_plot=='newfsm':
         # Check file, open, read

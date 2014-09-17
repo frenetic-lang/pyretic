@@ -89,6 +89,6 @@ def main():
 #    mc.verify()
     
     # Ask deployment
-    ask_deploy()
+    ask_deploy(pol.fsm_pol)
 
     return pol >> flood()

@@ -11,10 +11,13 @@ import pickle
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.kinetic.language import *
+from pyretic.kinetic.resettableTimer import *
 import ipaddr
+from threading import Timer
 
 measures_list = []
 howmany = 0
+BATCH_AMOUNT = 1000
 
 class Event(object):
     def __init__(self,name,value,flow):
@@ -110,6 +113,12 @@ class FSMPolicy(DynamicPolicy):
         self.lpec_fn = lpec_fn
         self.list_of_fsm_policies = list()
         self.dict_of_fsm_policies  = {}
+        self.event_list = list()
+#        self.timer_thread = threading.Timer(1.0, perform_batch)
+        self.timer_thread = TimerReset(1.0, self.dead)
+        self.started = True
+        self.timer_thread.start()
+        self.num_of_fsms = num_of_fsms
 
         loadwith_varname =  ''
         loadwith_varvalue = True
@@ -139,21 +148,14 @@ class FSMPolicy(DynamicPolicy):
         self.lpec_to_fsm = dict()
         self.initial_policy = self.state['policy']
         self.lock = Lock()
+        self.event_lock = Lock()
 
         super(FSMPolicy,self).__init__(self.initial_policy)
 
         self.load_LPEC(int(num_of_fsms), loadwith_varname,loadwith_varvalue)
 
-    def event_handler(self,event):
-        global measures_list
-        global howmany
-        compile_time = -1
 
-        if event.name=='endofworld':
-            pickle_fd = open('./measure_data.p','wb')
-            pickle.dump(measures_list,pickle_fd)
-            pickle_fd.close() 
-            
+    def single_event_handle(self,event):
         # Events that apply to a single lpec
         if event.flow:
             try:
@@ -191,15 +193,6 @@ class FSMPolicy(DynamicPolicy):
                     self.list_of_fsm_policies.append(lpec >> lpec_fsm)
                     self.policy = disjoint(self.list_of_fsm_policies)
 #                    self.policy = parallel(self.list_of_fsm_policies)
-                    
-                n1=dt.datetime.now()
-                self.policy.compile()
-                n2=dt.datetime.now()
-                compile_time = float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds)
-                measures_list.append(compile_time)
-                howmany = howmany +1
-#                print self.policy
-#                print '=== Compile takes: ',compile_time,'===\n'
  
         # Events that apply to all lpecs
         else:
@@ -207,10 +200,73 @@ class FSMPolicy(DynamicPolicy):
                 for lpec_fsm in self.lpec_to_fsm.values():
                     lpec_fsm.handle_event(event.name,event.value)
 
-#        print "Number of FSMs loaded: " + str(len(self.lpec_to_fsm))
-#        print howmany
+    def dead(self): 
+        print 'Times up!!~'
+        self.perform_batch(timesup=True)
+        return
+
+    def perform_batch(self,timesup=False):
+        compile_time = 0
+        if len(self.event_list)>0:
+            for e in self.event_list:
+                self.single_event_handle(e)
+            print "event lengh",len(self.event_list)
+            # Now, compile.
+            n1=dt.datetime.now()
+            self.policy.compile()
+            n2=dt.datetime.now()
+            compile_time = float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds)
+            self.event_list = []
+    
+            print 'Time',compile_time
+            if timesup is True:
+                compile_time += 1.0
+
+            measures_list.append(compile_time)
+
+        else:
+            compile_time = 0
+            print 'Ba'
+
         return compile_time
-        
+
+
+    def event_handler(self,event):
+        global measures_list
+        global howmany
+        global BATCH_AMOUNT
+        compile_time = 0
+
+        howmany = howmany + 1
+
+        if self.started is False:
+            self.timer_thread.start()
+            self.started = True
+
+        if event.name=='endofworld':
+            time.sleep(2.0)
+            print 'Save result. Number of FSMs:',self.num_of_fsms
+            pickle_fd = open('./measure_data_'+self.num_of_fsms+'_'+ event.value+'.p','wb')
+            pickle.dump(measures_list,pickle_fd)
+            pickle_fd.close() 
+            measures_list = []
+            return 0
+
+        self.timer_thread.reset()
+
+        self.event_list.append(event)   
+
+        if len(self.event_list) < BATCH_AMOUNT:
+            # check timer,
+#            while self.timer_thread.isAlive():
+#                continue;
+#            compile_time = self.perform_batch()
+            return 0
+
+        else:
+            compile_time = self.perform_batch()
+            return compile_time
+
 
     def load_LPEC(self,num_of_fsms,event_name,event_value):
         src_ip_real = ipaddr.IPAddress('10.0.0.1')

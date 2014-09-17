@@ -127,6 +127,9 @@ def plot_multiline_dist(x_ax, y_map, output_dir, filename, title):
 
   #  ind = np.arange(len(ya))
 
+    print 'what'
+    y_map.keys()
+
     for idx,y in enumerate(y_map):
         y_ax = y_map[y]
         cidx = idx%len(colors)
@@ -141,7 +144,9 @@ def plot_multiline_dist(x_ax, y_map, output_dir, filename, title):
             data_maxerr_list.append(np.max(this_flow_list) - np.median(this_flow_list))
             data_minerr_list.append(np.median(this_flow_list) - np.min(this_flow_list))
  
+#        pl.append(plt.errorbar(x_ax, data_median_list, yerr=[data_minerr_list, data_maxerr_list], fmt='%s' %(colors[cidx]), markersize=1.5))
         pl.append(plt.errorbar(x_ax, data_median_list, yerr=[data_minerr_list, data_maxerr_list], fmt='%s' %(colors[cidx]), markersize=1.5))
+        print colors[cidx]
 
   
   # xlabels = ['0', '10', '20', '30', '40', '50', '60']
@@ -157,7 +162,7 @@ def plot_multiline_dist(x_ax, y_map, output_dir, filename, title):
     plt.xlabel('Number of events per second')
     plt.ylabel('Delay (seconds)', rotation=90)
 
-#    l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['One Task','50 Tasks','100 Tasks','150 Tasks'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
+#    l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['100 FSMs','1000 FSMs','10000 FSMs','50000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
     
     plt.savefig(output_dir + str(filename), dpi=700)
 

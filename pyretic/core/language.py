@@ -862,9 +862,9 @@ class disjoint(CombinatorPolicy):
         # Processes list
         jobs = []
 
-        from multiprocessing import Pool
+#        from multiprocessing import Pool
         from multiprocessing import cpu_count
-        pool = Pool(processes=cpu_count())    
+#        pool = Pool(processes=cpu_count())    
         do_multi_process = False
 
 
