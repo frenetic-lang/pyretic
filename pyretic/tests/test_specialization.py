@@ -442,11 +442,7 @@ def test21():
 
 def test22():
     a = atom(match(srcip='10.0.0.1'))
-    a_h = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
-    a_sp = atom(match(srcip='10.0.0.1', dstip='10.0.0.2'))
     b = atom(match(srcip='10.0.0.2'))
-    b_h = hook(match(srcip='10.0.0.2'), groupby=['dstip'])
-    b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
     c = atom(match(srcip='10.0.0.3'))
     e = path_epsilon()
     p1 = base_pkt.modifymany({'srcip':'10.0.0.1', 'dstip':'10.0.0.2'})
@@ -490,6 +486,48 @@ def test22():
     assert m11
     assert sp11 == q4
 
+def test23():
+    a = atom(match(srcip='10.0.0.1'))
+    a_h = hook(match(srcip='10.0.0.1'), groupby=['dstip'])
+    a_sp = atom(match(srcip='10.0.0.1', dstip='10.0.0.2'))
+    b = atom(match(srcip='10.0.0.2'))
+    b_h = hook(match(srcip='10.0.0.2'), groupby=['dstip'])
+    b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
+    c = atom(match(srcip='10.0.0.3'))
+    e = path_epsilon()
+    p1 = base_pkt.modifymany({'srcip':'10.0.0.1', 'dstip':'10.0.0.2'})
+    p2 = base_pkt.modifymany({'srcip':'10.0.0.2', 'dstip':'10.0.0.1'})
+    p3 = base_pkt.modifymany({'srcip':'10.0.0.3'})
+
+    q1 = ~(a_h ^ c) ^ b
+    (m1, sp1, _) = specialize_main(q1, [p2])
+    assert m1
+    assert sp1 == q1
+    (m2, sp2, _) = specialize_main(q1, [p1, p3, p2])
+    assert not m2
+    (m3, sp3, _) = specialize_main(q1, [p1, p3])
+    assert not m3
+
+    q2 = ~(a_h ^ c) ^ b_h
+    (m4, sp4, _) = specialize_main(q2, [p1, p2])
+    assert m4
+    assert sp4 == ~(a_h ^ c) ^ b_sp
+
+    q3 = ~(a ^ c) ^ b_h
+    (m5, sp5, _) = specialize_main(q3, [p3, p3, p3, p2])
+    assert m5
+    assert sp5 == ~(a ^ c) ^ b_sp
+
+    q4 = a_h ^ path_negate(b) ^ b_h
+    (m6, sp6, _) = specialize_main(q4, [p1, p2, p2, p2])
+    assert m6
+    assert sp6 == a_sp ^ path_negate(b) ^ b_sp
+    (m7, sp7, _) = specialize_main(q4, [p1, p2, p3])
+    assert not m7
+    (m8, sp8, _) = specialize_main(q4, [p1, p2])
+    assert m8
+    assert sp8 == a_sp ^ path_negate(b) ^ b_sp
+
 if __name__ == "__main__":
     test1()
     test2()
@@ -515,3 +553,4 @@ if __name__ == "__main__":
     #test20()
     #test21()
     test22()
+    test23()
