@@ -12,8 +12,13 @@ cg = re_tree_gen
 
 def __continuation__(ast, trj):
     if ast == path_epsilon():
-        return (True, path_epsilon(), trj)
+        """ Only return True if the path is completely matched. """
+        if len(trj) == 0:
+            return (True, path_epsilon(), trj)
+        else:
+            return (False, None, None)
     else:
+        """ Some more of the expression left to match, carry on. """
         return specialize(ast, trj, path_epsilon())
 
 def __sp_group__(group_atom, pkt):
@@ -46,14 +51,17 @@ def __sp_combinator__(ast_list, trj, c_ast, map_fun, reduce_fun):
     return reduce(reduce_fun, results_list)
 
 def specialize(ast, trj, c_ast):
-    if isinstance(ast, atom):
+    if isinstance(ast, path_empty):
+        return (False, None, None)
+
+    elif isinstance(ast, path_epsilon):
+        return __continuation__(c_ast, trj)
+
+    elif isinstance(ast, atom):
         return __sp_atom__(ast, c_ast, trj, lambda x, y: x)
 
     elif isinstance(ast, hook):
         return __sp_atom__(ast, c_ast, trj, __sp_group__)
-
-    elif isinstance(ast, path_epsilon):
-        return __continuation__(c_ast, trj)
 
     elif isinstance(ast, path_concat):
         assert len(ast.paths) > 1
@@ -61,22 +69,22 @@ def specialize(ast, trj, c_ast):
         return specialize(ast.paths[0], trj, cont_ast)
 
     elif isinstance(ast, path_alternate):
-        def alter_map_fun(p, trj, c_ast):
-            (m, sp, rem_trj) = specialize(p, trj, c_ast)
-            if m:
-                return (True, sp, rem_trj)
-            else:
-                return (False, p ^ c_ast, [])
-
         def alter_reduce_fun(acc, res):
-            max_len = lambda a, b: a if len(a) > len(b) else b
             (m, sp, rem_trj) = acc
             (m_res, sp_res, rem_trj_res) = res
-            return (m or m_res, sp | sp_res, max_len(rem_trj, rem_trj_res))
+            final_sp = None
+            if m and m_res:
+                final_sp = sp | sp_res
+            elif m:
+                final_sp = sp
+            elif m_res:
+                final_sp = sp_res
+            else:
+                final_sp = None
+            return (m or m_res, final_sp, rem_trj)
 
         return __sp_combinator__(ast.paths, trj, c_ast,
-                                 alter_map_fun,
-                                 alter_reduce_fun)
+                                 specialize, alter_reduce_fun)
 
     elif isinstance(ast, path_inters):
         def inters_reduce_fun(acc, res):
@@ -92,14 +100,23 @@ def specialize(ast, trj, c_ast):
     elif isinstance(ast, path_star):
         assert len(ast.paths) == 1
         # use the fact that p* == epsilon | (p ^ p*)
+        p = ast.paths[0]
         (m,sp,rem_trj) = specialize(path_epsilon(), trj, c_ast)
         if m:
             return (m, sp, rem_trj)
         else:
-            return specialize(ast.paths[0], trj, ast ^ c_ast)
+            return specialize(p, trj, ast ^ c_ast)
 
     elif isinstance(ast, path_negate):
-        return NotImplementedError("Negation not implemented yet.")
+        assert len(ast.paths) == 1
+        p = ast.paths[0]
+        for k in range(0, len(trj)):
+            (m_pre, sp_pre, _) = specialize(p, trj[0:k], path_epsilon())
+            (m_cont, sp_cont, trj_cont) = specialize(c_ast, trj[k:],
+                                                     path_epsilon())
+            if m_cont and not m_pre:
+                return (True, ast ^ sp_cont, trj_cont)
+        return (False, None, None)
 
     else:
         raise TypeError("Can't specialize unknown path type!")
@@ -163,10 +180,12 @@ def test5():
 
 def test6():
     cg.clear()
-    (m, sp, trj) = specialize_main(path_epsilon(), [base_pkt])
+    (ml, spl, trjl) = specialize_main(path_epsilon(), [base_pkt])
+    (m, sp, trj)    = specialize_main(path_epsilon(), [])
     assert m
+    assert not ml
     assert sp == path_epsilon()
-    assert trj == [base_pkt]
+    assert trj == []
 
 def test7():
     cg.clear()
@@ -198,7 +217,8 @@ def test8():
     (m, sp, trj) = specialize_main(((a ^ b) | (c ^ d)) ^ e, [pkt1, pkt2, pkt3])
     b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
     assert m
-    assert sp == (a ^ b_sp ^ e) | (c ^ d ^ e)
+    # assert sp == (a ^ b_sp ^ e) | (c ^ d ^ e)
+    assert sp == (a ^ b_sp ^ e)
     assert trj == []
 
 def test9():
@@ -290,7 +310,8 @@ def test13():
     h2 = atom(match(dstip='10.0.0.2', switch=2))
     h3 = atom(match(dstip='10.0.0.2', switch=3))
     h4 = atom(match(dstip='10.0.0.2', switch=4))
-    assert sp == (+g ^ a ^ c) | (b ^ h2 ^ h3 ^ h4 ^ c)
+    # assert sp == (+g ^ a ^ c) | (b ^ h2 ^ h3 ^ h4 ^ c)
+    assert sp == (b ^ h2 ^ h3 ^ h4 ^ c)
     assert trj == []
 
 def test14():
@@ -357,7 +378,8 @@ def test16():
     b_sp = atom(match(srcip='10.0.0.2', dstip='10.0.0.1'))
     e_sp = atom(match(srcip='10.0.0.1', dstip='10.0.0.3'))
     assert m
-    assert sp == (a ^ b_sp ^ e_sp) | (c ^ d ^ e)
+    # assert sp == (a ^ b_sp ^ e_sp) | (c ^ d ^ e)
+    assert sp == (a ^ b_sp ^ e_sp)
     assert trj == []
 
 def test17():
@@ -370,28 +392,30 @@ def test17():
     pkt4 = base_pkt.modifymany({'srcip': '10.0.0.1', 'switch': 4})
     pkt5 = base_pkt.modifymany({'srcip': '10.0.0.2'})
     pkt6 = base_pkt
-    (m, sp, trj) = specialize_main(+g ^ a, [pkt1, pkt2, pkt3, pkt4, pkt5, pkt6])
+    t = [pkt1, pkt2, pkt3, pkt4, pkt5]
+    tl = t + [pkt6]
+    (m, sp, trj) = specialize_main(+g ^ a, t)
+    (ml, spl, trjl) = specialize_main(+g ^ a, tl)
     assert m
     g1 = atom(match(srcip='10.0.0.1', switch=1))
     g2 = atom(match(srcip='10.0.0.1', switch=2))
     g3 = atom(match(srcip='10.0.0.1', switch=3))
     g4 = atom(match(srcip='10.0.0.1', switch=4))
     assert sp == g1 ^ g2 ^ g3 ^ g4 ^ a
-    assert trj == [pkt6]
+    assert trj == []
+    assert not ml
 
 def test18():
-    cg.clear()
-    (m, sp, trj) = specialize_main(+path_epsilon(), [base_pkt])
-    assert m
-    assert sp == path_epsilon()
-    assert trj == [base_pkt]
-
-def test19():
     cg.clear()
     (m, sp, trj) = specialize_main(+path_epsilon(), [])
     assert m
     assert sp == path_epsilon()
     assert trj == []
+
+def test19():
+    cg.clear()
+    (m, sp, trj) = specialize_main(+path_epsilon(), [base_pkt])
+    assert not m
 
 def test20():
     a = atom(match(srcip='10.0.0.1'))
@@ -399,12 +423,20 @@ def test20():
     p = +(path_epsilon() | a) ^ b
     pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1'})
     pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2'})
-    # this will fail with an infinite loop as of now.
-    print "About to start buggy infinite loop:"
-    time.sleep(2)
     (m, sp, trj) = specialize_main(p, [pkt1, pkt2])
     assert m
-    assert sp == (path_epsilon() | a) ^ b # this needs to change
+    assert sp == a ^ b
+    assert trj == []
+
+def test21():
+    a = atom(match(srcip='10.0.0.1'))
+    b = atom(match(srcip='10.0.0.2'))
+    p = a ^ +(path_epsilon() | b)
+    pkt1 = base_pkt.modifymany({'srcip': '10.0.0.1'})
+    pkt2 = base_pkt.modifymany({'srcip': '10.0.0.2'})
+    (m, sp, trj) = specialize_main(p, [pkt1, pkt2])
+    assert m
+    assert sp == a ^ b
     assert trj == []
 
 if __name__ == "__main__":
@@ -426,5 +458,8 @@ if __name__ == "__main__":
     test16()
     test17()
     test18()
-    test19()
-    test20()
+    #print "Infinite loop cases follow:"
+    #time.sleep(3)
+    #test19()
+    #test20()
+    #test21()

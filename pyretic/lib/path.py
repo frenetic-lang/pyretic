@@ -394,6 +394,19 @@ class path_epsilon(path):
     def __repr__(self):
         return "path_epsilon"
 
+class path_empty(path):
+    def __init__(self):
+        self.re_tree = re_empty()
+        super(path_empty, self).__init__()
+
+    def __eq__(self, other):
+        if isinstance(other, path_empty):
+            return True
+        else:
+            return False
+
+    def __repr__(self):
+        return "path_empty"
 
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class
