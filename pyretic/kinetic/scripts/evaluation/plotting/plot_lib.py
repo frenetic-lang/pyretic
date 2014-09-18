@@ -283,13 +283,17 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 
         # Need to sort rate
         str_rate = []
+        int_rate = []
         for r in rate.keys():
+            int_rate.append(int(str(r)))
             str_rate.append(str(r))
-        sorted_rate = sorted(str_rate)
+
+
+        sorted_rate = sorted(int_rate)
 
         # Different rates
         for r in sorted_rate:
-            list_of_tuples = rate[r]
+            list_of_tuples = rate[str(r)]
             compile_times = []
             handle_times = []
 
@@ -303,7 +307,6 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
             yerr1_c.append(np.std(compile_times))
             yerr1_h.append(np.std(handle_times))
 
-        print ya1_c               
 
         if (len(modes)%2==0):
             shift_factor = len(modes)/2 - idx
@@ -338,11 +341,12 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     plt.xlabel('Event arrival rate (events/second)')
     plt.ylabel('Processing time (seconds)', rotation=90)
 
-    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
-               ['single,compile','single,handle','multi,compile','multi,handle'],\
-               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
-               shadow=False, prop={'size':7.0})    
- 
+#    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
+#               ['single,compile','single,handle','multi,compile','multi,handle'],\
+#               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
+#               shadow=False, prop={'size':7.0})    
+# 
+
     plt.savefig(output_dir + str(filename), dpi=700)
 
 
