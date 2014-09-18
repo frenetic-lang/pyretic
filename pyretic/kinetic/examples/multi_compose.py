@@ -12,32 +12,45 @@ from pyretic.kinetic.apps.mac_learner import *
 from pyretic.kinetic.apps.rate_limiter import *
 from pyretic.kinetic.apps.monitor import *
 DATAFILE = 'compilation_results'
+aggregate_policies_dict = {}
 
 def dynamic_policy_compiler(event_queue, composed_aggregate_policies, mode, number_of_fsms):
     print 'Dynamic compiler started'
-    time_list = list()
+    event_list = list()
     data = {}
     while True:
         try:
-            time_list.append(event_queue.get())
+            event_list.append(event_queue.get())
             print 'event_queue received: '
             time.sleep(3)
             print '# of events logged so far: ', 1 + event_queue.qsize()
             number_events = 1 + event_queue.qsize()
+            
+            # Empty the event queue
+            while event_queue.empty() == False:
+                event_list.append(event_queue.get())
+            #print event_list
+            time_list = [elem[0] for elem in event_list]
+            lpec_list = [elem[1] for elem in event_list]
+            
+            lpec_list = list(set(lpec_list))
+            
+            updated_list_of_composed_policies = [aggregate_policies_dict[lpec] for lpec in lpec_list]
+            updated_composed_aggregate_policies = disjoint(updated_list_of_composed_policies)
+            
             start = time.time()
-            composed_classifiers = composed_aggregate_policies.compile()
+            composed_classifiers = updated_composed_aggregate_policies.compile()
             compile_time = time.time() - start
             print 'Time to compile the composed policies ', compile_time
             print '# of flow rules after composition ', len(composed_classifiers)
-            while event_queue.empty() == False:
-                time_list.append(event_queue.get())
-
+            
             event_handling_time = max(time_list) - min(time_list)
+            print lpec_list[0]
             print 'Total time to input events in event_queue: ', event_handling_time
             if number_events not in data:
                 data[number_events] = []
             data[number_events].append((compile_time, event_handling_time))
-            time_list = list()
+            event_list = list()
         except:
             print 'Dumping the data file ...'
             with open(DATAFILE+'_'+mode+'_'+str(number_of_fsms)+'.txt', 'w') as outfile:
@@ -68,6 +81,7 @@ def policy_compose(auth_w_obj, auth_x_obj, ids_obj, rl_obj):
             pol_rl_obj = lpecs_for_rl_obj[lpec]
         tmp = pol_auth_w + pol_auth_x >> pol_ids_obj >> pol_rl_obj
         list_of_composed_policies.append(tmp)
+        aggregate_policies_dict[repr(lpec)] = tmp
 
     composed_aggregate_policies = disjoint(list_of_composed_policies)
     return composed_aggregate_policies

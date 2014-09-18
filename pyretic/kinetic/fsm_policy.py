@@ -160,6 +160,7 @@ class FSMPolicy(DynamicPolicy):
 
     def single_event_handle(self,event):
         # Events that apply to a single lpec
+        lpec_k = ""
         if event.flow:
             try:
                 lpec = self.lpec_fn(event.flow)
@@ -205,7 +206,7 @@ class FSMPolicy(DynamicPolicy):
                     
         # Add an element in event_queue after handling the event
         #print "Updating the event_queue, size: ", self.event_queue.qsize()
-        self.event_queue.put(time.time())
+        self.event_queue.put((time.time(),lpec_k))
 
     def dead(self): 
         print 'Times up!!~'
