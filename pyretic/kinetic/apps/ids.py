@@ -105,7 +105,7 @@ def main():
     mc.save_as_smv_file()
 
     # Verify
-#    mc.verify()
+    mc.verify()
 
     # Ask deployment
     ask_deploy()

@@ -12,6 +12,7 @@ import plot_lib
 import sys
 import pickle
 import numpy as np
+import json
 
 def plot_the_event3(input_dir, output_dir, saveAsFileName, plot_title):
 
@@ -39,6 +40,39 @@ def plot_the_event3(input_dir, output_dir, saveAsFileName, plot_title):
     plot_lib.plot_multi_cdf(ymap,output_dir,saveAsFileName,plot_title)
 
     return   
+
+def plot_the_event_arpit(input_dir, output_dir, saveAsFileName, plot_title):
+
+    files = os.listdir(input_dir)
+
+    set_of_fsms = set()
+    set_of_modes = set()
+
+    for f in files:
+        s_split = f.split('_')
+        set_of_modes.add(s_split[2])
+        set_of_fsms.add(int(s_split[3].rstrip('.txt')))
+
+    ymap = {}
+    
+    files = os.listdir(input_dir)
+    # for different number of FSMs loaded,
+    for m in set_of_modes:
+        ymap[m] = []
+        for fsm in set_of_fsms:
+            fd = open(input_dir + 'compilation_results_'+str(m)+'_'+str(fsm)+'.txt','r')
+            data_map = json.load(fd)
+            fd.close()
+            xa = data_map.keys()
+            ymap[m].append(data_map)
+    
+    x_int = []
+    for x in xa:
+        x_int.append(int(str(x)))
+    #### Do your stuff
+    plot_lib.figplot_bar(sorted(x_int),ymap, output_dir, saveAsFileName, plot_title)
+    return   
+
 
 
 def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
@@ -78,6 +112,7 @@ def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
     plot_lib.plot_multiline_dist(xa, ymap, output_dir, saveAsFileName, plot_title)
 
     return   
+
 
 
 def plot_the_event(input_dir, output_dir, saveAsFileName, plot_title):
@@ -162,7 +197,7 @@ def main():
         saveAsFileName = 'nevent.eps'  # Add file extension yourself.
 #        plot_title = 'Event processing time (1 module)'
         plot_title = ''
-        plot_the_event2(input_t, output_dir, saveAsFileName, plot_title)
+        plot_the_event_arpit(input_t, output_dir, saveAsFileName, plot_title)
 
     elif options.type_plot=='newfsm':
         # Check file, open, read

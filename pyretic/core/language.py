@@ -53,6 +53,8 @@ NO_CACHE=False
 compile_debug = False
 use_disjoint_cache = True
 
+manager = Manager()
+disjoint_cache_shr = manager.dict()
 
 disjoint_cache={}
 
@@ -853,7 +855,6 @@ class disjoint(CombinatorPolicy):
 
         ## Processes will store return values here (Synchronized with lock)
         job_returns = Queue()
-        manager = Manager()
         last_rule_entry = manager.list()
         last_rule_entry.append(None)
         from multiprocessing import Lock
@@ -884,12 +885,14 @@ class disjoint(CombinatorPolicy):
                 policy_list = self.policies[start:end]
                 
                 p=Process(target=self.mp_for_each_policy,\
-                          args=(djLock,policy_list,job_returns,last_rule_entry))
+                          args=(djLock,policy_list,job_returns,disjoint_cache_shr,last_rule_entry))
                 p.start()
                 jobs.append(p)
 
 
             # Wait until done
+#            for j in jobs:
+#                j.join()
             while job_returns.qsize()!=nProc:
                 continue
 
@@ -926,17 +929,56 @@ class disjoint(CombinatorPolicy):
         #print "Cache state: ", disjoint_cache    
         return classifiers
 
+    def do_each_sequentially_for_mp(self,policy_list,disjoint_cache_shr,djLock):
+        aggr_rules = []
+        tmp_rule_list = []
+        last_rule = [None,]
+        print "Policy List Length:",len(policy_list)
+        for policy in policy_list:
+            start1 = time.time()
+            tmp_rule_list = []
+            
+            if use_disjoint_cache:
+                hash_d = policy.__repr__()
+                if hash_d in disjoint_cache_shr:
+                    tmp_rules=disjoint_cache_shr[hash_d]
+                else:
+                    tmp_rules=policy.compile().rules
+                    disjoint_cache_shr[hash_d]=str(tmp_rules)
+            else:                      
+                tmp_rules=policy.compile().rules  
+                                                
+            last_rule=[tmp_rules[len(tmp_rules)-1]]
+            
+            ctr = 0
+            for obj in tmp_rules:
+                
+                if ctr == len(tmp_rules)-1:
+                    break
+                else:
+                    tmp_rule_list.append(obj)
+                    ctr += 1
+                    
+            aggr_rules+=tmp_rule_list                 
+#            print 'Time!!!:',time.time() - start1
+
+        return aggr_rules,last_rule
+
+
     def do_each_sequentially(self,policy_list):
         aggr_rules = []
         tmp_rule_list = []
         last_rule = [None,]
+        print "Policy List Length:",len(policy_list)
         for policy in policy_list:
+            start1 = time.time()
             tmp_rule_list = []
             
             if use_disjoint_cache:
                 hash_d = policy.__repr__()
                 if hash_d in disjoint_cache:
                     tmp_rules=disjoint_cache[hash_d]
+                    print 'got cache'
                 else:
                     tmp_rules=policy.compile().rules
                     disjoint_cache[hash_d]=tmp_rules  
@@ -955,12 +997,13 @@ class disjoint(CombinatorPolicy):
                     ctr += 1
                     
             aggr_rules+=tmp_rule_list                 
+#            print 'Time!!!:',time.time() - start1
 
         return aggr_rules,last_rule
 
-    def mp_for_each_policy(self, djLock,policy_list,job_returns,last_rule_entry):
+    def mp_for_each_policy(self, djLock,policy_list,job_returns,disjoint_cache_shr,last_rule_entry):
         
-        this_aggr_list,last_rule = self.do_each_sequentially(policy_list)
+        this_aggr_list,last_rule = self.do_each_sequentially_for_mp(policy_list,disjoint_cache_shr,djLock)
 
         job_returns.put(str(this_aggr_list))
         last_rule_entry[0] = str(last_rule)

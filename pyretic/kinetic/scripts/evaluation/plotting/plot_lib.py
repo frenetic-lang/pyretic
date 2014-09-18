@@ -251,6 +251,94 @@ def plot_multiline(x_ax, y_map, output_dir, filename, title):
 #  l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['One Task','50 Tasks','100 Tasks','150 Tasks'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
   
   plt.savefig(output_dir + str(filename), dpi=700)
+ 
+
+def figplot_bar(xa,cmap, output_dir, filename, title):
+    # Plot
+    fig = plt.figure(dpi=700)
+    ax = fig.add_subplot(111)
+    xlabels = []
+    for x in xa:
+        xlabels.append(str(x))
+        
+    ind = np.arange(len(xlabels))
+    width = 0.4
+    ya1 = []
+    yerr1 = []
+
+    modes = sorted(cmap.keys(),reverse=True)
+    pl = []
+    
+    colors = ['red','green','black','grey']
+    hatch = ['','x','||||']
+    # Different modes
+    for idx,m in enumerate(modes):
+
+        ya1_c =[]
+        yerr1_c = []
+        ya1_h =[]
+        yerr1_h = []
+        rate= cmap[m][0]
+        print 'Mode:',m
+
+        # Need to sort rate
+        str_rate = []
+        for r in rate.keys():
+            str_rate.append(str(r))
+        sorted_rate = sorted(str_rate)
+
+        # Different rates
+        for r in sorted_rate:
+            list_of_tuples = rate[r]
+            compile_times = []
+            handle_times = []
+
+            for l in list_of_tuples:
+                compile_times.append(l[0])
+                handle_times.append(l[1])
+
+            # Get median for each rate
+            ya1_c.append(np.median(compile_times))
+            ya1_h.append(np.median(handle_times))
+            yerr1_c.append(np.std(compile_times))
+            yerr1_h.append(np.std(handle_times))
+
+        print ya1_c               
+
+        if (len(modes)%2==0):
+            shift_factor = len(modes)/2 - idx
+
+            # Plot compiliation time
+            pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_c, width/2, \
+                               color=colors[1], fill=True, yerr=yerr1_c, hatch=hatch[idx] )  )
+
+            # Plot event handling time. Stack on top of compilation
+            pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_h, width/2, \
+                                color=colors[0], fill=True, yerr=yerr1_h,  hatch=hatch[idx])  )
+        else:
+#            shift_factor = width/2.0
+            pass
+#
+    majorind = np.arange(len(xlabels),step=1)
+    plt.xticks(majorind,xlabels, rotation=0)
+##  ax.xaxis.grid(True, which='major')
+    ax.yaxis.grid(True, which='major')
+#
+#    ax.annotate(str(int(ya1[0])), xy=(0-0.2,int(ya1[0])+200))
+#    ax.annotate(str(int(ya1[1])), xy=(1-0.2,int(ya1[1])+200))
+#    ax.annotate(str(int(ya1[2])), xy=(2-0.2,int(ya1[2])+200))
+##  ax.annotate(str(int(ya1[3])), xy=(3-0.2,int(ya1[3])+200))
+#
+    ff = plt.gcf()
+    ff.subplots_adjust(bottom=0.20)
+    ff.subplots_adjust(left=0.15)
+##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
+#    plt.title(title)
+    plt.xlabel('Event arrival rate (events/second)')
+    plt.ylabel('Processing time (seconds)', rotation=90)
+##  plt.legend([b1[0],b2[0]], ['Developed','Developing'],  prop={'size':7})
+    plt.savefig(output_dir + str(filename), dpi=700)
+
 
 
 

@@ -79,11 +79,15 @@ def main():
     event_queue = Queue()
     composed_aggregate_policies = drop
     if mode == 'multi':
+        start = time.time()
         auth_w_obj = auth_web(number_of_fsms, event_queue)
         auth_x_obj = auth_8021x(number_of_fsms, event_queue)
         ids_obj = ids(number_of_fsms, event_queue)
         rl_obj = rate_limiter(number_of_fsms, event_queue)
+        print 'Time to initialize:',time.time() - start
+        start = time.time()
         composed_aggregate_policies = policy_compose(auth_w_obj, auth_x_obj, ids_obj, rl_obj)
+        print 'Time to compose:',time.time() - start
     else:
         auth_w_obj = auth_web(number_of_fsms, event_queue)
         composed_aggregate_policies = auth_w_obj.policy
@@ -92,6 +96,7 @@ def main():
     dynamic_update_policy_thread.daemon = True
     dynamic_update_policy_thread.start()
     start = time.time()
+    print 'Starting to compile...'
     composed_classifiers = composed_aggregate_policies.compile()
     print 'Time to compile the composed policies ', time.time() - start
     print '# of flow rules after composition ', len(composed_classifiers)
