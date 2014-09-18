@@ -978,7 +978,6 @@ class disjoint(CombinatorPolicy):
                 hash_d = policy.__repr__()
                 if hash_d in disjoint_cache:
                     tmp_rules=disjoint_cache[hash_d]
-                    print 'got cache'
                 else:
                     tmp_rules=policy.compile().rules
                     disjoint_cache[hash_d]=tmp_rules  

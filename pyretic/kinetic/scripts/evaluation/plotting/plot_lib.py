@@ -330,13 +330,19 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 ##  ax.annotate(str(int(ya1[3])), xy=(3-0.2,int(ya1[3])+200))
 #
     ff = plt.gcf()
+    ff.subplots_adjust(top=0.8)
     ff.subplots_adjust(bottom=0.20)
     ff.subplots_adjust(left=0.15)
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
     plt.xlabel('Event arrival rate (events/second)')
     plt.ylabel('Processing time (seconds)', rotation=90)
-##  plt.legend([b1[0],b2[0]], ['Developed','Developing'],  prop={'size':7})
+
+    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
+               ['single,compile','single,handle','multi,compile','multi,handle'],\
+               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
+               shadow=False, prop={'size':7.0})    
+ 
     plt.savefig(output_dir + str(filename), dpi=700)
 
 
