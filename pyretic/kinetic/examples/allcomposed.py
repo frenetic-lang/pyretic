@@ -59,6 +59,10 @@ def main():
     ### If authentication event is false, next policy state is 'drop'
     mc.add_spec("SPEC AG ( (authenticated_web | authenticated_1x) & !infected -> AX policy!=drop )")
 
+    mc.add_spec("SPEC AG ( (!authenticated_web & authenticated_1x) & !infected & rate=2 -> AX policy=policy_6)")
+    
+    mc.add_spec("SPEC AG ( (authenticated_web & !authenticated_1x) & !infected & rate=2 -> EX policy=policy_10 )")
+
     mc.save_as_smv_file()
     mc.verify()
 

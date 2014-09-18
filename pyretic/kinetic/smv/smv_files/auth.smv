@@ -29,7 +29,4 @@ MODULE main
 -- 
 FAIRNESS
   authenticated;
-SPEC AG (authenticated -> AX policy=policy_1)
-SPEC AG (!authenticated -> AX policy=drop)
-SPEC AG (EF policy=policy_1)
-SPEC A [ policy=drop U authenticated ]
+SPEC EG (!authenticated -> AF policy=policy_1)

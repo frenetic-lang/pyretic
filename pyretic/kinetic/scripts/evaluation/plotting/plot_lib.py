@@ -22,9 +22,9 @@ from collections import namedtuple
 from datetime import datetime
 import tarfile
 import matplotlib as mpl
-#mpl.use('PS')
+mpl.use('PS')
 #mpl.use('pdf')
-mpl.use('AGG')
+#mpl.use('AGG')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from numpy.random import normal
@@ -42,6 +42,40 @@ mpl.rc('axes', linewidth=0.5)
 mpl.rc('patch', linewidth=0.5)
 mpl.rc('lines', linewidth=0.5)
 mpl.rc('grid', linewidth=0.25)
+
+
+def plot_multi_cdf(y_map,output_dir,saveAsFileName,plot_title):
+  fig = plt.figure(dpi=700)
+  ax = fig.add_subplot(111)
+  colors = ['r-','k--','g-','m:','r-']
+  pl = []
+  #  ax.set_yscale('log')
+#    ax.xaxis.grid(True, which='major')
+  ax.yaxis.grid(True, which='major')
+
+  #  ind = np.arange(len(ya))
+
+  for idx,y in enumerate(sorted(y_map.keys())):
+    x_ax,y_ax = y_map[y]
+    cidx = idx%len(colors)
+    pl.append( plt.plot(x_ax, y_ax, '%s' %(colors[cidx]), label="",linewidth=1.5) )
+  
+  plt.xlim(0,25)
+
+  ff = plt.gcf()
+  ff.subplots_adjust(top=0.73)
+  ff.subplots_adjust(bottom=0.20)
+  ff.subplots_adjust(left=0.15)
+  plt.title(plot_title)
+  plt.xlabel('Time to complete verification process (ms)')
+  plt.ylabel('CDF', rotation=90)
+
+  l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['Prgm=IDS, nProp=1','Prgm=IDS, nProp=100','Prgm=Composed, nProp=1','Prgm=Composed, nProp=100'], bbox_to_anchor=(0.5, 1.4), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':6.8})    
+#  l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['M=Auth,S=1','M=Auth,S=1000','M=Composed,S=1','M=Composed,S=1000'], bbox_to_anchor=(0.92, 0.9), loc='upper center',ncol=1, fancybox=True, shadow=False, prop={'size':5.5})    
+  
+  plt.savefig(output_dir + str(saveAsFileName), dpi=700)
+
+
 
 
 
@@ -127,10 +161,11 @@ def plot_multiline_dist(x_ax, y_map, output_dir, filename, title):
 
   #  ind = np.arange(len(ya))
 
-    print 'what'
-    y_map.keys()
+    nfsms_sorted_keys = sorted(y_map.keys())
+    print nfsms_sorted_keys
 
-    for idx,y in enumerate(y_map):
+#    for idx,y in enumerate(y_map):
+    for idx,y in enumerate(nfsms_sorted_keys):
         y_ax = y_map[y]
         cidx = idx%len(colors)
     
@@ -160,10 +195,12 @@ def plot_multiline_dist(x_ax, y_map, output_dir, filename, title):
     ff.subplots_adjust(left=0.15)
     plt.title(title)
     plt.xlabel('Number of events per second')
-    plt.ylabel('Delay (seconds)', rotation=90)
+    plt.ylabel('Recompilation time (seconds)', rotation=90)
 
-#    l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['100 FSMs','1000 FSMs','10000 FSMs','50000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
+#    if len(pl) > 1:
+#        l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['100 FSMs','1000 FSMs','10000 FSMs','50000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
     
+    l = plt.legend([pl[0][0],pl[1][0],pl[2][0]], ['1000 FSMs','10000 FSMs','45000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=3, fancybox=True, shadow=False, prop={'size':6.2})    
     plt.savefig(output_dir + str(filename), dpi=700)
 
 

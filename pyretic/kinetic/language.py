@@ -783,3 +783,34 @@ def fsm_def_to_smv_model(fsm_def):
 
     return s
 
+def fsm_def_to_smv_model_build(fsm_def):
+
+
+    # First, see if there are complex policies. 
+    # If so, number them, and save info.
+    policy_set = set()
+    p_named_set = set()
+    for k,v in fsm_def.map.items():
+        t = v['type']
+        if t.py_type==Policy:
+            for p in t.dom:
+                policy_to_hash(p_named_set,policy_set, p)
+    sorted_list = sorted(list(policy_set))
+    for idx,p in enumerate(sorted_list):
+        policy_to_name_map[p] = 'policy_'+str(idx+1)
+
+    boolean_v_list = []
+    policy_v_list = []
+
+    # Start        
+    s =  'MODULE main\n'
+    s += '  VAR\n'
+    for k,v in fsm_def.map.items():
+        t = v['type']
+        if t.py_type==bool:
+            boolean_v_list.append(k)
+        elif t.py_type==Policy:
+            policy_v_list = map(to_smv,t.dom)
+
+    return boolean_v_list,policy_v_list
+

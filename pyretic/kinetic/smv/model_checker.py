@@ -1,3 +1,5 @@
+
+from pyretic.kinetic.fsm_policy import *
 import subprocess
 import platform
 import os
@@ -40,9 +42,68 @@ class ModelChecker(object):
         out, err = p.communicate()
 
         n2=dt.datetime.now()
-        print "\n=== Verification takes (ms): ",float((n2-n1).microseconds)/1000.0,"==="
-        print "=== Verification takes (s): ",float((n2-n1).seconds),"===\n"
- 
+        verify_time = (float((n2-n1).microseconds)/1000.0/1000.0 + float((n2-n1).seconds))
+#        print "\n=== Verification takes (ms): ",float((n2-n1).microseconds)/1000.0,"==="
+#        print "=== Verification takes (s): ",float((n2-n1).seconds),"===\n"
+        print "=== Verification takes (ms): ",verify_time*1000.0,"===\n"
+        print "=== Verification takes (s): ",verify_time,"===\n"
         print out
 
         print '======================== NuSMV OUTPUT END ========================\n'
+
+        return verify_time
+
+
+    def spec_builder(self,fsm_def,nspec):
+
+        spec_list = []
+        boolean_v_list, policy_v_list = fsm_def_to_smv_model_build(fsm_def)
+
+        # AG, Eventvariable, AX, policyVal
+        front = ['AG', 'EG']
+        middle = ['AX','EX','AF','EF']
+
+        for f in front:
+            for m in middle:
+                for b in boolean_v_list:
+                    for p in policy_v_list:
+                        spec_str = "SPEC %s (%s -> %s policy=%s)" % (f,b,m,p)
+                        spec_list.append(spec_str)
+                        spec_str = "SPEC %s (!%s -> %s policy=%s)" % (f,b,m,p)
+                        spec_list.append(spec_str)
+                        spec_str = "SPEC %s (%s -> %s policy!=%s)" % (f,b,m,p)
+                        spec_list.append(spec_str)
+                        spec_str = "SPEC %s (!%s -> %s policy!=%s)" % (f,b,m,p)
+                        spec_list.append(spec_str)
+
+        for f in front:
+            for m in middle:
+                for p in policy_v_list:
+                        spec_str = "SPEC %s (%s policy=%s)" % (f,m,p)
+                        spec_list.append(spec_str)
+                        spec_str = "SPEC %s (%s policy!=%s)" % (f,m,p)
+                        spec_list.append(spec_str)
+
+
+
+        for p in policy_v_list:
+            for b in boolean_v_list:
+                spec_str = "SPEC A [ policy=%s U !%s ]" % (p,b)
+                spec_list.append(spec_str)
+                spec_str = "SPEC A [ policy=%s U %s ]" % (p,b)
+                spec_list.append(spec_str)
+                spec_str = "SPEC A [ policy!=%s U !%s ]" % (p,b)
+                spec_list.append(spec_str)
+                spec_str = "SPEC A [ policy!=%s U %s ]" % (p,b)
+                spec_list.append(spec_str)
+
+        return_specs = [] 
+        import random
+        # Randomly choose 100.
+        for d in range(nspec):
+            i = random.randint(0,len(spec_list)-1)
+            return_specs.append(spec_list[i])
+            
+
+        return return_specs
+

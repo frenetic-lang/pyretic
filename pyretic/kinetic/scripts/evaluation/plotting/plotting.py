@@ -13,6 +13,34 @@ import sys
 import pickle
 import numpy as np
 
+def plot_the_event3(input_dir, output_dir, saveAsFileName, plot_title):
+
+    files = os.listdir(input_dir)
+
+    set_of_pols= set()
+    set_of_specs = set()
+
+    ymap = {}
+    for f in files:
+        s_split = f.split('_')
+        set_of_pols.add(s_split[1])
+        set_of_specs.add(int(s_split[2].rstrip('.p')))
+
+    for p in set_of_pols:
+        for s in set_of_specs:
+            line_id = p+'_'+str(s)
+            ymap[line_id] = []
+            fd = open(input_dir + 'verify_'+str(p)+'_'+str(s)+'.p','rb')
+            data = pickle.load(fd)
+            fd.close()
+            x_ax, y_ax = plot_lib.get_cdf2(data)
+            ymap[line_id] = (x_ax,y_ax)
+ 
+    plot_lib.plot_multi_cdf(ymap,output_dir,saveAsFileName,plot_title)
+
+    return   
+
+
 def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
 
     files = os.listdir(input_dir)
@@ -22,7 +50,7 @@ def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
 
     for f in files:
         s_split = f.split('_')
-        set_of_fsms.add(s_split[2])
+        set_of_fsms.add(int(s_split[2]))
         set_of_rates.add(int(s_split[3].rstrip('.p')))
 
     xa = sorted(list(set_of_rates))
@@ -37,7 +65,7 @@ def plot_the_event2(input_dir, output_dir, saveAsFileName, plot_title):
         ymap[fsm] = []
         # for each rate,
         for x in xa:
-            fd = open(input_dir + 'measure_data_'+fsm+'_'+str(x)+'.p','rb')
+            fd = open(input_dir + 'measure_data_'+str(fsm)+'_'+str(x)+'.p','rb')
             data = pickle.load(fd)
             fd.close()
             ymap[fsm].append(data)
@@ -113,8 +141,8 @@ def main():
     op.add_option( '--outputdir', '-o', action="store", \
                    dest="output_dir", help = "Directory to store plots")
 
-    op.add_option( '--type', '-t', action="store", choices=['event','newfsm'],\
-                   default='newfsm',dest="type_plot", help = "Type of plot [event, newfsm]")
+    op.add_option( '--type', '-t', action="store", choices=['event','newfsm','verify'],\
+                   default='newfsm',dest="type_plot", help = "Type of plot [event, newfsm,verify]")
  
 
     # Parsing and processing args
@@ -131,8 +159,9 @@ def main():
         input_t= python_api.check_directory_and_add_slash(options.input_t)
 
         # Get data from input directory 
-        saveAsFileName = 'nevent.png'  # Add file extension yourself.
-        plot_title = 'Event processing time'
+        saveAsFileName = 'nevent.eps'  # Add file extension yourself.
+#        plot_title = 'Event processing time (1 module)'
+        plot_title = ''
         plot_the_event2(input_t, output_dir, saveAsFileName, plot_title)
 
     elif options.type_plot=='newfsm':
@@ -145,6 +174,17 @@ def main():
         plot_title = 'Compilation time based on number of LPEC FSMs'
         plot_the_data(data, output_dir, saveAsFileName, plot_title)
  
+    elif options.type_plot=='verify':
+        input_t= python_api.check_directory_and_add_slash(options.input_t)
+
+        # Get data from input directory 
+        saveAsFileName = 'verify.eps'  # Add file extension yourself.
+#        plot_title = 'Event processing time (1 module)'
+        plot_title = ''
+        plot_the_event3(input_t, output_dir, saveAsFileName, plot_title)
+
+
+
     else: 
         print 'Wrong plot type. Abort'
         print op.print_help()

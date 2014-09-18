@@ -119,7 +119,7 @@ class FSMPolicy(DynamicPolicy):
 #        self.timer_thread = threading.Timer(1.0, perform_batch)
         self.timer_thread = TimerReset(1.0, self.dead)
         self.started = True
-        #self.timer_thread.start()
+#        self.timer_thread.start()
         self.num_of_fsms = num_of_fsms
         self.event_queue = event_queue
 
@@ -226,14 +226,14 @@ class FSMPolicy(DynamicPolicy):
             self.event_list = []
     
             print 'Time',compile_time
-            if timesup is True:
-                compile_time += 1.0
+#            if timesup is True:
+#                compile_time += 1.0
 
             measures_list.append(compile_time)
 
         else:
             compile_time = 0
-            print 'Ba'
+#            print 'Ba'
 
         return compile_time
 
