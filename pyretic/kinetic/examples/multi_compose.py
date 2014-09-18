@@ -21,7 +21,7 @@ def dynamic_policy_compiler(event_queue, composed_aggregate_policies, mode, numb
         try:
             time_list.append(event_queue.get())
             print 'event_queue received: '
-            time.sleep(2)
+            time.sleep(3)
             print '# of events logged so far: ', 1 + event_queue.qsize()
             number_events = 1 + event_queue.qsize()
             start = time.time()
@@ -97,7 +97,8 @@ def main():
     dynamic_update_policy_thread.start()
     start = time.time()
     print 'Starting to compile...'
-    composed_classifiers = composed_aggregate_policies.compile()
+    composed_classifiers = composed_aggregate_policies.compile(do_mp=True)
     print 'Time to compile the composed policies ', time.time() - start
     print '# of flow rules after composition ', len(composed_classifiers)
-    return composed_aggregate_policies
+    return identity
+#    return composed_aggregate_policies

@@ -34,6 +34,8 @@ def plot_the_event3(input_dir, output_dir, saveAsFileName, plot_title):
             fd = open(input_dir + 'verify_'+str(p)+'_'+str(s)+'.p','rb')
             data = pickle.load(fd)
             fd.close()
+            
+            print "Average verification time for",p,s,':',np.average(data)
             x_ax, y_ax = plot_lib.get_cdf2(data)
             ymap[line_id] = (x_ax,y_ax)
  

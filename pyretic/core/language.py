@@ -36,6 +36,7 @@ import struct
 import time
 from ipaddr import IPv4Network
 from bitarray import bitarray
+import copy
 
 from pyretic.core import util
 from pyretic.core.network import *
@@ -837,7 +838,7 @@ class disjoint(CombinatorPolicy):
         #print output
         return output
     
-    def compile(self):
+    def compile(self, do_mp=False):
         """
         Produce a Classifier for this policy
 
@@ -860,13 +861,14 @@ class disjoint(CombinatorPolicy):
         from multiprocessing import Lock
         djLock = Lock()
 
+        global disjoint_cache 
         # Processes list
         jobs = []
 
 #        from multiprocessing import Pool
         from multiprocessing import cpu_count
 #        pool = Pool(processes=cpu_count())    
-        do_multi_process = False
+        do_multi_process = do_mp
 
 
         # Spawn processes based on number of CPUs
@@ -896,6 +898,8 @@ class disjoint(CombinatorPolicy):
             while job_returns.qsize()!=nProc:
                 continue
 
+
+            disjoint_cache = copy.deepcopy(disjoint_cache_shr)
             # Create aggr_rules from all returned lists
             while not job_returns.empty():
                 try:
@@ -942,7 +946,9 @@ class disjoint(CombinatorPolicy):
                 hash_d = policy.__repr__()
                 if hash_d in disjoint_cache_shr:
                     tmp_rules=disjoint_cache_shr[hash_d]
+#                    print 'HIT'
                 else:
+#                    print 'MISS in MP'
                     tmp_rules=policy.compile().rules
                     disjoint_cache_shr[hash_d]=str(tmp_rules)
             else:                      
@@ -969,7 +975,7 @@ class disjoint(CombinatorPolicy):
         aggr_rules = []
         tmp_rule_list = []
         last_rule = [None,]
-        print "Policy List Length:",len(policy_list)
+        print "Policy List Length SP:",len(policy_list)
         for policy in policy_list:
             start1 = time.time()
             tmp_rule_list = []
@@ -979,6 +985,7 @@ class disjoint(CombinatorPolicy):
                 if hash_d in disjoint_cache:
                     tmp_rules=disjoint_cache[hash_d]
                 else:
+#                    print 'MISS in SP'
                     tmp_rules=policy.compile().rules
                     disjoint_cache[hash_d]=tmp_rules  
             else:                      

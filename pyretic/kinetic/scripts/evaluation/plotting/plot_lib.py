@@ -259,6 +259,9 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     ax = fig.add_subplot(111)
     xlabels = []
     for x in xa:
+        if x%200!=0 or x==100:
+            continue
+ 
         xlabels.append(str(x))
         
     ind = np.arange(len(xlabels))
@@ -293,13 +296,16 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 
         # Different rates
         for r in sorted_rate:
+            if r%200!=0 or r==100:
+                print r
+                continue
             list_of_tuples = rate[str(r)]
             compile_times = []
             handle_times = []
 
             for l in list_of_tuples:
-                compile_times.append(l[0])
-                handle_times.append(l[1])
+                compile_times.append(l[0]*1000.0)
+                handle_times.append(l[1]*1000.0)
 
             # Get median for each rate
             ya1_c.append(np.median(compile_times))
@@ -307,6 +313,8 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
             yerr1_c.append(np.std(compile_times))
             yerr1_h.append(np.std(handle_times))
 
+        print ya1_c
+        print ya1_h
 
         if (len(modes)%2==0):
             shift_factor = len(modes)/2 - idx
@@ -339,7 +347,7 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
     plt.xlabel('Event arrival rate (events/second)')
-    plt.ylabel('Processing time (seconds)', rotation=90)
+    plt.ylabel('Processing time (ms)', rotation=90)
 
 #    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
 #               ['single,compile','single,handle','multi,compile','multi,handle'],\
