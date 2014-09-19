@@ -36,7 +36,8 @@ from socket import *
 
 
 mpl.rc('text', usetex=True)
-mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
+#mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
+mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 mpl.rc('figure', figsize=(3.33, 2.06))
 mpl.rc('axes', linewidth=0.5)
 mpl.rc('patch', linewidth=0.5)

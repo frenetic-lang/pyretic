@@ -898,8 +898,8 @@ class disjoint(CombinatorPolicy):
             while job_returns.qsize()!=nProc:
                 continue
 
-
             disjoint_cache = copy.deepcopy(disjoint_cache_shr)
+
             # Create aggr_rules from all returned lists
             while not job_returns.empty():
                 try:

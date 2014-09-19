@@ -73,18 +73,19 @@ def main():
     mc.add_spec("FAIRNESS\n  authenticated;")
 
 
-    nspec = 1
-    spec_list = mc.spec_builder(pol.fsm_def,nspec)
+    nspec = [1,10,20,30,40,50,60,70,80,100]
+    for i in nspec:
+        spec_list = mc.spec_builder(pol.fsm_def,nspec)
 
-    for s in spec_list:
-        mc.add_spec(s)
+        for s in spec_list:
+            mc.add_spec(s)
 
-    mc.save_as_smv_file()
+        mc.save_as_smv_file()
 
-    verify_time_list = []
-    for i in range(1000):
-        verify_time_list.append(mc.verify()*1000)
-    
+        verify_time_list = []
+        for i in range(1000):
+            verify_time_list.append(mc.verify()*1000)
+        
     print 'Save result. '
     pickle_fd = open('./verify_auth_' +str(nspec) + '.p','wb')
     pickle.dump(verify_time_list,pickle_fd)
