@@ -315,6 +315,8 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     fig = plt.figure(dpi=700)
     ax = fig.add_subplot(111)
     xlabels = []
+
+    ax.set_yscale('log')
     for x in xa:
         if x%200!=0 or x==100:
             continue
@@ -322,7 +324,7 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
         xlabels.append(str(x))
         
     ind = np.arange(len(xlabels))
-    width = 0.4
+    width = 0.7
     ya1 = []
     yerr1 = []
 
@@ -376,13 +378,14 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
         if (len(modes)%2==0):
             shift_factor = len(modes)/2 - idx
 
-            # Plot compiliation time
-            pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_c, width/2, \
-                               color=colors[1], fill=True, yerr=yerr1_c, hatch=hatch[idx] )  )
-
             # Plot event handling time. Stack on top of compilation
             pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_h, width/2, \
-                                color=colors[0], fill=True, yerr=yerr1_h,  hatch=hatch[idx])  )
+                                color=colors[1], fill=True, yerr=yerr1_h,  hatch=hatch[idx])  )
+            # Plot compiliation time
+            pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_c, width/2, \
+                               color=colors[0], fill=True, yerr=yerr1_c, hatch=hatch[idx] )  )
+
+
         else:
 #            shift_factor = width/2.0
             pass
@@ -401,17 +404,17 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     ff.subplots_adjust(top=0.8)
     ff.subplots_adjust(bottom=0.20)
     ff.subplots_adjust(left=0.15)
-    ff.subplots_adjust(right=0.95)
+    ff.subplots_adjust(right=0.98)
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
     plt.xlabel('Event arrival rate (events/second)')
-    plt.ylabel('Processing time (ms)', rotation=90)
+    plt.ylabel('Event processing time (ms)', rotation=90)
 
-#    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
-#               ['single,compile','single,handle','multi,compile','multi,handle'],\
-#               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
-#               shadow=False, prop={'size':7.0})    
-# 
+    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
+               ['Single-handle time','Single-compile time','Composed-handle time','Composed-compile time'],\
+               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
+               shadow=False, prop={'size':7.0})    
+ 
 
     plt.savefig(output_dir + str(filename), dpi=700)
 
