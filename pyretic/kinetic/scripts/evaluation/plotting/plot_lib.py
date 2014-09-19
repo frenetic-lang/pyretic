@@ -37,7 +37,7 @@ from socket import *
 
 mpl.rc('text', usetex=True)
 #mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
-mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':9})
 mpl.rc('figure', figsize=(3.33, 2.06))
 mpl.rc('axes', linewidth=0.5)
 mpl.rc('patch', linewidth=0.5)
@@ -109,6 +109,7 @@ def plot_distribution(x_ax, y_map, output_dir, filename, title):
     ff = plt.gcf()
     ff.subplots_adjust(bottom=0.20)
     ff.subplots_adjust(left=0.15)
+    ff.subplots_adjust(right=0.6)
     plt.title(title)
     plt.xlabel('Number of flows')
     plt.ylabel('Delay (seconds)', rotation=90)
@@ -147,6 +148,61 @@ def plot_singleline(x_ax, y_ax, output_dir, filename, title):
 #  l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['One Task','50 Tasks','100 Tasks','150 Tasks'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
   
   plt.savefig(output_dir + str(filename), dpi=700)
+
+
+def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
+
+    fig = plt.figure(dpi=700)
+    ax = fig.add_subplot(111)
+    colors = ['r--^','k-*','g-^','c-h','r-.']
+    pl = []
+  #  ax.set_yscale('log')
+#    ax.xaxis.grid(True, which='major')
+    ax.yaxis.grid(True, which='major')
+
+    sorted_keys = sorted(y_map.keys())
+
+    for idx,y in enumerate(sorted_keys):
+        y_ax_map = y_map[y]
+        y_ax = sorted(y_ax_map.keys())
+        cidx = idx%len(colors)
+    
+        data_median_list = []
+        data_maxerr_list = []
+        data_minerr_list = []
+
+        for i in y_ax:
+            this_flow_list = y_ax_map[i]
+            data_median_list.append(np.median(this_flow_list))
+            data_maxerr_list.append(np.max(this_flow_list) - np.median(this_flow_list))
+            data_minerr_list.append(np.median(this_flow_list) - np.min(this_flow_list))
+ 
+        pl.append(plt.errorbar(x_ax, data_median_list, yerr=[data_minerr_list, data_maxerr_list], fmt='%s' %(colors[cidx]), markersize=4.0,linewidth=1))
+        print colors[cidx]
+
+  
+  # xlabels = ['0', '10', '20', '30', '40', '50', '60']
+  #  majorind = np.arange(len(ya),step=99)
+  #  plt.xticks(majorind,xlabels)
+ 
+    plt.xlim(0,120)
+
+    ff = plt.gcf()
+    ff.subplots_adjust(bottom=0.18)
+    ff.subplots_adjust(left=0.13)
+    ff.subplots_adjust(right=0.95)
+    plt.title(title)
+    plt.xlabel('Number of properties')
+    plt.ylabel('Verification time (ms)', rotation=90)
+
+#    if len(pl) > 1:
+#        l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['100 FSMs','1000 FSMs','10000 FSMs','50000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
+    
+    l = plt.legend([pl[0][0],pl[1][0] ], ['Single','Composed'], bbox_to_anchor=(0.49, 1.1), loc='upper center',ncol=3, fancybox=True, shadow=False, prop={'size':7.8})    
+    plt.savefig(output_dir + str(filename), dpi=700)
+
+
+
 
 
 
@@ -345,6 +401,7 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     ff.subplots_adjust(top=0.8)
     ff.subplots_adjust(bottom=0.20)
     ff.subplots_adjust(left=0.15)
+    ff.subplots_adjust(right=0.95)
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
     plt.xlabel('Event arrival rate (events/second)')

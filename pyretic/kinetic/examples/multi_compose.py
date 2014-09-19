@@ -37,7 +37,7 @@ def dynamic_policy_compiler(event_queue, composed_aggregate_policies, mode, numb
             
             updated_list_of_composed_policies = [aggregate_policies_dict[lpec] for lpec in lpec_list]
             updated_composed_aggregate_policies = disjoint(updated_list_of_composed_policies)
-            
+
             start = time.time()
             composed_classifiers = updated_composed_aggregate_policies.compile()
             compile_time = time.time() - start
@@ -87,6 +87,22 @@ def policy_compose(auth_w_obj, auth_x_obj, ids_obj, rl_obj):
     return composed_aggregate_policies
 
 
+def policy_compose_single(auth_w_obj):
+    list_of_composed_policies = []
+    lpecs_for_auth_w = auth_w_obj.fsm_pol.dict_of_fsm_policies
+    total_lpecs = list(set(lpecs_for_auth_w.keys()))
+    for lpec in total_lpecs:
+        pol_auth_w = identity
+        if lpec in lpecs_for_auth_w:
+            pol_auth_w = lpecs_for_auth_w[lpec]
+        tmp = pol_auth_w
+        list_of_composed_policies.append(tmp)
+        aggregate_policies_dict[repr(lpec)] = tmp
+
+    composed_aggregate_policies = disjoint(list_of_composed_policies)
+    return composed_aggregate_policies
+
+
 def main():
     number_of_fsms = sys.argv[2]
     mode = sys.argv[3]
@@ -104,14 +120,18 @@ def main():
         print 'Time to compose:',time.time() - start
     else:
         auth_w_obj = auth_web(number_of_fsms, event_queue)
-        composed_aggregate_policies = auth_w_obj.policy
+        composed_aggregate_policies = policy_compose_single(auth_w_obj)
+#        composed_aggregate_policies = auth_w_obj.policy
     
     dynamic_update_policy_thread = Thread(target=dynamic_policy_compiler, args=(event_queue, composed_aggregate_policies, mode, number_of_fsms))
     dynamic_update_policy_thread.daemon = True
     dynamic_update_policy_thread.start()
     start = time.time()
     print 'Starting to compile...'
-    composed_classifiers = composed_aggregate_policies.compile(do_mp=True)
+    if mode=='multi':
+        composed_classifiers = composed_aggregate_policies.compile(do_mp=True)
+    else:
+        composed_classifiers = composed_aggregate_policies.compile()
     print 'Time to compile the composed policies ', time.time() - start
     print '# of flow rules after composition ', len(composed_classifiers)
     return identity

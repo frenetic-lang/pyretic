@@ -52,7 +52,7 @@ def forge_json(flow_str, event_name, event_value):
 def send_message_list(json_message_list,queue):
 
     for jsonmsg in json_message_list:
-        send_message(jsonmsg,queue)
+        send_message(jsonmsg[0],queue,jsonmsg[1])
 #    # Create socket
 #    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 #
@@ -74,12 +74,12 @@ def send_message_list(json_message_list,queue):
 
 
 
-def send_message(json_message,queue):
+def send_message(json_message,queue,portnum):
     # Create socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Connect to server
-    s.connect(('127.0.0.1', int('50001')))
+    s.connect(('127.0.0.1', int(portnum)))
     bufsize = len(json_message)
 
     # Send data
@@ -115,15 +115,20 @@ def send_event(rate, num_exp, measure_map, variation,event_msgs_list):
 #            else:
 #                json_message_list = json_message_list_true
     
-            for b in range(5000):
+            for b in range(1200):
                 which_event1 = random.randint(0,variation-1)
-                which_event2 = random.randint(0,4999)
-                json_message_list.append(event_msgs_list[which_event1][which_event2])
+                which_event2 = b
+#                which_event2 = random.randint(0,4999)
+                jsonmlist = event_msgs_list[which_event1][0]
+                portnum = event_msgs_list[which_event1][1]
+                
+                json_message_list.append( (jsonmlist[b], portnum) )
 
             
 #            for n in range(rate[0]):
             for n in range(rate[0]/50):
 #                t = threading.Thread(target=send_message,args=(json_message_list[i],queue))
+#                t = threading.Thread(target=send_message_list,args=(json_message_list[i:i+50],queue))
                 t = threading.Thread(target=send_message_list,args=(json_message_list[i:i+50],queue))
                 thread_list.append(t)
 
@@ -224,14 +229,18 @@ def main():
 
     # Events and values
     ev_tuple_list = []
-    ev_tuple_list.append(('authenticated_web','False'))
-    ev_tuple_list.append(('authenticated_web','True'))
-#    ev_tuple_list.append(('rate','1'))
-#    ev_tuple_list.append(('rate','2'))
-#    ev_tuple_list.append(('rate','3'))
-#    ev_tuple_list.append(('ids','False'))
-#    ev_tuple_list.append(('ids','True'))
-      
+    ev_tuple_list.append(('authenticated_web','False',50001))
+    ev_tuple_list.append(('authenticated_web','True',50001))
+    if options.nfsm!='1':
+        ev_tuple_list.append(('authenticated_1x','False',50002))
+        ev_tuple_list.append(('authenticated_1x','True',50002))
+        ev_tuple_list.append(('infected','False',50003))
+        ev_tuple_list.append(('infected','True',50003))
+        ev_tuple_list.append(('rate','1',50004))
+        ev_tuple_list.append(('rate','2',50004))
+        ev_tuple_list.append(('rate','3',50004))
+
+
     measure_map = {} ### {rate : list of (join_time, total)}
 
     # Create messages
@@ -244,21 +253,37 @@ def main():
     event_msgs_list = []
     json_message_list = []
 
-    for e in ev_tuple_list:
-        json_message_list = []
-        for i in range(5000):
-            json_message_list.append(forge_json('srcip='+str(src_IP)+',dstip='+str(dst_IP), e[0], e[1]))
-#            src_IP = src_IP + 1
-#            dst_IP = dst_IP + 1
-#            if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
-#                src_IP = src_IP + 1
-#            if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
-#                dst_IP = dst_IP + 1
-        event_msgs_list.append(json_message_list)
-
-        src_IP = ipaddr.IPAddress('10.0.0.1')
-        dst_IP = ipaddr.IPAddress('10.0.0.2')
+    if options.nfsm=='1':
+        for e in ev_tuple_list:
+            json_message_list = []
+            for i in range(5000):
+                json_message_list.append(forge_json('srcip='+str(src_IP)+',dstip='+str(dst_IP), e[0], e[1]))
+    #            src_IP = src_IP + 1
+    #            dst_IP = dst_IP + 1
+    #            if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
+    #                src_IP = src_IP + 1
+    #            if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
+    #                dst_IP = dst_IP + 1
+            event_msgs_list.append( (json_message_list,e[2]) )
+    
+            src_IP = ipaddr.IPAddress('10.0.0.1')
+            dst_IP = ipaddr.IPAddress('10.0.0.2')
  
+    else:
+        for e in ev_tuple_list:
+            json_message_list = []
+            for i in range(1200):
+                json_message_list.append(forge_json('srcip='+str(src_IP)+',dstip='+str(dst_IP), e[0], e[1]))
+                src_IP = src_IP + 1
+                dst_IP = dst_IP + 1
+                if str(src_IP).endswith('0') or str(src_IP).endswith('255'):
+                    src_IP = src_IP + 1
+                if str(dst_IP).endswith('0') or str(dst_IP).endswith('255'):
+                    dst_IP = dst_IP + 1
+            event_msgs_list.append((json_message_list,e[2]))
+            src_IP = ipaddr.IPAddress('10.0.0.1')
+            dst_IP = ipaddr.IPAddress('10.0.0.2')
+
     # Send
     print 'Done creating messages. Now sending...'
     for r in rate_list:

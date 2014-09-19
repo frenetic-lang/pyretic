@@ -51,20 +51,27 @@ def main():
     mc.add_spec("FAIRNESS\n  authenticated_1x;")
     mc.add_spec("FAIRNESS\n  infected;")
 
-    nspec = 1
-    spec_list = mc.spec_builder(cfsm_def3,nspec)
-    for s in spec_list:
-        mc.add_spec(s)
+    org_smv_str = mc.get_smv_str()
 
-    mc.save_as_smv_file()
-    verify_time_list = []
-
-    for i in range(1000):
-        verify_time_list.append(mc.verify()*1000)
-
+    verify_time_list_map = {}   #  { nspec : [list of measurements] } 
+    nspec = [1,20,40,60,80,100]
+    for i in nspec:
+        mc.set_smv_str(org_smv_str)
+        spec_list = mc.spec_builder(cfsm_def3,i)
+        for s in spec_list:
+            mc.add_spec(s)
+    
+        mc.save_as_smv_file()
+        verify_time_list = []
+    
+        for j in range(1000):
+            verify_time_list.append(mc.verify()*1000)
+            time.sleep(0.05)
+        verify_time_list_map[i] = verify_time_list
+    
     print 'Save result. '
-    pickle_fd = open('./verify_composed_' +str(nspec) + '.p','wb')
-    pickle.dump(verify_time_list,pickle_fd)
+    pickle_fd = open('./verify_composed_map.p','wb')
+    pickle.dump(verify_time_list_map,pickle_fd)
     pickle_fd.close() 
 
     print "=== Verification takes (ms): ",verify_time_list[0],"===\n"

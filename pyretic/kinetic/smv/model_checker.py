@@ -23,6 +23,13 @@ class ModelChecker(object):
         self.filename = self.smv_file_directory + appname_str + '.smv'
         self.smv_str = smv_str +'\n'
 
+    def get_smv_str(self):
+        return self.smv_str
+
+    def set_smv_str(self,smv_str):
+        self.smv_str = smv_str
+
+
     def add_spec(self,spec_str):
         self.smv_str = self.smv_str + spec_str + '\n'
 
