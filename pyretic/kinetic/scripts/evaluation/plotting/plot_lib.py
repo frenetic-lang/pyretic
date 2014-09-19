@@ -170,14 +170,18 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
         data_median_list = []
         data_maxerr_list = []
         data_minerr_list = []
+        data_stderr_list = []
 
         for i in y_ax:
             this_flow_list = y_ax_map[i]
             data_median_list.append(np.median(this_flow_list))
             data_maxerr_list.append(np.max(this_flow_list) - np.median(this_flow_list))
             data_minerr_list.append(np.median(this_flow_list) - np.min(this_flow_list))
+            data_stderr_list.append(np.std(this_flow_list))
  
-        pl.append(plt.errorbar(x_ax, data_median_list, yerr=[data_minerr_list, data_maxerr_list], fmt='%s' %(colors[cidx]), markersize=4.0,linewidth=1))
+ 
+#        pl.append(plt.errorbar(x_ax, data_median_list, yerr=data_stderr_list, fmt='%s' %(colors[cidx]), markersize=4.0,linewidth=1))
+        pl.append(plt.errorbar(x_ax, data_median_list,  fmt='%s' %(colors[cidx]), markersize=4.0,linewidth=1))
         print colors[cidx]
 
   
@@ -186,6 +190,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
   #  plt.xticks(majorind,xlabels)
  
     plt.xlim(0,120)
+    plt.ylim(0,30)
 
     ff = plt.gcf()
     ff.subplots_adjust(bottom=0.18)
@@ -311,12 +316,28 @@ def plot_multiline(x_ax, y_map, output_dir, filename, title):
  
 
 def figplot_bar(xa,cmap, output_dir, filename, title):
+
+    cdict = {'red': ((0.0, 0.0, 0.0),
+                     (205.0,102.0,29.0),
+                     (1.0, 1.0, 1.0)),
+          'green': ((0.0, 0.0, 0.0),
+                    (0.5, 1.0, 0.0),
+                    (1.0, 1.0, 1.0)),
+          'blue': ((0.0, 0.0, 0.0),
+                   (0.5, 1.0, 0.0),
+                   (1.0, 0.5, 1.0))}
+          
+#    my_cmap = mpl.colors.LinearSegmentedColormap('my_colormap',cdict,256)
+#    pcolor(rand(10,10),cmap=my_cmap)
+#    colorbar()
+
     # Plot
     fig = plt.figure(dpi=700)
     ax = fig.add_subplot(111)
     xlabels = []
 
-    ax.set_yscale('log')
+    ax.set_yscale('log',basey=10)
+
     for x in xa:
         if x%200!=0 or x==100:
             continue
@@ -331,8 +352,8 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     modes = sorted(cmap.keys(),reverse=True)
     pl = []
     
-    colors = ['red','green','black','grey']
-    hatch = ['','x','||||']
+    colors = ['#8B8878','#C1CDCD','black','grey']
+    hatch = ['','.....','||||']
     # Different modes
     for idx,m in enumerate(modes):
 
@@ -380,16 +401,18 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 
             # Plot event handling time. Stack on top of compilation
             pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_h, width/2, \
-                                color=colors[1], fill=True, yerr=yerr1_h,  hatch=hatch[idx])  )
+                                color=colors[1], fill=True,   hatch=hatch[idx])  )
             # Plot compiliation time
             pl.append( plt.bar(ind-(width/2.0)*shift_factor,ya1_c, width/2, \
-                               color=colors[0], fill=True, yerr=yerr1_c, hatch=hatch[idx] )  )
+                               color=colors[0], fill=True,  hatch=hatch[idx] )  )
 
 
         else:
 #            shift_factor = width/2.0
             pass
 #
+
+    plt.ylim(1,1000)
     majorind = np.arange(len(xlabels),step=1)
     plt.xticks(majorind,xlabels, rotation=0)
 ##  ax.xaxis.grid(True, which='major')
@@ -401,18 +424,27 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 ##  ax.annotate(str(int(ya1[3])), xy=(3-0.2,int(ya1[3])+200))
 #
     ff = plt.gcf()
-    ff.subplots_adjust(top=0.8)
+    ff.subplots_adjust(top=0.9)
     ff.subplots_adjust(bottom=0.20)
     ff.subplots_adjust(left=0.15)
     ff.subplots_adjust(right=0.98)
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
     plt.xlabel('Event arrival rate (events/second)')
-    plt.ylabel('Event processing time (ms)', rotation=90)
+    plt.ylabel('Event reaction time (ms)', rotation=90)
 
-    plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], \
-               ['Single-handle time','Single-compile time','Composed-handle time','Composed-compile time'],\
-               bbox_to_anchor=(0.5, 1.3), loc='upper center',ncol=2, fancybox=True, \
+    import matplotlib.patches as mpatches
+    event_patch = mpatches.Patch(color='grey', label='The eventh data')
+    compile_patch = mpatches.Patch(color='black', label='The compile data')
+
+    single_patch = mpatches.Patch(color='none', fill=True,label='The nohatch data')
+    multi_patch = mpatches.Patch(hatch='.....', fill=True,color='none', label='The hatched data')
+
+    ### Legends
+    plt.legend([pl[0][0],pl[1][0],single_patch,multi_patch], \
+#               ['Single-handle time','Single-compile time','Composed-handle time','Composed-compile time'],\
+               ['Event handling time','Recompilation time','Single','Multi'],\
+               bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, \
                shadow=False, prop={'size':7.0})    
  
 
