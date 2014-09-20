@@ -14,6 +14,17 @@ import pickle
 import numpy as np
 import json
 
+
+def plot_quali_bar(input_file, output_dir, saveAsFileName, plot_title):
+    print input_file
+    fd = open(input_file,'r')
+    data_map = fd.read()
+    fd.close()
+    dmap = json.loads(data_map)
+
+    xa = ['Kinetic','Pyretic','POX']
+    plot_lib.liked_bar(xa,dmap, output_dir, saveAsFileName, plot_title)
+
 def plot_the_veri_line(input_dir, output_dir, saveAsFileName, plot_title):
 
     files = os.listdir(input_dir)
@@ -204,8 +215,8 @@ def main():
     op.add_option( '--outputdir', '-o', action="store", \
                    dest="output_dir", help = "Directory to store plots")
 
-    op.add_option( '--type', '-t', action="store", choices=['event','newfsm','verify'],\
-                   default='newfsm',dest="type_plot", help = "Type of plot [event, newfsm,verify]")
+    op.add_option( '--type', '-t', action="store", choices=['event','newfsm','verify','liked'],\
+                   default='newfsm',dest="type_plot", help = "Type of plot [event, newfsm,verify,'liked']")
  
 
     # Parsing and processing args
@@ -248,6 +259,16 @@ def main():
 #        plot_the_event3(input_t, output_dir, saveAsFileName, plot_title)
         plot_the_veri_line(input_t, output_dir, saveAsFileName, plot_title)
 
+    elif options.type_plot=='liked':
+        input_t= (options.input_t)
+
+        # Get data from input directory 
+        saveAsFileName = 'liked.eps'  # Add file extension yourself.
+        plot_title = ''
+#        plot_the_event3(input_t, output_dir, saveAsFileName, plot_title)
+        plot_quali_bar(input_t, output_dir, saveAsFileName, plot_title)
+
+    
 
     else: 
         print 'Wrong plot type. Abort'

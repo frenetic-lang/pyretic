@@ -22,9 +22,9 @@ from collections import namedtuple
 from datetime import datetime
 import tarfile
 import matplotlib as mpl
-mpl.use('PS')
+#mpl.use('PS')
 #mpl.use('pdf')
-#mpl.use('AGG')
+mpl.use('AGG')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from numpy.random import normal
@@ -43,6 +43,92 @@ mpl.rc('axes', linewidth=0.5)
 mpl.rc('patch', linewidth=0.5)
 mpl.rc('lines', linewidth=0.5)
 mpl.rc('grid', linewidth=0.25)
+
+
+def liked_bar(xa,cmap, output_dir, filename, title):
+
+    keys_str = []
+    for c in cmap:
+        keys_str.append(str(c))
+
+    # Plot
+    fig = plt.figure(dpi=700)
+    ax = fig.add_subplot(111)
+    xlabels = []
+
+    for x in xa:
+        xlabels.append(str(x))
+        
+    ind = np.arange(len(xlabels))
+    print (xlabels)
+    print ind
+    width = 0.7
+    ya1 = []
+    yerr1 = []
+
+    modes = sorted(cmap.keys(),reverse=False)
+    pl = []
+    
+    colors = ['#8B8878','#C1CDCD','black','grey']
+    hatch = ['','.....','|||||']
+    # Different ranks
+    for idx,m in enumerate(modes):
+        rate_data= eval(cmap[m])
+        print 'Mode:',m
+        print rate_data
+
+        if (len(modes)%2==0):
+            shift_factor = len(modes)/2 - idx
+
+            # Plot event handling time. Stack on top of compilation
+            pl.append( plt.bar(ind-(width/2.0)*shift_factor,rate_data, width/2, \
+                                color=colors[1], fill=True,   hatch=hatch[idx])  )
+
+        else:
+            shift_factor = len(modes)/2 - idx
+            print len(rate_data)
+
+            # Plot event handling time. Stack on top of compilation
+            pl.append( plt.bar(ind-(width/3.0)*shift_factor - width/6.0,rate_data, width/3, \
+                                color=colors[1], fill=True,   hatch=hatch[idx])  )
+
+            pass
+#
+
+    plt.ylim(1,350)
+    majorind = np.arange(len(xlabels),step=1)
+    plt.xticks(majorind,xlabels, rotation=0)
+##  ax.xaxis.grid(True, which='major')
+    ax.yaxis.grid(True, which='major')
+#
+#    ax.annotate(str(int(ya1[0])), xy=(0-0.2,int(ya1[0])+200))
+#
+    ff = plt.gcf()
+    ff.subplots_adjust(top=0.9)
+    ff.subplots_adjust(bottom=0.20)
+    ff.subplots_adjust(left=0.16)
+    ff.subplots_adjust(right=0.98)
+##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
+#    plt.title(title)
+#    plt.xlabel('Event arrival rate (events/second)')
+    plt.ylabel('Number of responses', rotation=90)
+
+    import matplotlib.patches as mpatches
+    event_patch = mpatches.Patch(color='grey', label='The eventh data')
+    compile_patch = mpatches.Patch(color='black', label='The compile data')
+
+    single_patch = mpatches.Patch(color='none', fill=True,label='The nohatch data')
+    multi_patch = mpatches.Patch(hatch='.....', fill=True,color='none', label='The hatched data')
+
+    ### Legends
+    plt.legend([pl[0][0],pl[1][0],pl[2][0]], \
+               ['Rank 1','Rank 2','Rank 3'],\
+               bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=3, fancybox=True, \
+               shadow=False, prop={'size':7.5})    
+ 
+
+    plt.savefig(output_dir + str(filename), dpi=700)
+
 
 
 def plot_multi_cdf(y_map,output_dir,saveAsFileName,plot_title):

@@ -163,6 +163,62 @@ def parse_flow_str(flow_dict, flow_str):
 
 #    print "\nData Payload = " + str(flow_dict) + '\n'
 
+
+def forge_json(flow_str, event_name, event_value):
+
+    if flow_str:
+        # Parse flow      
+        flow_dict = dict(
+            switch=None,
+            inport=None,
+            srcmac=None,
+            dstmac=None,
+            srcip=None,
+            dstip=None,
+            tos=None,
+            srcport=None,
+            dstport=None,
+            ethtype=None, 
+            protocol=None,
+            vlan_id=None, 
+            vlan_pcp=None)
+        
+        parse_flow_str(flow_dict, flow_str)
+
+        # Construct JSON message
+        json_message = dict(name=event_name,
+                            value=event_value,
+                            flow=flow_dict)
+    else:
+        print 'No flow_str! Abort.'
+        sys.exit(1)
+
+    return json_message
+
+def send_message_list(json_message_list,queue):
+
+    for jsonmsg in json_message_list:
+        send_message(jsonmsg[0],queue,jsonmsg[1])
+
+def send_message(json_message,queue,portnum):
+    # Create socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Connect to server
+    s.connect(('127.0.0.1', int(portnum)))
+    bufsize = len(json_message)
+
+    # Send data
+    totalsent = 0
+    s.sendall(json.dumps(json_message))
+ 
+    # Receive return value
+    recvdata = s.recv(1024)
+
+    s.close()
+    if queue != None:
+        queue.put(recvdata)
+
 # main ######
 if __name__ == '__main__':
     main()
