@@ -22,9 +22,9 @@ from collections import namedtuple
 from datetime import datetime
 import tarfile
 import matplotlib as mpl
-#mpl.use('PS')
+mpl.use('PS')
 #mpl.use('pdf')
-mpl.use('AGG')
+#mpl.use('AGG')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from numpy.random import normal
@@ -38,7 +38,8 @@ from socket import *
 mpl.rc('text', usetex=True)
 #mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
 mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':9})
-mpl.rc('figure', figsize=(3.33, 2.06))
+#mpl.rc('figure', figsize=(3.33, 2.06))
+mpl.rc('figure', figsize=(3.33, 1.80))
 mpl.rc('axes', linewidth=0.5)
 mpl.rc('patch', linewidth=0.5)
 mpl.rc('lines', linewidth=0.5)
@@ -240,6 +241,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
 
     fig = plt.figure(dpi=700)
     ax = fig.add_subplot(111)
+
     colors = ['r--^','k-*','g-^','c-h','r-.']
     pl = []
   #  ax.set_yscale('log')
@@ -279,7 +281,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
     plt.ylim(0,30)
 
     ff = plt.gcf()
-    ff.subplots_adjust(bottom=0.18)
+    ff.subplots_adjust(bottom=0.25)
     ff.subplots_adjust(left=0.13)
     ff.subplots_adjust(right=0.95)
     plt.title(title)
