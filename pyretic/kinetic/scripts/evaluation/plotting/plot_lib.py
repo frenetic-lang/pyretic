@@ -293,7 +293,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
 #    if len(pl) > 1:
 #        l = plt.legend([pl[0][0],pl[1][0],pl[2][0],pl[3][0]], ['100 FSMs','1000 FSMs','10000 FSMs','50000 FSMs'], bbox_to_anchor=(0.5, 1.1), loc='upper center',ncol=2, fancybox=True, shadow=False, prop={'size':7.0})    
     
-    l = plt.legend([pl[0][0],pl[1][0] ], ['Single','Composed'], bbox_to_anchor=(0.49, 1.1), loc='upper center',ncol=3, fancybox=True, shadow=False, prop={'size':7.8})    
+    l = plt.legend([pl[0][0],pl[1][0] ], ['Single','Multi'], bbox_to_anchor=(0.49, 1.1), loc='upper center',ncol=3, fancybox=True, shadow=False, prop={'size':7.8})    
     plt.savefig(output_dir + str(filename), dpi=700)
 
 
@@ -537,7 +537,7 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 #    plt.title(title)
 
     plt.xlabel('Event arrival rate (events/second)')
-    plt.ylabel('Event reaction time (ms)', rotation=90)
+    plt.ylabel('Time (ms)', rotation=90)
 
     import matplotlib.patches as mpatches
     event_patch = mpatches.Patch(color='grey', label='The eventh data')
