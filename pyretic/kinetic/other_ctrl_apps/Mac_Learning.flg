@@ -1,0 +1,16 @@
+TABLE learned(switchid, portid, macaddr);
+
+ON packet(pkt):
+  INSERT (pkt.locSw, pkt.locPt, pkt.dlSrc) INTO learned;
+
+  DELETE (pkt.locSw, pt, pkt.dlSrc) FROM learned WHERE
+    not pt = pkt.locPt;
+
+  DO forward(new) WHERE
+    learned(pkt.locSw, new.locPt, pkt.dlDst)
+    OR
+    (NOT learned(pkt.locSw, ANY, pkt.dlDst) AND
+     pkt.locPt != new.locPt);
+
+ON switch_down(swd):
+  DELETE (swd.sw, ANY, ANY) FROM learned;

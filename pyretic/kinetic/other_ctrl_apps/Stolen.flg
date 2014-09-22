@@ -1,0 +1,43 @@
+/*
+    MUST BE STARTED FIRST:
+      thrift/timer.native
+      thrift/police_tipline.native
+
+    To send events, use
+      thrift/notify.native
+    e.g.,
+      ./notify.native stolen_laptop_report mac=1
+      (addresses must be passed as decimal numbers for now)
+*/
+
+EVENT stolen_laptop_report {mac: macaddr};
+EVENT stolen_laptop_cancel {mac: macaddr};
+EVENT stolen_laptop_found  {macaddr: macaddr, swid: switchid, time: int};
+
+TABLE stolen(macaddr);
+
+// Outgoing defn just defines a named pipe for events:
+OUTGOING notify_police(stolen_laptop_found) THEN
+  SEND TO 127.0.0.1 5050;
+
+// Basic test for REMOTE TABLE: current time
+REMOTE TABLE get_time(int)
+  FROM time AT 127.0.0.1 9091
+  TIMEOUT 1 seconds;
+
+ON stolen_laptop_cancel(rec):
+  DELETE (rec.mac) FROM stolen;
+
+ON stolen_laptop_report(stolen):
+  INSERT (stolen.mac) INTO stolen;
+
+ON packet(pkt):
+  // For demonstration only: flood.
+  DO forward(new) WHERE
+    new.locPt != pkt.locPt;
+
+  DO notify_police(sto) WHERE
+    sto.macaddr = pkt.dlSrc AND sto.time=time AND sto.swid = pkt.locSw AND
+    stolen(pkt.dlSrc) AND
+    get_time(time);
+
