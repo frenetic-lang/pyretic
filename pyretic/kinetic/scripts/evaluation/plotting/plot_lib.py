@@ -27,6 +27,7 @@ mpl.use('PS')
 #mpl.use('AGG')
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
+from matplotlib import font_manager
 from numpy.random import normal
 import numpy as np
 from optparse import OptionParser
@@ -35,9 +36,9 @@ import struct
 from socket import *
 
 
-mpl.rc('text', usetex=True)
+mpl.rc('text', usetex=False)
 #mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
-mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':9})
+mpl.rc('font',**{'size':9})
 #mpl.rc('figure', figsize=(3.33, 2.06))
 mpl.rc('figure', figsize=(3.33, 1.80))
 mpl.rc('axes', linewidth=0.5)
@@ -277,6 +278,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
   #  majorind = np.arange(len(ya),step=99)
   #  plt.xticks(majorind,xlabels)
  
+
     plt.xlim(0,120)
     plt.ylim(0,30)
 
@@ -426,6 +428,9 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
 
     ax.set_yscale('log',basey=10)
 
+#    mpl.rc('font', **{'family':'serif', 'sans-serif': ['Times'], 'size': 9})
+#    mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':9})
+#
     for x in xa:
         if x%200!=0 or x==100:
             continue
@@ -500,6 +505,18 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
             pass
 #
 
+#    ticks_font = font_manager.FontProperties(family='Helvetica', style='normal',\
+#                     size=9, weight='normal', stretch='normal')
+#    fontProperties = {'family':'sans-serif','sans-serif':['Helvetica'],'size':9}
+#    fontProperties = {'family':'serif', 'sans-serif': ['Times'], 'size': 9}
+#    a = plt.gca()
+#    a.set_xticklabels(a.get_xticks(), fontProperties)
+#    a.set_yticklabels(a.get_yticks(), fontProperties)
+
+
+#    for tick in ax.yaxis.get_major_ticks():
+#        tick.label.set_fontproperties(ticks_font)
+
     plt.ylim(1,1000)
     majorind = np.arange(len(xlabels),step=1)
     plt.xticks(majorind,xlabels, rotation=0)
@@ -518,6 +535,7 @@ def figplot_bar(xa,cmap, output_dir, filename, title):
     ff.subplots_adjust(right=0.98)
 ##  plt.axis([-1,len(ind)+0.5,0,max(ya1+ya2)+max(yerr1+yerr2)+1])
 #    plt.title(title)
+
     plt.xlabel('Event arrival rate (events/second)')
     plt.ylabel('Event reaction time (ms)', rotation=90)
 
