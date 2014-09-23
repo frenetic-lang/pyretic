@@ -279,7 +279,7 @@ def plot_multiline_dist_verify(x_ax, y_map, output_dir, filename, title):
   #  plt.xticks(majorind,xlabels)
  
 
-    plt.xlim(0,120)
+    plt.xlim(0,104)
     plt.ylim(0,30)
 
     ff = plt.gcf()
