@@ -95,8 +95,6 @@ class sf(DynamicPolicy):
 
         fsm_pol = FSMPolicy(lpec,self.fsm_def)
         q = FwdBucket()
-#        q = resetting_q(query.packets,limit=1,group_by=['srcmac','switch'])
-#        q = query.packets(limit=0,group_by=['srcmac','switch'])
         q.register_callback(q_callback)
         json_event = JSONEvent()
         json_event.register_callback(fsm_pol.event_handler)
