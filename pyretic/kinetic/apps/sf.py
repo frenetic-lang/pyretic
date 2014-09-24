@@ -29,8 +29,7 @@ class sf(DynamicPolicy):
             if internal_h is None or external_h is None:
                 return None
 
-            return (match(srcip=internal_h,dstip=external_h) |
-                    match(srcip=external_h,dstip=internal_h) )
+            return (match(srcip=internal_h,dstip=external_h) | match(srcip=external_h,dstip=internal_h) )
 
         ## SET UP TRANSITION FUNCTIONS
 
@@ -66,8 +65,7 @@ class sf(DynamicPolicy):
         def q_callback(pkt):
             src = pkt['srcip']
             dst = pkt['dstip']
-            flow = frozendict(srcip=src,dstip=dst)
-            return fsm_pol.event_handler(Event('outgoing',True,flow))
+            return fsm_pol.event_handler(Event('outgoing',True,frozendict(srcip=src,dstip=dst)))
 
         ### SET UP POLICY AND EVENT STREAMS
 
