@@ -50,7 +50,7 @@ class mac_learner(DynamicPolicy):
         def port(self):
             self.case(is_true(V('topo_change')),C(0))
             self.case(occurred(self.event) & (V('port')==C(0)),self.event)
-            self.default(C(0))
+#            self.default(C(0))
 
         @transition
         def policy(self):
@@ -74,11 +74,8 @@ class mac_learner(DynamicPolicy):
         ### DEFINE QUERY CALLBACKS
 
         def q_callback(pkt):
-            host = pkt['srcmac']
-            switch = pkt['switch']
-            port = pkt['inport']
-            flow = frozendict(dstmac=host,switch=switch)
-            return fsm_pol.event_handler(Event('port',port,flow))
+            flow = frozendict(dstmac=pkt['srcmac'],switch=pkt['switch'])
+            return fsm_pol.event_handler(Event('port',pkt['inport'],flow))
 
         ### SET UP POLICY AND EVENT STREAMS
 

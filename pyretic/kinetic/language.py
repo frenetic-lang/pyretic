@@ -45,8 +45,9 @@ def policy_to_hash(p_named_set,policy_set,p):
 #    elif isinstance(p, Policy) and p.compile() == identity.compile():
 #        p_named_set.add('identity')
 #        return 'identity'
-    elif isinstance(p,union):
-        return 'union'
+#    elif isinstance(p,union):
+#        print 'yo'
+#        return 'union'
     s = str(p) 
     if s=='False':
         return 'FALSE'

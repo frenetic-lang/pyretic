@@ -7,12 +7,18 @@ import inspect
 import textwrap
 import datetime as dt
 import pickle
+import threading
 
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.kinetic.language import *
 
+from pyretic.kinetic.resettableTimer import *
+import ipaddr
+
 measures_list = []
+
+TIMEOUT = 5.0
 
 class Event(object):
     def __init__(self,name,value,flow):
@@ -32,6 +38,9 @@ class LpecFSM(DynamicPolicy):
         self.exogenous = x
         self.dependencies = d
         self._topo_init = False
+        self.timer_thread = TimerReset(TIMEOUT, self.resetTimer)
+        self.timer_thread.start()
+
         super(LpecFSM,self).__init__(self.state['policy'])
 
     def handle_change(self,var_name,is_event=False):
@@ -96,6 +105,14 @@ class LpecFSM(DynamicPolicy):
         if 'topo_change' in self.exogenous:
             self.handle_event('topo_change',True)
 
+    def resetTimer(self):
+
+        # timeout IS A RESERVED NAME!!!
+        if 'timeout' in self.exogenous:
+            print 'Timeout!!!!'
+            self.handle_event('timeout',True)
+            self.timer_thread = threading.Timer(TIMEOUT,self.resetTimer)
+
 
 class FSMPolicy(DynamicPolicy):
     def __init__(self,lpec_fn,fsm_description):
@@ -121,6 +138,7 @@ class FSMPolicy(DynamicPolicy):
         super(FSMPolicy,self).__init__(self.initial_policy)
 
     def event_handler(self,event):
+        print 'Event',event
         global measures_list 
         print len(measures_list)
 
