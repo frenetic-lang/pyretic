@@ -427,7 +427,7 @@ class path(path_policy):
 
 
 class path_epsilon(path):
-    """ Empty path object. """
+    """ Path of length 0. """
     def __init__(self):
         self.re_tree = re_epsilon()
         super(path_epsilon, self).__init__()
@@ -442,6 +442,7 @@ class path_epsilon(path):
         return "path_epsilon"
 
 class path_empty(path):
+    """ Empty path object. """
     def __init__(self):
         self.re_tree = re_empty()
         super(path_empty, self).__init__()
@@ -689,6 +690,39 @@ class path_inters(path_combinator):
             tree = tree & p.re_tree
         return tree
 
+class dynamic_path(path):
+    """ Dynamic path object. """
+    def __init__(self, path):
+        self._path = path
+        self.notify = None
+        super(path, self).__init__()
+
+    @property
+    def re_tree(self):
+        return self.path.re_tree
+
+    def attach(self, notify):
+        self.notify = notify
+
+    def detach(self):
+        self.notify = None
+
+    def changed(self):
+        if self.notify:
+            self.notify(self)
+
+    @property
+    def path(self):
+        return self._path
+
+    @path.setter
+    def path(self, path):
+        self._path = path
+        self.changed()
+
+    def __repr__(self):
+        return "[DynamicPath]\n%s" % repr(self.path)
+
 
 #############################################################################
 ###                      Path query compilation                           ###
@@ -730,7 +764,7 @@ class pathcomp(object):
         return (re_acc + [p.path.re_tree], pol_acc + [p.policy])
 
     @classmethod
-    def compile(cls, path_pol, fwding):
+    def compile(cls, path_list, rt_tagging, rt_capture):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
@@ -765,7 +799,29 @@ class pathcomp(object):
                     capture += ((match_tag(src) & pred) >> capture_pol)
 
         tagging += cg.get_unaffected_pred()
-        return (tagging >> fwding) + capture
+        rt_tagging.policy = tagging
+        rt_capture.policy = capture
+        # return (tagging >> fwding) + capture
+
+    def path_mod_add(paths, p):
+        paths.append(p)
+        return paths
+
+    def path_mod_repl(paths, p, new_p):
+        new_paths = []
+        for q in paths:
+            if q == p:
+                new_paths.append(new_p)
+            else:
+                new_paths.append(q)
+        return new_paths
+
+    def path_mod_del(paths, p):
+        new_paths = []
+        for q in paths:
+            if not q == p:
+                new_paths.append(q)
+        return new_paths
 
     class policy_frags:
         def __init__(self):

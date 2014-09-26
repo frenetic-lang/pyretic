@@ -66,11 +66,18 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+        self.paths  = []
+        self.path_tagging = DynamicPolicy(identity)
+        self.path_capture = DynamicPolicy(drop)
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            path_policies = path_main(**kwargs)
-            self.policy = pathcomp.compile(path_policies, self.policy)
+            self.paths = path_main(**kwargs)
+            pathcomp.compile(self.paths, 
+                             self.path_tagging,
+                             self.path_capture)
+            self.policy = ((self.path_tagging >> self.policy) +
+                           self.path_capture)
             # Virtual field composition
             self.policy = (virtual_field_tagging() >>
                            self.policy >>
