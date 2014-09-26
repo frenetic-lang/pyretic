@@ -471,6 +471,7 @@ class path_epsilon(path):
     def __repr__(self):
         return "path_epsilon"
 
+
 class path_empty(path):
     """ Empty path object. """
     def __init__(self):
@@ -485,6 +486,7 @@ class path_empty(path):
 
     def __repr__(self):
         return "path_empty"
+
 
 class abstract_atom(path, Filter):
     """A single atomic match in a path expression. This is an abstract class
@@ -558,6 +560,7 @@ class drop_atom(abstract_atom):
     def __init__(self, m):
         super(drop_atom, self).__init__(m)
 
+
 class end_path(abstract_atom):
     def __init__(self, m):
         super(end_path, self).__init__(m)
@@ -622,6 +625,7 @@ class path_combinator(path):
     def __repr__(self):
         return self.__repr_pretty__()
 
+
 class path_alternate(path_combinator):
     """ Alternation of paths. """
     def __init__(self, paths_list):
@@ -638,6 +642,7 @@ class path_alternate(path_combinator):
         for p in self.paths:
             tree = tree | p.re_tree
         return tree
+
 
 class path_star(path_combinator):
     """ Kleene star on a path. """
