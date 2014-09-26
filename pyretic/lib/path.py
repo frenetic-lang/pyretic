@@ -345,13 +345,20 @@ class path_policy(Query):
     def expr(self):
         return self.path.expr
 
+    def __repr_pretty__(self, pre_spaces=''):
+        extra_ind = '    '
+        out  = pre_spaces +'[path policy]\n'
+        out += pre_spaces + extra_ind + repr(self.path) + '\n'
+        out += pre_spaces + extra_ind + '>>>\n'
+        out += '%s%s%s\n' % (pre_spaces, extra_ind, repr(self.piped_policy))
+        return out
+
     def __repr__(self):
-        return '[path policy]\n  %s\n>>>\n  %s' % (repr(self.path),
-                                                   repr(self.piped_policy))
+        return self.__repr_pretty__()
 
     def __add__(self, ppol):
         assert isinstance(ppol, path_policy)
-        return union_path_policy(self, ppol)
+        return path_policy_union([self, ppol])
 
     def __eq__(self, other):
         if isinstance(other, path_policy):
@@ -364,7 +371,17 @@ class path_policy_union(path_policy):
     def __init__(self, ppols):
         assert len(ppols) > 1
         self.path_policies = ppols
-        super(union_path_policy, self).__init__(path_empty, drop)
+        super(path_policy_union, self).__init__(path_empty, drop)
+
+    def __repr_pretty__(self, pre_spaces=''):
+        extra_ind = '    '
+        out  = pre_spaces + "[path policy union]\n"
+        for ppol in self.path_policies:
+            out += ppol.__repr_pretty__(pre_spaces + extra_ind)
+        return out
+
+    def __repr__(self):
+        return self.__repr_pretty__()
 
 class path_policy_utils(object):
     """ Utilities to manipulate path policy ASTs. """
@@ -733,9 +750,15 @@ class dynamic_path_policy(path_policy):
         self.notify = None
         super(path_policy, self).__init__(path_pol.path, path_pol.policy)
 
+    def __repr_pretty__(self, pre_spaces=''):
+        extra_ind = '    '
+        out  = pre_spaces + '[dynamic path policy]\n'
+        out += pre_spaces + extra_ind
+        out += self._path_policy.__repr_pretty__(pre_spaces + extra_ind)
+        return out
+
     def __repr__(self):
-        return '[dynamic_path_policy]\n  %s\n>>>\n  %s' % (repr(self.path),
-                                                           repr(self.piped_policy))
+        return self.__repr_pretty__()
 
     def attach(self, notify):
         self.notify = notify
