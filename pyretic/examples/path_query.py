@@ -109,14 +109,14 @@ def path_test_1():
     a2 = atom(match(switch=3,dstip=ip3))
     p = a1 ** a2
     p.register_callback(query_callback(1))
-    return [p]
+    return p
 
 def path_test_2():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
     p = a1 ** a2
     p.register_callback(query_callback(2))
-    return [p]
+    return p
 
 def path_test_3():
     return path_test_2() + path_test_1()
@@ -131,34 +131,34 @@ def path_test_4():
     query_thread = threading.Thread(target=query_func, args=(cb,2.5))
     query_thread.daemon = True
     query_thread.start()
-    return [p]
+    return p
 
 def path_test_5():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
     p = (a1 ^ a2)  | (a2 ^ a1)
     p.register_callback(query_callback(5))
-    return [p]
+    return p
 
 def path_test_6():
     p = +atom(identity)
     p.register_callback(query_callback(6))
-    return [p]
+    return p
 
 def path_test_7():
     p = atom(match(switch=1)) ^ +atom(identity)
     p.register_callback(query_callback(7))
-    return [p]
+    return p
 
 def path_test_8():
     p = atom(ingress_network())
     p.register_callback(query_callback(8))
-    return [p]
+    return p
 
 def path_test_9():
     p = atom(match(srcip=ip1)) ^ end_path(identity)
     p.register_callback(query_callback(9))
-    return [p]
+    return p
 
 def path_test_10():
     """ TODO(ngsrinivas): Defunct test as of now -- drop atoms are not stitched
@@ -166,36 +166,36 @@ def path_test_10():
     """
     p = atom(match(srcip=ip1)) ^ drop_atom(identity)
     p.register_callback(query_callback(10))
-    return [p]
+    return p
 
 def path_test_11():
     p = end_path(identity)
     p.register_callback(query_callback(11))
-    return [p]
+    return p
 
 def path_test_12():
     p = atom(match(switch=1))
     pb = PathBucket()
     p.set_bucket(pb)
     p.register_callback(path_callback(12))
-    return [p]
+    return p
 
 def path_test_13():
     p = (atom(match(switch=1)) ^ atom(match(switch=2)) ^ atom(match(switch=3)))
     p.register_callback(query_callback(13))
-    return [p]
+    return p
 
 def path_test_14():
     p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
          atom(match(switch=3)))
     p.register_callback(query_callback(14))
-    return [p]
+    return p
 
 def path_test_15():
     p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
          hook(match(switch=3), ['srcip','dstip']))
     p.register_callback(query_callback(15))
-    return [p]
+    return p
 
 def path_test_16():
     return path_test_13() + path_test_14() + path_test_15()

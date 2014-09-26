@@ -336,7 +336,7 @@ class path_policy(Query):
         self.piped_policy = q
 
     def get_policy(self):
-        return self.pol
+        return self.piped_policy
 
     def set_policy(self, pol):
         self.piped_policy = pol
@@ -418,7 +418,7 @@ class path(path_policy):
         self.set_policy(bucket)
 
     def register_callback(self, f):
-        self.policy.register_callback(f)
+        self.get_policy().register_callback(f)
 
     def __repr__(self):
         return '[path expr: ' + self.expr + ' id: ' + str(id(self)) + ']'

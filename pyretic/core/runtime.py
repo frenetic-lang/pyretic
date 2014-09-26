@@ -294,6 +294,7 @@ class Runtime(object):
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
+        from pyretic.lib.path import pathcomp
         (tagging, capture) = pathcomp.compile(self.path_policy)
         self.path_tagging.policy = tagging
         self.path_capture.policy = capture
