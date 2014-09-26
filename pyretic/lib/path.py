@@ -319,7 +319,54 @@ class re_tree_gen(object):
 ###               Path query language components                          ###
 #############################################################################
 
-class path(Query):
+class path_policy(Query):
+    """ Defines a "path policy" object, which is a combination of a path
+    function (trajectory -> {pkt}), and a policy function (pkt -> {pkt}), used
+    in sequential composition. The action of the path policy on the packet is
+    written as
+
+    p >> q
+
+    which is a function that takes a trajectory as input, and produces a set of
+    packets as output.
+    """
+    def __init__(self, p, q):
+        super(path_policy, self).__init__()
+        self.path = p
+        self.policy = q
+
+    def get_policy(self):
+        return self.pol
+
+    def set_policy(self, pol):
+        self.policy = pol
+
+    def __add__(self, ppol):
+        assert isinstance(ppol, path_policy)
+        return union_path_policy(self, ppol)
+
+class path_policy_union(path_policy):
+    def __init__(self, ppols):
+        assert len(ppols) > 1
+        self.path_policies = ppols
+        super(union_path_policy, self).__init__(path_empty, drop)
+
+class path_policy_utils(object):
+    """ Utilities to manipulate path policy ASTs. """
+    @classmethod
+    def ast_fold(cls, ast, fold_f, default):
+        """ Fold the AST with a function fold_f, which also takes a default
+        value. """
+        if isinstance(ast, path_policy_union):
+            sub_fold_f = lambda p1: ast_fold(cls, p1, fold_f, default)
+            folded_sub_pps = [sub_fold_f(p) for p in ast.path_policies]
+            return reduce(fold_f, folded_subpps, default)
+        elif isinstance(ast, path_policy):
+            return fold_f(default, ast)
+        else:
+            raise TypeError("Can only fold path_policy objects!")
+
+class path(path_policy):
     """A way to query packets or traffic volumes satisfying regular expressions
     denoting paths of located packets.
 
@@ -327,21 +374,21 @@ class path(Query):
     :type atom: atom
     """
     def __init__(self):
-        super(path, self).__init__()
-        self.bucket_instance = FwdBucket() # default bucket type
+        fb = FwdBucket()
+        super(path, self).__init__(self, fb)
 
     @property
     def expr(self):
         return self.re_tree.re_string_repr()
 
     def get_bucket(self):
-        return self.bucket_instance
+        return self.get_policy()
 
-    def set_bucket(self, bucket_instance):
-        self.bucket_instance = bucket_instance
+    def set_bucket(self, bucket):
+        self.set_policy(bucket)
 
     def register_callback(self, f):
-        self.bucket_instance.register_callback(f)
+        self.policy.register_callback(f)
 
     def __repr__(self):
         return '[path expr: ' + self.expr + ' id: ' + str(id(self)) + ']'
@@ -676,14 +723,23 @@ class pathcomp(object):
         return cls.__match_tag__(dfa, dead)
 
     @classmethod
-    def compile(cls, path_list, fwding):
+    def __get_re_pols__(cls, acc, p):
+        """ A reduce lambda which extracts an re and a policy to go with the re,
+        from the AST of paths."""
+        (re_acc, pol_acc) = acc
+        return (re_acc + [p.path.re_tree], pol_acc + [p.policy])
+
+    @classmethod
+    def compile(cls, path_pol, fwding):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
         du = dfa_utils
         cg = re_tree_gen
+        ast_fold = path_policy_utils.ast_fold
+        re_pols  = cls.__get_re_pols__
 
-        re_list = map(lambda x: x.re_tree, path_list)
+        (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
         virtual_field(name="path_tag",
                       values=range(0, du.get_num_states(dfa)),
@@ -705,8 +761,8 @@ class pathcomp(object):
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
-                    bucket = path_list[i].get_bucket()
-                    capture += ((match_tag(src) & pred) >> bucket)
+                    capture_pol = pol_list[i]
+                    capture += ((match_tag(src) & pred) >> capture_pol)
 
         tagging += cg.get_unaffected_pred()
         return (tagging >> fwding) + capture

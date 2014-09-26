@@ -267,7 +267,7 @@ def path_test_waypoint_violation():
     i = atom(identity)
     p = (a ^ +b ^ c) | (c ^ +b ^ a)
     p.register_callback(query_callback(16))
-    return [p]
+    return p
 
 # type: unit -> path list
 def path_main():
