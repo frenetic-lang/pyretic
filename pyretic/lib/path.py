@@ -386,7 +386,7 @@ class path_policy_union(path_policy):
 class path_policy_utils(object):
     """ Utilities to manipulate path policy ASTs. """
     @classmethod
-    def ast_fold(cls, ast, fold_f, default):
+    def ast_fold(cls, ast, fold_f, acc):
         """ Fold the AST with a function fold_f, which also takes a default
         value.
 
@@ -395,13 +395,13 @@ class path_policy_utils(object):
         default: 'a
         """
         if isinstance(ast, path_policy_union):
-            sub_fold_f = lambda p1: ast_fold(cls, p1, fold_f, default)
-            folded_sub_pps = [sub_fold_f(p) for p in ast.path_policies]
-            return reduce(fold_f, folded_sub_pps, default)
+            for pp in ast.path_policies:
+                acc = cls.ast_fold(pp, fold_f, acc)
+            return acc
         elif isinstance(ast, dynamic_path_policy):
-            return cls.ast_fold(ast.path_pol, fold_f, default)
+            return cls.ast_fold(ast.path_policy, fold_f, acc)
         elif isinstance(ast, path_policy):
-            return fold_f(default, ast)
+            return fold_f(acc, ast)
         else:
             raise TypeError("Can only fold path_policy objects!")
 
