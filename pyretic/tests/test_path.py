@@ -361,27 +361,25 @@ du = dfa_utils
 
 def test_path_compile_1():
     cg.clear()
-    fwding = fwd(1)
     a1 = atom(match(srcip=ip1))
-    policy = pathcomp.compile([a1], fwding)
+    (tagging, capture) = pathcomp.compile(a1)
     ref_tagging = ((match(path_tag=2)) +
                    (match(srcip=ip1, path_tag=None) >> modify(path_tag=1)) +
                    (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)) +
                    (~match(srcip=ip1)))
     ref_capture = (drop +
                    (match(srcip=ip1, path_tag=None) >> FwdBucket()))
-    ref_policy = (ref_tagging >> fwding) + ref_capture
-    assert policy
-    assert ref_policy
-    [x.compile() for x in [policy, ref_policy]]
-    assert policy._classifier == ref_policy._classifier
+    assert tagging
+    assert capture
+    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
+    assert tagging._classifier == ref_tagging._classifier
+    assert capture._classifier == ref_capture._classifier
 
 def test_path_compile_2():
     cg.clear()
-    fwding = fwd(2)
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    policy = pathcomp.compile([a1 ^ a2], fwding)
+    (tagging, capture) = pathcomp.compile(a1 ^ a2)
 
     pred_a = match(srcip=ip1) & match(dstip=ip2)
     pred_b = match(srcip=ip1) & ~match(dstip=ip2)
@@ -400,21 +398,20 @@ def test_path_compile_2():
     ref_capture = (drop +
                    ((match(path_tag=1) & pred_a) >> FwdBucket()) +
                    ((match(path_tag=1) & pred_c) >> FwdBucket()))
-    ref_policy = (ref_tagging >> fwding) + ref_capture
-
-    [x.compile() for x in [policy, ref_policy]]
-
-    assert policy._classifier == ref_policy._classifier
+    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
+    assert tagging._classifier == ref_tagging._classifier
+    assert capture._classifier == ref_capture._classifier
 
 def test_empty_paths():
     cg.clear()
     fwding = fwd(2)
-    policy = pathcomp.compile([], fwding)
+    (tagging, capture) = pathcomp.compile(path_empty())
     ref_tagging = (match(path_tag=None) + identity)
     ref_capture = drop
-    ref_policy = (ref_tagging >> fwding) + ref_capture
-    [x.compile() for x in [policy, ref_policy]]
-    assert policy._classifier == ref_policy._classifier
+    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
+    assert tagging._classifier == ref_tagging._classifier
+    assert capture._classifier == ref_capture._classifier
+
 
 ### Unit test class-based token generation using the various atom types ###
 
