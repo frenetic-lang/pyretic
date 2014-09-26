@@ -66,16 +66,15 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
-        self.paths  = []
+        self.path_policy = None
         self.path_tagging = DynamicPolicy(identity)
         self.path_capture = DynamicPolicy(drop)
+        self.dynamic_sub_path_pols = set([])
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            self.paths = path_main(**kwargs)
-            pathcomp.compile(self.paths, 
-                             self.path_tagging,
-                             self.path_capture)
+            self.path_policy = path_main(**kwargs)
+            self.handle_path_change()
             self.policy = ((self.path_tagging >> self.policy) +
                            self.path_capture)
             # Virtual field composition
@@ -267,6 +266,37 @@ class Runtime(object):
         for p in (self.dynamic_sub_pols - old_dynamic_sub_pols):
             p.set_network(self.network)
             p.attach(self.handle_policy_change)
+
+
+    def handle_path_change(self):
+        """ When a dynamic path policy updates its path_policy, initiate
+        recompilation of the path (and hence pyretic) policy. """
+        self.update_dynamic_sub_path_pols(self.path_policy)
+        self.recompile_paths()
+
+
+    def update_dynamic_sub_path_pols(self, path_pol):
+        """ Update runtime internal structures which keep track of dynamic
+        members of the path policy AST.
+        """
+        import copy
+        from pyretic.lib.path import path_policy_utils
+        old_dynamic_sub_path_pols = copy.copy(self.dynamic_sub_path_pols)
+        ast_fold = path_policy_utils.ast_fold
+        add_pols = path_policy_utils.add_dynamic_path_pols
+        self.dynamic_sub_path_pols = ast_fold(path_pol, add_pols, set())
+        for pp in (old_dynamic_sub_path_pols - self.dynamic_sub_path_pols):
+            pp.detach()
+        for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
+            pp.attach(self.handle_path_change)
+
+
+    def recompile_paths(self):
+        """ Recompile DFA based on new path policy, which in turns updates the
+        runtime's policy member. """
+        (tagging, capture) = pathcomp.compile(self.path_policy)
+        self.path_tagging.policy = tagging
+        self.path_capture.policy = capture
 
 
 #######################

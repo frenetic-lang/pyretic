@@ -333,17 +333,32 @@ class path_policy(Query):
     def __init__(self, p, q):
         super(path_policy, self).__init__()
         self.path = p
-        self.policy = q
+        self.piped_policy = q
 
     def get_policy(self):
         return self.pol
 
     def set_policy(self, pol):
-        self.policy = pol
+        self.piped_policy = pol
+
+    @property
+    def expr(self):
+        return self.path.expr
+
+    def __repr__(self):
+        return '[path policy]\n  %s\n>>>\n  %s' % (repr(self.path),
+                                                   repr(self.piped_policy))
 
     def __add__(self, ppol):
         assert isinstance(ppol, path_policy)
         return union_path_policy(self, ppol)
+
+    def __eq__(self, other):
+        if isinstance(other, path_policy):
+            return ((self.path == other.path) and
+                    (self.piped_policy == other.piped_policy))
+        else:
+            return False
 
 class path_policy_union(path_policy):
     def __init__(self, ppols):
@@ -356,15 +371,31 @@ class path_policy_utils(object):
     @classmethod
     def ast_fold(cls, ast, fold_f, default):
         """ Fold the AST with a function fold_f, which also takes a default
-        value. """
+        value.
+
+        ast: path
+        fold_f: 'a -> path -> 'a
+        default: 'a
+        """
         if isinstance(ast, path_policy_union):
             sub_fold_f = lambda p1: ast_fold(cls, p1, fold_f, default)
             folded_sub_pps = [sub_fold_f(p) for p in ast.path_policies]
-            return reduce(fold_f, folded_subpps, default)
+            return reduce(fold_f, folded_sub_pps, default)
+        elif isinstance(ast, dynamic_path_policy):
+            return cls.ast_fold(ast.path_pol, fold_f, default)
         elif isinstance(ast, path_policy):
             return fold_f(default, ast)
         else:
             raise TypeError("Can only fold path_policy objects!")
+
+    @classmethod
+    def add_dynamic_path_pols(cls, acc, pp):
+        if isinstance(pp, dynamic_path_policy):
+            new_acc = acc | set([pp])
+            return new_acc
+        else:
+            return acc
+
 
 class path(path_policy):
     """A way to query packets or traffic volumes satisfying regular expressions
@@ -374,8 +405,7 @@ class path(path_policy):
     :type atom: atom
     """
     def __init__(self):
-        fb = FwdBucket()
-        super(path, self).__init__(self, fb)
+        super(path, self).__init__(self, FwdBucket())
 
     @property
     def expr(self):
@@ -690,16 +720,17 @@ class path_inters(path_combinator):
             tree = tree & p.re_tree
         return tree
 
-class dynamic_path(path):
-    """ Dynamic path object. """
-    def __init__(self, path):
-        self._path = path
-        self.notify = None
-        super(path, self).__init__()
 
-    @property
-    def re_tree(self):
-        return self.path.re_tree
+class dynamic_path_policy(path_policy):
+    """ Dynamic path object. """
+    def __init__(self, path_pol):
+        self._path_policy = path_pol
+        self.notify = None
+        super(path_policy, self).__init__(path_pol.path, path_pol.policy)
+
+    def __repr__(self):
+        return '[dynamic_path_policy]\n  %s\n>>>\n  %s' % (repr(self.path),
+                                                           repr(self.piped_policy))
 
     def attach(self, notify):
         self.notify = notify
@@ -712,16 +743,13 @@ class dynamic_path(path):
             self.notify(self)
 
     @property
-    def path(self):
-        return self._path
+    def path_policy(self):
+        return self._path_policy
 
-    @path.setter
-    def path(self, path):
-        self._path = path
+    @path_policy.setter
+    def path_policy(self, path_pol):
+        self._path_policy = path_pol
         self.changed()
-
-    def __repr__(self):
-        return "[DynamicPath]\n%s" % repr(self.path)
 
 
 #############################################################################
@@ -761,10 +789,10 @@ class pathcomp(object):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths."""
         (re_acc, pol_acc) = acc
-        return (re_acc + [p.path.re_tree], pol_acc + [p.policy])
+        return (re_acc + [p.path.re_tree], pol_acc + [p.piped_policy])
 
     @classmethod
-    def compile(cls, path_list, rt_tagging, rt_capture):
+    def compile(cls, path_pol):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
@@ -799,9 +827,7 @@ class pathcomp(object):
                     capture += ((match_tag(src) & pred) >> capture_pol)
 
         tagging += cg.get_unaffected_pred()
-        rt_tagging.policy = tagging
-        rt_capture.policy = capture
-        # return (tagging >> fwding) + capture
+        return (tagging, capture)
 
     def path_mod_add(paths, p):
         paths.append(p)
