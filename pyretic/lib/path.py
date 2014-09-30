@@ -383,6 +383,44 @@ class path_policy_union(path_policy):
     def __repr__(self):
         return self.__repr_pretty__()
 
+
+class dynamic_path_policy(path_policy):
+    """ Dynamic path object. """
+    def __init__(self, path_pol):
+        self._path_policy = path_pol
+        self.notify = None
+        super(path_policy, self).__init__(path_pol.path, path_pol.policy)
+
+    def __repr_pretty__(self, pre_spaces=''):
+        extra_ind = '    '
+        out  = pre_spaces + '[dynamic path policy]\n'
+        out += pre_spaces + extra_ind
+        out += self._path_policy.__repr_pretty__(pre_spaces + extra_ind)
+        return out
+
+    def __repr__(self):
+        return self.__repr_pretty__()
+
+    def attach(self, notify):
+        self.notify = notify
+
+    def detach(self):
+        self.notify = None
+
+    def changed(self):
+        if self.notify:
+            self.notify(self)
+
+    @property
+    def path_policy(self):
+        return self._path_policy
+
+    @path_policy.setter
+    def path_policy(self, path_pol):
+        self._path_policy = path_pol
+        self.changed()
+
+
 class path_policy_utils(object):
     """ Utilities to manipulate path policy ASTs. """
     @classmethod
@@ -741,43 +779,6 @@ class path_inters(path_combinator):
         for p in self.paths:
             tree = tree & p.re_tree
         return tree
-
-
-class dynamic_path_policy(path_policy):
-    """ Dynamic path object. """
-    def __init__(self, path_pol):
-        self._path_policy = path_pol
-        self.notify = None
-        super(path_policy, self).__init__(path_pol.path, path_pol.policy)
-
-    def __repr_pretty__(self, pre_spaces=''):
-        extra_ind = '    '
-        out  = pre_spaces + '[dynamic path policy]\n'
-        out += pre_spaces + extra_ind
-        out += self._path_policy.__repr_pretty__(pre_spaces + extra_ind)
-        return out
-
-    def __repr__(self):
-        return self.__repr_pretty__()
-
-    def attach(self, notify):
-        self.notify = notify
-
-    def detach(self):
-        self.notify = None
-
-    def changed(self):
-        if self.notify:
-            self.notify(self)
-
-    @property
-    def path_policy(self):
-        return self._path_policy
-
-    @path_policy.setter
-    def path_policy(self, path_pol):
-        self._path_policy = path_pol
-        self.changed()
 
 
 #############################################################################
