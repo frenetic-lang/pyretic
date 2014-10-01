@@ -404,7 +404,6 @@ def test_path_compile_2():
 
 def test_empty_paths():
     cg.clear()
-    fwding = fwd(2)
     (tagging, capture) = pathcomp.compile(path_empty())
     ref_tagging = (match(path_tag=None) + identity)
     ref_capture = drop
@@ -412,6 +411,46 @@ def test_empty_paths():
     assert tagging._classifier == ref_tagging._classifier
     assert capture._classifier == ref_capture._classifier
 
+### Tests for path policy ast folding routine. ###
+
+ast_fold = path_policy_utils.ast_fold
+add_dyn  = path_policy_utils.add_dynamic_path_pols
+re_pols  = pathcomp.__get_re_pols__
+
+def test_ast_fold():
+    cg.clear()
+    a1 = atom(match(srcip=ip1))
+    a2 = atom(match(srcip=ip2))
+
+    """ Base case folding. """
+    val = ast_fold(a1, lambda a, x: a | ~(x.path), path_empty())
+    assert val == path_empty() | ~a1
+
+    """ Path policy unions are folded correctly. """
+    val = ast_fold(a1 + a2, lambda x, y: y, ())
+    assert val == a2
+    val = ast_fold(a1 + a2, lambda x, y: x + [y], [])
+    assert val == [a1+a2, a1, a2]
+    val = ast_fold(a1 + a2, lambda x, y: x, [])
+    assert val == []
+
+    """ Get innermost policy of dynamic path policies when folding. """
+    p1 = dynamic_path_policy(a1)
+    val = ast_fold(p1, lambda x, y: y, [])
+    assert val == a1
+
+    p2 = dynamic_path_policy(a2)
+    p3 = dynamic_path_policy(p2)
+    val = ast_fold(p3, lambda x, y: y, [])
+    assert val == a2
+
+    """ Aggregate dynamic policies as ast traversal goes. """
+    val = ast_fold(p1 + p3, add_dyn, set())
+    assert val == set([p1, p2, p3])
+
+    """ Test re-policy extraction lambda. """
+    val = ast_fold(p1 + p3, re_pols, ([], []))
+    assert val == ([a1.re_tree, a2.re_tree], [a1.get_bucket(), a2.get_bucket()])
 
 ### Unit test class-based token generation using the various atom types ###
 
@@ -614,6 +653,8 @@ if __name__ == "__main__":
     test_path_compile_1()
     test_path_compile_2()
     test_empty_paths()
+
+    test_ast_fold()
 
     print "If this message is printed without errors before it, we're good."
     print "Also ensure all unit tests are listed above this line in the source."

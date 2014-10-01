@@ -389,7 +389,7 @@ class dynamic_path_policy(path_policy):
     def __init__(self, path_pol):
         self._path_policy = path_pol
         self.notify = None
-        super(path_policy, self).__init__(path_pol.path, path_pol.policy)
+        super(dynamic_path_policy, self).__init__(path_pol.path, path_pol.piped_policy)
 
     def __repr_pretty__(self, pre_spaces=''):
         extra_ind = '    '
@@ -433,10 +433,12 @@ class path_policy_utils(object):
         default: 'a
         """
         if isinstance(ast, path_policy_union):
+            acc = fold_f(acc, ast)
             for pp in ast.path_policies:
                 acc = cls.ast_fold(pp, fold_f, acc)
             return acc
         elif isinstance(ast, dynamic_path_policy):
+            acc = fold_f(acc, ast)
             return cls.ast_fold(ast.path_policy, fold_f, acc)
         elif isinstance(ast, path_policy):
             return fold_f(acc, ast)
@@ -818,7 +820,18 @@ class pathcomp(object):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths."""
         (re_acc, pol_acc) = acc
-        return (re_acc + [p.path.re_tree], pol_acc + [p.piped_policy])
+        """ Skip re extraction for all but the leaves of the path policy ast. """
+        if isinstance(p, dynamic_path_policy):
+            return acc
+        elif isinstance(p, path_policy_union):
+            return acc
+        elif isinstance(p, path_policy):
+            """ Reached a leaf """
+            tree = p.path.re_tree
+            piped_pol = p.piped_policy
+            return (re_acc + [tree], pol_acc + [piped_pol])
+        else:
+            raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
     def compile(cls, path_pol):
