@@ -258,12 +258,32 @@ class Runtime(object):
         """
         Updates the set of active dynamic sub-policies in self.policy
         """
+        def list_diff_by_f(list1, list2, f):
+            list_diff = []
+            for i in list1:
+                found_i = False
+                for j in list2:
+                    if f(i) == f(j):
+                        found_i = True
+                        break
+                if not found_i:
+                    list_diff.append(i)
+            return list_diff
+
+        def old_but_not_new(old, new):
+            return list_diff_by_f(old, new, id)
+
+        def new_but_not_old(old, new):
+            return list_diff_by_f(new, old, id)
+
         import copy
         old_dynamic_sub_pols = copy.copy(self.dynamic_sub_pols)
-        self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, set(), self.policy)
-        for p in (old_dynamic_sub_pols - self.dynamic_sub_pols):
+        self.dynamic_sub_pols = ast_fold(add_dynamic_sub_pols, list(), self.policy)
+        old = old_dynamic_sub_pols
+        new = self.dynamic_sub_pols
+        for p in old_but_not_new(old, new):
             p.detach()
-        for p in (self.dynamic_sub_pols - old_dynamic_sub_pols):
+        for p in new_but_not_old(old, new):
             p.set_network(self.network)
             p.attach(self.handle_policy_change)
 

@@ -269,6 +269,35 @@ def path_test_waypoint_violation():
     p.register_callback(query_callback(16))
     return p
 
+def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
+    """ A function that periodically changes the path policy of a dynamic path
+    policy object.
+
+    path_pol: dynamic_path_policy object
+    interval: time (sec) between changes
+    f_old_new_path_pol: function path_pol -> path_pol
+    """
+    while True:
+        output =  str(datetime.now())
+        output += "  Changing path policy"
+        print output
+        new_path_pol = f_old_new_path_pol(path_pol)
+        path_pol.path_policy = new_path_pol
+        time.sleep(interval)
+
+def path_test_dynamic_1():
+    a1 = atom(match(switch=1,srcip=ip1))
+    a2 = atom(match(switch=2,dstip=ip2))
+    p1 = a1 ** a2
+    p1.register_callback(query_callback("dyn_1"))
+    p = dynamic_path_policy(p1)
+    p.register_callback(query_callback("dyn_1"))
+    dyn_thread = threading.Thread(target=change_dynamic_path,
+                                  args=(p, 5.0, lambda x: x.path_policy))
+    dyn_thread.daemon = True
+    dyn_thread.start()
+    return p
+
 # type: unit -> path list
 def path_main():
     return path_test_waypoint_violation()

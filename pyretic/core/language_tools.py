@@ -128,7 +128,7 @@ def ast_fold(fun, acc, policy):
     
 def add_dynamic_sub_pols(acc, policy):
     if isinstance(policy,DynamicPolicy):
-        return acc | {policy}
+        return acc + [policy]
     else:
         return acc
 

@@ -409,7 +409,7 @@ class dynamic_path_policy(path_policy):
 
     def changed(self):
         if self.notify:
-            self.notify(self)
+            self.notify()
 
     @property
     def path_policy(self):
