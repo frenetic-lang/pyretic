@@ -141,6 +141,13 @@ def assert_and_get_syms(ms):
         syms.append(cg.pred_to_symbol[m])
     return syms
 
+@pytest.mark.skipif(True)
+def generate_re_trees(plist):
+    """ Just generates the re_tree for each path in turn, triggering the
+    generation of regular expression ASTs for each path and predicate. """
+    for p in plist:
+        rt = p.re_tree
+
 def test_CG_equal_matches():
     cg.clear()
     m1 = match(srcip=ip1)
@@ -148,6 +155,7 @@ def test_CG_equal_matches():
     a1 = atom(m1)
     a2 = atom(m2)
 
+    generate_re_trees([a1, a2])
     assert len(cg.pred_to_symbol.keys()) == 1
     ms = [match(srcip=ip1)]
     syms = assert_and_get_syms(ms)
@@ -169,6 +177,7 @@ def test_CG_superset_matches():
     a1 = atom(m1)
     a2 = atom(m2)
 
+    generate_re_trees([a1, a2])
     assert len(cg.pred_to_symbol.keys()) == 2
     ms = [match(srcip=ip1) & match(switch=2),
           match(srcip=ip1) & ~(match(srcip=ip1) & match(switch=2))]
@@ -193,6 +202,7 @@ def test_CG_subset_matches():
     a1 = atom(m1)
     a2 = atom(m2)
 
+    generate_re_trees([a1, a2])
     assert len(cg.pred_to_symbol.keys()) == 2
 
     ms = [(match(srcip=ip1, switch=2)),
@@ -218,6 +228,7 @@ def test_CG_intersection_matches_1():
     a1 = atom(m1)
     a2 = atom(m2)
 
+    generate_re_trees([a1, a2])
     assert len(cg.pred_to_symbol.keys()) == 3
     ms = [(match(srcip=ip1) & ~match(dstip=ip2)),
           (match(dstip=ip2) & ~match(srcip=ip1)),
@@ -246,6 +257,7 @@ def test_CG_intersection_matches_2():
     a2 = atom(m2)
     a3 = atom(m3)
 
+    generate_re_trees([a1, a2, a3])
     assert len(cg.pred_to_symbol.keys()) == 2
     ms = [match(srcip=ip1),
           match(srcip=ip2)]
@@ -312,7 +324,9 @@ def test_path_concatenation():
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
     p = a1 ^ a2
+    generate_re_trees([p])
     assert isinstance(p, path)
+    assert p.re_tree == a1.re_tree ^ a2.re_tree
     assert p.expr == ('(' + a1.expr + ') ^ (' + a2.expr + ')')
 
 def test_path_alternation_1():
@@ -320,6 +334,7 @@ def test_path_alternation_1():
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
+    generate_re_trees([a1, a2])
     assert isinstance(p, path)
     assert p.expr == ('(' + a1.expr + ') | (' + a2.expr + ')')
 
@@ -330,6 +345,7 @@ def test_path_alternation_2():
     p1 = a1 ^ a2
     p2 = a2 ^ a1
     p = p1 | p2
+    generate_re_trees([a1, a2, p])
     assert isinstance(p, path)
     assert p.expr == ('(' + p1.expr + ') | (' + p2.expr + ')')
 
@@ -337,6 +353,7 @@ def test_path_kleene_closure():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     p1 = +a1
+    generate_re_trees([a1])
     assert isinstance(p1, path)
     assert p1.expr == '(' + a1.expr + ')*'
     p2 = +p1
@@ -351,6 +368,7 @@ def test_slightly_complicated_expr_1():
     a4 = atom(match(dstip=ip1))
     a5 = atom(match(switch=1)) | atom(match(srcip=ip3))
     p = ((a1 ^ a4) | (a2 ^ a3)) & a5
+    generate_re_trees([a1, a2, a3, a4, a5])
     assert isinstance(p, path)
     assert p.expr == ('(((' + a1.expr + ') ^ (' + a4.expr + ')) | ((' + a2.expr +
                       ') ^ (' + a3.expr + '))) & (' + a5.expr + ')')
@@ -363,10 +381,11 @@ def test_path_compile_1():
     cg.clear()
     a1 = atom(match(srcip=ip1))
     (tagging, capture) = pathcomp.compile(a1)
-    ref_tagging = ((match(path_tag=2)) +
+    ref_tagging = ((~match(srcip=ip1) >> ~match(path_tag=2) >>
+                     modify(path_tag=2)) +
+                   (match(path_tag=2)) +
                    (match(srcip=ip1, path_tag=None) >> modify(path_tag=1)) +
-                   (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)) +
-                   (~match(srcip=ip1)))
+                   (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)))
     ref_capture = (drop +
                    (match(srcip=ip1, path_tag=None) >> FwdBucket()))
     assert tagging
@@ -384,7 +403,9 @@ def test_path_compile_2():
     pred_a = match(srcip=ip1) & match(dstip=ip2)
     pred_b = match(srcip=ip1) & ~match(dstip=ip2)
     pred_c = match(dstip=ip2) & ~match(srcip=ip1)
-    ref_tagging = ((match(path_tag=3)) +
+    ref_tagging = ((~(pred_a | pred_b | pred_c) >> ~match(path_tag=3) >>
+                     modify(path_tag=3)) +
+                   (match(path_tag=3)) +
                    ((match(path_tag=1) & pred_a) >> modify(path_tag=2)) +
                    ((match(path_tag=1) & pred_b) >> modify(path_tag=3)) +
                    ((match(path_tag=1) & pred_c) >> modify(path_tag=2)) +
@@ -393,8 +414,7 @@ def test_path_compile_2():
                    ((match(path_tag=2) & pred_c) >> modify(path_tag=3)) +
                    ((match(path_tag=None) & pred_a) >> modify(path_tag=1)) +
                    ((match(path_tag=None) & pred_b) >> modify(path_tag=1)) +
-                   ((match(path_tag=None) & pred_c) >> modify(path_tag=3)) +
-                   ~(pred_a | pred_b | pred_c))
+                   ((match(path_tag=None) & pred_c) >> modify(path_tag=3)))
     ref_capture = (drop +
                    ((match(path_tag=1) & pred_a) >> FwdBucket()) +
                    ((match(path_tag=1) & pred_c) >> FwdBucket()))
@@ -405,7 +425,9 @@ def test_path_compile_2():
 def test_empty_paths():
     cg.clear()
     (tagging, capture) = pathcomp.compile(path_empty())
-    ref_tagging = (match(path_tag=None) + identity)
+    ref_tagging = ((identity >> ~match(path_tag=None) >>
+                    modify(path_tag=None)) +
+                   match(path_tag=None))
     ref_capture = drop
     [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
     assert tagging._classifier == ref_tagging._classifier

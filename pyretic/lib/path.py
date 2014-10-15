@@ -555,8 +555,22 @@ class abstract_atom(path, Filter):
     def __init__(self, m):
         assert isinstance(m, Filter)
         self.policy = m
-        self.re_tree = re_tree_gen.get_re_tree(m, self)
+        self._re_tree = None
+        self.tree_counter = 0 # diagnostic; counts each time re_tree is set
         super(abstract_atom, self).__init__()
+
+    @property
+    def re_tree(self):
+        if not self._re_tree:
+            self.tree_counter += 1
+            self._re_tree = re_tree_gen.get_re_tree(self.policy, self)
+            assert self.tree_counter <= 1
+        return self._re_tree
+
+    @re_tree.setter
+    def re_tree(self, rt):
+        self._re_tree = rt
+        self.tree_counter += 1
 
     def __and__(self, other):
         if isinstance(other, abstract_atom):
@@ -827,6 +841,18 @@ class pathcomp(object):
             return identity
 
     @classmethod
+    def __prep_re_trees__(cls, acc, p):
+        if (isinstance(p, path_policy) and
+            not isinstance(p, dynamic_path_policy) and
+            not isinstance(p, path_policy_union)):
+            tree = p.path.re_tree
+            return None
+        elif isinstance(p, path_policy):
+            return None
+        else:
+            raise TypeError("Can't prep re_tree for non-path-policy!")
+
+    @classmethod
     def __get_re_pols__(cls, acc, p):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths."""
@@ -853,7 +879,9 @@ class pathcomp(object):
         cg = re_tree_gen
         ast_fold = path_policy_utils.ast_fold
         re_pols  = cls.__get_re_pols__
+        prep_trees = cls.__prep_re_trees__
 
+        ast_fold(path_pol, prep_trees, None)
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
         virtual_field(name="path_tag",
