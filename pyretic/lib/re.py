@@ -896,8 +896,11 @@ class dfa_state_table(object):
         for q in self.re_table:
             if self.dead_state_check_fun(q):
                 dead_states.append(q)
-        assert len(dead_states) == 1
-        return dead_states[0]
+        assert len(dead_states) <= 1
+        if len(dead_states) == 1:
+            return dead_states[0]
+        else:
+            return None
 
     def get_final_states(self):
         f = []

@@ -813,12 +813,18 @@ class pathcomp(object):
     @classmethod
     def __get_dead_state_pred__(cls, dfa):
         dead = dfa_utils.get_dead_state(dfa)
-        return cls.__match_tag__(dfa, dead)
+        if dead:
+            return cls.__match_tag__(dfa, dead)
+        else:
+            return drop
 
     @classmethod
     def __set_dead_state_tag__(cls, dfa):
         dead = dfa_utils.get_dead_state(dfa)
-        return cls.__set_tag__(dfa, dead)
+        if dead:
+            return cls.__set_tag__(dfa, dead)
+        else:
+            return identity
 
     @classmethod
     def __get_re_pols__(cls, acc, p):
