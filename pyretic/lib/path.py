@@ -367,6 +367,9 @@ class path_policy(Query):
         else:
             return False
 
+    def __hash__(self):
+        return id(self)
+
 class path_policy_union(path_policy):
     def __init__(self, ppols):
         assert len(ppols) > 1
