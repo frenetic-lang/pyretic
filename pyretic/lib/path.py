@@ -816,6 +816,11 @@ class pathcomp(object):
         return cls.__match_tag__(dfa, dead)
 
     @classmethod
+    def __set_dead_state_tag__(cls, dfa):
+        dead = dfa_utils.get_dead_state(dfa)
+        return cls.__set_tag__(dfa, dead)
+
+    @classmethod
     def __get_re_pols__(cls, acc, p):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths."""
@@ -848,7 +853,9 @@ class pathcomp(object):
         virtual_field(name="path_tag",
                       values=range(0, du.get_num_states(dfa)),
                       type="integer")
-        tagging = (cls.__get_dead_state_pred__(dfa))
+        tagging = (((cg.get_unaffected_pred() & ~(cls.__get_dead_state_pred__(dfa)))
+                    >> cls.__set_dead_state_tag__(dfa)) +
+                   cls.__get_dead_state_pred__(dfa))
         capture = drop
         match_tag = lambda q: cls.__match_tag__(dfa, q)
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
@@ -868,7 +875,6 @@ class pathcomp(object):
                     capture_pol = pol_list[i]
                     capture += ((match_tag(src) & pred) >> capture_pol)
 
-        tagging += cg.get_unaffected_pred()
         return (tagging, capture)
 
     def path_mod_add(paths, p):
