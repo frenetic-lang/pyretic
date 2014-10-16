@@ -28,7 +28,7 @@
 
 from pyretic.core.language import identity, egress_network, Filter, drop, match
 from pyretic.core.language import modify, Query, FwdBucket, CountBucket
-from pyretic.core.language import PathBucket
+from pyretic.core.language import PathBucket, DynamicFilter
 
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
@@ -280,7 +280,13 @@ class re_tree_gen(object):
             else:
                 pass
 
-        if is_not_drop(new_pred):
+        if is_not_drop(new_pred) or isinstance(new_pred, DynamicFilter):
+            """ The new predicate should be added if either:
+                - some part of it doesn't intersect any existing predicate,
+                  i.e., new_pred is not drop, OR
+                - new_pred is a DynamicFilter, in which case we keep a copy in
+                  the policy to trigger recompilation if it changes.
+            """
             add_pred(new_pred, new_sym(), [at])
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
@@ -391,7 +397,7 @@ class dynamic_path_policy(path_policy):
     """ Dynamic path object. """
     def __init__(self, path_pol):
         self._path_policy = path_pol
-        self.notify = None
+        self.path_notify = None
         super(dynamic_path_policy, self).__init__(path_pol.path, path_pol.piped_policy)
 
     def __repr_pretty__(self, pre_spaces=''):
@@ -404,15 +410,15 @@ class dynamic_path_policy(path_policy):
     def __repr__(self):
         return self.__repr_pretty__()
 
-    def attach(self, notify):
-        self.notify = notify
+    def path_attach(self, path_notify):
+        self.path_notify = path_notify
 
     def detach(self):
-        self.notify = None
+        self.path_notify = None
 
-    def changed(self):
-        if self.notify:
-            self.notify()
+    def path_changed(self):
+        if self.path_notify:
+            self.path_notify()
 
     @property
     def path_policy(self):
@@ -421,40 +427,81 @@ class dynamic_path_policy(path_policy):
     @path_policy.setter
     def path_policy(self, path_pol):
         self._path_policy = path_pol
-        self.changed()
+        self.path_changed()
 
 
 class path_policy_utils(object):
     """ Utilities to manipulate path policy ASTs. """
     @classmethod
-    def ast_fold(cls, ast, fold_f, acc):
+    def path_policy_ast_fold(cls, ast, fold_f, acc):
         """ Fold the AST with a function fold_f, which also takes a default
         value.
 
-        ast: path
-        fold_f: 'a -> path -> 'a
+        ast: path_policy
+        fold_f: 'a -> path_policy -> 'a
         default: 'a
         """
         if isinstance(ast, path_policy_union):
             acc = fold_f(acc, ast)
             for pp in ast.path_policies:
-                acc = cls.ast_fold(pp, fold_f, acc)
+                acc = cls.path_policy_ast_fold(pp, fold_f, acc)
             return acc
         elif isinstance(ast, dynamic_path_policy):
             acc = fold_f(acc, ast)
-            return cls.ast_fold(ast.path_policy, fold_f, acc)
+            return cls.path_policy_ast_fold(ast.path_policy, fold_f, acc)
         elif isinstance(ast, path_policy):
             return fold_f(acc, ast)
         else:
             raise TypeError("Can only fold path_policy objects!")
 
     @classmethod
+    def path_ast_fold(cls, ast, fold_f, acc):
+        """ Fold a path AST with a function fold_f, which also takes a default
+        value.
+
+        ast: path
+        fold_f: 'a -> path -> 'a
+        default: 'a
+        """
+        if (isinstance(ast, path_epsilon) or
+            isinstance(ast, path_empty) or
+            isinstance(ast, abstract_atom)):
+            return fold_f(acc, ast)
+        elif isinstance(ast, path_combinator):
+            acc = fold_f(acc, ast)
+            for p in ast.paths:
+                acc = cls.path_ast_fold(p, fold_f, acc)
+            return acc
+        else:
+            raise TypeError("Can only fold path objects!")
+
+    @classmethod
+    def add_dynamic_filters(cls, acc, at):
+        """ Collect all DynamicFilters that are part of atoms in paths. """
+        if isinstance(at, abstract_atom):
+            p = at.policy
+            if isinstance(p, DynamicFilter):
+                return acc | set([p])
+            else:
+                return acc
+        elif isinstance(at, path):
+            return acc
+        else:
+            raise TypeError("Can only operate on path objects!")
+
+    @classmethod
     def add_dynamic_path_pols(cls, acc, pp):
         if isinstance(pp, dynamic_path_policy):
-            new_acc = acc | set([pp])
-            return new_acc
-        else:
+            return acc | set([pp])
+        elif isinstance(pp, path_policy_union):
             return acc
+        elif isinstance(pp, path_policy):
+            """ Add DynamicFilters from constituent path atoms. """
+            dyn_fun = cls.add_dynamic_filters
+            dyn_filters = cls.path_ast_fold(pp.path, dyn_fun, set())
+            return acc | dyn_filters
+        else:
+            raise TypeError("Can only act on path_policy objects!")
 
 
 class path(path_policy):
@@ -874,22 +921,26 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
-    def compile(cls, path_pol):
+    def init_tag_field(cls, numvals):
+        virtual_field(name="path_tag",
+                      values=range(0, numvals),
+                      type="integer")
+
+    @classmethod
+    def compile(cls, path_pol, max_states=1022):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
         du = dfa_utils
         cg = re_tree_gen
-        ast_fold = path_policy_utils.ast_fold
+        ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
         prep_trees = cls.__prep_re_trees__
 
         ast_fold(path_pol, prep_trees, None)
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
-        virtual_field(name="path_tag",
-                      values=range(0, du.get_num_states(dfa)),
-                      type="integer")
+        assert du.get_num_states(dfa) <= max_states
         tagging = (((cg.get_unaffected_pred() & ~(cls.__get_dead_state_pred__(dfa)))
                     >> cls.__set_dead_state_tag__(dfa)) +
                    cls.__get_dead_state_pred__(dfa))

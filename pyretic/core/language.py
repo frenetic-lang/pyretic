@@ -1477,7 +1477,27 @@ class DynamicFilter(DynamicPolicy,Filter):
     Abstact class for dynamic filter policies.
     The behavior of a dynamic filter policy changes each time self.policy is reassigned.
     """
-    pass
+    def __init__(self, policy=drop):
+        super(DynamicFilter, self).__init__(policy)
+        self.path_notify = None
+
+    def path_attach(self, path_notify):
+        self.path_notify = path_notify
+
+    def path_detach(self):
+        self.path_notify = None
+
+    def changed(self):
+        if self.path_notify:
+            self.path_notify()
+            """ Explicitly avoiding a call to self.notify(.), since
+            self.path_notify() results in policy recompilation anyway.
+            """
+        elif self.notify:
+            self.notify(self)
+
+    def __hash__(self):
+        return id(self)
 
 
 class flood(DynamicPolicy):

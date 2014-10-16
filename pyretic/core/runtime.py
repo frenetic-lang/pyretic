@@ -42,6 +42,7 @@ import copy
 TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
 STATS_REQUERY_THRESHOLD_SEC = 10
+NUM_PATH_TAGS=1022
 
 class Runtime(object):
     """
@@ -69,10 +70,11 @@ class Runtime(object):
         self.path_policy = None
         self.path_tagging = DynamicPolicy(identity)
         self.path_capture = DynamicPolicy(drop)
-        self.dynamic_sub_path_pols = set([])
+        self.dynamic_sub_path_pols = set()
 
         if path_main:
             from pyretic.lib.path import pathcomp
+            pathcomp.init_tag_field(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.policy = ((self.path_tagging >> self.policy) +
@@ -92,7 +94,6 @@ class Runtime(object):
         self.extended_values_to_vlan_db = {}
         self.extended_values_lock = RLock()
         self.dynamic_sub_pols = set()
-        self.update_dynamic_sub_pols()
         self.in_network_update = False
         self.in_bucket_apply = False
         self.network_triggered_policy_update = False
@@ -114,6 +115,7 @@ class Runtime(object):
         self.default_cookie = 0
         self.packet_in_time = 0
         self.num_packet_ins = 0
+        self.update_dynamic_sub_pols()
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -302,20 +304,20 @@ class Runtime(object):
         import copy
         from pyretic.lib.path import path_policy_utils
         old_dynamic_sub_path_pols = copy.copy(self.dynamic_sub_path_pols)
-        ast_fold = path_policy_utils.ast_fold
+        ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
         self.dynamic_sub_path_pols = ast_fold(path_pol, add_pols, set())
         for pp in (old_dynamic_sub_path_pols - self.dynamic_sub_path_pols):
-            pp.detach()
+            pp.path_detach()
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
-            pp.attach(self.handle_path_change)
+            pp.path_attach(self.handle_path_change)
 
 
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        (tagging, capture) = pathcomp.compile(self.path_policy)
+        (tagging, capture) = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
         self.path_tagging.policy = tagging
         self.path_capture.policy = capture
 

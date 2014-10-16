@@ -435,7 +435,7 @@ def test_empty_paths():
 
 ### Tests for path policy ast folding routine. ###
 
-ast_fold = path_policy_utils.ast_fold
+ast_fold = path_policy_utils.path_policy_ast_fold
 add_dyn  = path_policy_utils.add_dynamic_path_pols
 re_pols  = pathcomp.__get_re_pols__
 
