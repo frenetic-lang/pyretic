@@ -1490,10 +1490,7 @@ class DynamicFilter(DynamicPolicy,Filter):
     def changed(self):
         if self.path_notify:
             self.path_notify()
-            """ Explicitly avoiding a call to self.notify(.), since
-            self.path_notify() results in policy recompilation anyway.
-            """
-        elif self.notify:
+        if self.notify:
             self.notify(self)
 
     def __hash__(self):
