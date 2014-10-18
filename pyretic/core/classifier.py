@@ -17,9 +17,19 @@ class Rule(object):
     # modify, identity, and/or Controller/CountBucket/FwdBucket policies.
     # Actions is Rule are semantically meant to run in parallel
     # unlike OpenFlow rules.
-    def __init__(self,m,acts):
+    def __init__(self,m,acts,parents=[],op="policy"):
         self.match = m
         self.actions = acts
+        self.parents = parents
+        """ op is the operator which combined the parents of this rule. Set of
+        values it can take:
+        - a class name of type CombinatorPolicy (in particular: "negate",
+        "parallel", "sequential")
+        - "empty_parallel", when two classifiers which are added results in a
+        drop classifier because of zero intersection.
+        - "policy" (this is a leaf rule directly generated from a policy)
+        """
+        self.op = op
 
     def __str__(self):
         return str(self.match) + '\n  -> ' + str(self.actions)
@@ -50,6 +60,32 @@ class Rule(object):
             for act in self.actions:
                 rv |= act.eval(pkt)
         return rv
+
+
+def get_rule_derivation_tree(r, pre_spaces='', only_leaves=False):
+    """ Get the tree of rules deriving the current rule."""
+    assert isinstance(r, Rule)
+    op = r.op
+    assert op in ["policy", "parallel", "empty_parallel",
+                  "sequential", "negate"]
+    extra_ind = '    '
+    output = ''
+    if op == "parallel" or op == "negate" or op == "sequential":
+        if not only_leaves:
+            output  = pre_spaces + str(r.match) + '\n'
+            output += pre_spaces + '-> ' + str(r.actions) + '\n'
+        output += pre_spaces + '[operator ' + r.op + ']\n'
+        for rp in r.parents:
+            output += get_rule_derivation_tree(rp, pre_spaces+extra_ind,
+                                               only_leaves)
+    elif op == "policy":
+        if r.parents[0]:
+            output = pre_spaces + str(r.parents[0]) + '\n'
+    elif op == "empty_parallel":
+        output = pre_spaces + "empty classifier\n"
+    else:
+        raise TypeError
+    return output
 
 
 class Classifier(object):
@@ -128,14 +164,19 @@ class Classifier(object):
     ### NEGATE ###
     def __invert__(self):
         from pyretic.core.language import identity
-        c = copy.copy(self)
-        for r in c.rules:
+        new_rules = list()
+        for r in self.rules:
+            r_new = copy.copy(r)
             if len(r.actions) == 0:
-                r.actions = {identity}
+                r_new.actions = {identity}
             elif r.actions == {identity}:
-                r.actions = set()
+                r_new.actions = set()
             else:
                 raise TypeError  # TODO MAKE A CompileError TYPE
+            r_new.parents = [r]
+            r_new.op = "negate"
+            new_rules.append(r_new)
+        c = Classifier(new_rules)
         return c
 
 
@@ -147,7 +188,7 @@ class Classifier(object):
             intersection = r1.match.intersect(r2.match)
             if intersection != drop:
                 actions = r1.actions | r2.actions
-                return Rule(intersection, actions)
+                return Rule(intersection, actions, [r1, r2], "parallel")
             else:
                 return None
 
@@ -162,7 +203,7 @@ class Classifier(object):
                     c3.append(crossed_r)
         # if the classifier is empty, add a drop-all rule
         if len(c3) == 0:
-            c3.append(Rule(identity,set()))
+            c3.append(Rule(identity,set(),[c1, c2],"empty_parallel"))
         # and optimize the classifier
         else:
             c3 = c3.optimize()
@@ -243,7 +284,7 @@ class Classifier(object):
             if m == drop:
                 return None
             else:
-                return Classifier([Rule(m,actions)])
+                return Classifier([Rule(m,actions,[r1,r2],"sequential")])
 
         # returns a potentially non-total classifier
         # suitable for concatenating w/ other potentially non-total classifiers

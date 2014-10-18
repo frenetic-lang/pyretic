@@ -224,7 +224,7 @@ class Singleton(Filter):
         return self.__class__._classifier
 
     def generate_classifier(self):
-        return Classifier([Rule(identity, {self})])
+        return Classifier([Rule(identity, {self}, [self])])
 
 
 @singleton
@@ -272,7 +272,7 @@ class drop(Singleton):
         return set()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,set())])
+        return Classifier([Rule(identity,set(),[self])])
 
     def intersect(self, other):
         return self
@@ -435,8 +435,8 @@ class _match(match):
         self.map = self.translate_virtual_fields()
 
     def generate_classifier(self):
-        r1 = Rule(self,{identity})
-        r2 = Rule(identity,set())
+        r1 = Rule(self,{identity},[self])
+        r2 = Rule(identity,set(),[None])
         return Classifier([r1, r2])
 
     def eval(self,pkt):
@@ -520,7 +520,7 @@ class _modify(modify):
         self.map = self.translate_virtual_fields()
 
     def generate_classifier(self):
-        r = Rule(identity,{self})
+        r = Rule(identity,{self},[self])
         return Classifier([r])
 
     def eval(self,pkt):
@@ -588,7 +588,7 @@ class FwdBucket(Query):
         self._classifier = self.generate_classifier()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,{Controller})])
+        return Classifier([Rule(identity,{Controller},[self])])
 
     def apply(self):
         with self.bucket_lock:
@@ -621,7 +621,7 @@ class PathBucket(FwdBucket):
         self.require_original_pkt = require_original_pkt
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,{self})])
+        return Classifier([Rule(identity,{self},[self])])
 
     def apply(self, original_pkt=None):
         with self.bucket_lock:
@@ -735,7 +735,7 @@ class CountBucket(Query):
         return output
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,{self})])
+        return Classifier([Rule(identity,{self},[self])])
 
     def apply(self):
         with self.bucket_lock:
