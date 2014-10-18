@@ -200,6 +200,16 @@ def path_test_15():
 def path_test_16():
     return path_test_13() + path_test_14() + path_test_15()
 
+def path_test_17():
+    p = atom(match(srcip=ip1))
+    p.register_callback(query_callback(17))
+    return p
+
+def path_test_18():
+    p = atom(identity)
+    p.register_callback(query_callback(18))
+    return p
+
 static_fwding_cycle_4_4_spanning_tree_1 = (
     (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
                           (match(switch=2) >> fwd(1)) +
