@@ -176,7 +176,7 @@ def queries_in_eval(acc, policy):
     return acc
 
 
-def on_recompile_path(acc,pol_id,policy):
+def on_recompile_path_set(acc,pol_id,policy):
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -191,7 +191,7 @@ def on_recompile_path(acc,pol_id,policy):
           isinstance(policy,intersection)):
         sub_acc = set()
         for sub_policy in policy.policies:
-            sub_acc |= on_recompile_path(sub_acc,pol_id,sub_policy)
+            sub_acc |= on_recompile_path_set(sub_acc,pol_id,sub_policy)
         if sub_acc:
             return acc | {policy} | sub_acc
         else:
@@ -200,10 +200,42 @@ def on_recompile_path(acc,pol_id,policy):
         if id(policy) == pol_id:
             return acc | {policy}
         else:
-            sub_acc = on_recompile_path(set(),pol_id,policy.policy)
+            sub_acc = on_recompile_path_set(set(),pol_id,policy.policy)
             if sub_acc:
                 return acc | {policy} | sub_acc
             else:
                 return set()
+    else:
+        raise NotImplementedError
+
+def on_recompile_path_list(acc,pol_id,policy):
+    if (  policy == identity or
+          policy == drop or
+          isinstance(policy,match) or
+          isinstance(policy,modify) or
+          policy == Controller or
+          isinstance(policy,Query)):
+        return list()
+    elif (isinstance(policy,negate) or
+          isinstance(policy,parallel) or
+          isinstance(policy,union) or
+          isinstance(policy,sequential) or
+          isinstance(policy,intersection)):
+        sub_acc = list()
+        for sub_policy in policy.policies:
+            sub_acc += on_recompile_path_list(sub_acc,pol_id,sub_policy)
+        if sub_acc:
+            return acc + [policy] + sub_acc
+        else:
+            return acc
+    elif isinstance(policy,DerivedPolicy):
+        if id(policy) == pol_id:
+            return acc + [policy]
+        else:
+            sub_acc = on_recompile_path_list(list(),pol_id,policy.policy)
+            if sub_acc:
+                return acc + [policy] + sub_acc
+            else:
+                return acc
     else:
         raise NotImplementedError

@@ -188,8 +188,9 @@ class Runtime(object):
         with self.policy_lock:
 
             # tag stale classifiers as invalid
-            map(lambda p: p.invalidate_classifier(), 
-                on_recompile_path(set(),id(sub_pol),self.policy))
+            recompile_list = on_recompile_path_list(list(), id(sub_pol),
+                                                    self.policy)
+            map(lambda p: p.invalidate_classifier(), recompile_list)
 
             # if change was driven by a network update, flag
             if self.in_network_update:
