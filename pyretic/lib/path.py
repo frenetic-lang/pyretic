@@ -1357,8 +1357,11 @@ class dfa_utils(object):
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
                       re_exps, True)
         if not symlist:
-            symlist = re_tree_gen.get_symlist()
+            symlist = (__in_re_tree_gen__.get_symlist() +
+                       __out_re_tree_gen__.get_symlist())
         dfa = makeDFA_vector(re_exps, symlist)
         cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
-        cls.__dump_file__(re_tree_gen.get_leaf_preds(), '/tmp/symbols.txt')
+        leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
+                      __out_re_tree_gen__.get_leaf_preds())
+        cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
         return dfa
