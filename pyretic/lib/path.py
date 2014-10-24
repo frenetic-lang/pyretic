@@ -605,25 +605,26 @@ class path_empty(path):
         return "path_empty"
 
 
-class abstract_atom(path, Filter):
+class abstract_atom(Filter):
     """A single atomic match in a path expression. This is an abstract class
     where the token isn't initialized.
 
     :param m: a Filter (or match) object used to initialize the path atom.
     :type match: Filter
     """
-    def __init__(self, m):
+    def __init__(self, m,re_tree_class=re_tree_gen):
         assert isinstance(m, Filter)
         self.policy = m
         self._re_tree = None
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
+        self.re_tree_class = re_tree_class
         super(abstract_atom, self).__init__()
 
     @property
     def re_tree(self):
         if not self._re_tree:
             self.tree_counter += 1
-            self._re_tree = re_tree_gen.get_re_tree(self.policy, self)
+            self._re_tree = self.re_tree_class.get_re_tree(self.policy, self)
             assert self.tree_counter <= 1
         return self._re_tree
 
@@ -666,8 +667,51 @@ class abstract_atom(path, Filter):
     def __repr__(self):
         return repr(self.policy) + '; expression: ' + self.expr
 
+    @property
+    def expr(self):
+        return self.re_tree.re_string_repr()
 
-class atom(abstract_atom):
+
+class __in__(abstract_atom):
+    """ Atom type that only matches a predicate at the entry of a switch. """
+    def __init__(self, m):
+        super(__in__, self).__init__(m, re_tree_class=__in_re_tree_gen__)
+
+class __out__(abstract_atom):
+    """ Atom type that only matches a predicate at the exit of a switch. """
+    def __init__(self, m):
+        super(__out__, self).__init__(m, re_tree_class=__out_re_tree_gen__)
+
+
+class in_out_atom(path):
+    """ The leaf atom for all path queries. """
+    def __init__(self, in_pred, out_pred):
+        self.in_pred  = in_pred
+        self.out_pred = out_pred
+        self.in_atom  = __in__(in_pred)
+        self.out_atom = __out__(out_pred)
+        self._re_tree = None
+
+    @property
+    def re_tree(self):
+        if not self._re_tree:
+            self._re_tree = self.in_atom.re_tree ^ self.out_atom.re_tree
+        return self._re_tree
+
+    @re_tree.setter
+    def re_tree(self, rt):
+        self._re_tree = rt
+
+
+class in_atom(in_out_atom):
+    def __init__(self, m):
+        super(in_atom, self).__init__(m, identity)
+
+class out_atom(in_out_atom):
+    def __init__(self, m):
+        super(out_atom, self).__init__(identity, m)
+
+class atom(in_atom):
     """A concrete "ingress" match atom."""
     def __init__(self, m):
         super(atom, self).__init__(m)
