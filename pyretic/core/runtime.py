@@ -68,8 +68,10 @@ class Runtime(object):
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
         self.path_policy = None
-        self.path_tagging = DynamicPolicy(identity)
-        self.path_capture = DynamicPolicy(drop)
+        self.path_in_tagging  = DynamicPolicy(identity)
+        self.path_in_capture  = DynamicPolicy(drop)
+        self.path_out_tagging = DynamicPolicy(identity)
+        self.path_out_capture = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
 
         if path_main:
@@ -77,8 +79,13 @@ class Runtime(object):
             pathcomp.init_tag_field(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
-            self.policy = ((self.path_tagging >> self.policy) +
-                           self.path_capture)
+            self.policy = ((self.path_in_tagging
+                            >> self.policy
+                            >> self.path_out_tagging) +
+                           (self.path_in_capture) +
+                           (self.path_in_tagging
+                            >> self.policy
+                            >> self.path_out_capture))
             # Virtual field composition
             self.policy = (virtual_field_tagging() >>
                            self.policy >>
@@ -318,9 +325,12 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        (tagging, capture) = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
-        self.path_tagging.policy = tagging
-        self.path_capture.policy = capture
+        policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
+        (in_tagging, in_capture, out_tagging, out_capture) = policy_fragments
+        self.path_in_tagging.policy  = in_tagging
+        self.path_in_capture.policy  = in_capture
+        self.path_out_tagging.policy = out_tagging
+        self.path_out_capture.policy = out_capture
 
 
 #######################
