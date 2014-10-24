@@ -240,7 +240,7 @@ class re_tree_gen(object):
         ne_inters   = classifier_utils.has_nonempty_intersection
         is_not_drop = classifier_utils.is_not_drop
         add_pred = cls.__add_pred__
-        new_sym  = cls.__new_symbol__
+        new_sym  = re_tree_gen.__new_symbol__
         del_pred = cls.__del_pred__
         replace_pred = cls.__replace_pred__
         ovlap = classifier_utils.get_overlap_mode
@@ -320,6 +320,16 @@ class re_tree_gen(object):
             return ~(reduce(lambda a,x: a | x, cls.pred_to_symbol.keys()))
         else:
             return identity
+
+
+""" Character generator classes belonging to "ingress" and "egress" matching
+predicates, respectively. """
+class __in_re_tree_gen__(re_tree_gen):
+    pass
+
+class __out_re_tree_gen__(re_tree_gen):
+    pass
+
 
 #############################################################################
 ###               Path query language components                          ###
