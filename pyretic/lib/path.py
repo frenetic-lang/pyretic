@@ -690,28 +690,12 @@ class atom(in_atom):
         super(atom, self).__init__(m)
 
 
-class egress_atom(abstract_atom):
-    """An atom that denotes a match on a packet after the forwarding decision
-    has been made. It can always be substituted by a normal ("ingress") atom at
-    the next hop, unless the packet is egressing the network. Hence, it may be
-    noted that this is only necessary (apart from expressive power, of course)
-    to match on packets that egress the network.
-    """
-    def __init__(self, m):
-        super(egress_atom, self).__init__(m)
-
-
 class drop_atom(abstract_atom):
     """An atom that matches on packets that were dropped by the forwarding
     policy.
     """
     def __init__(self, m):
         super(drop_atom, self).__init__(m)
-
-
-class end_path(abstract_atom):
-    def __init__(self, m):
-        super(end_path, self).__init__(m)
 
 
 class hook(abstract_atom):
