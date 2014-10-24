@@ -605,7 +605,7 @@ class path_empty(path):
         return "path_empty"
 
 
-class abstract_atom(Filter):
+class abstract_atom(object):
     """A single atomic match in a path expression. This is an abstract class
     where the token isn't initialized.
 
@@ -632,33 +632,6 @@ class abstract_atom(Filter):
     def re_tree(self, rt):
         self._re_tree = rt
         self.tree_counter += 1
-
-    def __and__(self, other):
-        if isinstance(other, abstract_atom):
-            if not isinstance(other, type(self)):
-                raise TypeError("'&' operator on atoms of different types")
-            return type(self)(self.policy & other.policy)
-        elif isinstance(other, path):
-            return super(abstract_atom, self).__and__(other)
-        else:
-            raise TypeError
-
-    def __or__(self, other):
-        if isinstance(other, abstract_atom):
-            if not isinstance(other, type(self)):
-                raise TypeError("'|' operator on atoms of different types")
-            return type(self)(self.policy | other.policy)
-        elif isinstance(other, path):
-            return super(abstract_atom, self).__or__(other)
-        else:
-            raise TypeError
-
-    def __sub__(self, other):
-        assert isinstance(other, type(self))
-        return type(self)((~other.policy) & self.policy)
-
-    def __invert__(self):
-        return type(self)(~(self.policy))
 
     def __eq__(self, other):
         return (type(self) == type(other) and
