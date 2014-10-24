@@ -881,9 +881,21 @@ class pathcomp(object):
             return match(path_tag=int(val))
 
     @classmethod
-    def __get_pred__(cls, edge):
-        """ Get predicate corresponding to an edge. """
-        return re_tree_gen.symbol_to_pred[dfa_utils.get_edge_label(edge)]
+    def __get_pred__(cls, dfa, edge):
+        """ Get predicate and atom type corresponding to an edge. """
+        edge_label = dfa_utils.get_edge_label(edge)
+        atoms = dfa_utils.get_edge_atoms(dfa, edge)
+        assert len(atoms) >= 1
+        typ = type(atoms[0])
+        # Sanity check. An edge can only have atoms of a single type
+        for a in atoms[1:]:
+            assert typ == type(a)
+        if typ == __in__:
+            return (__in_re_tree_gen__.symbol_to_pred[edge_label], typ)
+        elif typ == __out__:
+            return (__out_re_tree_gen__.symbol_to_pred[edge_label], typ)
+        else:
+            raise TypeError("Can only return predicates for abstract atoms!")
 
     @classmethod
     def __get_dead_state_pred__(cls, dfa):
@@ -943,7 +955,8 @@ class pathcomp(object):
         into a single classifier to be installed on switches.
         """
         du = dfa_utils
-        cg = re_tree_gen
+        in_cg = __in_re_tree_gen__
+        out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
         prep_trees = cls.__prep_re_trees__
@@ -952,29 +965,44 @@ class pathcomp(object):
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
         assert du.get_num_states(dfa) <= max_states
-        tagging = (((cg.get_unaffected_pred() & ~(cls.__get_dead_state_pred__(dfa)))
-                    >> cls.__set_dead_state_tag__(dfa)) +
-                   cls.__get_dead_state_pred__(dfa))
-        capture = drop
         match_tag = lambda q: cls.__match_tag__(dfa, q)
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
-        get_pred  = cls.__get_pred__
+        get_pred  = lambda e: cls.__get_pred__(dfa, e)
+
+        in_tagging = (((in_cg.get_unaffected_pred() &
+                        ~(cls.__get_dead_state_pred__(dfa)))
+                       >> cls.__set_dead_state_tag__(dfa)) +
+                      cls.__get_dead_state_pred__(dfa))
+        out_tagging = (((out_cg.get_unaffected_pred() &
+                         ~(cls.__get_dead_state_pred__(dfa)))
+                        >> cls.__set_dead_state_tag__(dfa)) +
+                       cls.__get_dead_state_pred__(dfa))
+        in_capture = drop
+        out_capture = drop
 
         edges = du.get_edges(dfa)
         for edge in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
-            pred = get_pred(edge)
+            (pred, typ) = get_pred(edge)
+            assert typ in [__in__, __out__]
             if not du.is_dead(dfa, src):
-                tagging += ((match_tag(src) & pred) >> set_tag(dst))
+                tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
+                if typ == __in__:
+                    in_tagging += tag_frag
+                elif typ == __out__:
+                    out_tagging += tag_frag
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
-                    capture_pol = pol_list[i]
-                    capture += ((match_tag(src) & pred) >> capture_pol)
+                    cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                    if typ == __in__:
+                        in_capture += cap_frag
+                    elif typ == __out__:
+                        out_capture += cap_frag
 
-        return (tagging, capture)
+        return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
         def __init__(self):
