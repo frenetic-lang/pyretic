@@ -30,6 +30,7 @@ from pyretic.core.language import *
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.lib.path import *
+from pyretic.lib.path import __in_re_tree_gen__, __out_re_tree_gen__
 
 import copy
 import pytest
@@ -39,7 +40,8 @@ ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
-cg = re_tree_gen
+in_cg  = __in_re_tree_gen__
+out_cg = __out_re_tree_gen__
 cu = classifier_utils
 ne_inters = cu.has_nonempty_intersection
 
@@ -77,13 +79,13 @@ def test_overlap_mode():
 
 def test_CG_token_gen():
     """Ensure you get a token back."""
-    cg.clear()
+    in_cg.clear()
     m = match(srcip=ip1) & match(switch=1)
     a = atom(m)
     assert a.re_tree
 
 def test_CG_token_equality_1():
-    cg.clear()
+    in_cg.clear()
     m1 = match(srcip=ip1)
     m2 = m1
     a1 = atom(m1)
@@ -93,7 +95,7 @@ def test_CG_token_equality_1():
     assert a1.re_tree.equals_meta_structural(a2.re_tree)
 
 def test_CG_token_equality_2():
-    cg.clear()
+    in_cg.clear()
     m1 = match(srcip=ip1)
     a1 = atom(m1)
     m2 = copy.copy(m1)
@@ -107,7 +109,7 @@ def test_CG_token_equality_2():
     assert not tree1.equals_meta_by_id(tree2)
 
 def test_CG_token_equality_3():
-    cg.clear()
+    in_cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(srcip=ip1) & match(switch=2)
     a1 = atom(m1)
@@ -130,10 +132,11 @@ def check_metadata_list(a_list):
         else:
             raise TypeError("Can't check metadata on re of any other type!")
     for a in a_list:
-        check_metadata_single_re(a.re_tree, a)
+        check_metadata_single_re(a.in_atom.re_tree, a.in_atom)
+        check_metadata_single_re(a.out_atom.re_tree, a.out_atom)
 
 @pytest.mark.skipif(True)
-def assert_and_get_syms(ms):
+def assert_and_get_syms(ms, cg):
     syms = []
     for m in ms:
         assert m in cg.pred_to_symbol
@@ -149,49 +152,83 @@ def generate_re_trees(plist):
         rt = p.re_tree
 
 def test_CG_equal_matches():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(srcip=ip1)
     a1 = atom(m1)
     a2 = atom(m2)
 
     generate_re_trees([a1, a2])
-    assert len(cg.pred_to_symbol.keys()) == 1
+    assert len(in_cg.pred_to_symbol.keys()) == 1
     ms = [match(srcip=ip1)]
-    syms = assert_and_get_syms(ms)
+    in_syms  = assert_and_get_syms(ms, in_cg)
+    out_syms = assert_and_get_syms([identity], out_cg)
 
-    assert m1 in cg.pred_to_symbol and m1 in cg.pred_to_atoms
-    assert m2 in cg.pred_to_symbol and m2 in cg.pred_to_atoms
+    assert m1 in in_cg.pred_to_symbol and m1 in in_cg.pred_to_atoms
+    assert m2 in in_cg.pred_to_symbol and m2 in in_cg.pred_to_atoms
 
-    assert a1.re_tree == re_symbol(syms[0])
-    assert a2.re_tree == re_symbol(syms[0])
+    assert a1.in_atom.re_tree  == re_symbol(in_syms[0])
+    assert a2.in_atom.re_tree  == re_symbol(in_syms[0])
+    assert a1.out_atom.re_tree == re_symbol(out_syms[0])
+    assert a2.out_atom.re_tree == re_symbol(out_syms[0])
+    assert a1.re_tree == (re_symbol(in_syms[0]) ^ re_symbol(out_syms[0]))
+    assert a2.re_tree == (re_symbol(in_syms[0]) ^ re_symbol(out_syms[0]))
 
-    assert cg.pred_to_atoms[ms[0]] == [a1, a2]
+    assert in_cg.pred_to_atoms[ms[0]] == [a1.in_atom, a2.in_atom]
+    assert out_cg.pred_to_atoms[identity] == [a1.out_atom, a2.out_atom]
 
     check_metadata_list([a1, a2])
 
+def test_CG_unequal_matches():
+    in_cg.clear()
+    out_cg.clear()
+    m1 = match(srcip=ip1)
+    a1 = in_atom(m1)
+    a2 = out_atom(m1)
+    generate_re_trees([a1, a2])
+
+    assert len(in_cg.pred_to_symbol.keys()) == 2
+    assert len(out_cg.pred_to_symbol.keys()) == 2
+    in_syms  = assert_and_get_syms([m1, identity & ~m1], in_cg)
+    out_syms = assert_and_get_syms([m1, identity & ~m1], out_cg)
+
+    assert m1 in in_cg.pred_to_symbol and m1 in in_cg.pred_to_atoms
+    assert m1 in out_cg.pred_to_symbol and m1 in out_cg.pred_to_atoms
+
+    assert in_cg.pred_to_symbol[m1] != out_cg.pred_to_symbol[m1]
+
+    assert a1.in_atom.re_tree  == re_symbol(in_syms[0])
+    assert a1.out_atom.re_tree == (re_symbol(out_syms[0]) |
+                                   re_symbol(out_syms[1]))
+    assert a2.out_atom.re_tree == re_symbol(out_syms[0])
+    assert a2.in_atom.re_tree  == (re_symbol(in_syms[0]) |
+                                   re_symbol(in_syms[1]))
+
 def test_CG_superset_matches():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(srcip=ip1) & match(switch=2)
     a1 = atom(m1)
     a2 = atom(m2)
 
     generate_re_trees([a1, a2])
-    assert len(cg.pred_to_symbol.keys()) == 2
+    assert len(in_cg.pred_to_symbol.keys()) == 2
     ms = [match(srcip=ip1) & match(switch=2),
           match(srcip=ip1) & ~(match(srcip=ip1) & match(switch=2))]
 
-    syms = assert_and_get_syms(ms)
+    syms = assert_and_get_syms(ms, in_cg)
 
-    assert not m1 in cg.pred_to_symbol
-    assert m2 in cg.pred_to_symbol
+    assert not m1 in in_cg.pred_to_symbol
+    assert m2 in in_cg.pred_to_symbol
 
-    assert a1.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
-    assert a2.re_tree == re_symbol(syms[0])
+    assert a1.in_atom.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
+    assert a2.in_atom.re_tree == re_symbol(syms[0])
 
-    assert cg.pred_to_atoms[ms[0]] == [a1, a2]
-    assert cg.pred_to_atoms[ms[1]] == [a1]
+    assert in_cg.pred_to_atoms[ms[0]] == [a1.in_atom, a2.in_atom]
+    assert in_cg.pred_to_atoms[ms[1]] == [a1.in_atom]
+    assert out_cg.pred_to_atoms[identity] == [a1.out_atom, a2.out_atom]
 
     check_metadata_list([a1, a2])
 
@@ -652,6 +689,7 @@ if __name__ == "__main__":
     test_CG_token_equality_3()
 
     test_CG_equal_matches()
+    test_CG_unequal_matches()
     test_CG_superset_matches()
     test_CG_subset_matches()
     test_CG_intersection_matches_1()
