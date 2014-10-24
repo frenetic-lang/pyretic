@@ -618,7 +618,6 @@ class abstract_atom(object):
         self._re_tree = None
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
         self.re_tree_class = re_tree_class
-        super(abstract_atom, self).__init__()
 
     @property
     def re_tree(self):
@@ -664,6 +663,7 @@ class in_out_atom(path):
         self.in_atom  = __in__(in_pred)
         self.out_atom = __out__(out_pred)
         self._re_tree = None
+        super(in_out_atom, self).__init__()
 
     @property
     def re_tree(self):
@@ -674,6 +674,16 @@ class in_out_atom(path):
     @re_tree.setter
     def re_tree(self, rt):
         self._re_tree = rt
+
+    def __eq__(self, other):
+        return (isinstance(other, in_out_atom) and
+                self.in_pred == other.in_pred and
+                self.out_pred == other.out_pred)
+
+    def __repr__(self):
+        return "in: %s\nout: %s\nexpr:%s" % (repr(self.in_pred),
+                                             repr(self.out_pred),
+                                             self.expr)
 
 
 class in_atom(in_out_atom):
