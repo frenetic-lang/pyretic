@@ -975,26 +975,6 @@ class pathcomp(object):
 
         return (tagging, capture)
 
-    def path_mod_add(paths, p):
-        paths.append(p)
-        return paths
-
-    def path_mod_repl(paths, p, new_p):
-        new_paths = []
-        for q in paths:
-            if q == p:
-                new_paths.append(new_p)
-            else:
-                new_paths.append(q)
-        return new_paths
-
-    def path_mod_del(paths, p):
-        new_paths = []
-        for q in paths:
-            if not q == p:
-                new_paths.append(q)
-        return new_paths
-
     class policy_frags:
         def __init__(self):
             self.tagging = drop
