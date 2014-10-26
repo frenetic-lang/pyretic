@@ -233,60 +233,68 @@ def test_CG_superset_matches():
     check_metadata_list([a1, a2])
 
 def test_CG_subset_matches():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1, switch=2)
     m2 = match(srcip=ip1)
     a1 = atom(m1)
     a2 = atom(m2)
 
     generate_re_trees([a1, a2])
-    assert len(cg.pred_to_symbol.keys()) == 2
+    assert len(in_cg.pred_to_symbol.keys()) == 2
 
     ms = [(match(srcip=ip1, switch=2)),
           (match(srcip=ip1) & ~match(srcip=ip1, switch=2))]
 
-    syms = assert_and_get_syms(ms)
+    syms = assert_and_get_syms(ms, in_cg)
 
-    assert m1 in cg.pred_to_symbol and m1 in cg.pred_to_atoms
-    assert not m2 in cg.pred_to_symbol and not m2 in cg.pred_to_symbol
+    assert m1 in in_cg.pred_to_symbol and m1 in in_cg.pred_to_atoms
+    assert not m2 in in_cg.pred_to_symbol and not m2 in in_cg.pred_to_symbol
+    assert identity in out_cg.pred_to_symbol
 
-    assert a1.re_tree == re_symbol(syms[0])
-    assert a2.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
+    assert a1.in_atom.re_tree == re_symbol(syms[0])
+    assert a2.in_atom.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
 
-    assert cg.pred_to_atoms[ms[0]] == [a1, a2]
-    assert cg.pred_to_atoms[ms[1]] == [a2]
+    assert in_cg.pred_to_atoms[ms[0]] == [a1.in_atom, a2.in_atom]
+    assert in_cg.pred_to_atoms[ms[1]] == [a2.in_atom]
+    assert out_cg.pred_to_atoms[identity] == [a1.out_atom, a2.out_atom]
 
     check_metadata_list([a1, a2])
 
 def test_CG_intersection_matches_1():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(dstip=ip2)
-    a1 = atom(m1)
-    a2 = atom(m2)
+    a1 = out_atom(m1)
+    a2 = out_atom(m2)
 
     generate_re_trees([a1, a2])
-    assert len(cg.pred_to_symbol.keys()) == 3
+    assert len(out_cg.pred_to_symbol.keys()) == 3
+    assert len(in_cg.pred_to_symbol.keys()) == 1
     ms = [(match(srcip=ip1) & ~match(dstip=ip2)),
           (match(dstip=ip2) & ~match(srcip=ip1)),
           (match(srcip=ip1) & match(dstip=ip2))]
 
-    syms = assert_and_get_syms(ms)
+    syms = assert_and_get_syms(ms, out_cg)
 
-    assert not m1 in cg.pred_to_symbol and not m1 in cg.pred_to_atoms
-    assert not m2 in cg.pred_to_symbol and not m2 in cg.pred_to_atoms
+    assert not m1 in out_cg.pred_to_symbol and not m1 in out_cg.pred_to_atoms
+    assert not m2 in out_cg.pred_to_symbol and not m2 in out_cg.pred_to_atoms
+    assert identity in in_cg.pred_to_symbol
 
-    assert a1.re_tree == re_symbol(syms[0]) | re_symbol(syms[2])
-    assert a2.re_tree == re_symbol(syms[1]) | re_symbol(syms[2])
+    assert a1.out_atom.re_tree == re_symbol(syms[0]) | re_symbol(syms[2])
+    assert a2.out_atom.re_tree == re_symbol(syms[1]) | re_symbol(syms[2])
 
-    assert cg.pred_to_atoms[ms[0]] == [a1]
-    assert cg.pred_to_atoms[ms[1]] == [a2]
-    assert cg.pred_to_atoms[ms[2]] == [a1, a2]
+    assert out_cg.pred_to_atoms[ms[0]] == [a1.out_atom]
+    assert out_cg.pred_to_atoms[ms[1]] == [a2.out_atom]
+    assert out_cg.pred_to_atoms[ms[2]] == [a1.out_atom, a2.out_atom]
+    assert in_cg.pred_to_atoms[identity] == [a1.in_atom, a2.in_atom]
 
     check_metadata_list([a1, a2])
 
 def test_CG_intersection_matches_2():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1)
     m2 = match(srcip=ip2)
     m3 = m1 | m2
@@ -295,31 +303,34 @@ def test_CG_intersection_matches_2():
     a3 = atom(m3)
 
     generate_re_trees([a1, a2, a3])
-    assert len(cg.pred_to_symbol.keys()) == 2
+    assert len(in_cg.pred_to_symbol.keys()) == 2
     ms = [match(srcip=ip1),
           match(srcip=ip2)]
 
-    syms = assert_and_get_syms(ms)
+    syms = assert_and_get_syms(ms, in_cg)
 
-    assert a1.re_tree == re_symbol(syms[0])
-    assert a2.re_tree == re_symbol(syms[1])
-    assert a3.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
+    assert a1.in_atom.re_tree == re_symbol(syms[0])
+    assert a2.in_atom.re_tree == re_symbol(syms[1])
+    assert a3.in_atom.re_tree == re_symbol(syms[0]) | re_symbol(syms[1])
 
-    assert cg.pred_to_atoms[ms[0]] == [a1, a3]
-    assert cg.pred_to_atoms[ms[1]] == [a2, a3]
+    assert in_cg.pred_to_atoms[ms[0]] == [a1.in_atom, a3.in_atom]
+    assert in_cg.pred_to_atoms[ms[1]] == [a2.in_atom, a3.in_atom]
+    assert out_cg.pred_to_atoms[identity] == [a1.out_atom, a2.out_atom,
+                                              a3.out_atom]
 
     check_metadata_list([a1, a2, a3])
 
 ### Basic checks on creating and manipulating path atoms ###
 
 def test_atom_creation():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     m1 = match(srcip=ip1) & match(switch=2)
     a1 = atom(m1)
-    assert a1.policy == m1
+    assert a1.in_atom.policy == m1
 
 def test_atom_and_1():
-    cg.clear()
+    in_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(switch=1))
     assert (a1 & a2).policy == (match(srcip=ip1) & match(switch=1))
