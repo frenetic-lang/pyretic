@@ -295,7 +295,7 @@ class re_tree_gen(object):
 
     @classmethod
     def clear(cls):
-        cls.token = TOKEN_START_VALUE
+        re_tree_gen.token = TOKEN_START_VALUE
         cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
         cls.symbol_to_pred  = {}
@@ -893,19 +893,34 @@ class pathcomp(object):
     @classmethod
     def __get_pred__(cls, dfa, edge):
         """ Get predicate and atom type corresponding to an edge. """
+        def __sym_in_class__(cg, sym):
+            return sym in cg.symbol_to_pred
+
+        def __get_atoms_cg_typ__(atoms, sym):
+            if len(atoms) > 1:
+                typ = type(atoms[0])
+                for a in atoms[1:]:
+                    assert typ == type(a)
+                if typ == __in__:
+                    return (__in_re_tree_gen__, __in__)
+                elif typ == __out__:
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Atoms can only be in or out typed.")
+            else:
+                if __sym_in_class__(__in_re_tree_gen__, sym):
+                    return (__in_re_tree_gen__, __in__)
+                elif __sym_in_class__(__out_re_tree_gen__, sym):
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Symbol can only be in or out typed.")
+
         edge_label = dfa_utils.get_edge_label(edge)
-        atoms = dfa_utils.get_edge_atoms(dfa, edge)
-        assert len(atoms) >= 1
-        typ = type(atoms[0])
-        # Sanity check. An edge can only have atoms of a single type
-        for a in atoms[1:]:
-            assert typ == type(a)
-        if typ == __in__:
-            return (__in_re_tree_gen__.symbol_to_pred[edge_label], typ)
-        elif typ == __out__:
-            return (__out_re_tree_gen__.symbol_to_pred[edge_label], typ)
-        else:
-            raise TypeError("Can only return predicates for abstract atoms!")
+        atoms_list = reduce(lambda a,x: a + x,
+                            dfa_utils.get_edge_atoms(dfa,edge),
+                            [])
+        (cg, typ) = __get_atoms_cg_typ__(atoms_list, edge_label)
+        return (cg.symbol_to_pred[edge_label], typ)
 
     @classmethod
     def __get_dead_state_pred__(cls, dfa):

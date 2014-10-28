@@ -329,65 +329,42 @@ def test_atom_creation():
     a1 = atom(m1)
     assert a1.in_atom.policy == m1
 
-def test_atom_and_1():
-    in_cg.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = atom(match(switch=1))
-    assert (a1 & a2).policy == (match(srcip=ip1) & match(switch=1))
-
-def test_atom_and_2():
-    cg.clear()
-    a1 = atom(match(srcip=ip1))
-    a2 = a1 & atom(match(switch=1))
-    assert isinstance(a2, atom)
-    assert a2.policy == (match(srcip=ip1) & match(switch=1))
-
-def test_atom_negate():
-    cg.clear()
-    a1 = atom(match(srcip=ip1))
-    assert (~a1).policy == (~match(srcip=ip1))
-
-def test_atom_difference():
-    cg.clear()
-    a1 = atom(match(switch=1,srcip=ip1))
-    a2 = atom(match(switch=1))
-    assert (a2 - a1).policy == (~match(switch=1,srcip=ip1) & match(switch=1))
-
-def test_atom_or():
-    cg.clear()
-    a1 = atom(match(switch=1))
-    a2 = atom(match(switch=2))
-    assert (a1 | a2).policy == (match(switch=1) | match(switch=2))
-
 ### Basic path creation and expression capabilities ###
 
 def test_path_creation():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a = atom(match(srcip=ip2))
     assert isinstance(a, path)
     assert a.expr
 
 def test_path_concatenation():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
     p = a1 ^ a2
     generate_re_trees([p])
     assert isinstance(p, path)
     assert p.re_tree == a1.re_tree ^ a2.re_tree
-    assert p.expr == ('(' + a1.expr + ') ^ (' + a2.expr + ')')
+    # since a1, a2, themselves are path_concat objects internally, the
+    # expression is flattened out, no longer (.) ^ (.) for basic atoms.
+    #assert p.expr == ('(' + a1.expr + ') ^ (' + a2.expr + ')')
 
 def test_path_alternation_1():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p = a1 | a2
     generate_re_trees([a1, a2])
     assert isinstance(p, path)
+    assert p.re_tree == a1.re_tree | a2.re_tree
     assert p.expr == ('(' + a1.expr + ') | (' + a2.expr + ')')
 
 def test_path_alternation_2():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
     p1 = a1 ^ a2
@@ -395,21 +372,26 @@ def test_path_alternation_2():
     p = p1 | p2
     generate_re_trees([a1, a2, p])
     assert isinstance(p, path)
+    assert p.re_tree == p1.re_tree | p2.re_tree
     assert p.expr == ('(' + p1.expr + ') | (' + p2.expr + ')')
 
 def test_path_kleene_closure():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     p1 = +a1
     generate_re_trees([a1])
     assert isinstance(p1, path)
+    assert p1.re_tree == +a1.re_tree
     assert p1.expr == '(' + a1.expr + ')*'
     p2 = +p1
     assert isinstance(p2, path)
+    assert p2.re_tree == +a1.re_tree
     assert p2.expr == '(' + a1.expr + ')*'
 
 def test_slightly_complicated_expr_1():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1, switch=2))
     a2 = atom(match(srcip=ip2, switch=1))
     a3 = atom(match(dstip=ip2))
@@ -418,39 +400,65 @@ def test_slightly_complicated_expr_1():
     p = ((a1 ^ a4) | (a2 ^ a3)) & a5
     generate_re_trees([a1, a2, a3, a4, a5])
     assert isinstance(p, path)
-    assert p.expr == ('(((' + a1.expr + ') ^ (' + a4.expr + ')) | ((' + a2.expr +
-                      ') ^ (' + a3.expr + '))) & (' + a5.expr + ')')
+    assert p.re_tree == (((a1.re_tree ^ a4.re_tree) | (a2.re_tree ^ a3.re_tree))
+                         & a5.re_tree)
+    #assert p.expr == ('(((' + a1.expr + ') ^ (' + a4.expr + ')) | ((' + a2.expr +
+    #                  ') ^ (' + a3.expr + '))) & (' + a5.expr + ')')
 
 ### Path compilation testing ###
 
 du = dfa_utils
 
 def test_path_compile_1():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
-    (tagging, capture) = pathcomp.compile(a1)
-    ref_tagging = ((~match(srcip=ip1) >> ~match(path_tag=2) >>
+    (in_tagging, in_capture, out_tagging, out_capture) = pathcomp.compile(a1)
+    ref_in_tag = ((~match(srcip=ip1) >> ~match(path_tag=2) >>
+                    modify(path_tag=2)) +
+                  (match(path_tag=2)) +
+                  (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)) +
+                  (match(srcip=ip1, path_tag=None) >> modify(path_tag=1)) +
+                  (match(srcip=ip1, path_tag=3) >> modify(path_tag=2)))
+    ref_out_tag = ((~identity >> ~match(path_tag=2) >>
                      modify(path_tag=2)) +
                    (match(path_tag=2)) +
-                   (match(srcip=ip1, path_tag=None) >> modify(path_tag=1)) +
-                   (match(srcip=ip1, path_tag=1) >> modify(path_tag=2)))
-    ref_capture = (drop +
-                   (match(srcip=ip1, path_tag=None) >> FwdBucket()))
-    assert tagging
-    assert capture
-    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
-    assert tagging._classifier == ref_tagging._classifier
-    assert capture._classifier == ref_capture._classifier
+                   (match(path_tag=1) >> identity >> modify(path_tag=3)) +
+                   (match(path_tag=None) >> identity >> modify(path_tag=2)) +
+                   (match(path_tag=3) >> identity >> modify(path_tag=2)))
+    ref_in_cap  = drop
+    ref_out_cap = (drop +
+                   (match(path_tag=1) >> identity >> FwdBucket()))
+    [x.compile() for x in [in_tagging, in_capture, out_tagging, out_capture,
+                           ref_in_tag, ref_in_cap, ref_out_tag, ref_out_cap]]
+    assert in_tagging._classifier == ref_in_tag._classifier
+    assert in_capture._classifier == ref_in_cap._classifier
+    assert out_tagging._classifier == ref_out_tag._classifier
+    assert out_capture._classifier == ref_out_cap._classifier
 
 def test_path_compile_2():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(dstip=ip2))
-    (tagging, capture) = pathcomp.compile(a1 ^ a2)
+    (in_tag, in_cap, out_tag, out_cap) = pathcomp.compile(a1 ^ a2)
 
     pred_a = match(srcip=ip1) & match(dstip=ip2)
     pred_b = match(srcip=ip1) & ~match(dstip=ip2)
     pred_c = match(dstip=ip2) & ~match(srcip=ip1)
+    tag_1  = match(path_tag=1)
+    tag_2  = match(path_tag=2)
+    tag_3  = match(path_tag=3)
+    tag_4  = match(path_tag=4)
+    tag_n  = match(path_tag=None)
+
+    print in_tag
+    print in_cap
+    print out_tag
+    print out_cap
+    sys.exit(0)
+
+    # TODO: correct ref_ policies
     ref_tagging = ((~(pred_a | pred_b | pred_c) >> ~match(path_tag=3) >>
                      modify(path_tag=3)) +
                    (match(path_tag=3)) +
@@ -469,6 +477,9 @@ def test_path_compile_2():
     [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
     assert tagging._classifier == ref_tagging._classifier
     assert capture._classifier == ref_capture._classifier
+
+## TODO(ngsrinivas): add a new test case that mixes in and out atoms
+## TODO(ngsrinivas): in_out_atom compilation
 
 def test_empty_paths():
     cg.clear()
@@ -707,11 +718,6 @@ if __name__ == "__main__":
     test_CG_intersection_matches_2()
 
     test_atom_creation()
-    test_atom_and_1()
-    test_atom_and_2()
-    test_atom_negate()
-    test_atom_difference()
-    test_atom_or()
 
     test_path_creation()
     test_path_concatenation()
