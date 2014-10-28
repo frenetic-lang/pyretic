@@ -475,7 +475,7 @@ class path_policy_utils(object):
         """
         if (isinstance(ast, path_epsilon) or
             isinstance(ast, path_empty) or
-            isinstance(ast, abstract_atom)):
+            isinstance(ast, in_out_atom)):
             return fold_f(acc, ast)
         elif isinstance(ast, path_combinator):
             acc = fold_f(acc, ast)

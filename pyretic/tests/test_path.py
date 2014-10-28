@@ -487,15 +487,19 @@ def test_path_compile_2():
 ## TODO(ngsrinivas): in_out_atom compilation
 
 def test_empty_paths():
-    cg.clear()
-    (tagging, capture) = pathcomp.compile(path_empty())
+    in_cg.clear()
+    out_cg.clear()
+    (in_tag, in_cap, out_tag, out_cap) = pathcomp.compile(path_empty())
     ref_tagging = ((identity >> ~match(path_tag=None) >>
                     modify(path_tag=None)) +
                    match(path_tag=None))
     ref_capture = drop
-    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
-    assert tagging._classifier == ref_tagging._classifier
-    assert capture._classifier == ref_capture._classifier
+    [x.compile() for x in [in_tag, in_cap, out_tag, out_cap,
+                           ref_tagging, ref_capture]]
+    assert in_tag._classifier == ref_tagging._classifier
+    assert in_cap._classifier == ref_capture._classifier
+    assert out_tag._classifier == ref_tagging._classifier
+    assert out_cap._classifier == ref_capture._classifier
 
 ### Tests for path policy ast folding routine. ###
 
@@ -504,7 +508,8 @@ add_dyn  = path_policy_utils.add_dynamic_path_pols
 re_pols  = pathcomp.__get_re_pols__
 
 def test_ast_fold():
-    cg.clear()
+    in_cg.clear()
+    out_cg.clear()
     a1 = atom(match(srcip=ip1))
     a2 = atom(match(srcip=ip2))
 
