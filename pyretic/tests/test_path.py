@@ -443,40 +443,45 @@ def test_path_compile_2():
     a2 = atom(match(dstip=ip2))
     (in_tag, in_cap, out_tag, out_cap) = pathcomp.compile(a1 ^ a2)
 
-    pred_a = match(srcip=ip1) & match(dstip=ip2)
-    pred_b = match(srcip=ip1) & ~match(dstip=ip2)
-    pred_c = match(dstip=ip2) & ~match(srcip=ip1)
-    tag_1  = match(path_tag=1)
-    tag_2  = match(path_tag=2)
-    tag_3  = match(path_tag=3)
-    tag_4  = match(path_tag=4)
-    tag_n  = match(path_tag=None)
+    pred_a = match(srcip=ip1) & ~match(dstip=ip2)
+    pred_b = match(dstip=ip2) & ~match(srcip=ip1)
+    pred_c = match(srcip=ip1) & match(dstip=ip2)
 
-    print in_tag
-    print in_cap
-    print out_tag
-    print out_cap
-    sys.exit(0)
+    ref_in_tag = ((~(pred_a | pred_b | pred_c) >> ~match(path_tag=2) >>
+                    modify(path_tag=2)) +
+                  (match(path_tag=2)) +
+                  ((match(path_tag=3) & pred_a) >> modify(path_tag=2)) +
+                  ((match(path_tag=3) & pred_b) >> modify(path_tag=4)) +
+                  ((match(path_tag=3) & pred_c) >> modify(path_tag=4)) +
+                  ((match(path_tag=5) & pred_a) >> modify(path_tag=2)) +
+                  ((match(path_tag=5) & pred_b) >> modify(path_tag=2)) +
+                  ((match(path_tag=5) & pred_c) >> modify(path_tag=2)) +
+                  ((match(path_tag=None) & pred_a) >> modify(path_tag=1)) +
+                  ((match(path_tag=None) & pred_b) >> modify(path_tag=2)) +
+                  ((match(path_tag=None) & pred_c) >> modify(path_tag=1)) +
+                  ((match(path_tag=1) & pred_a) >> modify(path_tag=2)) +
+                  ((match(path_tag=1) & pred_b) >> modify(path_tag=2)) +
+                  ((match(path_tag=1) & pred_c) >> modify(path_tag=2)) +
+                  ((match(path_tag=4) & pred_a) >> modify(path_tag=2)) +
+                  ((match(path_tag=4) & pred_b) >> modify(path_tag=2)) +
+                  ((match(path_tag=4) & pred_c) >> modify(path_tag=2)))
+    ref_in_cap = drop
+    ref_out_tag = ((~identity >> ~match(path_tag=2) >> modify(path_tag=2)) +
+                   (match(path_tag=2)) +
+                   (match(path_tag=3) >> identity >> modify(path_tag=2)) +
+                   (match(path_tag=5) >> identity >> modify(path_tag=2)) +
+                   (match(path_tag=None) >> identity >> modify(path_tag=2)) +
+                   (match(path_tag=1) >> identity >> modify(path_tag=3)) +
+                   (match(path_tag=4) >> identity >> modify(path_tag=5)))
+    ref_out_cap = (drop +
+                   (match(path_tag=4) >> identity >> FwdBucket()))
 
-    # TODO: correct ref_ policies
-    ref_tagging = ((~(pred_a | pred_b | pred_c) >> ~match(path_tag=3) >>
-                     modify(path_tag=3)) +
-                   (match(path_tag=3)) +
-                   ((match(path_tag=1) & pred_a) >> modify(path_tag=2)) +
-                   ((match(path_tag=1) & pred_b) >> modify(path_tag=3)) +
-                   ((match(path_tag=1) & pred_c) >> modify(path_tag=2)) +
-                   ((match(path_tag=2) & pred_a) >> modify(path_tag=3)) +
-                   ((match(path_tag=2) & pred_b) >> modify(path_tag=3)) +
-                   ((match(path_tag=2) & pred_c) >> modify(path_tag=3)) +
-                   ((match(path_tag=None) & pred_a) >> modify(path_tag=1)) +
-                   ((match(path_tag=None) & pred_b) >> modify(path_tag=1)) +
-                   ((match(path_tag=None) & pred_c) >> modify(path_tag=3)))
-    ref_capture = (drop +
-                   ((match(path_tag=1) & pred_a) >> FwdBucket()) +
-                   ((match(path_tag=1) & pred_c) >> FwdBucket()))
-    [x.compile() for x in [tagging, capture, ref_tagging, ref_capture]]
-    assert tagging._classifier == ref_tagging._classifier
-    assert capture._classifier == ref_capture._classifier
+    [x.compile() for x in [in_tag, in_cap, out_tag, out_cap,
+                           ref_in_tag, ref_in_cap, ref_out_tag, ref_out_cap]]
+    assert in_tag._classifier == ref_in_tag._classifier
+    assert in_cap._classifier == ref_in_cap._classifier
+    assert out_tag._classifier == ref_out_tag._classifier
+    assert out_cap._classifier == ref_out_cap._classifier
 
 ## TODO(ngsrinivas): add a new test case that mixes in and out atoms
 ## TODO(ngsrinivas): in_out_atom compilation

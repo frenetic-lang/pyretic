@@ -662,18 +662,11 @@ class in_out_atom(path):
         self.out_pred = out_pred
         self.in_atom  = __in__(in_pred)
         self.out_atom = __out__(out_pred)
-        self._re_tree = None
         super(in_out_atom, self).__init__()
 
     @property
     def re_tree(self):
-        if not self._re_tree:
-            self._re_tree = self.in_atom.re_tree ^ self.out_atom.re_tree
-        return self._re_tree
-
-    @re_tree.setter
-    def re_tree(self, rt):
-        self._re_tree = rt
+        return self.in_atom.re_tree ^ self.out_atom.re_tree
 
     def __eq__(self, other):
         return (isinstance(other, in_out_atom) and
