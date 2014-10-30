@@ -334,6 +334,42 @@ def path_test_dynamic_1():
     dyn_thread.start()
     return p
 
+def path_test_19():
+    p = out_atom(match(switch=1, outport=1))
+    p.register_callback(query_callback(19))
+    return p
+
+def path_test_20():
+    p = in_out_atom(match(switch=2, inport=3), match(switch=2, outport=1))
+    p.register_callback(query_callback(20))
+    return p
+
+def path_test_21():
+    p = +in_atom(identity) ^ out_atom(egress_network())
+    p.register_callback(query_callback(21))
+    return p
+
+def path_test_22():
+    p1 = in_atom(match(switch=1)) ^ out_atom(match(switch=2))
+    p2 = out_atom(match(switch=1)) ^ in_atom(match(switch=2))
+    p1.register_callback(query_callback("22.p1"))
+    p2.register_callback(query_callback("22.p2"))
+    return p1 + p2
+
+def path_test_23():
+    p1 = in_atom(match(switch=1,inport=2)) ^ out_atom(match(switch=2,outport=3))
+    p2 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
+    p1.register_callback(query_callback("23.p1"))
+    p2.register_callback(query_callback("23.p2"))
+    return p1 + p2
+
+def path_test_24():
+    p1 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
+    p2 = out_atom(match(switch=2,outport=1)) ^ in_atom(match(switch=1,inport=1))
+    p1.register_callback(query_callback("24.p1"))
+    p2.register_callback(query_callback("24.p2"))
+    return p1 + p2
+
 # type: unit -> path list
 def path_main():
     return path_test_waypoint_violation()
