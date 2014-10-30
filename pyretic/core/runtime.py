@@ -76,7 +76,7 @@ class Runtime(object):
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            pathcomp.init_tag_field(NUM_PATH_TAGS)
+            pathcomp.init(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.policy = ((self.path_in_tagging

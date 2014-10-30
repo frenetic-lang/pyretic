@@ -161,6 +161,7 @@ def test_CG_equal_matches():
 
     generate_re_trees([a1, a2])
     assert len(in_cg.pred_to_symbol.keys()) == 1
+    assert len(out_cg.pred_to_symbol.keys()) == 1
     ms = [match(srcip=ip1)]
     in_syms  = assert_and_get_syms(ms, in_cg)
     out_syms = assert_and_get_syms([identity], out_cg)
@@ -215,6 +216,7 @@ def test_CG_superset_matches():
 
     generate_re_trees([a1, a2])
     assert len(in_cg.pred_to_symbol.keys()) == 2
+    assert len(out_cg.pred_to_symbol.keys()) == 1
     ms = [match(srcip=ip1) & match(switch=2),
           match(srcip=ip1) & ~(match(srcip=ip1) & match(switch=2))]
 
@@ -242,6 +244,7 @@ def test_CG_subset_matches():
 
     generate_re_trees([a1, a2])
     assert len(in_cg.pred_to_symbol.keys()) == 2
+    assert len(out_cg.pred_to_symbol.keys()) == 1
 
     ms = [(match(srcip=ip1, switch=2)),
           (match(srcip=ip1) & ~match(srcip=ip1, switch=2))]
@@ -304,6 +307,7 @@ def test_CG_intersection_matches_2():
 
     generate_re_trees([a1, a2, a3])
     assert len(in_cg.pred_to_symbol.keys()) == 2
+    assert len(out_cg.pred_to_symbol.keys()) == 1
     ms = [match(srcip=ip1),
           match(srcip=ip2)]
 

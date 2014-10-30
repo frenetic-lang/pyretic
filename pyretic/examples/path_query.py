@@ -113,6 +113,11 @@ def path_callback(test_num):
         print '**************'
     return actual_callback
 
+def path_test_0():
+    p = atom(match(switch=2))
+    p.register_callback(query_callback(0))
+    return p
+
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
     a2 = atom(match(switch=3,dstip=ip3))

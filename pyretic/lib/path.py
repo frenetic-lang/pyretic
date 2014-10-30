@@ -962,10 +962,12 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
-    def init_tag_field(cls, numvals):
+    def init(cls, numvals):
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
+        __in_re_tree_gen__.clear()
+        __out_re_tree_gen__.clear()
 
     @classmethod
     def compile(cls, path_pol, max_states=1022):
