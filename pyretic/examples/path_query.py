@@ -147,6 +147,18 @@ def path_test_4():
     query_thread.start()
     return p
 
+def path_test_4_5():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=2))
+    p = a1 ^ a2
+    cb = CountBucket()
+    p.set_bucket(cb)
+    p.register_callback(query_callback(4))
+    query_thread = threading.Thread(target=query_func, args=(cb,5.0))
+    query_thread.daemon = True
+    query_thread.start()
+    return p
+
 def path_test_5():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))

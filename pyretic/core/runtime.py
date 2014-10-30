@@ -79,17 +79,16 @@ class Runtime(object):
             pathcomp.init(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
-            self.policy = ((self.path_in_tagging
-                            >> self.policy
-                            >> self.path_out_tagging) +
-                           (self.path_in_capture) +
-                           (self.path_in_tagging
-                            >> self.policy
-                            >> self.path_out_capture))
-            # Virtual field composition
-            self.policy = (virtual_field_tagging() >>
-                           self.policy >>
-                           virtual_field_untagging())
+            in_tag_policy = self.path_in_tagging >> self.policy
+            forwarding = (in_tag_policy >> self.path_out_tagging)
+            in_capture  = self.path_in_capture
+            out_capture = (in_tag_policy >> self.path_out_capture)
+            virtual_tag = virtual_field_tagging()
+            virtual_untag = virtual_field_untagging()
+            self.policy = ((virtual_tag >>
+                            (in_capture + forwarding) >>
+                            virtual_untag) +
+                           (virtual_tag >> out_capture))
 
         self.mode = mode
         self.backend = backend

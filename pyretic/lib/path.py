@@ -551,7 +551,7 @@ class path(path_policy):
         x ** y is just a shorthand for x ^ identity* ^ y.
         """
         assert isinstance(other, path)
-        return path_concat.smart_concat([self, +atom(identity), other])
+        return path_concat.smart_concat([self, +in_atom(identity), other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
