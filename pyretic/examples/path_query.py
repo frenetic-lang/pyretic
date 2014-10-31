@@ -370,11 +370,66 @@ def path_test_24():
     p2.register_callback(query_callback("24.p2"))
     return p1 + p2
 
+def path_test_per_hop_pktcount(**kwargs):
+    """ Get packet counts of traffic from h_1 and h_n along a chain topology of
+    length n, at each hop.
+    """
+    def setup_query(partial_query, query_pred, i, count=False):
+        new_query = partial_query ^ atom(query_pred)
+        if count:
+            cb = CountBucket()
+            new_query.set_bucket(cb)
+            query_thread = threading.Thread(target=query_func, args=(cb,10.0))
+            query_thread.daemon = True
+            query_thread.start()
+        new_query.register_callback(query_callback("per_hop_" + str(i)))
+        return new_query
+
+    params = dict(**kwargs)
+    n = int(params['n'])
+    p = path_epsilon()
+    ip1 = IPAddr('10.0.0.1')
+    ipn = IPAddr('10.0.0.' + str(n))
+    partial_query = setup_query(path_epsilon(),
+                            match(switch=1, srcip=ip1, dstip=ipn),
+                            1)
+    p += partial_query
+    for i in range(2, n+1):
+        partial_query = setup_query(partial_query,
+                                    match(switch=i),
+                                    i)
+        p += partial_query
+    return p
+
+def chain_forwarding(**kwargs):
+    params = dict(**kwargs)
+    n = int(params['n'])
+    ips = [0] + map(lambda x: IPAddr('10.0.0.' + str(x)), range(1, n+1))
+    host_pol = drop
+    for h in range(1, n+1):
+        switch_pol = drop
+        for s in range(1, n+1):
+            if s == h:
+                if h == 1 or h == n:
+                    switch_pol += (match(dstip=ips[h], switch=s) >> fwd(2))
+                else:
+                    switch_pol += (match(dstip=ips[h], switch=s) >> fwd(3))
+            elif s == 1:
+                switch_pol += (match(dstip=ips[h], switch=1) >> fwd(1))
+            elif s < h:
+                switch_pol += (match(dstip=ips[h], switch=s) >> fwd(2))
+            elif s > h:
+                switch_pol += (match(dstip=ips[h], switch=s) >> fwd(1))
+            else:
+                raise RuntimeError("unmatchable condition.")
+        host_pol += switch_pol
+    return host_pol
+
 # type: unit -> path list
-def path_main():
+def path_main(**kwargs):
     return path_test_waypoint_violation()
 
-def main():
+def main(**kwargs):
 #    return mac_learner()
 #    return static_fwding_chain_3_3
     return static_fwding_cycle_4_4_spanning_tree_1
