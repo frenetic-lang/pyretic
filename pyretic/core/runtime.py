@@ -194,7 +194,7 @@ class Runtime(object):
         with self.policy_lock:
 
             # tag stale classifiers as invalid
-            recompile_list = on_recompile_path_list(list(), id(sub_pol),
+            recompile_list = on_recompile_path_list(id(sub_pol),
                                                     self.policy)
             map(lambda p: p.invalidate_classifier(), recompile_list)
 

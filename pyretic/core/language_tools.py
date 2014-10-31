@@ -208,7 +208,7 @@ def on_recompile_path_set(acc,pol_id,policy):
     else:
         raise NotImplementedError
 
-def on_recompile_path_list(acc,pol_id,policy):
+def on_recompile_path_list(pol_id,policy):
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -223,19 +223,19 @@ def on_recompile_path_list(acc,pol_id,policy):
           isinstance(policy,intersection)):
         sub_acc = list()
         for sub_policy in policy.policies:
-            sub_acc += on_recompile_path_list(sub_acc,pol_id,sub_policy)
+            sub_acc += on_recompile_path_list(pol_id,sub_policy)
         if sub_acc:
-            return acc + [policy] + sub_acc
+            return [policy] + sub_acc
         else:
-            return acc
+            return list()
     elif isinstance(policy,DerivedPolicy):
         if id(policy) == pol_id:
-            return acc + [policy]
+            return [policy]
         else:
-            sub_acc = on_recompile_path_list(list(),pol_id,policy.policy)
+            sub_acc = on_recompile_path_list(pol_id,policy.policy)
             if sub_acc:
-                return acc + [policy] + sub_acc
+                return [policy] + sub_acc
             else:
-                return acc
+                return list()
     else:
         raise NotImplementedError
