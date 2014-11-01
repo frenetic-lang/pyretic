@@ -42,7 +42,6 @@ def stop():
     global symbol_path
     global rule_cnt_file
 
-    print 'stoppppppppppppping', time.time()
     if monitoring:
         report_dfa(dfa_path, symbol_path, path)
         create_overall_report(path, rule_cnt_file, os.path.basename(dfa_path))
@@ -81,7 +80,8 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
 
     # general statstics gathered
     try:
-        g = open('general_stats.txt', 'r')
+        g = open(adjust_func('general_stats.txt'), 'r')
+        print 'here'
         for line in g.readlines():
             f.write(line)
         f.write('--------------------------------------\n')
@@ -177,7 +177,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
         pass
  
 
-    rule_cnt = 0
+    '''rule_cnt = 0
     rule_avg = 0
    
     try:
@@ -191,10 +191,13 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
                 rule_avg = float(line[line.index(':') + 2 : -1])
         g.close()
     except:
-        pass
+        pass'''
 
     tagging_edge = 0
     capture_edge = 0
+
+    switch_cnt = 0
+    rule_cnt = 0
    
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
@@ -205,9 +208,19 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
             elif 'capture edges' in line:
                 capture_edge = int(line[line.index(':') + 2 : -1])
 
+            elif 'switch count' in line:
+                switch_cnt = int(line[line.index(':') + 2 :-1])
+
+            elif 'rule count' in line:
+                rule_cnt = int(line[line.index(':') + 2 : -1])
+
         g.close()
     except:
         pass
+
+    rule_avg = 0
+    if switch_cnt and rule_cnt:
+        rule_avg = float(rule_cnt) / switch_cnt
 
     gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge] 
 
