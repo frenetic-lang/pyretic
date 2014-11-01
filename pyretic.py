@@ -42,9 +42,11 @@ import logging
 from multiprocessing import Queue, Process
 import pyretic.core.util as util
 import yappi
+from pyretic.evaluations import stat
 
 of_client = None
 enable_profile = False
+eval_profile_enabled = False
 
 def signal_handler(signal, frame):
     print '\n----starting pyretic shutdown------'
@@ -62,6 +64,11 @@ def signal_handler(signal, frame):
         funcstats.sort("tsub")
         funcstats.print_all(columns={0:("name",38), 1:("ncall",8), 2:("tsub",8),
                                      3:("ttot",8), 4:("tavg", 8)})
+
+    global eval_profile_enabled
+    if eval_profile_enabled:
+        stat.stop()
+
     sys.exit(0)
 
 
@@ -94,6 +101,10 @@ def parseArgs():
     op.add_option( '--enable_profile', '-p', action="store_true",
                    dest="enable_profile",
                    help = 'enable yappi multithreaded profiler' )
+
+    op.add_option('--eval_profile_enabled', '-e', action='store', 
+                    type='string', dest='eval_result_path', 
+                   )
 
     op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False)
     options, args = op.parse_args()
@@ -174,6 +185,11 @@ def main():
     handler = util.QueueStreamHandler(logging_queue)
     logger.addHandler(handler)
     logger.setLevel(log_level)
+
+    if options.eval_result_path:
+        global eval_profile_enabled
+        eval_profile_enabled = True
+        stat.start(options.eval_result_path)
     
     runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity)
     if not options.frontend_only:

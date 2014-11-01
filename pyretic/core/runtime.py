@@ -63,46 +63,14 @@ class Runtime(object):
     :type verbosity: string
     """
     
-    @stat.classifier_size
-    @stat.elapsed_time
-    def forwarding_compile(self):
-        return self.policy.compile()
-     
-    @stat.classifier_size
-    @stat.elapsed_time
-    def tagging_compile(self):
-        return self.path_tagging.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def capture_compile(self):
-        return self.path_capture.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def vf_tag_compile(self):
-        return self.vf_tag_pol.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def vf_untag_compile(self):
-        return self.vf_untag_pol.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def tag_fw_cap_compile(self):
-        return self.policy.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def first_whole_compile(self):
-        return self.policy.compile()
-
+    
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
+        print type(self.network.topology)
+        print self.network.topology
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
 
@@ -134,15 +102,11 @@ class Runtime(object):
             self.vf_tag_pol = virtual_field_tagging()
             self.vf_untag_pol = virtual_field_untagging()
 
-           # self.vf_tag_compile()
-            #self.vf_untag_compile()
 
             self.policy = (self.vf_tag_pol >>
                            self.policy >>
                            self.vf_untag_pol)
 
-            #print "first : " , str(self.policy)
-            #self.first_whole_compile()
 
         self.mode = mode
         self.backend = backend
@@ -177,6 +141,44 @@ class Runtime(object):
         self.num_packet_ins = 0
         self.update_dynamic_sub_pols()
 
+######################
+# Stat Methods 
+######################
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def forwarding_compile(self):
+        return self.policy.compile()
+     
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tagging_compile(self):
+        return self.path_tagging.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def capture_compile(self):
+        return self.path_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vf_tag_compile(self):
+        return self.vf_tag_pol.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vf_untag_compile(self):
+        return self.vf_untag_pol.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fw_cap_compile(self):
+        return self.policy.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def first_whole_compile(self):
+        return self.policy.compile()
 
 
     def verbosity_numeric(self,verbosity_option):
@@ -1797,3 +1799,6 @@ class virtual_field:
         }
 
 virtual_field.fields = {}
+
+
+

@@ -77,40 +77,11 @@ def report_rule_counts(switches, file_path):
     f.close()
         
 
-def report_dfa_state_count(dfa_path, output_path):
-    f = open(dfa_path, 'r')
-    cnt = 0
-    for line in f.readlines():
-        if 'shape' in line:
-            cnt += 1
-
-    f.close()
-    f = open(output_path, 'w')
-    f.write('dfa state count : %d \n' % cnt)
-    f.write('--------------------\n')
-    f.close()   
-################################################################################
-#### Test-case-specific functions
-################################################################################
-
-
-################################################################################
-#### Diagnostics
-################################################################################
-
-def ping_flow_pairs(net, hosts_src, hosts_dst):
-    """ Test connectivity between flow sources and destinations """
-    assert len(hosts_src) == len(hosts_dst)
-    for i in range(0, len(hosts_src)):
-        result = hosts_src[i].cmd('ping -c1 %s' % (hosts_dst[i].IP()))
-        sent, received = net._parsePing(result)
-        print ('%d ' % i) if received else 'X '
-
 ################################################################################
 ### Essentials test setup functions on all test cases
 ################################################################################
 
-def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
+def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath, results_path):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
     # Hackety hack. I don't know of any other way to supply the PYTHONPATH
@@ -119,7 +90,7 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
     if not "PYTHONPATH" in py_env:
         py_env["PYTHONPATH"] = pythonpath
 
-    cmd = ("pyretic.py -m p0 pyretic.evaluations.eval_path --test=" + test +
+    cmd = ("pyretic.py -m p0 pyretic.evaluations.eval_path -e " + results_path  + " --test=" + test +
            reduce(lambda r, k: r + ("--" + k + "=" + testwise_params[k] + " "),
                   testwise_params.keys(), " "))
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
@@ -154,56 +125,6 @@ def wait_switch_rules_installed(switches):
     time_waited = per_iter_timeout * num_iterations
     print "Rules fully installed after waiting", time_waited, "seconds"
 
-def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
-                   per_transfer_bandwidth, client_prefix, server_prefix):
-    """Run UDP iperf transfers between hosts_src and hosts_dst pairs for
-    test_duration_sec seconds, with a targeted bandwidth of
-    per_transfer_bandwidth.
-    """
-    # start iperf servers
-    for dst in hosts_dst:
-        dst_server_file = server_prefix + '-' + dst.name + '.txt'
-        dst.cmd("iperf -fK -u -s -p 5002 2>&1 > " + dst_server_file + " &")
-    print "Finished starting up iperf servers..."
-
-    # start iperf client transfers
-    iperf_min = 1.63 * 1000 * 8
-    std_bw = standardize_bw(per_transfer_bandwidth)
-    for i in range(0, len(hosts_src)):
-        src = hosts_src[i]
-        src_client_file = client_prefix + '-' + src.name + '.txt'
-        if std_bw[i] >= iperf_min:
-            src.cmd("iperf -fK -t " + str(test_duration_sec) + " -c " +
-                    hosts_dst[i].IP() + " -u -p 5002 -b " +
-                    per_transfer_bandwidth[i] + " 2>&1 > " + src_client_file +
-                    "&")
-        else:
-            print ("Avoiding transfer %s ---> %s because target bandwidth is too"
-                   " low" % (src.name, hosts_dst[i].name))
-    print "Client transfers initiated."
-
-def get_interfaces(intr_list):
-    """ Helper function to get tshark interface argument for a switch sw, whose
-    interfaces in interface_list must be captured."""
-    return reduce(lambda r, intr: r + "-i " + intr + " ", intr_list, ' ')
-
-def get_fds_processes(cmds, files):
-    """ Helper function to get the processes and output files of commands
-    specified in `cmds`, with corresponding output/error streams written to
-    entries in `files`."""
-    out_fds = []
-    processes = []
-    assert len(cmds) == len(files)
-    for i in range(0, len(cmds)):
-        f = files[i]
-        cmd = cmds[i]
-        out_fds.append(open(f, 'w'))
-        processes.append(subprocess.Popen(shlex.split(cmd),
-                                          stdout=out_fds[-1],
-                                          stderr=subprocess.STDOUT))
-    return processes, out_fds
-
-
 ################################################################################
 ### The main function.
 ################################################################################
@@ -212,16 +133,16 @@ def query_test():
     """ Main """
     # Configuring the experiment.
     args = parse_args()
-    default_results_path = './results/'
+    results_path = args.results_folder
     
-    if not os.path.exists(default_results_path):
-        os.makedirs(default_results_path)
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
         
     # Get path adjustment function
-    adjust_path = get_adjust_path(default_results_path)
+    adjust_path = get_adjust_path(results_path)
 
 
-    for f in os.listdir(default_results_path):
+    for f in os.listdir(results_path):
         fpath = adjust_path(f)
         os.unlink(fpath)
     # Global parameters used by specific tests as well
@@ -238,10 +159,7 @@ def query_test():
     s_cnt = adjust_path("rule-count.txt") 
     
 
-    iperf_client_prefix = adjust_path("client-udp")
-    iperf_server_prefix = adjust_path("server-udp")
     params_file = adjust_path("params.txt")
-    tshark_wait_slack_sec = 3
 
     # Explicit spelling-out of testwise parameters for pyretic controller
     testwise_params = get_testwise_params(test, args)
@@ -249,7 +167,6 @@ def query_test():
     # Hack to set pythonpath.
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
     test_module_path = "pyretic.evaluations.Tests."
-    dfa_path = "/tmp/pyretic-regexes.txt.dot"
     # Actual experiment setup.
     mn_cleanup()
     import importlib
@@ -259,7 +176,7 @@ def query_test():
     ctlr = None
     if not controller_debug_mode:
         print "Starting pyretic controller"
-        ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath)
+        ctlr = pyretic_controller(test, testwise_params, c_out, c_err, pypath, results_path)
 
     print "Setting up topology"
     (net, hosts, switches, topo) = setup_network(test_module, args)
@@ -280,7 +197,6 @@ def query_test():
         print "*** YOU must start the controller separately for this to work!"
     wait_switch_rules_installed(switches)
 
-    report_dfa_state_count(dfa_path, s_cnt)
     report_rule_counts(switches,s_cnt)
     
     #net.pingAll()
@@ -300,116 +216,11 @@ def query_test():
         CLI(net)
         net.stop()
 
-    create_overall_report(default_results_path, s_cnt)
-    create_excel_report(default_results_path, s_cnt)
-    import shutil
-    shutil.move(default_results_path, args.results_folder)
-    shutil.copy('/tmp/pyretic-regexes.txt.dot', args.results_folder)
-    shutil.copy('/tmp/symbols.txt', args.results_folder)
-        
+       
 
 ################################################################################
 ### Cleanup-related functions
 ################################################################################
-
-def create_overall_report(results_path, s_cnt):
-    adjust_func = get_adjust_path(results_path)
-    f = open(adjust_func('performance_report.txt'), 'w')
-
-    g = open(s_cnt, 'r');
-    for line in g.readlines():
-        f.write(line)
-    g.close()
-
-    files = os.listdir(results_path)
-    profiles = [ p for p in files if (".profile" in p)]
-    cls = [p for p in files if ".cls" in p]
-
-    for prof in profiles:
-        g = open(adjust_func(prof), 'r')
-        name = prof[:-8]
-        f.write(name + '\n')
-        for line in g.readlines():
-            f.write(line)
-        g.close()
-        c = [p for p in cls if name in p]
-        if len(c) == 1:
-            g = open(adjust_func(c[0]), 'r')
-            for line in g.readlines():
-                f.write(line)
-        f.write('--------------------------------------\n')
-
-    f.close() 
-    
-
-def create_excel_report(results_path, s_cnt):
-    cols = [ ["makeDFA_vector", 'compile', 'forwarding_compile', 'tagging_compile', 'capture_compile', 'tag_fw_cap_compile'],
-                ['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],   
-            ]
-
-    adjust_func = get_adjust_path(results_path)
-    f = open(adjust_func('excel_report.txt'), 'w')
-    
-    for col in cols:
-        for c in col:
-            cpath = adjust_func(c + '.profile')
-            if os.path.exists(cpath):
-                g = open(cpath, 'r')
-                for line in g.readlines():
-                    if "average" in line:
-                        f.write(line[line.index(':') + 2 :-1] + "\t")
-                        break
-                g.close()
-            else:
-                f.write('0\t')
-
-            cpath = adjust_func(c + '.cls')
-            if os.path.exists(cpath):
-                g = open(cpath, 'r')
-                for line in g.readlines():
-                    if "classifier" in line:
-                        f.write(line[line.index(':') + 2 :-1] + "\t")
-                        break
-                g.close()
-
-        f.write('\n')
-    
-    dfa_state_cnt = 0
-    rule_cnt = 0
-    rule_avg = 0
-    
-    g = open(adjust_func('rule-count.txt'), 'r')
-    for line in g.readlines():
-        if "dfa state count" in line:
-            dfa_state_cnt = int(line[line.index(':') + 2:-1])
-
-        elif 'total rule count' in line:
-            rule_cnt = int(line[line.index(':') + 2 : -1])
-
-        elif 'average rule count' in line:
-            rule_avg = float(line[line.index(':') + 2 : -1])
-    g.close()
-
-    tagging_edge = 0
-    capture_edge = 0
-    
-    g = open(adjust_func('general_stats.txt'), 'r')
-    for line in g.readlines():
-        if "tagging edges" in line:
-            tagging_edge = int(line[line.index(':') + 2:-1])
-
-        elif 'capture edges' in line:
-            capture_edge = int(line[line.index(':') + 2 : -1])
-
-    g.close()
-
-    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge] 
-
-    for gen in gen_list:
-        f.write(str(gen) + "\t")
-    f.write('\n')        
-
-    f.close()
 
            
 def mn_cleanup():
