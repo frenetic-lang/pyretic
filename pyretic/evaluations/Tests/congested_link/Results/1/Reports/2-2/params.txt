@@ -1,0 +1,11 @@
+profile True
+controller_debug_mode False
+cli False
+listen_port 6634
+test_duration_sec 30
+total_traffic_prefix total-traffic
+slack_factor 5.0
+topo_args [2, 2]
+results_folder ./2-2
+policy_args ['n', '2', 'm', '2']
+test congested_link

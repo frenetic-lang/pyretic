@@ -40,6 +40,9 @@ import pyretic.vendor
 import pydot
 import copy
 
+
+from pyretic.evaluations import stat
+
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
 # token type definitions
 TOK_INGRESS = "ingress"
@@ -926,7 +929,9 @@ class pathcomp(object):
                       values=range(0, numvals),
                       type="integer")
 
+
     @classmethod
+    @stat.elapsed_time
     def compile(cls, path_pol, max_states=1022):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
@@ -937,7 +942,9 @@ class pathcomp(object):
         re_pols  = cls.__get_re_pols__
         prep_trees = cls.__prep_re_trees__
 
+        
         ast_fold(path_pol, prep_trees, None)
+
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
         assert du.get_num_states(dfa) <= max_states
@@ -949,6 +956,10 @@ class pathcomp(object):
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
         get_pred  = cls.__get_pred__
 
+        
+        tag_rules = 0
+        cap_rules = 0
+
         edges = du.get_edges(dfa)
         for edge in edges:
             src = du.get_edge_src(dfa, edge)
@@ -956,13 +967,17 @@ class pathcomp(object):
             pred = get_pred(edge)
             if not du.is_dead(dfa, src):
                 tagging += ((match_tag(src) & pred) >> set_tag(dst))
+                tag_rules += 1
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
                     capture_pol = pol_list[i]
                     capture += ((match_tag(src) & pred) >> capture_pol)
+                    cap_rules += 1
 
+        stat.gather_general_stats('tagging edges', tag_rules, 0, False)
+        stat.gather_general_stats('capture edges', cap_rules, 0, False)  
         return (tagging, capture)
 
     def path_mod_add(paths, p):

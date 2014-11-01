@@ -1,0 +1,17 @@
+1: match: ('switch', 1)
+4: match: ('switch', 4)
+6: match: ('switch', 5)
+9: intersection:
+    identity
+    negate:
+        match: ('switch', 1)
+    negate:
+        match: ('switch', 4)
+    negate:
+        match: ('switch', 5)
+    negate:
+        match: ('switch', 2)
+    negate:
+        match: ('switch', 3)
+8: match: ('switch', 2)
+:: match: ('switch', 3)

@@ -1,0 +1,11 @@
+profile True
+controller_debug_mode False
+cli False
+listen_port 6634
+test_duration_sec 30
+total_traffic_prefix total-traffic
+slack_factor 5.0
+topo_args [3, 5]
+results_folder ./Reports/3-5vim
+policy_args ['n', '3', 'm', '5']
+test congested_link

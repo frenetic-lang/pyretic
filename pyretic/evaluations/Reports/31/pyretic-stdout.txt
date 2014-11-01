@@ -1,0 +1,52 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-09 10] connected
+INFO:openflow.of_01:[00-00-00-00-00-10 2] connected
+INFO:openflow.of_01:[00-00-00-00-00-1f 5] connected
+INFO:openflow.of_01:[00-00-00-00-00-11 1] connected
+INFO:openflow.of_01:[00-00-00-00-00-1d 12] connected
+INFO:openflow.of_01:[00-00-00-00-00-04 3] connected
+INFO:openflow.of_01:[00-00-00-00-00-01 11] connected
+INFO:openflow.of_01:[00-00-00-00-00-0b 6] connected
+INFO:openflow.of_01:[00-00-00-00-00-19 15] connected
+INFO:openflow.of_01:[00-00-00-00-00-17 9] connected
+INFO:openflow.of_01:[00-00-00-00-00-1e 14] connected
+INFO:openflow.of_01:[00-00-00-00-00-1a 8] connected
+INFO:openflow.of_01:[00-00-00-00-00-02 4] connected
+INFO:openflow.of_01:[00-00-00-00-00-0a 7] connected
+INFO:openflow.of_01:[00-00-00-00-00-15 13] connected
+INFO:openflow.of_01:[00-00-00-00-00-13 16] connected
+INFO:openflow.of_01:[00-00-00-00-00-12 17] connected
+INFO:openflow.of_01:[00-00-00-00-00-0e 19] connected
+INFO:openflow.of_01:[00-00-00-00-00-0f 18] connected
+INFO:openflow.of_01:[None 20] closed
+INFO:openflow.of_01:[None 21] disconnected
+INFO:openflow.of_01:[None 21] closed
+INFO:openflow.of_01:[None 22] disconnected
+INFO:openflow.of_01:[None 23] disconnected
+INFO:openflow.of_01:[None 22] closed
+INFO:openflow.of_01:[None 24] disconnected
+INFO:openflow.of_01:[None 23] closed
+INFO:openflow.of_01:[None 24] closed
+INFO:openflow.of_01:[None 25] disconnected
+INFO:openflow.of_01:[None 26] disconnected
+INFO:openflow.of_01:[None 25] closed
+INFO:openflow.of_01:[None 27] disconnected
+INFO:openflow.of_01:[None 26] closed
+INFO:openflow.of_01:[None 27] closed
+INFO:openflow.of_01:[00-00-00-00-00-06 29] connected
+INFO:openflow.of_01:[00-00-00-00-00-08 28] connected
+INFO:openflow.of_01:[00-00-00-00-00-1c 30] connected
+INFO:openflow.of_01:[00-00-00-00-00-05 31] connected
+INFO:openflow.of_01:[00-00-00-00-00-0d 35] connected
+INFO:openflow.of_01:[00-00-00-00-00-07 33] connected
+INFO:openflow.of_01:[00-00-00-00-00-16 34] connected
+INFO:openflow.of_01:[00-00-00-00-00-18 32] connected
+INFO:openflow.of_01:[00-00-00-00-00-0c 36] connected
+INFO:openflow.of_01:[00-00-00-00-00-14 38] connected
+INFO:openflow.of_01:[00-00-00-00-00-1b 37] connected
+INFO:openflow.of_01:[00-00-00-00-00-03 39] connected
+
+----starting pyretic shutdown------
+attempting to kill of_client
+pyretic.py done

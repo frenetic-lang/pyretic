@@ -44,6 +44,8 @@ TABLE_START_PRIORITY = 60000
 STATS_REQUERY_THRESHOLD_SEC = 10
 NUM_PATH_TAGS=1022
 
+from pyretic.evaluations import stat
+
 class Runtime(object):
     """
     The Runtime system.  Includes packet handling, compilation to OF switches,
@@ -60,6 +62,42 @@ class Runtime(object):
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
     """
+    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def forwarding_compile(self):
+        return self.policy.compile()
+     
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tagging_compile(self):
+        return self.path_tagging.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def capture_compile(self):
+        return self.path_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vf_tag_compile(self):
+        return self.vf_tag_pol.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vf_untag_compile(self):
+        return self.vf_untag_pol.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fw_cap_compile(self):
+        return self.policy.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def first_whole_compile(self):
+        return self.policy.compile()
+
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal'):
         self.verbosity = self.verbosity_numeric(verbosity)
@@ -67,22 +105,44 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
+
+        self.forwarding_compile()
+
         self.path_policy = None
         self.path_tagging = DynamicPolicy(identity)
         self.path_capture = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
+
+        self.vf_tag_pol = None
+        self.vf_untag_pol = None
 
         if path_main:
             from pyretic.lib.path import pathcomp
             pathcomp.init_tag_field(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
+            
+            self.tagging_compile()
+            self.capture_compile()
+
             self.policy = ((self.path_tagging >> self.policy) +
                            self.path_capture)
+
+            self.tag_fw_cap_compile()
             # Virtual field composition
-            self.policy = (virtual_field_tagging() >>
+
+            self.vf_tag_pol = virtual_field_tagging()
+            self.vf_untag_pol = virtual_field_untagging()
+
+           # self.vf_tag_compile()
+            #self.vf_untag_compile()
+
+            self.policy = (self.vf_tag_pol >>
                            self.policy >>
-                           virtual_field_untagging())
+                           self.vf_untag_pol)
+
+            #print "first : " , str(self.policy)
+            #self.first_whole_compile()
 
         self.mode = mode
         self.backend = backend
@@ -116,6 +176,8 @@ class Runtime(object):
         self.packet_in_time = 0
         self.num_packet_ins = 0
         self.update_dynamic_sub_pols()
+
+
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -188,8 +250,10 @@ class Runtime(object):
         with self.policy_lock:
 
             # tag stale classifiers as invalid
-            recompile_list = on_recompile_path_list(list(), id(sub_pol),
-                                                    self.policy)
+            #recompile_list = on_recompile_path_list(list(), id(sub_pol),
+             #                                       self.policy)
+            recompile_list = on_recompile_path_list(id(sub_pol), self.policy)
+
             map(lambda p: p.invalidate_classifier(), recompile_list)
 
             # if change was driven by a network update, flag
@@ -237,7 +301,12 @@ class Runtime(object):
 
             self.in_network_update = False
 
-    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def whole_policy_compile(self):
+        p = self.policy.compile()
+        return p
+ 
     def update_switch_classifiers(self):
         """
         Updates switch classifiers
@@ -248,7 +317,12 @@ class Runtime(object):
             self.clear_all() 
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-            classifier = self.policy.compile()
+            #print "second : ", str(self.policy)
+
+            if self.vf_tag_pol and self.vf_untag_pol: 
+                self.vf_tag_compile()
+                self.vf_untag_compile()
+            classifier = self.whole_policy_compile()
             self.log.debug(
                 '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                               "generate classifier",
@@ -426,11 +500,11 @@ class Runtime(object):
                            self.default_cookie,
                            False))
         # Drop all IPv6 packets by default.
-        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
-                           TABLE_START_PRIORITY + 1,
-                           [],
-                           self.default_cookie,
-                           False))
+        #self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
+         #                  TABLE_START_PRIORITY + 1,
+          #                 [],
+           #                self.default_cookie,
+            #               False))
 
     def install_classifier(self, classifier):
         """
