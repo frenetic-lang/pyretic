@@ -69,8 +69,6 @@ class Runtime(object):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
-        print type(self.network.topology)
-        print self.network.topology
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
 
@@ -1135,12 +1133,18 @@ class Runtime(object):
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
-
+        
         self.log.debug('================================')
         self.log.debug('Final classifier to be installed:')
         for rule in new_rules:
             self.log.debug(str(rule))
         self.log.debug('================================')
+
+
+        stat_switch_attrs_tuples = self.network.topology.nodes(data=True)
+        stat_switch_cnt = len({ k : v for (k,v) in stat_switch_attrs_tuples }.keys())
+        stat.gather_general_stats('switch count', stat_switch_cnt, 0, False)
+        stat.gather_general_stats('rule count', len(new_rules), 0, False)
 
         p = Process(target=f, args=(diff_lists,curr_version_no))
         p.daemon = True
