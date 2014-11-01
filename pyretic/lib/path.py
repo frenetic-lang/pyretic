@@ -343,7 +343,7 @@ class __out_re_tree_gen__(re_tree_gen):
 ###               Path query language components                          ###
 #############################################################################
 
-class path_policy(Query):
+class path_policy(object):
     """ Defines a "path policy" object, which is a combination of a path
     function (trajectory -> {pkt}), and a policy function (pkt -> {pkt}), used
     in sequential composition. The action of the path policy on the packet is
