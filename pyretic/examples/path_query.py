@@ -302,7 +302,7 @@ def path_test_waypoint_violation():
     c = atom(match(switch=3))
     i = atom(identity)
     p = (a ^ +b ^ c) | (c ^ +b ^ a)
-    p.register_callback(query_callback(16))
+    p.register_callback(query_callback("waypoint violated"))
     return p
 
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
@@ -424,6 +424,11 @@ def chain_forwarding(**kwargs):
                 raise RuntimeError("unmatchable condition.")
         host_pol += switch_pol
     return host_pol
+
+def path_test_25():
+    p = atom(ingress_network() & match(switch=1))
+    p.register_callback(query_callback(25))
+    return p
 
 # type: unit -> path list
 def path_main(**kwargs):

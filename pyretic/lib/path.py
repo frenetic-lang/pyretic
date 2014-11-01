@@ -29,6 +29,8 @@
 from pyretic.core.language import identity, egress_network, Filter, drop, match
 from pyretic.core.language import modify, Query, FwdBucket, CountBucket
 from pyretic.core.language import PathBucket, DynamicFilter
+from pyretic.core.language_tools import ast_fold as policy_ast_fold
+from pyretic.core.language_tools import add_dynamic_sub_pols
 
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
@@ -234,6 +236,12 @@ class re_tree_gen(object):
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
+        def has_dyn_pols(p):
+            if path_policy_utils.get_dyn_pols(p):
+                return True
+            else:
+                return False
+
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
 
@@ -280,12 +288,12 @@ class re_tree_gen(object):
             else:
                 pass
 
-        if is_not_drop(new_pred) or isinstance(new_pred, DynamicFilter):
+        if is_not_drop(new_pred) or has_dyn_pols(new_pred):
             """ The new predicate should be added if either:
                 - some part of it doesn't intersect any existing predicate,
                   i.e., new_pred is not drop, OR
-                - new_pred is a DynamicFilter, in which case we keep a copy in
-                  the policy to trigger recompilation if it changes.
+                - new_pred contains a DynamicFilter, in which case we keep a
+                  copy in the policy to trigger recompilation if it changes.
             """
             add_pred(new_pred, new_sym(), [at])
             added_sym = cls.pred_to_symbol[new_pred]
@@ -486,14 +494,18 @@ class path_policy_utils(object):
             raise TypeError("Can only fold path objects!")
 
     @classmethod
+    def get_dyn_pols(cls, p):
+        return policy_ast_fold(add_dynamic_sub_pols, list(), p)
+
+    @classmethod
     def add_dynamic_filters(cls, acc, at):
         """ Collect all DynamicFilters that are part of atoms in paths. """
-        if isinstance(at, abstract_atom):
-            p = at.policy
-            if isinstance(p, DynamicFilter):
-                return acc | set([p])
-            else:
-                return acc
+        if isinstance(at, in_out_atom):
+            p_in  = at.in_atom.policy
+            p_out = at.out_atom.policy
+            in_set = map(lambda x: (x, p_in), cls.get_dyn_pols(p_in))
+            out_set = map(lambda x: (x, p_out), cls.get_dyn_pols(p_out))
+            return acc | set(in_set) | set(out_set)
         elif isinstance(at, path):
             return acc
         else:
@@ -502,7 +514,7 @@ class path_policy_utils(object):
     @classmethod
     def add_dynamic_path_pols(cls, acc, pp):
         if isinstance(pp, dynamic_path_policy):
-            return acc | set([pp])
+            return acc | set([(pp,)])
         elif isinstance(pp, path_policy_union):
             return acc
         elif isinstance(pp, path_policy):

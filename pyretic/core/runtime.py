@@ -314,10 +314,22 @@ class Runtime(object):
         ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
         self.dynamic_sub_path_pols = ast_fold(path_pol, add_pols, set())
+        """ dynamic sub path pols is a set of tuples with the following
+        structure:
+        (dynamic component, "root" policy (if applicable, see below)). Here,
+        - "dynamic component" is either a dynamic path policy, or a dynamic
+          filter used in a query
+        - if the "dynamic component" is a dynamic filter, the "root policy" is
+          the filter policy (used in the query) that contains the dynamic
+          filter.
+          """
         for pp in (old_dynamic_sub_path_pols - self.dynamic_sub_path_pols):
-            pp.path_detach()
+            pp[0].path_detach()
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
-            pp.path_attach(self.handle_path_change)
+            if isinstance(pp[0], Policy):
+                recompile_list = on_recompile_path_list(id(pp[0]), pp[1])
+                map(lambda p: p.invalidate_classifier(), recompile_list)
+            pp[0].path_attach(self.handle_path_change)
 
 
     def recompile_paths(self):
