@@ -12,6 +12,8 @@ dfa_path = '/tmp/pyretic-regexes.txt.dot'
 symbol_path = '/tmp/symbols.txt'
 rule_cnt_file = 'rule-count.txt'
 clean_tmp = False
+policies = []
+pol_cls = []
 
 def start(results_folder=None):
     global path
@@ -45,12 +47,9 @@ def stop():
     if monitoring:
         report_dfa(dfa_path, symbol_path, path)
         create_overall_report(path, rule_cnt_file, os.path.basename(dfa_path))
-        create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path)) 
+        create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
 
     monitoring = False
-
-
-
 def report_dfa(dfa_path, symbol_path, results_path):
     global clean_tmp
     if clean_tmp:
@@ -59,13 +58,13 @@ def report_dfa(dfa_path, symbol_path, results_path):
             shutil.copy(dfa_path, results_path)
             shutil.copy(symbol_path, results_path)
         except:
-            pass
-     
+            print 'exception in dfa report'
+
 
 def create_overall_report(results_path, rule_cnt, dfa_path):
     def adjust_func(file_path):
         return os.path.join(results_path, file_path)
-    
+
 
     f = open(adjust_func('performance_report.txt'), 'w')
 
@@ -81,7 +80,6 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
     # general statstics gathered
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
-        print 'here'
         for line in g.readlines():
             f.write(line)
         f.write('--------------------------------------\n')
@@ -104,8 +102,8 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
         f.write('--------------------------------------\n')
     except:
         pass
-            
-    
+
+
     # compile times
     def getFileName(file_name):
         return os.path.splitext(file_name)[0]
@@ -128,19 +126,19 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
                 f.write(line)
         f.write('--------------------------------------\n')
 
-    f.close() 
-    
+    f.close()
+
 
 def create_excel_report(results_path, rule_cnt, dfa_path):
     cols = [ ["makeDFA_vector", 'compile', 'forwarding_compile', 'tagging_compile', 'capture_compile', 'tag_fw_cap_compile'],
-                ['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],   
+                ['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],
             ]
 
     def adjust_func(file_path):
         return os.path.join(results_path, file_path)
-    
+
     f = open(adjust_func('excel_report.txt'), 'w')
-    
+
     for col in cols:
         for c in col:
             cpath = adjust_func(c + '.profile')
@@ -158,13 +156,15 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
             if os.path.exists(cpath):
                 g = open(cpath, 'r')
                 for line in g.readlines():
+                    cls = "\t"
                     if "classifier" in line:
-                        f.write(line[line.index(':') + 2 :-1] + "\t")
-                        break
+                        cls = line[line.index(':') + 2 :-1] + "\t"
+
+                f.write(cls)
                 g.close()
 
         f.write('\n')
-    
+
     dfa_state_cnt = 0
     try:
         g = open(adjust_func(dfa_path), 'r')
@@ -175,7 +175,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
         g.close()
     except:
         pass
- 
+
 
     '''rule_cnt = 0
     rule_avg = 0
@@ -195,10 +195,9 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
 
     tagging_edge = 0
     capture_edge = 0
-
     switch_cnt = 0
     rule_cnt = 0
-   
+
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
         for line in g.readlines():
@@ -222,11 +221,11 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
     if switch_cnt and rule_cnt:
         rule_avg = float(rule_cnt) / switch_cnt
 
-    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge] 
+    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge]
 
     for gen in gen_list:
         f.write(str(gen) + "\t")
-    f.write('\n')        
+    f.write('\n')
 
     f.close()
 
@@ -245,12 +244,31 @@ def gather_general_stats(stat_name, stat_value, init, aggr=True):
             if not stat_name in general_stats:
                 general_stats[stat_name] = init
             general_stats[stat_name] += stat_value
-
         f = open(os.path.join(path, 'general_stats.txt'), 'w')
         for s in general_stats:
             f.write('%s: %s\n' % (s, str(general_stats[s])))
 
         f.close()
+
+def compare_policies(pol):
+    global policies
+    global pol_cls
+
+    policies.append(pol)
+    c = pol.compile()
+    print len(c.rules)
+    pol_cls.append(c)
+    if(len(policies) == 2):
+        print "0 is \n", policies[0]
+        print "cls is \n", pol_cls[0]
+        print "------------------------------"
+        print "1 is \n", policies[1]
+        print "cls is \n", pol_cls[1]
+        print "------------------------------"
+        print "equal : ", (policies[0] == policies[1])
+        print len(pol_cls[0].rules)
+        print len(pol_cls[1].rules)
+
 
 def classifier_size(func):
     global classifier
@@ -261,21 +279,23 @@ def classifier_size(func):
     def profiled_func(*args, **kwargs):
         res = func(*args, **kwargs)
 
-        if monitoring:
+        if monitoring and res:
             fname = func.__name__
-            
+
             if fname not in classifier:
                 classifier[fname] = 0
-            
-            classifier[fname] += len(res.rules)
-            
+
+            classifier[fname] = len(res.rules)
+
             f = open(os.path.join(path, '%s.cls' % fname), 'a')
             f.write(('classifier size: %d' % classifier[fname]) + '\n')
+            f.write('print : %s \n' % str(res))
+            f.write('---------------------------------\n')
             f.close()
         return res
 
     return profiled_func
-        
+
 def elapsed_time(func):
     global stats
     global path
@@ -291,10 +311,9 @@ def elapsed_time(func):
             fname = func.__name__
             if fname not in stats:
                 stats[fname] = [0, []] #ncalls, times
-
             stats[fname][0] += 1
             stats[fname][1].append(elapsed)
-         
+
             f = open(os.path.join(path, '%s.profile' % fname), 'w')
             f.write(('number of calls: %d' % stats[fname][0]) + '\n')
 
@@ -306,8 +325,7 @@ def elapsed_time(func):
 
             f.close()
 
- 
+
         return res
 
     return profiled_func
-

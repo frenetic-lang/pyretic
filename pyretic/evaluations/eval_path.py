@@ -47,10 +47,12 @@ def test_setup(**kwargs):
    
 def path_main(**kwargs):
     (module, params) = test_setup(**kwargs)
-    return module.policy.path_main(**params) 
+    p =  module.policy.path_main(**params) 
+    return p
 
 def main(**kwargs):
     (module, params) = test_setup(**kwargs)
-    return module.policy.main(**params) 
+    p = module.policy.main(**params)
+    return p
 
 

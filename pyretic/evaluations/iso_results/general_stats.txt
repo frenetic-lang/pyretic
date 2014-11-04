@@ -1,0 +1,2 @@
+capture edges: 30
+tagging edges: 120

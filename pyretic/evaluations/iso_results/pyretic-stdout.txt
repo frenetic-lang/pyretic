@@ -1,0 +1,936 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+{'test': 'congested_link', 'm': '3', 'n': '2'}
+main policy 
+: parallel:
+    drop
+    sequential:
+        match: ('dstip', IPv4Network('10.0.0.1/32'))
+        parallel:
+            sequential:
+                match: ('switch', 1)
+                fwd 2
+            sequential:
+                match: ('switch', 6)
+                fwd 1
+            sequential:
+                match: ('switch', 7)
+                fwd 4
+            sequential:
+                negate:
+                    match: ('switch', 1)
+                negate:
+                    match: ('switch', 6)
+                negate:
+                    match: ('switch', 7)
+                fwd 1
+    sequential:
+        match: ('dstip', IPv4Network('10.0.0.2/32'))
+        parallel:
+            sequential:
+                match: ('switch', 2)
+                fwd 2
+            sequential:
+                match: ('switch', 6)
+                fwd 2
+            sequential:
+                match: ('switch', 7)
+                fwd 4
+            sequential:
+                negate:
+                    match: ('switch', 2)
+                negate:
+                    match: ('switch', 6)
+                negate:
+                    match: ('switch', 7)
+                fwd 1
+    sequential:
+        match: ('dstip', IPv4Network('10.0.0.3/32'))
+        parallel:
+            sequential:
+                match: ('switch', 3)
+                fwd 2
+            sequential:
+                match: ('switch', 6)
+                fwd 3
+            sequential:
+                match: ('switch', 7)
+                fwd 1
+            sequential:
+                negate:
+                    match: ('switch', 3)
+                negate:
+                    match: ('switch', 6)
+                negate:
+                    match: ('switch', 7)
+                fwd 1
+    sequential:
+        match: ('dstip', IPv4Network('10.0.0.4/32'))
+        parallel:
+            sequential:
+                match: ('switch', 4)
+                fwd 2
+            sequential:
+                match: ('switch', 6)
+                fwd 3
+            sequential:
+                match: ('switch', 7)
+                fwd 2
+            sequential:
+                negate:
+                    match: ('switch', 4)
+                negate:
+                    match: ('switch', 6)
+                negate:
+                    match: ('switch', 7)
+                fwd 1
+    sequential:
+        match: ('dstip', IPv4Network('10.0.0.5/32'))
+        parallel:
+            sequential:
+                match: ('switch', 5)
+                fwd 2
+            sequential:
+                match: ('switch', 6)
+                fwd 3
+            sequential:
+                match: ('switch', 7)
+                fwd 3
+            sequential:
+                negate:
+                    match: ('switch', 5)
+                negate:
+                    match: ('switch', 6)
+                negate:
+                    match: ('switch', 7)
+                fwd 1
+path policy 
+ : [path policy union]
+    [path policy union]
+        [path policy union]
+            [path policy union]
+                [path policy union]
+                    path_concat:
+                        [path policy]
+                            match: ('switch', 1); expression: 1
+                            >>>
+                            FwdBucket 49751760
+
+                        path_star:
+                            [path policy]
+                                identity; expression: (1) | (2)
+                                >>>
+                                FwdBucket 49824272
+
+                        [path policy]
+                            match: ('switch', 6); expression: 4
+                            >>>
+                            FwdBucket 49823888
+
+                        [path policy]
+                            match: ('switch', 7); expression: 6
+                            >>>
+                            FwdBucket 49826064
+
+                        path_star:
+                            [path policy]
+                                identity; expression: (1) | (4) | (5) | (6)
+                                >>>
+                                FwdBucket 49827472
+
+                        [path policy]
+                            match: ('switch', 3); expression: 8
+                            >>>
+                            FwdBucket 49827088
+                    path_concat:
+                        [path policy]
+                            match: ('switch', 1); expression: 1
+                            >>>
+                            FwdBucket 49838608
+
+                        path_star:
+                            [path policy]
+                                identity; expression: (1) | (4) | (6) | (7) | (8)
+                                >>>
+                                FwdBucket 49840016
+
+                        [path policy]
+                            match: ('switch', 6); expression: 4
+                            >>>
+                            FwdBucket 49839632
+
+                        [path policy]
+                            match: ('switch', 7); expression: 6
+                            >>>
+                            FwdBucket 49824976
+
+                        path_star:
+                            [path policy]
+                                identity; expression: (1) | (4) | (6) | (7) | (8)
+                                >>>
+                                FwdBucket 50309328
+
+                        [path policy]
+                            match: ('switch', 4); expression: :
+                            >>>
+                            FwdBucket 50308944
+                path_concat:
+                    [path policy]
+                        match: ('switch', 1); expression: 1
+                        >>>
+                        FwdBucket 50341008
+
+                    path_star:
+                        [path policy]
+                            identity; expression: (1) | (4) | (6) | (8) | (9) | (:)
+                            >>>
+                            FwdBucket 50342416
+
+                    [path policy]
+                        match: ('switch', 6); expression: 4
+                        >>>
+                        FwdBucket 50342032
+
+                    [path policy]
+                        match: ('switch', 7); expression: 6
+                        >>>
+                        FwdBucket 50352464
+
+                    path_star:
+                        [path policy]
+                            identity; expression: (1) | (4) | (6) | (8) | (9) | (:)
+                            >>>
+                            FwdBucket 50353872
+
+                    [path policy]
+                        match: ('switch', 5); expression: <
+                        >>>
+                        FwdBucket 50353488
+            path_concat:
+                [path policy]
+                    match: ('switch', 2); expression: >
+                    >>>
+                    FwdBucket 50376976
+
+                path_star:
+                    [path policy]
+                        identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                        >>>
+                        FwdBucket 50378384
+
+                [path policy]
+                    match: ('switch', 6); expression: 4
+                    >>>
+                    FwdBucket 50378000
+
+                [path policy]
+                    match: ('switch', 7); expression: 6
+                    >>>
+                    FwdBucket 50380176
+
+                path_star:
+                    [path policy]
+                        identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                        >>>
+                        FwdBucket 50398032
+
+                [path policy]
+                    match: ('switch', 3); expression: 8
+                    >>>
+                    FwdBucket 50397648
+        path_concat:
+            [path policy]
+                match: ('switch', 2); expression: >
+                >>>
+                FwdBucket 50400976
+
+            path_star:
+                [path policy]
+                    identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                    >>>
+                    FwdBucket 50427024
+
+            [path policy]
+                match: ('switch', 6); expression: 4
+                >>>
+                FwdBucket 50426640
+
+            [path policy]
+                match: ('switch', 7); expression: 6
+                >>>
+                FwdBucket 50428048
+
+            path_star:
+                [path policy]
+                    identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                    >>>
+                    FwdBucket 50429456
+
+            [path policy]
+                match: ('switch', 4); expression: :
+                >>>
+                FwdBucket 50429072
+    path_concat:
+        [path policy]
+            match: ('switch', 2); expression: >
+            >>>
+            FwdBucket 50440656
+
+        path_star:
+            [path policy]
+                identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                >>>
+                FwdBucket 50442064
+
+        [path policy]
+            match: ('switch', 6); expression: 4
+            >>>
+            FwdBucket 50441680
+
+        [path policy]
+            match: ('switch', 7); expression: 6
+            >>>
+            FwdBucket 50464400
+
+        path_star:
+            [path policy]
+                identity; expression: (1) | (4) | (6) | (8) | (:) | (<) | (=) | (>)
+                >>>
+                FwdBucket 50465808
+
+        [path policy]
+            match: ('switch', 5); expression: <
+            >>>
+            FwdBucket 50465424
+
+tagging: 
+parallel:
+    sequential:
+        negate:
+            union:
+                match: ('switch', 1)
+                match: ('switch', 2)
+                match: ('switch', 5)
+                match: ('switch', 4)
+                match: ('switch', 3)
+                match: ('switch', 6)
+                match: ('switch', 7)
+                intersection:
+                    identity
+                    negate:
+                        match: ('switch', 1)
+                    negate:
+                        match: ('switch', 6)
+                    negate:
+                        match: ('switch', 7)
+                    negate:
+                        match: ('switch', 3)
+                    negate:
+                        match: ('switch', 4)
+                    negate:
+                        match: ('switch', 5)
+                    negate:
+                        match: ('switch', 2)
+        negate:
+            match: ('path_tag', 8)
+        modify: ('path_tag', 8)
+    match: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', 6) ('switch', 1)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 6) ('switch', 6)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('path_tag', 6) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 6) ('switch', 3)
+        modify: ('path_tag', 5)
+    sequential:
+        match: ('path_tag', 6) ('switch', 4)
+        modify: ('path_tag', 6)
+    sequential:
+        match: ('path_tag', 6)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 6) ('switch', 5)
+        modify: ('path_tag', 7)
+    sequential:
+        match: ('path_tag', 6) ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 4) ('switch', 1)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 4) ('switch', 6)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('path_tag', 4) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 4) ('switch', 3)
+        modify: ('path_tag', 5)
+    sequential:
+        match: ('path_tag', 4) ('switch', 4)
+        modify: ('path_tag', 6)
+    sequential:
+        match: ('path_tag', 4)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 4) ('switch', 5)
+        modify: ('path_tag', 7)
+    sequential:
+        match: ('path_tag', 4) ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 15) ('switch', 1)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 15) ('switch', 6)
+        modify: ('path_tag', 12)
+    sequential:
+        match: ('path_tag', 15) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 15) ('switch', 3)
+        modify: ('path_tag', 13)
+    sequential:
+        match: ('path_tag', 15) ('switch', 4)
+        modify: ('path_tag', 14)
+    sequential:
+        match: ('path_tag', 15)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 15) ('switch', 5)
+        modify: ('path_tag', 15)
+    sequential:
+        match: ('path_tag', 15) ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 3) ('switch', 1)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 3) ('switch', 6)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('path_tag', 3) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 3) ('switch', 3)
+        modify: ('path_tag', 5)
+    sequential:
+        match: ('path_tag', 3) ('switch', 4)
+        modify: ('path_tag', 6)
+    sequential:
+        match: ('path_tag', 3)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 3) ('switch', 5)
+        modify: ('path_tag', 7)
+    sequential:
+        match: ('path_tag', 3) ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 10) ('switch', 1)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 10) ('switch', 6)
+        modify: ('path_tag', 10)
+    sequential:
+        match: ('path_tag', 10) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 10) ('switch', 3)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 10) ('switch', 4)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 10)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 10) ('switch', 5)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 10) ('switch', 2)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 11) ('switch', 1)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 11) ('switch', 6)
+        modify: ('path_tag', 12)
+    sequential:
+        match: ('path_tag', 11) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 11) ('switch', 3)
+        modify: ('path_tag', 13)
+    sequential:
+        match: ('path_tag', 11) ('switch', 4)
+        modify: ('path_tag', 14)
+    sequential:
+        match: ('path_tag', 11)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 11) ('switch', 5)
+        modify: ('path_tag', 15)
+    sequential:
+        match: ('path_tag', 11) ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 2) ('switch', 1)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 2) ('switch', 6)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', 2) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 2) ('switch', 3)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 2) ('switch', 4)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 2)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 2) ('switch', 5)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 2) ('switch', 2)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 12) ('switch', 1)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 12) ('switch', 6)
+        modify: ('path_tag', 12)
+    sequential:
+        match: ('path_tag', 12) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 12) ('switch', 3)
+        modify: ('path_tag', 13)
+    sequential:
+        match: ('path_tag', 12) ('switch', 4)
+        modify: ('path_tag', 14)
+    sequential:
+        match: ('path_tag', 12)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 12) ('switch', 5)
+        modify: ('path_tag', 15)
+    sequential:
+        match: ('path_tag', 12) ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 9) ('switch', 1)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9) ('switch', 6)
+        modify: ('path_tag', 10)
+    sequential:
+        match: ('path_tag', 9) ('switch', 7)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9) ('switch', 3)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9) ('switch', 4)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9) ('switch', 5)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 9) ('switch', 2)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 14) ('switch', 1)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 14) ('switch', 6)
+        modify: ('path_tag', 12)
+    sequential:
+        match: ('path_tag', 14) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 14) ('switch', 3)
+        modify: ('path_tag', 13)
+    sequential:
+        match: ('path_tag', 14) ('switch', 4)
+        modify: ('path_tag', 14)
+    sequential:
+        match: ('path_tag', 14)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 14) ('switch', 5)
+        modify: ('path_tag', 15)
+    sequential:
+        match: ('path_tag', 14) ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 13) ('switch', 1)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 13) ('switch', 6)
+        modify: ('path_tag', 12)
+    sequential:
+        match: ('path_tag', 13) ('switch', 7)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 13) ('switch', 3)
+        modify: ('path_tag', 13)
+    sequential:
+        match: ('path_tag', 13) ('switch', 4)
+        modify: ('path_tag', 14)
+    sequential:
+        match: ('path_tag', 13)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', 13) ('switch', 5)
+        modify: ('path_tag', 15)
+    sequential:
+        match: ('path_tag', 13) ('switch', 2)
+        modify: ('path_tag', 11)
+    sequential:
+        match: ('path_tag', None) ('switch', 1)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', None) ('switch', 6)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None) ('switch', 7)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None) ('switch', 3)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None) ('switch', 4)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None) ('switch', 5)
+        modify: ('path_tag', 8)
+    sequential:
+        match: ('path_tag', None) ('switch', 2)
+        modify: ('path_tag', 9)
+    sequential:
+        match: ('path_tag', 5) ('switch', 1)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 5) ('switch', 6)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('path_tag', 5) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 5) ('switch', 3)
+        modify: ('path_tag', 5)
+    sequential:
+        match: ('path_tag', 5) ('switch', 4)
+        modify: ('path_tag', 6)
+    sequential:
+        match: ('path_tag', 5)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 5) ('switch', 5)
+        modify: ('path_tag', 7)
+    sequential:
+        match: ('path_tag', 5) ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 1) ('switch', 1)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1) ('switch', 6)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', 1) ('switch', 7)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1) ('switch', 3)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1) ('switch', 4)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1) ('switch', 5)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 1) ('switch', 2)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', 7) ('switch', 1)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 7) ('switch', 6)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('path_tag', 7) ('switch', 7)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 7) ('switch', 3)
+        modify: ('path_tag', 5)
+    sequential:
+        match: ('path_tag', 7) ('switch', 4)
+        modify: ('path_tag', 6)
+    sequential:
+        match: ('path_tag', 7)
+        intersection:
+            identity
+            negate:
+                match: ('switch', 1)
+            negate:
+                match: ('switch', 6)
+            negate:
+                match: ('switch', 7)
+            negate:
+                match: ('switch', 3)
+            negate:
+                match: ('switch', 4)
+            negate:
+                match: ('switch', 5)
+            negate:
+                match: ('switch', 2)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 7) ('switch', 5)
+        modify: ('path_tag', 7)
+    sequential:
+        match: ('path_tag', 7) ('switch', 2)
+        modify: ('path_tag', 3)

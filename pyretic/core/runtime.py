@@ -393,6 +393,7 @@ class Runtime(object):
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
         (tagging, capture) = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
+        stat.compare_policies(tagging)
         self.path_tagging.policy = tagging
         self.path_capture.policy = capture
 

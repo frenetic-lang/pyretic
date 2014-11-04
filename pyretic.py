@@ -64,11 +64,14 @@ def signal_handler(signal, frame):
         funcstats.sort("tsub")
         funcstats.print_all(columns={0:("name",38), 1:("ncall",8), 2:("tsub",8),
                                      3:("ttot",8), 4:("tavg", 8)})
-
+    
     global eval_profile_enabled
     if eval_profile_enabled:
         stat.stop()
 
+    from pyretic.evaluations.eval_compilation import eval_compilation
+    eval_c = eval_compilation(stat.path, **{'test' : 'congested_link', 'n' : '2', 'm' : '3'})
+    eval_c.compile()
     sys.exit(0)
 
 
