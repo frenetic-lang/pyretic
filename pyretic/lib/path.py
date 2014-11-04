@@ -959,6 +959,8 @@ class pathcomp(object):
         
         tag_rules = 0
         cap_rules = 0
+       
+        from pyretic.core.language import DynamicPolicy
 
         edges = du.get_edges(dfa)
         for edge in edges:
@@ -968,6 +970,7 @@ class pathcomp(object):
             if not du.is_dead(dfa, src):
                 tagging += ((match_tag(src) & pred) >> set_tag(dst))
                 tag_rules += 1
+                
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
@@ -978,6 +981,11 @@ class pathcomp(object):
 
         stat.gather_general_stats('tagging edges', tag_rules, 0, False)
         stat.gather_general_stats('capture edges', cap_rules, 0, False)  
+        
+        if isinstance(tagging, DynamicPolicy):
+                    print "in compile dynamic"
+
+
         return (tagging, capture)
 
     def path_mod_add(paths, p):
