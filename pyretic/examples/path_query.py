@@ -305,6 +305,15 @@ def path_test_waypoint_violation():
     p.register_callback(query_callback("waypoint violated"))
     return p
 
+def path_test_waypoint_violation_general():
+    fw = match(switch=4)
+    ing = ingress_network()
+    eg  = egress_network()
+    p = ((in_atom(ing & ~fw) ^ +in_atom(~fw) ^ out_atom(eg & ~fw)) |
+         (in_out_atom(ing, eg & ~fw)))
+    p.register_callback(query_callback("generalized waypoint violation"))
+    return p
+
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
     """ A function that periodically changes the path policy of a dynamic path
     policy object.
@@ -432,7 +441,7 @@ def path_test_25():
 
 # type: unit -> path list
 def path_main(**kwargs):
-    return path_test_waypoint_violation()
+    return path_test_waypoint_violation_general()
 
 def main(**kwargs):
 #    return mac_learner()
