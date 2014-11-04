@@ -33,6 +33,8 @@ from pyretic.core.language import *
 from pyretic.core.language_tools import *
 from pyretic.core.network import *
 from pyretic.core.packet import *
+from pyretic.core.classifier import get_rule_exact_match
+from pyretic.core.classifier import get_rule_derivation_tree
 
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
