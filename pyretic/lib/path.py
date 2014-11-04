@@ -135,7 +135,8 @@ class re_tree_gen(object):
     # path query.
     pred_to_symbol = {}
     pred_to_atoms  = {}
-    symbol_to_pred = {} # Used solely during compilation, not re_tree generation.
+    symbol_to_pred = {}
+    dyn_preds      = []
 
     @classmethod
     def repr_state(cls):
@@ -159,6 +160,11 @@ class re_tree_gen(object):
         cls.pred_to_symbol[pred] = symbol
         cls.pred_to_atoms[pred] = atoms
         cls.symbol_to_pred[symbol] = pred
+
+    @classmethod
+    def __add_dyn_preds__(cls, preds, atom):
+        for pred in preds:
+            cls.dyn_preds.append((pred, atom))
 
     @classmethod
     def __del_pred__(cls, pred):
@@ -236,12 +242,6 @@ class re_tree_gen(object):
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
-        def has_dyn_pols(p):
-            if path_policy_utils.get_dyn_pols(p):
-                return True
-            else:
-                return False
-
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
 
@@ -288,16 +288,19 @@ class re_tree_gen(object):
             else:
                 pass
 
-        if is_not_drop(new_pred) or has_dyn_pols(new_pred):
-            """ The new predicate should be added if either:
-                - some part of it doesn't intersect any existing predicate,
-                  i.e., new_pred is not drop, OR
-                - new_pred contains a DynamicFilter, in which case we keep a
-                  copy in the policy to trigger recompilation if it changes.
+        if is_not_drop(new_pred):
+            """ The new predicate should be added if some part of it doesn't
+            intersect any existing predicate, i.e., new_pred is not drop.
             """
             add_pred(new_pred, new_sym(), [at])
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
+
+        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
+        if dyn_pols:
+            """ If new_pred contains a dynamic predicate, it must be remembered
+            explicitly to set up recompilation routines in the runtime."""
+            cls.__add_dyn_preds__(dyn_pols, at.policy)
 
         return re_tree
 
@@ -307,6 +310,7 @@ class re_tree_gen(object):
         cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
         cls.symbol_to_pred  = {}
+        cls.dyn_preds       = []
 
     @classmethod
     def get_symlist(cls):

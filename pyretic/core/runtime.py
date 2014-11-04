@@ -87,9 +87,8 @@ class Runtime(object):
             out_capture = (in_tag_policy >> self.path_out_capture)
             virtual_tag = virtual_field_tagging()
             virtual_untag = virtual_field_untagging()
-            self.policy = ((virtual_tag >>
-                            (in_capture + forwarding) >>
-                            virtual_untag) +
+            self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
+                           (virtual_tag >> in_capture) +
                            (virtual_tag >> out_capture))
 
         self.mode = mode
