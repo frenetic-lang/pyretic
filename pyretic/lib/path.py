@@ -523,7 +523,7 @@ class path_policy_utils(object):
     @classmethod
     def add_dynamic_path_pols(cls, acc, pp):
         if isinstance(pp, dynamic_path_policy):
-            return acc | set([(pp,)])
+            return acc | set([pp])
         elif isinstance(pp, path_policy_union):
             return acc
         elif isinstance(pp, path_policy):
@@ -1007,6 +1007,7 @@ class pathcomp(object):
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
 
+        """ Initialize tagging and capture policies. """
         in_tagging = (((in_cg.get_unaffected_pred() &
                         ~(cls.__get_dead_state_pred__(dfa)))
                        >> cls.__set_dead_state_tag__(dfa)) +
@@ -1018,6 +1019,7 @@ class pathcomp(object):
         in_capture = drop
         out_capture = drop
 
+        """ Generate transition/accept rules from DFA """
         edges = du.get_edges(dfa)
         for edge in edges:
             src = du.get_edge_src(dfa, edge)

@@ -75,6 +75,7 @@ class Runtime(object):
         self.path_out_tagging = DynamicPolicy(identity)
         self.path_out_capture = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
+        self.dynamic_path_preds    = set()
 
         if path_main:
             from pyretic.lib.path import pathcomp
@@ -232,6 +233,8 @@ class Runtime(object):
             with self.policy_lock:
                 for policy in self.dynamic_sub_pols:
                     policy.set_network(self.network)
+                for (sub_pol, full_pol) in self.dynamic_path_preds:
+                    sub_pol.set_network(self.network)
 
                 # FIXME(joshreich) :-)
                 # This is a temporary fix. We need to specialize the check below
@@ -321,39 +324,30 @@ class Runtime(object):
         ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
         self.dynamic_sub_path_pols = ast_fold(path_pol, add_pols, set())
-        self.dynamic_sub_path_pols |= set(in_cg.get_dyn_preds())
-        self.dynamic_sub_path_pols |= set(out_cg.get_dyn_preds())
-        """ dynamic sub path pols is a set of tuples with the following
-        structure:
-        (dynamic component, "root" policy (if applicable, see below)). Here,
-        - "dynamic component" is either a dynamic path policy, or a dynamic
-          filter used in a query
-        - if the "dynamic component" is a dynamic filter, the "root policy" is
-          the filter policy (used in the query) that contains the dynamic
-          filter.
-          """
         for pp in (old_dynamic_sub_path_pols - self.dynamic_sub_path_pols):
-            pp[0].path_detach()
+            pp.path_detach()
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
-            if isinstance(pp[0], path):
-                pp[0].path_attach(self.handle_path_change)
-            elif isinstance(pp[0], Policy):
-                f = lambda sp: self.handle_path_change_dyn_pred(sp, pp[1])
-                pp[0].path_attach(f)
-            else:
-                raise TypeError("Expecting a path or policy")
-
+            pp.path_attach(self.handle_path_change)
+        old_dynamic_path_preds = copy.copy(self.dynamic_path_preds)
+        self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
+                                      out_cg.get_dyn_preds())
+        for (sp, fp) in (old_dynamic_path_preds - self.dynamic_path_preds):
+            sp.path_detach()
+        for (sp, fp) in (self.dynamic_path_preds - old_dynamic_path_preds):
+            sp.set_network(self.network)
+            f = lambda x: self.handle_path_change_dyn_pred(x, fp)
+            sp.path_attach(f)
 
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
-        (in_tagging, in_capture, out_tagging, out_capture) = policy_fragments
-        self.path_in_tagging.policy  = in_tagging
-        self.path_in_capture.policy  = in_capture
-        self.path_out_tagging.policy = out_tagging
-        self.path_out_capture.policy = out_capture
+        (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+        self.path_in_tagging.policy  = in_tag
+        self.path_in_capture.policy  = in_cap
+        self.path_out_tagging.policy = out_tag
+        self.path_out_capture.policy = out_cap
 
 
 #######################
