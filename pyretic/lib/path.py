@@ -650,6 +650,10 @@ class abstract_atom(object):
         self._re_tree = rt
         self.tree_counter += 1
 
+    def invalidate_re_tree(self):
+        self._re_tree = None
+        self.tree_counter = 0
+
     def __eq__(self, other):
         return (type(self) == type(other) and
                 self.policy == other.policy)
@@ -685,6 +689,10 @@ class in_out_atom(path):
     @property
     def re_tree(self):
         return self.in_atom.re_tree ^ self.out_atom.re_tree
+
+    def invalidate_re_tree(self):
+        self.in_atom.invalidate_re_tree()
+        self.out_atom.invalidate_re_tree()
 
     def __eq__(self, other):
         return (isinstance(other, in_out_atom) and
@@ -950,6 +958,24 @@ class pathcomp(object):
             return identity
 
     @classmethod
+    def __invalidate_re_trees__(cls, acc, p):
+        """ Invalidate the re_tree values for all abstract atoms in the given
+        path policy p. """
+        def inv_atoms(acc, x):
+            if isinstance(x, in_out_atom):
+                x.invalidate_re_tree()
+            return None
+        if (isinstance(p, path_policy) and
+            not isinstance(p, dynamic_path_policy) and
+            not isinstance(p, path_policy_union)):
+            path_policy_utils.path_ast_fold(p.path, inv_atoms, None)
+            return None
+        elif isinstance(p, path_policy):
+            return None
+        else:
+            raise TypeError("Expecting a path_policy")
+
+    @classmethod
     def __prep_re_trees__(cls, acc, p):
         if (isinstance(p, path_policy) and
             not isinstance(p, dynamic_path_policy) and
@@ -997,8 +1023,13 @@ class pathcomp(object):
         out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
+        inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
+        in_cg.clear()
+        out_cg.clear()
+
+        ast_fold(path_pol, inv_trees, None)
         ast_fold(path_pol, prep_trees, None)
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
