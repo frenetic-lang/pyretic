@@ -256,6 +256,13 @@ class re_tree_gen(object):
         re_tree = re_empty()
         pred_list = cls.pred_to_symbol.keys()
 
+        """ Record dynamic predicates separately for update purposes."""
+        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
+        if dyn_pols:
+            """ If new_pred contains a dynamic predicate, it must be remembered
+            explicitly to set up recompilation routines in the runtime."""
+            cls.__add_dyn_preds__(dyn_pols, at.policy)
+
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
@@ -296,12 +303,6 @@ class re_tree_gen(object):
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
 
-        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
-        if dyn_pols:
-            """ If new_pred contains a dynamic predicate, it must be remembered
-            explicitly to set up recompilation routines in the runtime."""
-            cls.__add_dyn_preds__(dyn_pols, at.policy)
-
         return re_tree
 
     @classmethod
@@ -324,6 +325,10 @@ class re_tree_gen(object):
             pred = cls.symbol_to_pred[sym]
             output += (sym + ': ' + repr(pred) + '\n')
         return output
+
+    @classmethod
+    def get_dyn_preds(cls):
+        return cls.dyn_preds
 
     @classmethod
     def get_unaffected_pred(cls):
@@ -522,10 +527,7 @@ class path_policy_utils(object):
         elif isinstance(pp, path_policy_union):
             return acc
         elif isinstance(pp, path_policy):
-            """ Add DynamicFilters from constituent path atoms. """
-            dyn_fun = cls.add_dynamic_filters
-            dyn_filters = cls.path_ast_fold(pp.path, dyn_fun, set())
-            return acc | dyn_filters
+            return acc
         else:
             raise TypeError("Can only act on path_policy objects!")
 

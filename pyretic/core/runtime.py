@@ -301,20 +301,28 @@ class Runtime(object):
     def handle_path_change(self):
         """ When a dynamic path policy updates its path_policy, initiate
         recompilation of the path (and hence pyretic) policy. """
-        self.update_dynamic_sub_path_pols(self.path_policy)
         self.recompile_paths()
+        self.update_dynamic_sub_path_pols(self.path_policy)
 
+    def handle_path_change_dyn_pred(self, sub_pol, full_pol):
+        recompile_list = on_recompile_path_list(id(sub_pol), full_pol)
+        map(lambda p: p.invalidate_classifier(), recompile_list)
+        self.handle_path_change()
 
     def update_dynamic_sub_path_pols(self, path_pol):
         """ Update runtime internal structures which keep track of dynamic
         members of the path policy AST.
         """
         import copy
-        from pyretic.lib.path import path_policy_utils
+        from pyretic.lib.path import path, path_policy_utils
+        from pyretic.lib.path import __in_re_tree_gen__ as in_cg
+        from pyretic.lib.path import __out_re_tree_gen__ as out_cg
         old_dynamic_sub_path_pols = copy.copy(self.dynamic_sub_path_pols)
         ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
         self.dynamic_sub_path_pols = ast_fold(path_pol, add_pols, set())
+        self.dynamic_sub_path_pols |= set(in_cg.get_dyn_preds())
+        self.dynamic_sub_path_pols |= set(out_cg.get_dyn_preds())
         """ dynamic sub path pols is a set of tuples with the following
         structure:
         (dynamic component, "root" policy (if applicable, see below)). Here,
@@ -327,10 +335,13 @@ class Runtime(object):
         for pp in (old_dynamic_sub_path_pols - self.dynamic_sub_path_pols):
             pp[0].path_detach()
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
-            if isinstance(pp[0], Policy):
-                recompile_list = on_recompile_path_list(id(pp[0]), pp[1])
-                map(lambda p: p.invalidate_classifier(), recompile_list)
-            pp[0].path_attach(self.handle_path_change)
+            if isinstance(pp[0], path):
+                pp[0].path_attach(self.handle_path_change)
+            elif isinstance(pp[0], Policy):
+                f = lambda sp: self.handle_path_change_dyn_pred(sp, pp[1])
+                pp[0].path_attach(f)
+            else:
+                raise TypeError("Expecting a path or policy")
 
 
     def recompile_paths(self):
