@@ -182,7 +182,7 @@ def path_test_8():
     return p
 
 def path_test_9():
-    p = atom(match(srcip=ip1)) ^ end_path(identity)
+    p = atom(match(srcip=ip1)) ** out_atom(egress_network())
     p.register_callback(query_callback(9))
     return p
 
@@ -195,7 +195,7 @@ def path_test_10():
     return p
 
 def path_test_11():
-    p = end_path(identity)
+    p = out_atom(identity)
     p.register_callback(query_callback(11))
     return p
 
@@ -336,7 +336,6 @@ def path_test_dynamic_1():
     p1 = a1 ** a2
     p1.register_callback(query_callback("dyn_1"))
     p = dynamic_path_policy(p1)
-    p.register_callback(query_callback("dyn_1"))
     dyn_thread = threading.Thread(target=change_dynamic_path,
                                   args=(p, 5.0, lambda x: x.path_policy))
     dyn_thread.daemon = True
