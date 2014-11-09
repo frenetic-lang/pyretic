@@ -46,6 +46,8 @@ from pyretic.core.util import frozendict, singleton
 from multiprocessing import Lock, Condition
 import copy
 
+from pyretic.evaluations import stat
+
 NO_CACHE=False
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
@@ -337,7 +339,10 @@ class match(Filter):
         return _match(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        return _match(**self.map).generate_classifier()
+        c = _match(**self.map).generate_classifier()
+        
+        stat.print_compile_detail("match : %d :" % len(c.rules))
+        return c
 
     def __eq__(self, other):
         return ( (isinstance(other, match) and self.map == other.map)
@@ -504,7 +509,10 @@ class modify(Policy):
         return _modify(**self.map).eval(pkt)
 
     def generate_classifier(self):
-        return _modify(**self.map).generate_classifier()
+        c = _modify(**self.map).generate_classifier()
+        stat.print_compile_detail("modify : %d :" % len(c.rules))
+        return c
+
 
     def __repr__(self):
         return "modify: %s" % ' '.join(map(str,self.map.items()))

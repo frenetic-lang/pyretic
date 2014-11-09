@@ -317,7 +317,6 @@ class Runtime(object):
             self.clear_all() 
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-            #print "second : ", str(self.policy)
 
             if self.vf_tag_pol and self.vf_untag_pol: 
                 self.vf_tag_compile()

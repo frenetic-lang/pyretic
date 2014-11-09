@@ -6,6 +6,6 @@ test_duration_sec 30
 total_traffic_prefix total-traffic
 slack_factor 5.0
 topo_args [2, 3]
-results_folder ./run_results
+results_folder ./run_results/
 policy_args ['n', '2', 'm', '3']
 test congested_link

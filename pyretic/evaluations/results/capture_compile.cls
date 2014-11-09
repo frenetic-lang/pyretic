@@ -30,3 +30,15 @@ print : match: ('switch', 8)
  identity
   -> set([]) 
 ---------------------------------
+classifier size: 2
+print : match: ('switch', 8)
+  -> set([Controller])
+ identity
+  -> set([]) 
+---------------------------------
+classifier size: 2
+print : match: ('switch', 8)
+  -> set([Controller])
+ identity
+  -> set([]) 
+---------------------------------

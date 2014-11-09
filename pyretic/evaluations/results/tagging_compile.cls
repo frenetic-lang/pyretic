@@ -50,3 +50,19 @@ print : match: ('switch', 7)
  match: 
   -> set([identity]) 
 ---------------------------------
+classifier size: 3
+print : match: ('switch', 7)
+  -> set([modify: , modify: , identity, modify: ])
+ match: ('switch', 8)
+  -> set([modify: , modify: , identity, modify: ])
+ match: 
+  -> set([identity]) 
+---------------------------------
+classifier size: 3
+print : match: ('switch', 7)
+  -> set([modify: , modify: , identity, modify: ])
+ match: ('switch', 8)
+  -> set([modify: , modify: , identity, modify: ])
+ match: 
+  -> set([identity]) 
+---------------------------------

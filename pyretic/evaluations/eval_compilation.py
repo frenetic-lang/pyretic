@@ -1,5 +1,7 @@
 import sys
 sys.path.append('/home/mininet/pyretic')
+import os
+import shutil
 
 from pyretic.core.language import *
 from pyretic.lib.corelib import *
@@ -19,11 +21,19 @@ class eval_compilation:
         self.results_folder = results_folder
 
 
+        if os.path.exists(self.results_folder):
+            for fname in os.listdir(self.results_folder):
+                fpath = os.path.join(self.results_folder, fname)
+                if os.path.isfile(fpath):
+                    os.unlink(fpath)
+                elif os.path.isdir(fpath):
+                    shutil.rmtree(fpath)
+
     def compile(self, full_compile = False):
         stat.start(self.results_folder)
 
         self.forwarding_compile()
-
+        pathcomp.init_tag_field(1022)
         (self.tagging, self.capture) = pathcomp.compile(self.path_policy)
         stat.compare_policies(self.tagging)
         self.tagging_compile()

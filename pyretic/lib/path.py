@@ -40,6 +40,7 @@ import pyretic.vendor
 import pydot
 import copy
 
+import pickle
 
 from pyretic.evaluations import stat
 
@@ -985,7 +986,6 @@ class pathcomp(object):
         if isinstance(tagging, DynamicPolicy):
                     print "in compile dynamic"
 
-
         return (tagging, capture)
 
     def path_mod_add(paths, p):
@@ -1356,6 +1356,16 @@ class dfa_utils(object):
         f.close()
 
     @classmethod
+    def get_leaf_pred_dumps(cls):
+        output = ''
+        for sym in re_tree_gen.symbol_to_pred:
+            pred = re_tree_gen.symbol_to_pred[sym]
+            print pred
+            output += (sym + ': ' + pickle.dumps(pred) + '\n')
+        return output
+
+
+    @classmethod
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
@@ -1365,4 +1375,6 @@ class dfa_utils(object):
         dfa = makeDFA_vector(re_exps, symlist)
         cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
         cls.__dump_file__(re_tree_gen.get_leaf_preds(), '/tmp/symbols.txt')
+
+        #cls.__dump_file__(cls.get_leaf_pred_dumps(), '/tmp/symbol-pred.txt')
         return dfa

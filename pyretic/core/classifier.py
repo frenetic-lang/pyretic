@@ -1,7 +1,7 @@
 
 from collections import deque
 import copy
-
+from pyretic.evaluations import stat
 ###############################################################################
 # Classifiers
 # an intermediate representation for proactive compilation.
@@ -177,6 +177,7 @@ class Classifier(object):
             r_new.op = "negate"
             new_rules.append(r_new)
         c = Classifier(new_rules)
+
         return c
 
 
@@ -207,6 +208,7 @@ class Classifier(object):
         # and optimize the classifier
         else:
             c3 = c3.optimize()
+
         return c3
 
 
@@ -322,6 +324,7 @@ class Classifier(object):
         # when all rules in c1 and c2 have been crossed
         # optimize c3
         c3 = c3.optimize()
+
         return c3
 
 
