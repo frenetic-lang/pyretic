@@ -1,0 +1,8 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+identity
+<function _reconstructor at 0x7f1afc6769b0>
+copy_reg
+<function _reconstructor at 0x7f1afc6769b0>
+<class 'pyretic.core.language.identity'>
+pyretic.core.language
+identity

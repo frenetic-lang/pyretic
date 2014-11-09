@@ -12,8 +12,11 @@ dfa_path = '/tmp/pyretic-regexes.txt.dot'
 symbol_path = '/tmp/symbols.txt'
 rule_cnt_file = 'rule-count.txt'
 clean_tmp = False
+
+
 policies = []
 pol_cls = []
+print_enabled = False
 
 def start(results_folder=None):
     global path
@@ -253,21 +256,26 @@ def gather_general_stats(stat_name, stat_value, init, aggr=True):
 def compare_policies(pol):
     global policies
     global pol_cls
+    global print_enabled
 
+    print '----------------tagging starts here -----------------'
     policies.append(pol)
+    print_enabled = True 
     c = pol.compile()
+    print_enabled = False
     print len(c.rules)
+    print '---------------tagging ends here---------------------'
     pol_cls.append(c)
-    if(len(policies) == 2):
+    if len(policies) == 2:
         print "0 is \n", policies[0]
+        print len(pol_cls[0].ruless)
         print "cls is \n", pol_cls[0]
         print "------------------------------"
         print "1 is \n", policies[1]
+        print len(pol_cls[1].rules)
         print "cls is \n", pol_cls[1]
         print "------------------------------"
         print "equal : ", (policies[0] == policies[1])
-        print len(pol_cls[0].rules)
-        print len(pol_cls[1].rules)
 
 
 def classifier_size(func):
@@ -295,6 +303,12 @@ def classifier_size(func):
         return res
 
     return profiled_func
+
+def print_compile_detail(inp):
+    global print_enabled
+
+    if print_enabled:
+        print inp
 
 def elapsed_time(func):
     global stats

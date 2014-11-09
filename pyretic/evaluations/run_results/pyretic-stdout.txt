@@ -1,5 +1,62 @@
 Couldn't import dot_parser, loading of dot files will not be possible.
+parallel:
+    sequential:
+        negate:
+            union:
+                match: ('switch', 7)
+                match: ('switch', 8)
+        negate:
+            match: ('path_tag', 2)
+        modify: ('path_tag', 2)
+    match: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', None) ('switch', 7)
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('path_tag', None) ('switch', 8)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', 1) ('switch', 7)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', 1) ('switch', 8)
+        modify: ('path_tag', 3)
+    sequential:
+        match: ('path_tag', 3) ('switch', 7)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('path_tag', 3) ('switch', 8)
+        modify: ('path_tag', 2)
+----------------tagging starts here -----------------
+add : 3
+invert : 3
+invert : 2
+seq : 4
+seq : 4
+seq : 2
+seq : 2
+seq : 2
+seq : 2
+seq : 2
+seq : 2
+match : 2 :
+match : 2 :
+match : 2 :
+add : 6
+match : 2 :
+add : 7
+match : 2 :
+add : 8
+match : 2 :
+add : 9
+match : 2 :
+add : 10
+match : 2 :
+add : 11
+match : 2 :
+add : 12
 12
+---------------tagging ends here---------------------
 INFO:core:POX 0.1.0 (betta) is up.
 INFO:openflow.of_01:[00-00-00-00-00-01 1] connected
 INFO:openflow.of_01:[00-00-00-00-00-02 2] connected
@@ -12,117 +69,3 @@ INFO:openflow.of_01:[00-00-00-00-00-07 7] connected
 ----starting pyretic shutdown------
 attempting to kill of_client
 pyretic.py done
-12
-0 is 
-parallel:
-    sequential:
-        negate:
-            union:
-                match: ('switch', 7)
-                match: ('switch', 8)
-        negate:
-            match: ('path_tag', 2)
-        modify: ('path_tag', 2)
-    match: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', None) ('switch', 7)
-        modify: ('path_tag', 1)
-    sequential:
-        match: ('path_tag', None) ('switch', 8)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 1) ('switch', 7)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 1) ('switch', 8)
-        modify: ('path_tag', 3)
-    sequential:
-        match: ('path_tag', 3) ('switch', 7)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 3) ('switch', 8)
-        modify: ('path_tag', 2)
-cls is 
-match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 0)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 2)])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 2)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 4)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 7)
-  -> set([])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 0)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 2)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 4)])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 4)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 8)
-  -> set([])
- match: ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- identity
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
-------------------------------
-1 is 
-parallel:
-    sequential:
-        negate:
-            union:
-                match: ('switch', 7)
-                match: ('switch', 8)
-        negate:
-            match: ('path_tag', 2)
-        modify: ('path_tag', 2)
-    match: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', None) ('switch', 7)
-        modify: ('path_tag', 1)
-    sequential:
-        match: ('path_tag', None) ('switch', 8)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 1) ('switch', 7)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 1) ('switch', 8)
-        modify: ('path_tag', 3)
-    sequential:
-        match: ('path_tag', 3) ('switch', 7)
-        modify: ('path_tag', 2)
-    sequential:
-        match: ('path_tag', 3) ('switch', 8)
-        modify: ('path_tag', 2)
-cls is 
-match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 0)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 2)])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 2)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 4)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 7)
-  -> set([])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 0)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 2)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 4)])
- match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 4)
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
- match: ('switch', 8)
-  -> set([])
- match: ('vlan_pcp', 0) ('vlan_id', 3)
-  -> set([identity])
- identity
-  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
-------------------------------
-equal :  True
-12
-12

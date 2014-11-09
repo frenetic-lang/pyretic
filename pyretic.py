@@ -69,9 +69,6 @@ def signal_handler(signal, frame):
     if eval_profile_enabled:
         stat.stop()
 
-    from pyretic.evaluations.eval_compilation import eval_compilation
-    eval_c = eval_compilation(stat.path, **{'test' : 'congested_link', 'n' : '2', 'm' : '3'})
-    eval_c.compile()
     sys.exit(0)
 
 
