@@ -85,7 +85,7 @@ def path_test_loop(**kwargs):
     :param n: number of switches in the topology
     :type n: integer
     """
-    plist = []
+    plist = path_empty
     assert 'n' in kwargs
     n = int(kwargs['n'])
     # actually this needs to change and include id* on both sides
@@ -93,7 +93,7 @@ def path_test_loop(**kwargs):
         p = (atom(match(switch=s)) ^ +(atom(~match(switch=s))) ^
              atom(match(switch=s)))
         p.register_callback(query_callback('loops'))
-        plist += [p]
+        plist += p
     return plist
     # return []
 
@@ -150,7 +150,7 @@ def path_test_tm(**kwargs):
         else:
             return default_poll_duration
 
-    plist = []
+    plist = path_empty
     n = int(kwargs['n'])
     timeout = get_timeout(kwargs)
     duration = get_duration(kwargs)
@@ -160,12 +160,12 @@ def path_test_tm(**kwargs):
                  end_path(match(switch=s2)))
             id = create_id_string(s1, s2)
             query_thread_setup(p, timeout, id, duration, s2==(s1+1))
-            plist.append(p)
+            plist += p
             p = (atom(ingress_network() & match(switch=s2)) ^
                  end_path(match(switch=s1)))
             id = create_id_string(s2, s1)
             query_thread_setup(p, timeout, id, duration, s2==(s1+1))
-            plist.append(p)
+            plist += p
     return plist
 
 def tm_fwding(**kwargs):
@@ -202,9 +202,9 @@ def path_test_waypoint(**kwargs):
     designated as a 'firewall' switch.
     """
     p = (atom(ingress_network()) ^ atom(~match(switch=4)) ^
-         atom(~match(switch=4)) ^ end_path(identity))
+         atom(~match(switch=4)) ^ out_atom(identity))
     p.register_callback(query_callback("waypoint"))
-    return [p]
+    return p
 
 # List of tests, to be used with the --test= parameter.
 test_mains = {'loops': loop_fwding,
