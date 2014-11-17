@@ -53,6 +53,9 @@ fwding = ( (match(dstip=ip1) >> fwd(1)) +
            (match(dstip=ip2) >> fwd(2)) +
            (match(dstip=ip3) >> fwd(3)) )
 
+def static_fwding():
+    return fwding
+
 class QueryTest(CountBucket):
     
     def __init__(self):
@@ -271,10 +274,16 @@ def test7():
     return ( (match(dstip=ip1) >> QueryTest()) +
              (match(dstip=ip1) >> Controller) )
 
-def main():
-    # examples:
-#     return test0() + fwding
-#    return test0() + flood()
-    return test0() + mac_learner()
-    # return test2() + mac_learner()
+def parse_args(kwargs, defaults):
+    params = dict(kwargs)
+    (query_policy, fwding_policy) = defaults
+    if 'query' in params:
+        query_policy = globals()[str(params['query'])]()
+    if 'fwding' in params:
+        fwding_policy = globals()[str(params['fwding'])]()
+    return (query_policy, fwding_policy)
 
+def main(**kwargs):
+    defaults = (test0(), mac_learner())
+    (fwding, query) = parse_args(kwargs, defaults)
+    return fwding + query
