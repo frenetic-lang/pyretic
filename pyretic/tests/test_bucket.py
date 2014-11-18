@@ -31,6 +31,7 @@ import os
 import subprocess, shlex
 import signal
 import time
+from pyretic.tests.tshark_filter import *
 from mininet.log import setLogLevel
 from mininet.topo import *
 from mininet.net import Mininet
@@ -67,19 +68,41 @@ def get_mininet(topo_args, listen_port):
 def capture_packets(t_out, t_err):
     t_outfile = open(t_out, 'w')
     t_errfile = open(t_err, 'w')
-    cmd = "tshark -i any -f 'inbound and net 10.0.0/24'"
+    """ tshark command below prints the following specific fields only for
+    mininet packets:
+    - frame length
+    - ip src for IP packets
+    - ip dst for IP packets
+    - ip src for ARP packets
+    - ip dst for ARP packets
+    If more fields are needed, the command needs to be modified accordingly.
+    """
+    cmd = ("tshark -i any -f 'inbound and net 10.0.0/24' -T fields -e ip.src " +
+           "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
+           "-E separator=,")
     t = subprocess.Popen(shlex.split(cmd), stdout=t_outfile, stderr=t_errfile)
     return (t, t_outfile, t_errfile)
 
 def workload(net, hosts):
     net.pingAll()
 
+def tshark_filter_count(t_outfile, filter_fun):
+    t_out = open(t_outfile, 'r')
+    pkt_count = 0
+    byte_count = 0
+    for line in t_out:
+        if filter_fun(line):
+            pkt_count  += 1
+            byte_count += get_bytes(line)
+    return [pkt_count, byte_count]
+
 def test_bucket_single_test():
+    """ Main function for a single test case. """
     args = parse_args()
     test_duration_sec = args.test_duration_sec
     tshark_slack_sec  = args.tshark_slack_sec
     adjust_path = get_adjust_path(args)
-    # mn_cleanup()
+    mn_cleanup()
 
     """ Controller """
     print "Setting up controller..."
@@ -156,6 +179,51 @@ def close_fds(fds, fd_str):
     for fd in fds:
         fd.close()
     print "Closed", fd_str, "file descriptors"
+
+### Filter functions to parse tshark output for various test cases ###
+ip1 = '10.0.0.1'
+ip2 = '10.0.0.2'
+ip3 = '10.0.0.3'
+
+def filt_test0():
+    return lambda x: True
+
+def filt_test1():
+    return pkt_srcip(ip1)
+
+def filt_test2_b0():
+    return lambda l: (ip_pkt_srcip(ip1)(l) or
+                      ip_pkt_srcip(ip3)(l))
+
+def filt_test2_b1():
+    return ip_pkt_srcip(ip2)
+
+def filt_test3_b0():
+    return lambda l: pkt_srcip(ip1)(l) or pkt_srcip(ip3)(l)
+
+def filt_test3_b1():
+    return pkt_srcip(ip2)
+
+def filt_test4_b0:
+    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+
+def filt_test4_b1:
+    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+
+def filt_test4_b2:
+    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip3)(l)
+
+def filt_test5():
+    return lambda l: (
+        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip2)(l)) or
+        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip3)(l)) or
+        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip1)(l)))
+
+def filt_test6():
+    return lambda l: not pkt_srcip(ip1)
+
+def filt_test7():
+    return pkt_srcip(ip1)
 
 ### The main thread.
 if __name__ == "__main__":
