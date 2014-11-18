@@ -330,6 +330,28 @@ class Classifier(object):
 
     ### SHADOW OPTIMIZATION
 
+    def __div__(c1, c2):
+        #TODO: checks
+        new_rules = list()
+        for r in c1.rules:
+            r_new = copy.copy(r)
+            r_new.parents = [r]
+            r_new.op = "div"
+            new_rules.append(r_new)
+        
+        new_rules = new_rules[:-1]
+        for r in c2.rules:
+            r_new = copy.copy(r)
+            r_new.parents = [r]
+            r_new.op = "div"
+            new_rules.append(r_new)
+        
+        c = Classifier(new_rules)
+        c = c.optimize()
+        return c
+
+
+
     def optimize(self):
         return self.remove_shadowed_cover_single()
 
