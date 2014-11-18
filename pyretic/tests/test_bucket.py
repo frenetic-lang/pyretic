@@ -77,7 +77,8 @@ def capture_packets(t_out, t_err):
     - ip dst for ARP packets
     If more fields are needed, the command needs to be modified accordingly.
     """
-    cmd = ("tshark -i any -f 'inbound and net 10.0.0/24' -T fields -e ip.src " +
+    cmd = ("tshark -i any -f 'inbound and net 10.0.0/24' -T fields " +
+           "-e frame.len -e ip.src " +
            "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
            "-E separator=,")
     t = subprocess.Popen(shlex.split(cmd), stdout=t_outfile, stderr=t_errfile)
@@ -86,14 +87,15 @@ def capture_packets(t_out, t_err):
 def workload(net, hosts):
     net.pingAll()
 
-def tshark_filter_count(t_outfile, filter_fun):
+def tshark_filter_count(t_outfile, tshark_filter_fun):
     t_out = open(t_outfile, 'r')
     pkt_count = 0
     byte_count = 0
+    filter_fun = globals()[tshark_filter_fun]
     for line in t_out:
         if filter_fun(line):
             pkt_count  += 1
-            byte_count += get_bytes(line)
+            byte_count += get_bytes_cooked_capture(line)
     return [pkt_count, byte_count]
 
 def test_bucket_single_test():
@@ -135,13 +137,17 @@ def test_bucket_single_test():
     time.sleep(test_duration_sec)
 
     """ Finish up """
-    print "Done. Finishing up..."
+    print "Actual run done. Cleaning up..."
     kill_process(ctlr, "controller")
     kill_process(tshark, "tshark")
     close_fds([c_out, c_err], "controller")
     close_fds([t_out, t_err], "tshark")
     net.stop()
-    
+
+    """ Verify results """
+    [pkts, bytes] = tshark_filter_count(t_outfile, args.tshark_filter_fun)
+    print "Got tshark counts:", pkts, "packets,", bytes, "bytes"
+
 #### Helper functions #####
 
 def parse_args():
@@ -152,6 +158,8 @@ def parse_args():
                         help="Forwarding policy to run")
     parser.add_argument("--topo_name", default="SingleSwitchTopo",
                         help="Topology class to use")
+    parser.add_argument("--tshark_filter_fun", default="filt_test0",
+                        help="Filter function to parse tshark output")
     parser.add_argument("--topo_args", default="3",
                         help="Arguments to the topology class constructor " +
                         "(separated by commas)")
@@ -185,45 +193,44 @@ ip1 = '10.0.0.1'
 ip2 = '10.0.0.2'
 ip3 = '10.0.0.3'
 
-def filt_test0():
-    return lambda x: True
+def filt_test0(l):
+    return True
 
-def filt_test1():
-    return pkt_srcip(ip1)
+def filt_test1(l):
+    return pkt_srcip(ip1)(l)
 
-def filt_test2_b0():
-    return lambda l: (ip_pkt_srcip(ip1)(l) or
-                      ip_pkt_srcip(ip3)(l))
+def filt_test2_b0(l):
+    return ip_pkt_srcip(ip1)(l) or ip_pkt_srcip(ip3)(l)
 
-def filt_test2_b1():
-    return ip_pkt_srcip(ip2)
+def filt_test2_b1(l):
+    return ip_pkt_srcip(ip2)(l)
 
-def filt_test3_b0():
-    return lambda l: pkt_srcip(ip1)(l) or pkt_srcip(ip3)(l)
+def filt_test3_b0(l):
+    return pkt_srcip(ip1)(l) or pkt_srcip(ip3)(l)
 
-def filt_test3_b1():
-    return pkt_srcip(ip2)
+def filt_test3_b1(l):
+    return pkt_srcip(ip2)(l)
 
-def filt_test4_b0:
-    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+def filt_test4_b0(l):
+    return pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
 
-def filt_test4_b1:
-    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+def filt_test4_b1(l):
+    return pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
 
-def filt_test4_b2:
-    return lambda l: pkt_srcip(ip1)(l) and pkt_dstip(ip3)(l)
+def filt_test4_b2(l):
+    return pkt_srcip(ip1)(l) and pkt_dstip(ip3)(l)
 
-def filt_test5():
-    return lambda l: (
+def filt_test5(l):
+    return (
         ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip2)(l)) or
         ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip3)(l)) or
         ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip1)(l)))
 
-def filt_test6():
-    return lambda l: not pkt_srcip(ip1)
+def filt_test6(l):
+    return not pkt_srcip(ip1)(l)
 
-def filt_test7():
-    return pkt_srcip(ip1)
+def filt_test7(l):
+    return pkt_srcip(ip1)(l)
 
 ### The main thread.
 if __name__ == "__main__":

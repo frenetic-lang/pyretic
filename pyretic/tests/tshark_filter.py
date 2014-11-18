@@ -44,7 +44,10 @@ def __get_arp_dstip(line):
     return line.split(',')[4]
 
 def get_bytes(l):
-    return __get_frame_len(l)
+    return int(__get_frame_len(l))
+
+def get_bytes_cooked_capture(l):
+    return int(__get_frame_len(l))-2
 
 def ip_pkt_srcip(target_ip):
     return lambda l: __get_ip_srcip(l) == target_ip
