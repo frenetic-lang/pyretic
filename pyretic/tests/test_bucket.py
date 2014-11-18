@@ -168,9 +168,8 @@ def test_bucket_single_test():
     print "Verifying correctness..."
     tshark_counts = get_tshark_counts(t_outfile, args.tshark_filter_funs)
     buckets_counts = ctlr_counts(c_outfile)
-    print tshark_counts
-    print buckets_counts
-    print tshark_counts == buckets_counts
+    success_file = adjust_path(args.success_file)
+    write_passfail_info(success_file, tshark_counts, buckets_counts)
 
 #### Helper functions #####
 
@@ -195,10 +194,12 @@ def parse_args():
                         help="Folder to put the raw results data into")
     parser.add_argument("--test_duration_sec", type=int,
                         help="Duration before workload finishes execution",
-                        default=30)
+                        default=15)
     parser.add_argument("--tshark_slack_sec", type=int,
                         help="Duration to wait for tshark capture to start",
                         default=5)
+    parser.add_argument("--success_file", help="File to write test pass/fail",
+                        default="pass-fail.txt")
     args = parser.parse_args()
     return args
 
@@ -212,6 +213,16 @@ def close_fds(fds, fd_str):
     for fd in fds:
         fd.close()
     print "Closed", fd_str, "file descriptors"
+
+def write_passfail_info(success_file, tshark_counts, buckets_counts):
+    passfail = open(success_file, 'w')
+    if tshark_counts == buckets_counts:
+        passfail.write("PASS\n")
+    else:
+        passfail.write("FAIL\n")
+        passfail.write("TShark: %d\n" % tshark_counts)
+        passfail.write("Bucket: %d\n" % bucket_counts)
+    passfail.close()
 
 ### Filter functions to parse tshark output for various test cases ###
 ip1 = '10.0.0.1'
