@@ -88,17 +88,22 @@ def capture_packets(t_out, t_err):
 def workload(net, hosts):
     net.pingAll()
 
-def tshark_filter_count(t_outfile, tshark_filter_fun):
-    # TODO: multiple filter functions for multiple buckets
+def get_tshark_counts(t_outfile, tshark_filter_funs):
+    tshark_counts = set()
+    for f in tshark_filter_funs.split(','):
+        tshark_counts.add(tshark_filter_count(t_outfile, f))
+    return tshark_counts
+
+def tshark_filter_count(t_outfile, filter_fun):
     t_out = open(t_outfile, 'r')
     pkt_count = 0
     byte_count = 0
-    filter_fun = globals()[tshark_filter_fun]
+    filter_fun = globals()[filter_fun]
     for line in t_out:
         if filter_fun(line):
             pkt_count  += 1
             byte_count += get_bytes_cooked_capture(line)
-    return [pkt_count, byte_count]
+    return (pkt_count, byte_count)
 
 def ctlr_counts(c_outfile):
     c_out = open(c_outfile, 'r')
@@ -107,8 +112,11 @@ def ctlr_counts(c_outfile):
     for line in c_out:
         if bucket_p.match(line.strip()):
             parts = line.strip().split()
-            buckets_counts[parts[1]] = [int(parts[-2][1:-1]), int(parts[-1][:-1])]
-    return buckets_counts
+            bucket_id = int(parts[1])
+            pkt_count  = int(parts[-2][1:-1])
+            byte_count = int(parts[-1][:-1])
+            buckets_counts[bucket_id] = (pkt_count, byte_count)
+    return set(buckets_counts.values())
 
 def test_bucket_single_test():
     """ Main function for a single test case. """
@@ -157,10 +165,12 @@ def test_bucket_single_test():
     net.stop()
 
     """ Verify results """
-    [pkts, bytes] = tshark_filter_count(t_outfile, args.tshark_filter_fun)
-    print "Got tshark counts:", pkts, "packets,", bytes, "bytes"
+    print "Verifying correctness..."
+    tshark_counts = get_tshark_counts(t_outfile, args.tshark_filter_funs)
     buckets_counts = ctlr_counts(c_outfile)
-    print "Got controller counts:", buckets_counts
+    print tshark_counts
+    print buckets_counts
+    print tshark_counts == buckets_counts
 
 #### Helper functions #####
 
@@ -172,8 +182,9 @@ def parse_args():
                         help="Forwarding policy to run")
     parser.add_argument("--topo_name", default="SingleSwitchTopo",
                         help="Topology class to use")
-    parser.add_argument("--tshark_filter_fun", default="filt_test0",
-                        help="Filter function to parse tshark output")
+    parser.add_argument("--tshark_filter_funs", default="filt_test0",
+                        help="Filter functions to parse tshark output " +
+                        "(multiple values can be comma separated")
     parser.add_argument("--topo_args", default="3",
                         help="Arguments to the topology class constructor " +
                         "(separated by commas)")
