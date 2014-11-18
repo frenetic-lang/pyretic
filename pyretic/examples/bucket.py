@@ -278,12 +278,12 @@ def parse_args(kwargs, defaults):
     params = dict(kwargs)
     (query_policy, fwding_policy) = defaults
     if 'query' in params:
-        query_policy = globals()[str(params['query'])]()
+        query_policy = globals()[str(params['query'])]
     if 'fwding' in params:
-        fwding_policy = globals()[str(params['fwding'])]()
+        fwding_policy = globals()[str(params['fwding'])]
     return (query_policy, fwding_policy)
 
 def main(**kwargs):
-    defaults = (test0(), mac_learner())
+    defaults = (test0, mac_learner)
     (fwding, query) = parse_args(kwargs, defaults)
-    return fwding + query
+    return fwding() + query()
