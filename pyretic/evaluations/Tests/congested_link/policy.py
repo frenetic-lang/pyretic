@@ -120,12 +120,9 @@ class LinkCongestionStats:
         return callback_func 
  
 def path_main(**kwargs):
-    #lcs = LinkCongestionStats(5,5)
-    #return lcs.link_congestion_query(**kwargs)
+    lcs = LinkCongestionStats(5,5)
+    return lcs.link_congestion_query(**kwargs)
 
-    a1 = atom(match(switch = 7))
-    a2 = atom(match(switch = 8))
-    return a1 ^ a2
 
 def main(**kwargs):
     params = dict(**kwargs)

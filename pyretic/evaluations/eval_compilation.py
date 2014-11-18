@@ -35,7 +35,6 @@ class eval_compilation:
         self.forwarding_compile()
         pathcomp.init_tag_field(1022)
         (self.tagging, self.capture) = pathcomp.compile(self.path_policy)
-        stat.compare_policies(self.tagging)
         self.tagging_compile()
         self.capture_compile()
 
@@ -77,7 +76,6 @@ class eval_compilation:
     def tagging_compile(self):
         if self.tagging:
             c = self.tagging.compile()
-            print c
             return c
         return None
 

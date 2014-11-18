@@ -33,8 +33,7 @@
 # pyretic: pyretic.py pyretic.examples.path_query -m p0                        #
 # test:    h1 ping h3 should produce packets at the controller from s3.        #
 ################################################################################
-from pyretic.core import language
-#from pyretic.lib.corelib import *
+from pyretic.lib.corelib import *
 from pyretic.core.network import *
 from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
@@ -322,9 +321,10 @@ def path_test_dynamic_1():
 # type: unit -> path list
 def path_main():
     #return path_test_waypoint_violation()
-    return atom(language.identity)
+#    print identity.__dict__
+    return atom(identity)
 
 def main():
-    return language.drop
+    return drop
 #    return static_fwding_chain_3_3
 #    return static_fwding_cycle_4_4_spanning_tree_1

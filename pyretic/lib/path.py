@@ -969,7 +969,7 @@ class pathcomp(object):
             dst = du.get_edge_dst(dfa, edge)
             pred = get_pred(edge)
             if not du.is_dead(dfa, src):
-                tagging += ((match_tag(src) & pred) >> set_tag(dst))
+                tagging = tagging / ((match_tag(src) & pred) >> set_tag(dst))
                 tag_rules += 1
                 
 
@@ -977,15 +977,12 @@ class pathcomp(object):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
                     capture_pol = pol_list[i]
-                    capture += ((match_tag(src) & pred) >> capture_pol)
+                    capture /= ((match_tag(src) & pred) >> capture_pol)
                     cap_rules += 1
 
         stat.gather_general_stats('tagging edges', tag_rules, 0, False)
         stat.gather_general_stats('capture edges', cap_rules, 0, False)  
         
-        if isinstance(tagging, DynamicPolicy):
-                    print "in compile dynamic"
-
         return (tagging, capture)
 
     def path_mod_add(paths, p):
