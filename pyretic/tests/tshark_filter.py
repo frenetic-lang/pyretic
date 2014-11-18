@@ -55,8 +55,8 @@ def ip_pkt_srcip(target_ip):
 def ip_pkt_dstip(target_ip):
     return lambda l: __get_ip_dstip(l) == target_ip
 
-def arp_pkt_dstip(target_ip):
-    return lambda l: __get_arp_dstip(l) == target_ip
+def arp_pkt_srcip(target_ip):
+    return lambda l: __get_arp_srcip(l) == target_ip
 
 def arp_pkt_dstip(target_ip):
     return lambda l: __get_arp_dstip(l) == target_ip

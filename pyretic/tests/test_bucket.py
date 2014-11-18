@@ -100,7 +100,7 @@ def tshark_filter_count(t_outfile, filter_fun):
     byte_count = 0
     filter_fun = globals()[filter_fun]
     for line in t_out:
-        if filter_fun(line):
+        if filter_fun(line.strip()):
             pkt_count  += 1
             byte_count += get_bytes_cooked_capture(line)
     return (pkt_count, byte_count)
@@ -220,8 +220,8 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts):
         passfail.write("PASS\n")
     else:
         passfail.write("FAIL\n")
-        passfail.write("TShark: %d\n" % tshark_counts)
-        passfail.write("Bucket: %d\n" % bucket_counts)
+        passfail.write("TShark: %s\n" % str(tshark_counts))
+        passfail.write("Bucket: %s\n" % str(buckets_counts))
     passfail.close()
 
 ### Filter functions to parse tshark output for various test cases ###

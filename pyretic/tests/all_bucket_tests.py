@@ -39,9 +39,16 @@ def single_test(fwding, query, filt_funs, topo_name, topo_args,
            "--results_folder=" + results + ' ' +
            "--success_file=" + pass_fail)
     test = subprocess.call(shlex.split(cmd))
-    f = open(os.path.join(results, pass_fail), 'r')
+    pf_file = os.path.join(results, pass_fail)
+    f = open(pf_file, 'r')
     success_info = f.read().strip()
     f.close()
+    """ Remove pass-fail file, for next test. """
+    cmd2 = ("rm -f %s" % pf_file)
+    subprocess.call(shlex.split(cmd2))
+    if success_info != 'PASS':
+        print "--- Got success_info: ---"
+        print success_info
     return success_info == 'PASS'
 
 def all_tests():
@@ -50,9 +57,9 @@ def all_tests():
                    'test4', 'test5', 'test6', 'test7']
     filt_funs   = ['filt_test0',
                    'filt_test1',
-                   'filt_test2_b0,filt_test_b1',
-                   'filt_test3_b0,filt_test_b1',
-                   'filt_test4_b0,filt_test_b1,filt_test_b2',
+                   'filt_test2_b0,filt_test2_b1',
+                   'filt_test3_b0,filt_test3_b1',
+                   'filt_test4_b0,filt_test4_b1,filt_test4_b2',
                    'filt_test5',
                    'filt_test6',
                    'filt_test7']
@@ -60,6 +67,8 @@ def all_tests():
     topo_args   = '3'
     results = './pyretic/evaluations/results'
     pass_fail = 'pass-fail.txt'
+    num_passed = 0
+    num_failed = 0
     
     for fwding in fwding_pols:
         for i in range(0, len(query_pols)):
@@ -68,8 +77,12 @@ def all_tests():
             test_name = "%s %s" % (query_pols[i], fwding)
             if res:
                 print "===== TEST %s PASSED =====" % test_name
+                num_passed += 1
             else:
                 print "===== TEST %s FAILED =====" % test_name
+                num_failed += 1
+    print "===== TESTS COMPLETE ====="
+    print "%d tests passed, %d failed" % (num_passed, num_failed)
 
 if __name__ == "__main__":
     all_tests()
