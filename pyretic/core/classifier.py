@@ -88,6 +88,15 @@ def get_rule_derivation_tree(r, pre_spaces='', only_leaves=False):
     return output
 
 
+# Classifier -> match -> rule
+def get_rule_exact_match(classifier, mat):
+    """ Get a rule from the classifier with a given match. """
+    for r in classifier.rules:
+        if r.match == mat:
+            return r
+    return None
+
+
 class Classifier(object):
     """
     A classifier contains a list of rules, where the order of the list implies

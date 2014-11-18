@@ -33,6 +33,8 @@ from pyretic.core.language import *
 from pyretic.core.language_tools import *
 from pyretic.core.network import *
 from pyretic.core.packet import *
+from pyretic.core.classifier import get_rule_exact_match
+from pyretic.core.classifier import get_rule_derivation_tree
 
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
@@ -72,39 +74,60 @@ class Runtime(object):
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
 
-        self.forwarding_compile()
 
         self.path_policy = None
-        self.path_tagging = DynamicPolicy(identity)
-        self.path_capture = DynamicPolicy(drop)
+        self.path_in_tagging  = DynamicPolicy(identity)
+        self.path_in_capture  = DynamicPolicy(drop)
+        self.path_out_tagging = DynamicPolicy(identity)
+        self.path_out_capture = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
+        self.dynamic_path_preds    = set()
 
         self.vf_tag_pol = None
         self.vf_untag_pol = None
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            pathcomp.init_tag_field(NUM_PATH_TAGS)
+            pathcomp.init(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
-            
+
+            in_tag_policy = self.path_in_tagging >> self.policy
+            self.forwarding = (in_tag_policy >> self.path_out_tagging)
+            in_capture  = self.path_in_capture
+            out_capture = (in_tag_policy >> self.path_out_capture)
+            self.virtual_tag = virtual_field_tagging()
+            self.virtual_untag = virtual_field_untagging()
+
+            ## gathering stats
+            # forwarding
+            self.forwarding_compile()
             self.tagging_compile()
+            self.out_tagging_compile()
+            self.tag_fwd_compile()
+
+            # capture
             self.capture_compile()
+            self.out_capture_compile()
 
-            self.policy = ((self.path_tagging >> self.policy) +
-                           self.path_capture)
+            # virtual tags
+            self.vf_tag_compile()
+            self.vf_untag_compile()
+            
+            self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+            self.vtag_in_capture = (self.virtual_tag >> in_capture)
+            self.vtag_out_capture = (self.virtual_tag >> out_capture)
 
-            self.tag_fw_cap_compile()
-            # Virtual field composition
+            self.vtag_fw_compile()
+            self.vtag_in_capture_compile()
+            self.vtag_out_capture_compile()
 
-            self.vf_tag_pol = virtual_field_tagging()
-            self.vf_untag_pol = virtual_field_untagging()
+            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+            self.whole_policy_compile()
 
-
-            self.policy = (self.vf_tag_pol >>
-                           self.policy >>
-                           self.vf_untag_pol)
-
+            #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
+             #              (virtual_tag >> in_capture) +
+              #             (virtual_tag >> out_capture))
 
         self.mode = mode
         self.backend = backend
@@ -151,31 +174,60 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def tagging_compile(self):
-        return self.path_tagging.compile()
+        return self.path_in_tagging.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def out_tagging_compile(self):
+        return self.path_out_tagging.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def capture_compile(self):
-        return self.path_capture.compile()
+        return self.path_in_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def out_capture_compile(self):
+        return self.path_out_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fwd_compile(self):
+        return self.forwarding.compile()
+
 
     @stat.classifier_size
     @stat.elapsed_time
     def vf_tag_compile(self):
-        return self.vf_tag_pol.compile()
+        return self.virtual_tag.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def vf_untag_compile(self):
-        return self.vf_untag_pol.compile()
+        return self.virtual_untag.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
-    def tag_fw_cap_compile(self):
+    def vtag_fw_compile(self):
         return self.policy.compile()
 
+
     @stat.classifier_size
     @stat.elapsed_time
-    def first_whole_compile(self):
+    def vtag_in_capture_compile(self):
+        return self.vtag_in_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vtag_out_capture_compile(self):
+        return self.vtag_out_capture.compile()
+
+
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def whole_compile(self):
         return self.policy.compile()
 
 
@@ -250,10 +302,9 @@ class Runtime(object):
         with self.policy_lock:
 
             # tag stale classifiers as invalid
-            #recompile_list = on_recompile_path_list(list(), id(sub_pol),
-             #                                       self.policy)
-            recompile_list = on_recompile_path_list(id(sub_pol), self.policy)
 
+            recompile_list = on_recompile_path_list(id(sub_pol),
+                                                    self.policy)
             map(lambda p: p.invalidate_classifier(), recompile_list)
 
             # if change was driven by a network update, flag
@@ -289,6 +340,8 @@ class Runtime(object):
             with self.policy_lock:
                 for policy in self.dynamic_sub_pols:
                     policy.set_network(self.network)
+                for (sub_pol, full_pol) in self.dynamic_path_preds:
+                    sub_pol.set_network(self.network)
 
                 # FIXME(joshreich) :-)
                 # This is a temporary fix. We need to specialize the check below
@@ -367,16 +420,22 @@ class Runtime(object):
     def handle_path_change(self):
         """ When a dynamic path policy updates its path_policy, initiate
         recompilation of the path (and hence pyretic) policy. """
-        self.update_dynamic_sub_path_pols(self.path_policy)
         self.recompile_paths()
+        self.update_dynamic_sub_path_pols(self.path_policy)
 
+    def handle_path_change_dyn_pred(self, sub_pol, full_pol):
+        recompile_list = on_recompile_path_list(id(sub_pol), full_pol)
+        map(lambda p: p.invalidate_classifier(), recompile_list)
+        self.handle_path_change()
 
     def update_dynamic_sub_path_pols(self, path_pol):
         """ Update runtime internal structures which keep track of dynamic
         members of the path policy AST.
         """
         import copy
-        from pyretic.lib.path import path_policy_utils
+        from pyretic.lib.path import path, path_policy_utils
+        from pyretic.lib.path import __in_re_tree_gen__ as in_cg
+        from pyretic.lib.path import __out_re_tree_gen__ as out_cg
         old_dynamic_sub_path_pols = copy.copy(self.dynamic_sub_path_pols)
         ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
@@ -385,15 +444,26 @@ class Runtime(object):
             pp.path_detach()
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
             pp.path_attach(self.handle_path_change)
-
+        old_dynamic_path_preds = copy.copy(self.dynamic_path_preds)
+        self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
+                                      out_cg.get_dyn_preds())
+        for (sp, fp) in (old_dynamic_path_preds - self.dynamic_path_preds):
+            sp.path_detach()
+        for (sp, fp) in (self.dynamic_path_preds - old_dynamic_path_preds):
+            sp.set_network(self.network)
+            f = lambda x: self.handle_path_change_dyn_pred(x, fp)
+            sp.path_attach(f)
 
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        (tagging, capture) = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
-        self.path_tagging.policy = tagging
-        self.path_capture.policy = capture
+        policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
+        (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+        self.path_in_tagging.policy  = in_tag
+        self.path_in_capture.policy  = in_cap
+        self.path_out_tagging.policy = out_tag
+        self.path_out_capture.policy = out_cap
 
 
 #######################

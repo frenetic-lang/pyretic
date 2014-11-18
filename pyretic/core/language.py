@@ -1548,7 +1548,7 @@ class DynamicFilter(DynamicPolicy,Filter):
 
     def changed(self):
         if self.path_notify:
-            self.path_notify()
+            self.path_notify(self)
         if self.notify:
             self.notify(self)
 
