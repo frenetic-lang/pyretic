@@ -30,12 +30,13 @@ import argparse
 import os
 import subprocess, shlex
 import signal
+import time
 from mininet.log import setLogLevel
 from mininet.topo import *
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
-from pyretic.evaluations.mininet_setup import mn_cleanup, wait_switch_rules_installed, get_abort_handler
+from pyretic.evaluations.mininet_setup import mn_cleanup, wait_switch_rules_installed, get_abort_handler, get_adjust_path
 
 def pyretic_controller(ctlr_params, c_out, c_err, pythonpath):
     c_outfile = open(c_out, 'w')
@@ -63,48 +64,65 @@ def get_mininet(topo_args, listen_port):
     net.start()
     return (net, net.hosts, net.switches)
 
+def capture_packets(t_out, t_err):
+    t_outfile = open(t_out, 'w')
+    t_errfile = open(t_err, 'w')
+    cmd = "tshark -i any -f 'inbound and net 10.0.0/24'"
+    t = subprocess.Popen(shlex.split(cmd), stdout=t_outfile, stderr=t_errfile)
+    return (t, t_outfile, t_errfile)
+
 def workload(net, hosts):
     net.pingAll()
 
 def test_bucket_single_test():
     args = parse_args()
     test_duration_sec = args.test_duration_sec
+    tshark_slack_sec  = args.tshark_slack_sec
     adjust_path = get_adjust_path(args)
     # mn_cleanup()
 
     """ Controller """
+    print "Setting up controller..."
     c_params = {'query': args.query, 'fwding': args.fwding}
-    c_out = adjust_path("pyretic-stdout.txt")
-    c_err = adjust_path("pyretic-stderr.txt")
+    c_outfile = adjust_path("pyretic-stdout.txt")
+    c_errfile = adjust_path("pyretic-stderr.txt")
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
-    (ctlr, c_out, c_err) = pyretic_controller(c_params, c_out, c_err, pypath)
+    (ctlr, c_out, c_err) = pyretic_controller(c_params, c_outfile, c_errfile,
+                                              pypath)
 
     """ Network """
+    print "Setting up mininet..."
     topo_args = {'class_name': args.topo_name, 'class_args': args.topo_args}
     (net, hosts, switches) = get_mininet(topo_args, args.listen_port)
 
+    """ Wait for switches to be prepped """
+    print "Waiting to install switch rules..."
+    wait_switch_rules_installed(switches)
+
+    """ Capture """
+    print "Starting tshark capture..."
+    t_outfile = adjust_path("tshark-stdout.txt")
+    t_errfile = adjust_path("tshark-stderr.txt")
+    (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile)
+    time.sleep(tshark_slack_sec)
+
     """ Workload """
+    print "Starting workload..."
     workload(net, hosts)
+    time.sleep(test_duration_sec)
 
     """ Finish up """
+    print "Done. Finishing up..."
     kill_process(ctlr, "controller")
+    kill_process(tshark, "tshark")
     close_fds([c_out, c_err], "controller")
+    close_fds([t_out, t_err], "tshark")
     net.stop()
     
 #### Helper functions #####
 
-def get_adjust_path(args):
-    """ Adjust the paths of all files relative to the global results folder. """
-    results_folder = args.results_folder
-    def adjust_path(rel_path):
-        return os.path.join(results_folder, rel_path)
-    return adjust_path
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Run correctness tests for buckets")
-    parser.add_argument("--test_duration_sec", type=int,
-                        help="Duration before workload finishes execution",
-                        default=30)
     parser.add_argument("-q", "--query", default="test0",
                         help="Query policy to run")
     parser.add_argument("-f", "--fwding", default="mac_learner",
@@ -119,6 +137,12 @@ def parse_args():
     parser.add_argument("-r", "--results_folder",
                         default="./pyretic/evaluations/results/",
                         help="Folder to put the raw results data into")
+    parser.add_argument("--test_duration_sec", type=int,
+                        help="Duration before workload finishes execution",
+                        default=30)
+    parser.add_argument("--tshark_slack_sec", type=int,
+                        help="Duration to wait for tshark capture to start",
+                        default=5)
     args = parser.parse_args()
     return args
 
@@ -132,9 +156,6 @@ def close_fds(fds, fd_str):
     for fd in fds:
         fd.close()
     print "Closed", fd_str, "file descriptors"
-
-def mn_cleanup():
-    subprocess.call("sudo mn -c", shell=True)
 
 ### The main thread.
 if __name__ == "__main__":
