@@ -29,6 +29,8 @@
 from pyretic.core.language import identity, egress_network, Filter, drop, match
 from pyretic.core.language import modify, Query, FwdBucket, CountBucket
 from pyretic.core.language import PathBucket, DynamicFilter
+from pyretic.core.language_tools import ast_fold as policy_ast_fold
+from pyretic.core.language_tools import add_dynamic_sub_pols
 
 from pyretic.lib.query import counts, packets
 from pyretic.core.runtime import virtual_field
@@ -137,7 +139,8 @@ class re_tree_gen(object):
     # path query.
     pred_to_symbol = {}
     pred_to_atoms  = {}
-    symbol_to_pred = {} # Used solely during compilation, not re_tree generation.
+    symbol_to_pred = {}
+    dyn_preds      = []
 
     @classmethod
     def repr_state(cls):
@@ -161,6 +164,11 @@ class re_tree_gen(object):
         cls.pred_to_symbol[pred] = symbol
         cls.pred_to_atoms[pred] = atoms
         cls.symbol_to_pred[symbol] = pred
+
+    @classmethod
+    def __add_dyn_preds__(cls, preds, atom):
+        for pred in preds:
+            cls.dyn_preds.append((pred, atom))
 
     @classmethod
     def __del_pred__(cls, pred):
@@ -244,13 +252,20 @@ class re_tree_gen(object):
         ne_inters   = classifier_utils.has_nonempty_intersection
         is_not_drop = classifier_utils.is_not_drop
         add_pred = cls.__add_pred__
-        new_sym  = cls.__new_symbol__
+        new_sym  = re_tree_gen.__new_symbol__
         del_pred = cls.__del_pred__
         replace_pred = cls.__replace_pred__
         ovlap = classifier_utils.get_overlap_mode
 
         re_tree = re_empty()
         pred_list = cls.pred_to_symbol.keys()
+
+        """ Record dynamic predicates separately for update purposes."""
+        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
+        if dyn_pols:
+            """ If new_pred contains a dynamic predicate, it must be remembered
+            explicitly to set up recompilation routines in the runtime."""
+            cls.__add_dyn_preds__(dyn_pols, at.policy)
 
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
@@ -284,12 +299,9 @@ class re_tree_gen(object):
             else:
                 pass
 
-        if is_not_drop(new_pred) or isinstance(new_pred, DynamicFilter):
-            """ The new predicate should be added if either:
-                - some part of it doesn't intersect any existing predicate,
-                  i.e., new_pred is not drop, OR
-                - new_pred is a DynamicFilter, in which case we keep a copy in
-                  the policy to trigger recompilation if it changes.
+        if is_not_drop(new_pred):
+            """ The new predicate should be added if some part of it doesn't
+            intersect any existing predicate, i.e., new_pred is not drop.
             """
             add_pred(new_pred, new_sym(), [at])
             added_sym = cls.pred_to_symbol[new_pred]
@@ -299,10 +311,11 @@ class re_tree_gen(object):
 
     @classmethod
     def clear(cls):
-        cls.token = TOKEN_START_VALUE
+        re_tree_gen.token = TOKEN_START_VALUE
         cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
         cls.symbol_to_pred  = {}
+        cls.dyn_preds       = []
 
     @classmethod
     def get_symlist(cls):
@@ -318,6 +331,10 @@ class re_tree_gen(object):
         return output
 
     @classmethod
+    def get_dyn_preds(cls):
+        return cls.dyn_preds
+
+    @classmethod
     def get_unaffected_pred(cls):
         """ Predicate that covers packets unaffected by query predicates. """
         if len(cls.pred_to_symbol.keys()) >= 1:
@@ -325,11 +342,21 @@ class re_tree_gen(object):
         else:
             return identity
 
+
+""" Character generator classes belonging to "ingress" and "egress" matching
+predicates, respectively. """
+class __in_re_tree_gen__(re_tree_gen):
+    pass
+
+class __out_re_tree_gen__(re_tree_gen):
+    pass
+
+
 #############################################################################
 ###               Path query language components                          ###
 #############################################################################
 
-class path_policy(Query):
+class path_policy(object):
     """ Defines a "path policy" object, which is a combination of a path
     function (trajectory -> {pkt}), and a policy function (pkt -> {pkt}), used
     in sequential composition. The action of the path policy on the packet is
@@ -469,7 +496,7 @@ class path_policy_utils(object):
         """
         if (isinstance(ast, path_epsilon) or
             isinstance(ast, path_empty) or
-            isinstance(ast, abstract_atom)):
+            isinstance(ast, in_out_atom)):
             return fold_f(acc, ast)
         elif isinstance(ast, path_combinator):
             acc = fold_f(acc, ast)
@@ -480,14 +507,18 @@ class path_policy_utils(object):
             raise TypeError("Can only fold path objects!")
 
     @classmethod
+    def get_dyn_pols(cls, p):
+        return policy_ast_fold(add_dynamic_sub_pols, list(), p)
+
+    @classmethod
     def add_dynamic_filters(cls, acc, at):
         """ Collect all DynamicFilters that are part of atoms in paths. """
-        if isinstance(at, abstract_atom):
-            p = at.policy
-            if isinstance(p, DynamicFilter):
-                return acc | set([p])
-            else:
-                return acc
+        if isinstance(at, in_out_atom):
+            p_in  = at.in_atom.policy
+            p_out = at.out_atom.policy
+            in_set = map(lambda x: (x, p_in), cls.get_dyn_pols(p_in))
+            out_set = map(lambda x: (x, p_out), cls.get_dyn_pols(p_out))
+            return acc | set(in_set) | set(out_set)
         elif isinstance(at, path):
             return acc
         else:
@@ -500,10 +531,7 @@ class path_policy_utils(object):
         elif isinstance(pp, path_policy_union):
             return acc
         elif isinstance(pp, path_policy):
-            """ Add DynamicFilters from constituent path atoms. """
-            dyn_fun = cls.add_dynamic_filters
-            dyn_filters = cls.path_ast_fold(pp.path, dyn_fun, set())
-            return acc | dyn_filters
+            return acc
         else:
             raise TypeError("Can only act on path_policy objects!")
 
@@ -545,7 +573,7 @@ class path(path_policy):
         x ** y is just a shorthand for x ^ identity* ^ y.
         """
         assert isinstance(other, path)
-        return path_concat.smart_concat([self, +atom(identity), other])
+        return path_concat.smart_concat([self, +in_atom(identity), other])
 
     def __or__(self, other):
         """Implementation of the path alternation operator ('|')"""
@@ -599,25 +627,25 @@ class path_empty(path):
         return "path_empty"
 
 
-class abstract_atom(path, Filter):
+class abstract_atom(object):
     """A single atomic match in a path expression. This is an abstract class
     where the token isn't initialized.
 
     :param m: a Filter (or match) object used to initialize the path atom.
     :type match: Filter
     """
-    def __init__(self, m):
+    def __init__(self, m,re_tree_class=re_tree_gen):
         assert isinstance(m, Filter)
         self.policy = m
         self._re_tree = None
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
-        super(abstract_atom, self).__init__()
+        self.re_tree_class = re_tree_class
 
     @property
     def re_tree(self):
         if not self._re_tree:
             self.tree_counter += 1
-            self._re_tree = re_tree_gen.get_re_tree(self.policy, self)
+            self._re_tree = self.re_tree_class.get_re_tree(self.policy, self)
             assert self.tree_counter <= 1
         return self._re_tree
 
@@ -626,32 +654,9 @@ class abstract_atom(path, Filter):
         self._re_tree = rt
         self.tree_counter += 1
 
-    def __and__(self, other):
-        if isinstance(other, abstract_atom):
-            if not isinstance(other, type(self)):
-                raise TypeError("'&' operator on atoms of different types")
-            return type(self)(self.policy & other.policy)
-        elif isinstance(other, path):
-            return super(abstract_atom, self).__and__(other)
-        else:
-            raise TypeError
-
-    def __or__(self, other):
-        if isinstance(other, abstract_atom):
-            if not isinstance(other, type(self)):
-                raise TypeError("'|' operator on atoms of different types")
-            return type(self)(self.policy | other.policy)
-        elif isinstance(other, path):
-            return super(abstract_atom, self).__or__(other)
-        else:
-            raise TypeError
-
-    def __sub__(self, other):
-        assert isinstance(other, type(self))
-        return type(self)((~other.policy) & self.policy)
-
-    def __invert__(self):
-        return type(self)(~(self.policy))
+    def invalidate_re_tree(self):
+        self._re_tree = None
+        self.tree_counter = 0
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -660,22 +665,62 @@ class abstract_atom(path, Filter):
     def __repr__(self):
         return repr(self.policy) + '; expression: ' + self.expr
 
+    @property
+    def expr(self):
+        return self.re_tree.re_string_repr()
 
-class atom(abstract_atom):
+
+class __in__(abstract_atom):
+    """ Atom type that only matches a predicate at the entry of a switch. """
+    def __init__(self, m):
+        super(__in__, self).__init__(m, re_tree_class=__in_re_tree_gen__)
+
+class __out__(abstract_atom):
+    """ Atom type that only matches a predicate at the exit of a switch. """
+    def __init__(self, m):
+        super(__out__, self).__init__(m, re_tree_class=__out_re_tree_gen__)
+
+
+class in_out_atom(path):
+    """ The leaf atom for all path queries. """
+    def __init__(self, in_pred, out_pred):
+        self.in_pred  = in_pred
+        self.out_pred = out_pred
+        self.in_atom  = __in__(in_pred)
+        self.out_atom = __out__(out_pred)
+        super(in_out_atom, self).__init__()
+
+    @property
+    def re_tree(self):
+        return self.in_atom.re_tree ^ self.out_atom.re_tree
+
+    def invalidate_re_tree(self):
+        self.in_atom.invalidate_re_tree()
+        self.out_atom.invalidate_re_tree()
+
+    def __eq__(self, other):
+        return (isinstance(other, in_out_atom) and
+                self.in_pred == other.in_pred and
+                self.out_pred == other.out_pred)
+
+    def __repr__(self):
+        return "in: %s\nout: %s\nexpr:%s" % (repr(self.in_pred),
+                                             repr(self.out_pred),
+                                             self.expr)
+
+
+class in_atom(in_out_atom):
+    def __init__(self, m):
+        super(in_atom, self).__init__(m, identity)
+
+class out_atom(in_out_atom):
+    def __init__(self, m):
+        super(out_atom, self).__init__(identity, m)
+
+class atom(in_atom):
     """A concrete "ingress" match atom."""
     def __init__(self, m):
         super(atom, self).__init__(m)
-
-
-class egress_atom(abstract_atom):
-    """An atom that denotes a match on a packet after the forwarding decision
-    has been made. It can always be substituted by a normal ("ingress") atom at
-    the next hop, unless the packet is egressing the network. Hence, it may be
-    noted that this is only necessary (apart from expressive power, of course)
-    to match on packets that egress the network.
-    """
-    def __init__(self, m):
-        super(egress_atom, self).__init__(m)
 
 
 class drop_atom(abstract_atom):
@@ -684,11 +729,6 @@ class drop_atom(abstract_atom):
     """
     def __init__(self, m):
         super(drop_atom, self).__init__(m)
-
-
-class end_path(abstract_atom):
-    def __init__(self, m):
-        super(end_path, self).__init__(m)
 
 
 class hook(abstract_atom):
@@ -874,9 +914,36 @@ class pathcomp(object):
             return match(path_tag=int(val))
 
     @classmethod
-    def __get_pred__(cls, edge):
-        """ Get predicate corresponding to an edge. """
-        return re_tree_gen.symbol_to_pred[dfa_utils.get_edge_label(edge)]
+    def __get_pred__(cls, dfa, edge):
+        """ Get predicate and atom type corresponding to an edge. """
+        def __sym_in_class__(cg, sym):
+            return sym in cg.symbol_to_pred
+
+        def __get_atoms_cg_typ__(atoms, sym):
+            if len(atoms) > 1:
+                typ = type(atoms[0])
+                for a in atoms[1:]:
+                    assert typ == type(a)
+                if typ == __in__:
+                    return (__in_re_tree_gen__, __in__)
+                elif typ == __out__:
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Atoms can only be in or out typed.")
+            else:
+                if __sym_in_class__(__in_re_tree_gen__, sym):
+                    return (__in_re_tree_gen__, __in__)
+                elif __sym_in_class__(__out_re_tree_gen__, sym):
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Symbol can only be in or out typed.")
+
+        edge_label = dfa_utils.get_edge_label(edge)
+        atoms_list = reduce(lambda a,x: a + x,
+                            dfa_utils.get_edge_atoms(dfa,edge),
+                            [])
+        (cg, typ) = __get_atoms_cg_typ__(atoms_list, edge_label)
+        return (cg.symbol_to_pred[edge_label], typ)
 
     @classmethod
     def __get_dead_state_pred__(cls, dfa):
@@ -893,6 +960,24 @@ class pathcomp(object):
             return cls.__set_tag__(dfa, dead)
         else:
             return identity
+
+    @classmethod
+    def __invalidate_re_trees__(cls, acc, p):
+        """ Invalidate the re_tree values for all abstract atoms in the given
+        path policy p. """
+        def inv_atoms(acc, x):
+            if isinstance(x, in_out_atom):
+                x.invalidate_re_tree()
+            return None
+        if (isinstance(p, path_policy) and
+            not isinstance(p, dynamic_path_policy) and
+            not isinstance(p, path_policy_union)):
+            path_policy_utils.path_ast_fold(p.path, inv_atoms, None)
+            return None
+        elif isinstance(p, path_policy):
+            return None
+        else:
+            raise TypeError("Expecting a path_policy")
 
     @classmethod
     def __prep_re_trees__(cls, acc, p):
@@ -925,10 +1010,12 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
-    def init_tag_field(cls, numvals):
+    def init(cls, numvals):
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
+        __in_re_tree_gen__.clear()
+        __out_re_tree_gen__.clear()
 
 
     @classmethod
@@ -938,72 +1025,84 @@ class pathcomp(object):
         into a single classifier to be installed on switches.
         """
         du = dfa_utils
-        cg = re_tree_gen
+        in_cg = __in_re_tree_gen__
+        out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
+        inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
-        
+        in_cg.clear()
+        out_cg.clear()
+
+        ast_fold(path_pol, inv_trees, None)
+
         ast_fold(path_pol, prep_trees, None)
 
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
         dfa = du.regexes_to_dfa(re_list)
         assert du.get_num_states(dfa) <= max_states
-        tagging = (((cg.get_unaffected_pred() & ~(cls.__get_dead_state_pred__(dfa)))
-                    >> cls.__set_dead_state_tag__(dfa)) +
-                   cls.__get_dead_state_pred__(dfa))
-        capture = drop
         match_tag = lambda q: cls.__match_tag__(dfa, q)
         set_tag   = lambda q: cls.__set_tag__(dfa, q)
-        get_pred  = cls.__get_pred__
 
         
-        tag_rules = 0
-        cap_rules = 0
-       
-        from pyretic.core.language import DynamicPolicy
+        in_tag_rules = 0
+        in_cap_rules = 0
 
+        out_tag_rules = 0
+        out_cap_rules = 0
+       
+        get_pred  = lambda e: cls.__get_pred__(dfa, e)
+
+        """ Initialize tagging and capture policies. """
+        in_tagging = (((in_cg.get_unaffected_pred() &
+                        ~(cls.__get_dead_state_pred__(dfa)))
+                       >> cls.__set_dead_state_tag__(dfa)) +
+                      cls.__get_dead_state_pred__(dfa))
+        out_tagging = (((out_cg.get_unaffected_pred() &
+                         ~(cls.__get_dead_state_pred__(dfa)))
+                        >> cls.__set_dead_state_tag__(dfa)) +
+                       cls.__get_dead_state_pred__(dfa))
+        in_capture = drop
+        out_capture = drop
+
+        """ Generate transition/accept rules from DFA """
         edges = du.get_edges(dfa)
         for edge in edges:
             src = du.get_edge_src(dfa, edge)
             dst = du.get_edge_dst(dfa, edge)
-            pred = get_pred(edge)
+            (pred, typ) = get_pred(edge)
+            assert typ in [__in__, __out__]
             if not du.is_dead(dfa, src):
-                tagging = tagging / ((match_tag(src) & pred) >> set_tag(dst))
-                tag_rules += 1
                 
+                tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
+                if typ == __in__:
+                    in_tagging += tag_frag
+                    in_tag_rules += 1
+
+                elif typ == __out__:
+                    out_tagging += tag_frag
+                    out_tag_rules += 1
 
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
-                    capture_pol = pol_list[i]
-                    capture /= ((match_tag(src) & pred) >> capture_pol)
-                    cap_rules += 1
 
-        stat.gather_general_stats('tagging edges', tag_rules, 0, False)
-        stat.gather_general_stats('capture edges', cap_rules, 0, False)  
+                    cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                    if typ == __in__:
+                        in_capture += cap_frag
+                        in_cap_rules += 1
+                    elif typ == __out__:
+                        out_capture += cap_frag
+                        out_cap_rules += 1
         
-        return (tagging, capture)
+        stat.gather_general_states('in tagging edges', in_tag_rules, 0, False)
+        stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
-    def path_mod_add(paths, p):
-        paths.append(p)
-        return paths
-
-    def path_mod_repl(paths, p, new_p):
-        new_paths = []
-        for q in paths:
-            if q == p:
-                new_paths.append(new_p)
-            else:
-                new_paths.append(q)
-        return new_paths
-
-    def path_mod_del(paths, p):
-        new_paths = []
-        for q in paths:
-            if not q == p:
-                new_paths.append(q)
-        return new_paths
+         stat.gather_general_states('out tagging edges', out_tag_rules, 0, False)
+        stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+        
+        return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
         def __init__(self):
@@ -1368,10 +1467,11 @@ class dfa_utils(object):
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
                       re_exps, True)
         if not symlist:
-            symlist = re_tree_gen.get_symlist()
+            symlist = (__in_re_tree_gen__.get_symlist() +
+                       __out_re_tree_gen__.get_symlist())
         dfa = makeDFA_vector(re_exps, symlist)
         cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
-        cls.__dump_file__(re_tree_gen.get_leaf_preds(), '/tmp/symbols.txt')
-
-        #cls.__dump_file__(cls.get_leaf_pred_dumps(), '/tmp/symbol-pred.txt')
+        leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
+                      __out_re_tree_gen__.get_leaf_preds())
+        cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
         return dfa

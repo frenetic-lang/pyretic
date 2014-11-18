@@ -114,6 +114,11 @@ def path_callback(test_num):
         print '**************'
     return actual_callback
 
+def path_test_0():
+    p = atom(match(switch=2))
+    p.register_callback(query_callback(0))
+    return p
+
 def path_test_1():
     a1 = atom(match(switch=1,srcip=ip1))
     a2 = atom(match(switch=3,dstip=ip3))
@@ -143,6 +148,18 @@ def path_test_4():
     query_thread.start()
     return p
 
+def path_test_4_5():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=2))
+    p = a1 ^ a2
+    cb = CountBucket()
+    p.set_bucket(cb)
+    p.register_callback(query_callback(4))
+    query_thread = threading.Thread(target=query_func, args=(cb,5.0))
+    query_thread.daemon = True
+    query_thread.start()
+    return p
+
 def path_test_5():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
@@ -166,7 +183,7 @@ def path_test_8():
     return p
 
 def path_test_9():
-    p = atom(match(srcip=ip1)) ^ end_path(identity)
+    p = atom(match(srcip=ip1)) ** out_atom(egress_network())
     p.register_callback(query_callback(9))
     return p
 
@@ -179,7 +196,7 @@ def path_test_10():
     return p
 
 def path_test_11():
-    p = end_path(identity)
+    p = out_atom(identity)
     p.register_callback(query_callback(11))
     return p
 
@@ -286,7 +303,16 @@ def path_test_waypoint_violation():
     c = atom(match(switch=3))
     i = atom(identity)
     p = (a ^ +b ^ c) | (c ^ +b ^ a)
-    p.register_callback(query_callback(16))
+    p.register_callback(query_callback("waypoint violated"))
+    return p
+
+def path_test_waypoint_violation_general():
+    fw = match(switch=4)
+    ing = ingress_network()
+    eg  = egress_network()
+    p = ((in_atom(ing & ~fw) ^ +in_atom(~fw) ^ out_atom(eg & ~fw)) |
+         (in_out_atom(ing, eg & ~fw)))
+    p.register_callback(query_callback("generalized waypoint violation"))
     return p
 
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
@@ -311,20 +337,113 @@ def path_test_dynamic_1():
     p1 = a1 ** a2
     p1.register_callback(query_callback("dyn_1"))
     p = dynamic_path_policy(p1)
-    p.register_callback(query_callback("dyn_1"))
     dyn_thread = threading.Thread(target=change_dynamic_path,
                                   args=(p, 5.0, lambda x: x.path_policy))
     dyn_thread.daemon = True
     dyn_thread.start()
     return p
 
-# type: unit -> path list
-def path_main():
-    #return path_test_waypoint_violation()
-#    print identity.__dict__
-    return atom(identity)
+def path_test_19():
+    p = out_atom(match(switch=1, outport=1))
+    p.register_callback(query_callback(19))
+    return p
 
-def main():
-    return drop
+def path_test_20():
+    p = in_out_atom(match(switch=2, inport=3), match(switch=2, outport=1))
+    p.register_callback(query_callback(20))
+    return p
+
+def path_test_21():
+    p = +in_atom(identity) ^ out_atom(egress_network())
+    p.register_callback(query_callback(21))
+    return p
+
+def path_test_22():
+    p1 = in_atom(match(switch=1)) ^ out_atom(match(switch=2))
+    p2 = out_atom(match(switch=1)) ^ in_atom(match(switch=2))
+    p1.register_callback(query_callback("22.p1"))
+    p2.register_callback(query_callback("22.p2"))
+    return p1 + p2
+
+def path_test_23():
+    p1 = in_atom(match(switch=1,inport=2)) ^ out_atom(match(switch=2,outport=3))
+    p2 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
+    p1.register_callback(query_callback("23.p1"))
+    p2.register_callback(query_callback("23.p2"))
+    return p1 + p2
+
+def path_test_24():
+    p1 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
+    p2 = out_atom(match(switch=2,outport=1)) ^ in_atom(match(switch=1,inport=1))
+    p1.register_callback(query_callback("24.p1"))
+    p2.register_callback(query_callback("24.p2"))
+    return p1 + p2
+
+def path_test_per_hop_pktcount(**kwargs):
+    """ Get packet counts of traffic from h_1 and h_n along a chain topology of
+    length n, at each hop.
+    """
+    def setup_query(partial_query, query_pred, i, count=False):
+        new_query = partial_query ^ atom(query_pred)
+        if count:
+            cb = CountBucket()
+            new_query.set_bucket(cb)
+            query_thread = threading.Thread(target=query_func, args=(cb,10.0))
+            query_thread.daemon = True
+            query_thread.start()
+        new_query.register_callback(query_callback("per_hop_" + str(i)))
+        return new_query
+
+    params = dict(**kwargs)
+    n = int(params['n'])
+    p = path_epsilon()
+    ip1 = IPAddr('10.0.0.1')
+    ipn = IPAddr('10.0.0.' + str(n))
+    partial_query = setup_query(path_epsilon(),
+                            match(switch=1, srcip=ip1, dstip=ipn),
+                            1)
+    p += partial_query
+    for i in range(2, n+1):
+        partial_query = setup_query(partial_query,
+                                    match(switch=i),
+                                    i)
+        p += partial_query
+    return p
+
+def chain_forwarding(**kwargs):
+    params = dict(**kwargs)
+    n = int(params['n'])
+    ips = [0] + map(lambda x: IPAddr('10.0.0.' + str(x)), range(1, n+1))
+    host_pol = drop
+    for h in range(1, n+1):
+        switch_pol = drop
+        for s in range(1, n+1):
+            if s == h:
+                if h == 1 or h == n:
+                    switch_pol += (match(dstip=ips[h], switch=s) >> fwd(2))
+                else:
+                    switch_pol += (match(dstip=ips[h], switch=s) >> fwd(3))
+            elif s == 1:
+                switch_pol += (match(dstip=ips[h], switch=1) >> fwd(1))
+            elif s < h:
+                switch_pol += (match(dstip=ips[h], switch=s) >> fwd(2))
+            elif s > h:
+                switch_pol += (match(dstip=ips[h], switch=s) >> fwd(1))
+            else:
+                raise RuntimeError("unmatchable condition.")
+        host_pol += switch_pol
+    return host_pol
+
+def path_test_25():
+    p = atom(ingress_network() & match(switch=1))
+    p.register_callback(query_callback(25))
+    return p
+
+# type: unit -> path list
+def path_main(**kwargs):
+    return path_test_waypoint_violation_general()
+
+def main(**kwargs):
+#    return mac_learner()
 #    return static_fwding_chain_3_3
-#    return static_fwding_cycle_4_4_spanning_tree_1
+    return static_fwding_cycle_4_4_spanning_tree_1
