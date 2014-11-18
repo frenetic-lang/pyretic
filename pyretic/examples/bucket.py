@@ -82,7 +82,7 @@ class QueryTest(CountBucket):
     def query_callback(self, counts):
         print "***", str(datetime.now()), "| In user callback for bucket",
         print id(self)
-        print "(packet, byte) counts:", counts
+        print "Bucket", id(self), "(packet, byte) counts:", counts
         print "-----------------------------------"
 
 def test0():

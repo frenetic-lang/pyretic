@@ -31,6 +31,7 @@ import os
 import subprocess, shlex
 import signal
 import time
+import re
 from pyretic.tests.tshark_filter import *
 from mininet.log import setLogLevel
 from mininet.topo import *
@@ -88,6 +89,7 @@ def workload(net, hosts):
     net.pingAll()
 
 def tshark_filter_count(t_outfile, tshark_filter_fun):
+    # TODO: multiple filter functions for multiple buckets
     t_out = open(t_outfile, 'r')
     pkt_count = 0
     byte_count = 0
@@ -97,6 +99,16 @@ def tshark_filter_count(t_outfile, tshark_filter_fun):
             pkt_count  += 1
             byte_count += get_bytes_cooked_capture(line)
     return [pkt_count, byte_count]
+
+def ctlr_counts(c_outfile):
+    c_out = open(c_outfile, 'r')
+    buckets_counts = {}
+    bucket_p = re.compile("Bucket [0-9]+ \(packet, byte\) counts: \[[0-9]+, [0-9]+\]")
+    for line in c_out:
+        if bucket_p.match(line.strip()):
+            parts = line.strip().split()
+            buckets_counts[parts[1]] = [int(parts[-2][1:-1]), int(parts[-1][:-1])]
+    return buckets_counts
 
 def test_bucket_single_test():
     """ Main function for a single test case. """
@@ -147,6 +159,8 @@ def test_bucket_single_test():
     """ Verify results """
     [pkts, bytes] = tshark_filter_count(t_outfile, args.tshark_filter_fun)
     print "Got tshark counts:", pkts, "packets,", bytes, "bytes"
+    buckets_counts = ctlr_counts(c_outfile)
+    print "Got controller counts:", buckets_counts
 
 #### Helper functions #####
 
