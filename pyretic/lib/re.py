@@ -95,6 +95,15 @@ class re_base(re_deriv):
     and a single symbol from the alphabet.
     """
     def __init__(self, metadata=None, lst=True):
+        """
+        Initialize a basic element of the re language. There can be metadata
+        associated with the basic element.
+
+        :param metadata: optional metadata to attach to the basic expression
+        :type metadata: 'a
+        :param lst: boolean flag that denotes whether metadata is a list
+        :type lst: boolean
+        """
         super(re_base, self).__init__()
         if metadata:
             if lst:
@@ -105,10 +114,12 @@ class re_base(re_deriv):
             self.metadata = []
 
     def add_metadata(self, new_meta):
+        """ Add new metadata to existing metadata list of the object. """
         assert isinstance(new_meta, list)
         self.metadata += new_meta
 
     def get_metadata(self):
+        """ Get back metadata. """
         return self.metadata
 
     def equals_meta_structural(self, other):
@@ -130,6 +141,7 @@ class re_base(re_deriv):
             return self.re_string_repr()
 
 class re_epsilon(re_base):
+    """ A regular expression that is equivalent to a zero-length string. """
     def __init__(self, metadata=None, lst=True):
         super(re_epsilon, self).__init__(metadata, lst)
 
@@ -143,6 +155,7 @@ class re_epsilon(re_base):
         return "epsilon"
 
 class re_empty(re_base):
+    """ The null regular expression, which matches nothing. """
     def __init__(self, metadata=None, lst=True):
         super(re_empty, self).__init__(metadata, lst)
 
@@ -156,6 +169,7 @@ class re_empty(re_base):
         return "phi"
 
 class re_symbol(re_base):
+    """ A symbol of the character set used by the regular language. """
     def __init__(self, char, metadata=None, lst=True):
         super(re_symbol, self).__init__(metadata, lst)
         self.char = char
@@ -174,6 +188,8 @@ class re_symbol(re_base):
 ### regular expression combinators as ASTs. They should *not* be used to
 ### construct regular expressions by applications.
 class re_combinator(re_deriv):
+    """ Abstract class for regular expressions which are formed by combining
+    simpler regular expressions. """
     def __init__(self, re_list):
         self.re_list = re_list
         super(re_combinator, self).__init__()
@@ -202,6 +218,7 @@ class re_combinator(re_deriv):
             return False
 
 class re_concat(re_combinator):
+    """ Class for regular expressions with a topmost concatenation operator. """
     def __init__(self, re1, re2):
         self.re1 = re1
         self.re2 = re2
@@ -225,6 +242,7 @@ class re_concat(re_combinator):
                 repr(self.re2) + ')')
 
 class re_alter(re_combinator):
+    """ Class for regular expressions with a topmost alternation operator. """
     def __init__(self, re_list):
         super(re_alter, self).__init__(re_list)
 
@@ -244,6 +262,7 @@ class re_alter(re_combinator):
         return '(' + string.join(words, ') | (') + ')'
 
 class re_star(re_combinator):
+    """ Class for regular expressions with a topmost Kleene star operator. """
     def __init__(self, re):
         self.re = re
         super(re_star, self).__init__([re])
@@ -263,6 +282,7 @@ class re_star(re_combinator):
         return '(' + repr(self.re) + ')*'
 
 class re_inters(re_combinator):
+    """ Class for regular expressions with a topmost intersection operator. """
     def __init__(self, re_list):
         super(re_inters, self).__init__(re_list)
 
@@ -282,6 +302,7 @@ class re_inters(re_combinator):
         return '(' + string.join(words, ') & (') + ')'
 
 class re_negate(re_combinator):
+    """ Class for regular expressions with a topmost negation operator. """
     def __init__(self, re):
         self.re = re
         super(re_negate, self).__init__([re])
@@ -303,7 +324,11 @@ class re_negate(re_combinator):
 # Nullable function
 def nullable(r):
     """ Return re_epsilon if a regular expression r is nullable, else
-    re_empty. """
+    re_empty.
+
+    :param r: the regex which is tested.
+    :type r: re_deriv
+    """
     def bool_to_re(b):
         return re_epsilon() if b else re_empty()
     def re_to_bool(r):
@@ -344,13 +369,14 @@ def nullable(r):
 # possible (e.g., no head constructor "and" in any r \in re if smart_and is
 # called).
 
-# Sort a list of regular expressions. Uses the sort_key() function to sort
-# through different regular expressions
 def re_sort(re_list):
+    """ Sort a list of regular expressions. Uses the sort_key() function to sort
+    through different regular expressions.
+    """
     return sorted(re_list, key=lambda r: r.sort_key())
 
-# Function to remove duplicates in a *sorted* list of REs.
 def re_nub(re_list):
+    """ Function to remove duplicates in a *sorted* list of REs."""
     new_list = []
     prev_re = None
     for re in re_list:
@@ -362,6 +388,7 @@ def re_nub(re_list):
     return new_list
 
 def aggregate_metadata(r, s):
+    """ Put together metadata from two different re_base objects. """
     assert type(r) == type(s)
     if isinstance(r, re_base):
         new_meta = r.get_metadata() + s.get_metadata()
@@ -376,8 +403,8 @@ def aggregate_metadata(r, s):
         # one of the non re_base types. No metadata to aggregate.
         return r
 
-# smart star for regular expressions
 def smart_star(r):
+    """ Smart star for regular expressions """
     if isinstance(r, re_star):
         return smart_star(r.re)
     elif isinstance(r, re_epsilon):
@@ -387,22 +414,23 @@ def smart_star(r):
     else:
         return re_star(r)
 
-# smart negation of regular expressions
 def smart_negate(r):
+    """ Smart negation of regular expressions """
     if isinstance(r, re_negate):
         return r.re
     else:
         return re_negate(r)
 
-# helpers to determine if expression is empty, or inverse of empty
 def is_empty(r):
+    """ Determine if a regular expression r is empty. """
     return isinstance(r, re_empty)
 
 def is_negated_empty(r):
+    """ Determine if the negation of a regular expression is empty. """
     return isinstance(r, re_negate) and isinstance(r.re, re_empty)
 
-# smart intersection of regular expressions
 def smart_inters(r, s):
+    """ Smart intersection of regular expressions. """
     def r_empty_helper(r, s):
         """ Helper to return phi if r is empty, and s if r is ~phi, where phi is
         the empty set regular expression.
@@ -429,8 +457,8 @@ def smart_inters(r, s):
     else:
         return re_inters(re_nub(re_sort([r, s])))
 
-# smart alternation of regular expressions
 def smart_alter(r, s):
+    """ Smart alternation of regular expressions """
     def r_empty_helper(r, s):
         """ Helper to return s if r is empty, and ~phi if r is ~phi, where phi
         is the empty set regular expression.
@@ -457,8 +485,8 @@ def smart_alter(r, s):
     else:
         return re_alter(re_nub(re_sort([r, s])))
 
-# smart concatenation for regular expressions
 def smart_concat(r, s):
+    """ Smart concatenation for regular expressions """
     if isinstance(r, re_concat):
         return smart_concat(r.re1, smart_concat(r.re2, s))
     elif isinstance(r, re_empty):
@@ -472,14 +500,20 @@ def smart_concat(r, s):
     else:
         return re_concat(r, s)
 
-# normal form checking functions
+### Normal form checking helper functions
 def re_list_sorted(re_list):
+    """ Check one aspect of "normality" of the form of the expression by
+    checking for sorted order. """
     return re_list == re_sort(re_list)
 
 def re_list_nodups(re_list):
+    """ Check one aspect of "normality" of the form of the expression by
+    ensuring that there are no duplicates in the list. """
     return re_list == re_nub(re_list)
 
 def no_tail_inters(re_list):
+    """ Check that there are no top-level intersections in the provided regular
+    expression list."""
     def is_inters(r):
         return isinstance(r, re_inters)
     return reduce(lambda acc, x: acc and not is_inters(x),
@@ -487,6 +521,8 @@ def no_tail_inters(re_list):
                   True)
 
 def no_tail_alter(re_list):
+    """ Check that there are no top-level alternations in the provided regular
+    expression list."""
     def is_alter(r):
         return isinstance(r, re_alter)
     return reduce(lambda acc, x: acc and not is_alter(x),
@@ -552,16 +588,22 @@ def is_normal(r):
         raise TypeError("normal form check doesn't see the right type!")
 
 #### Derivative construction
-# Fold from right
 def foldr(fun, re_list, init):
+    """ Fold from right """
     return reduce(fun, reversed(re_list), init)
 
-# Fold from left
 def foldl(fun, re_list, init):
+    """ Fold from left """
     return reduce(fun, re_list, init)
 
-# Derivative of a regular expression with respect to a single symbol
 def deriv(r, a):
+    """ Derivative of a regular expression with respect to a single symbol
+
+    :param r: regular expression
+    :type r: re_deriv
+    :param a: a character with respect to which deriv is performed
+    :type a: re_symbol
+    """
     assert isinstance(r, re_deriv)
     assert isinstance(a, re_symbol)
     asym = a.char
@@ -640,8 +682,8 @@ def deriv_consumed(r, a):
     else:
         raise TypeError('unknown type in deriv')
 
-# Derivative of a regular expression with respect to a string
 def deriv_string(r, s):
+    """ Derivative of a regular expression with respect to a string """
     assert isinstance(r, re_deriv)
     assert isinstance(s, str)
     if len(s) == 0:
@@ -651,8 +693,8 @@ def deriv_string(r, s):
         w = s[1:]
         return deriv_string(deriv(r, a), w)
 
-# Match a single string against a single regular expression
 def match_string(r, s):
+    """ Match a single string against a single regular expression """
     assert isinstance(r, re_deriv)
     assert isinstance(s, str)
     if len(s) == 0:
@@ -698,6 +740,7 @@ class dfa_transition_table(object):
         return len(self.get_transitions())
 
     def add_transition(self, state, symbol, new_state):
+        """ Add a new transition to the DFA """
         assert self.state_type_check_fun(state, self.state_type)
         assert self.state_type_check_fun(new_state, self.state_type)
         assert self.symbol_type_check_fun(symbol, self.symbol_type)
@@ -713,10 +756,12 @@ class dfa_transition_table(object):
             self.re_to_transitions[state][symbol] = new_state
 
     def contains_state(self, state):
+        """ Return True if the DFA contains the argument state. """
         assert self.state_type_check_fun(state, self.state_type)
         return state in self.re_to_transitions.keys()
 
     def lookup_state_symbol(self, q, c):
+        """ Lookup a transition from state `q` on symbol `c` """
         assert self.state_type_check_fun(q, self.state_type)
         assert self.symbol_type_check_fun(c, self.symbol_type)
         if q in self.re_to_transitions.keys():
@@ -903,6 +948,7 @@ class dfa_state_table(object):
             return None
 
     def get_final_states(self):
+        """ Get the list of final states of the DFA as a state table """
         f = []
         for q in self.re_table:
             if self.final_state_check_fun(q):
@@ -991,6 +1037,7 @@ class dfa_base(object):
     def __init__(self, all_states, init_state, final_states, transition_table,
                  symbol_list, state_table_type, state_type,
                  state_type_check_fun, tt_type, dead_state_check_fun):
+        """ Abstract DFA base class. """
         assert isinstance(all_states, state_table_type)
         assert state_type_check_fun(init_state, state_type)
         assert isinstance(final_states, state_table_type)
@@ -1103,6 +1150,7 @@ def get_transition_exps_metadata(q, c, Q):
 def typecheck_goto(q, c, tt, states, alphabet_list,
                    state_type, state_type_check_fun,
                    tt_type, states_table_type):
+    """ Type-checking function invoked by goto. """
     assert state_type_check_fun(q, state_type)
     assert isinstance(c, str) and len(c) == 1
     assert isinstance(tt, tt_type)
@@ -1131,6 +1179,7 @@ def goto(q, c, tt, states, alphabet_list):
 
 def typecheck_explore(states, tt, q, alphabet_list, state_table_type, tt_type,
                       state_type, state_type_check_fun):
+    """ Type-checking function invoked by explore. """
     assert isinstance(states, state_table_type)
     assert isinstance(tt, tt_type)
     assert state_type_check_fun(q, state_type)
@@ -1180,6 +1229,8 @@ def list_from_tuple(t):
 
 class re_vector_state_table(dfa_state_table):
     def __init__(self, states=None):
+        """ Class for table of states which are vectors of regular
+        expressions. """
         def tuple_has_final_state(qtuple):
             return reduce(lambda acc, x: acc or nullable(x) == re_epsilon(),
                           qtuple, False)
@@ -1214,6 +1265,8 @@ class re_vector_state_table(dfa_state_table):
 
 class re_vector_transition_table(dfa_transition_table):
     def __init__(self, component_dfas):
+        """ Transition table class when the states are vectors of regular
+        expressions. """
         def symcheck(c, typ):
             return isinstance(c, typ) and len(c) == 1
         super(re_vector_transition_table, self).__init__(
@@ -1240,6 +1293,7 @@ class re_vector_transition_table(dfa_transition_table):
 class re_vector_dfa(dfa_base):
     def __init__(self, all_states, init_state, final_states, transition_table,
                  symbol_list):
+        """ DFA of states which are vectors of regular expressions. """
         def check_dead_state(x):
             return reduce(lambda q, acc: acc and q == re_empty(), x, True)
 
