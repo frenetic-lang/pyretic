@@ -75,7 +75,11 @@ class classifier_utils(object):
 
     @classmethod
     def is_not_drop(cls, p):
-        """ Return true if policy p is effectively a drop. """
+        """ Return true if policy p is effectively a drop.
+
+        :param p: policy
+        :type p: Policy
+        """
         p_class = cls.__get_classifier__(p)
         return cls.__is_not_drop_classifier__(p_class)
 
@@ -84,6 +88,11 @@ class classifier_utils(object):
         """Return True if policies p1, p2 have an intesection which is
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
+
+        :param p1: Policy
+        :type p1: Policy
+        :param p2: Policy
+        :type p2: Policy
         """
         return cls.is_not_drop(p1 & p2)
 
@@ -92,6 +101,11 @@ class classifier_utils(object):
         """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
         booleans, depending on whether pred is equal, is a superset of, is a subset
         of, or just intersects new_pred.
+
+        :param pred: reference predicate
+        :type pred: Filter
+        :param new_pred: new predicate investigated
+        :type new_pred: Filter
         """
         assert isinstance(new_pred, Filter) and isinstance(pred, Filter)
         ne_inters = cls.has_nonempty_intersection
@@ -113,6 +127,9 @@ class classifier_utils(object):
     def get_dropped_packets(cls, p):
         """For an arbitrary policy p, return the set of packets (as a filter
         policy) that are dropped by it.
+
+        :param p: policy
+        :type p: Policy
         """
         pol_classifier = cls.__get_classifier__(p)
         matched_packets = drop
@@ -163,6 +180,8 @@ class re_tree_gen(object):
 
     @classmethod
     def __add_dyn_preds__(cls, preds, atom):
+        """ Add each predicate in `preds` to list of dynamic predicates, with
+        the corresponding `atom`. """
         for pred in preds:
             cls.dyn_preds.append((pred, atom))
 
@@ -263,6 +282,9 @@ class re_tree_gen(object):
             explicitly to set up recompilation routines in the runtime."""
             cls.__add_dyn_preds__(dyn_pols, at.policy)
 
+        """ For each case of overlap between new and existing predicates, do
+        actions that will only retain and keep track of non-overlapping
+        pieces. """
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
@@ -307,6 +329,7 @@ class re_tree_gen(object):
 
     @classmethod
     def clear(cls):
+        """ Completely reset character generating structures. """
         re_tree_gen.token = TOKEN_START_VALUE
         cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
@@ -320,6 +343,8 @@ class re_tree_gen(object):
 
     @classmethod
     def get_leaf_preds(cls):
+        """ Get a string representation of all leaf-level predicates in the
+        structure. """
         output = ''
         for sym in cls.symbol_to_pred:
             pred = cls.symbol_to_pred[sym]
@@ -342,9 +367,11 @@ class re_tree_gen(object):
 """ Character generator classes belonging to "ingress" and "egress" matching
 predicates, respectively. """
 class __in_re_tree_gen__(re_tree_gen):
+    """ Character generator for in_atom matches. """
     pass
 
 class __out_re_tree_gen__(re_tree_gen):
+    """ Character generator for out_atom matches. """
     pass
 
 
@@ -353,17 +380,22 @@ class __out_re_tree_gen__(re_tree_gen):
 #############################################################################
 
 class path_policy(object):
-    """ Defines a "path policy" object, which is a combination of a path
-    function (trajectory -> {pkt}), and a policy function (pkt -> {pkt}), used
-    in sequential composition. The action of the path policy on the packet is
-    written as
-
-    p >> q
-
-    which is a function that takes a trajectory as input, and produces a set of
-    packets as output.
-    """
     def __init__(self, p, q):
+        """ Defines a "path policy" object, which is a combination of a path
+        function (trajectory -> {pkt}), and a policy function (pkt -> {pkt}),
+        used in sequential composition. The action of the path policy on the
+        packet is written as
+
+        p >> q
+
+        which is a function that takes a trajectory as input, and produces a set
+        of packets as output.
+
+        :param p: a predicate on the trajectory of a packet
+        :type p: path
+        :param q: policy to apply after acceptance by path
+        :type q: Policy
+        """
         super(path_policy, self).__init__()
         self.path = p
         self.piped_policy = q
@@ -379,6 +411,7 @@ class path_policy(object):
         return self.path.expr
 
     def __repr_pretty__(self, pre_spaces=''):
+        """ Pretty printing. """
         extra_ind = '    '
         out  = pre_spaces +'[path policy]\n'
         out += pre_spaces + extra_ind + repr(self.path) + '\n'
@@ -390,6 +423,8 @@ class path_policy(object):
         return self.__repr_pretty__()
 
     def __add__(self, ppol):
+        """ Implements the '+' operator for path policies, producing a
+        collection of path predicates and corresponding piped policies."""
         assert isinstance(ppol, path_policy)
         return path_policy_union([self, ppol])
 
@@ -405,6 +440,8 @@ class path_policy(object):
 
 class path_policy_union(path_policy):
     def __init__(self, ppols):
+        """ Class that denotes a collection of path policies in an AST of '+'
+        operators. """
         assert len(ppols) > 1
         self.path_policies = ppols
         super(path_policy_union, self).__init__(path_empty, drop)
@@ -421,8 +458,10 @@ class path_policy_union(path_policy):
 
 
 class dynamic_path_policy(path_policy):
-    """ Dynamic path object. """
     def __init__(self, path_pol):
+        """ Dynamic path object. The self.path_policy object denotes the
+        internal representation of the path policy at any given point, similar
+        to the self.policy of a DynamicPolicy."""
         self._path_policy = path_pol
         self.path_notify = None
         super(dynamic_path_policy, self).__init__(path_pol.path, path_pol.piped_policy)
@@ -438,12 +477,17 @@ class dynamic_path_policy(path_policy):
         return self.__repr_pretty__()
 
     def path_attach(self, path_notify):
+        """ Allows the runtime to attach a function that is notified whenever
+        the path policy changes its internal policy. """
         self.path_notify = path_notify
 
-    def detach(self):
+    def path_detach(self):
+        """ Detach the runtime notification function. """
         self.path_notify = None
 
     def path_changed(self):
+        """ Function that is called whenever the internal representation of the
+        path policy changes. """
         if self.path_notify:
             self.path_notify()
 
@@ -464,9 +508,9 @@ class path_policy_utils(object):
         """ Fold the AST with a function fold_f, which also takes a default
         value.
 
-        ast: path_policy
-        fold_f: 'a -> path_policy -> 'a
-        default: 'a
+        :param ast: path_policy
+        :param fold_f: 'a -> path_policy -> 'a
+        :param default: 'a
         """
         if isinstance(ast, path_policy_union):
             acc = fold_f(acc, ast)
@@ -486,9 +530,9 @@ class path_policy_utils(object):
         """ Fold a path AST with a function fold_f, which also takes a default
         value.
 
-        ast: path
-        fold_f: 'a -> path -> 'a
-        default: 'a
+        :param ast: path
+        :param fold_f: 'a -> path -> 'a
+        :param default: 'a
         """
         if (isinstance(ast, path_epsilon) or
             isinstance(ast, path_empty) or
@@ -504,6 +548,7 @@ class path_policy_utils(object):
 
     @classmethod
     def get_dyn_pols(cls, p):
+        """ Get the dynamic sub policies from a policy p. """
         return policy_ast_fold(add_dynamic_sub_pols, list(), p)
 
     @classmethod
@@ -522,6 +567,8 @@ class path_policy_utils(object):
 
     @classmethod
     def add_dynamic_path_pols(cls, acc, pp):
+        """ Fold function that can be used to get all dynamic sub path policies
+        from a path policy pp. """
         if isinstance(pp, dynamic_path_policy):
             return acc | set([pp])
         elif isinstance(pp, path_policy_union):
@@ -533,23 +580,28 @@ class path_policy_utils(object):
 
 
 class path(path_policy):
-    """A way to query packets or traffic volumes satisfying regular expressions
-    denoting paths of located packets.
-
-    :param a: path atom used to construct this path element
-    :type atom: atom
-    """
     def __init__(self):
+        """A way to select packets or count traffic volumes satisfying regular
+        expressions denoting paths of located packets.
+
+        :param a: path atom used to construct this path element
+        :type atom: atom
+        """
         super(path, self).__init__(self, FwdBucket())
 
     @property
     def expr(self):
+        """ The self.expr of a path object denotes its string representation
+        constructed from the AST of predicate symbols. """
         return self.re_tree.re_string_repr()
 
     def get_bucket(self):
+        """ Get the bucket associated with a path object, which is its default
+        piped policy as part of the path policy. """
         return self.get_policy()
 
     def set_bucket(self, bucket):
+        """ Set the bucket associated with the path. """
         self.set_policy(bucket)
 
     def register_callback(self, f):
@@ -639,6 +691,8 @@ class abstract_atom(object):
 
     @property
     def re_tree(self):
+        """ The internal representation of an abstract atom in terms of the
+        constituent leaf-level predicates. """
         if not self._re_tree:
             self.tree_counter += 1
             self._re_tree = self.re_tree_class.get_re_tree(self.policy, self)
@@ -651,6 +705,8 @@ class abstract_atom(object):
         self.tree_counter += 1
 
     def invalidate_re_tree(self):
+        """ Invalidate the internal representation in terms of regular
+        expressions, for example, during recompilation. """
         self._re_tree = None
         self.tree_counter = 0
 
@@ -832,6 +888,7 @@ class path_concat(path_combinator):
 
     @classmethod
     def smart_concat(cls, paths):
+        """ Perform "smart concatenation" to maintain more compact path ASTs."""
         new_paths = []
         for p in paths:
             if not isinstance(p, path_epsilon):
@@ -895,6 +952,7 @@ class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
     @classmethod
     def __set_tag__(cls, d, q):
+        """ Set tag when going to a state q in a DFA d. """
         val = dfa_utils.get_state_index(d, q)
         if int(val) == 0:
             return modify(path_tag=None)
@@ -903,6 +961,7 @@ class pathcomp(object):
 
     @classmethod
     def __match_tag__(cls, d, q):
+        """ Match a tag for a state q in a DFA d. """
         val = dfa_utils.get_state_index(d, q)
         if int(val) == 0:
             return match(path_tag=None)
@@ -943,6 +1002,7 @@ class pathcomp(object):
 
     @classmethod
     def __get_dead_state_pred__(cls, dfa):
+        """ Get a predicate that matches packets in the dead state. """
         dead = dfa_utils.get_dead_state(dfa)
         if dead:
             return cls.__match_tag__(dfa, dead)
@@ -951,6 +1011,7 @@ class pathcomp(object):
 
     @classmethod
     def __set_dead_state_tag__(cls, dfa):
+        """ Return a policy that moves a packet to the dead state. """
         dead = dfa_utils.get_dead_state(dfa)
         if dead:
             return cls.__set_tag__(dfa, dead)
@@ -977,6 +1038,8 @@ class pathcomp(object):
 
     @classmethod
     def __prep_re_trees__(cls, acc, p):
+        """ Access re_trees of constituent path policies to help generate DFA
+        later on. """
         if (isinstance(p, path_policy) and
             not isinstance(p, dynamic_path_policy) and
             not isinstance(p, path_policy_union)):
@@ -1007,6 +1070,10 @@ class pathcomp(object):
 
     @classmethod
     def init(cls, numvals):
+        """ Initialize path-related structures, namely:
+        - a new virtual field for path tag;
+        - in and out character generators.
+        """
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
@@ -1311,6 +1378,7 @@ class pathcomp(object):
 #############################################################################
 
 class dfa_utils(object):
+    """ Utilities to generate DFAs and access various properties. """
     @classmethod
     def print_dfa(cls, d):
         """ Print a DFA object d. """
