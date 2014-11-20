@@ -28,8 +28,14 @@
 
 import subprocess, shlex, os
 
+num_passed = 0
+num_failed = 0
+failed_tests = []
+fails_counts = []
+
 def single_test(fwding, query, filt_funs, topo_name, topo_args,
                        results, pass_fail):
+    global fails_counts
     cmd = ("sudo python pyretic/tests/test_bucket.py " +
            "--fwding=" + fwding + ' ' +
            "--query=" + query + ' ' +
@@ -49,10 +55,11 @@ def single_test(fwding, query, filt_funs, topo_name, topo_args,
     if success_info != 'PASS':
         print "--- Got success_info: ---"
         print success_info
+        fails_counts.append(success_info)
     return success_info == 'PASS'
 
-def all_tests():
-    fwding_pols = ['static_fwding', 'mac_learner']
+def generic_topo_tests(topo_name, topo_args, fwding_pols):
+    global num_passed, num_failed, failed_tests
     query_pols  = ['test0', 'test1', 'test2', 'test3', 
                    'test4', 'test5', 'test6', 'test7']
     filt_funs   = ['filt_test0',
@@ -63,26 +70,46 @@ def all_tests():
                    'filt_test5',
                    'filt_test6',
                    'filt_test7']
-    topo_name   = 'SingleSwitchTopo'
-    topo_args   = '3'
     results = './pyretic/evaluations/results'
     pass_fail = 'pass-fail.txt'
-    num_passed = 0
-    num_failed = 0
-    
+
     for fwding in fwding_pols:
         for i in range(0, len(query_pols)):
             res = single_test(fwding, query_pols[i], filt_funs[i],
                               topo_name, topo_args, results, pass_fail)
-            test_name = "%s %s" % (query_pols[i], fwding)
+            test_name = "%s %s on %s" % (query_pols[i], fwding, topo_name)
             if res:
                 print "===== TEST %s PASSED =====" % test_name
                 num_passed += 1
             else:
                 print "===== TEST %s FAILED =====" % test_name
+                failed_tests.append(test_name)
                 num_failed += 1
-    print "===== TESTS COMPLETE ====="
-    print "%d tests passed, %d failed" % (num_passed, num_failed)
+
+def single_switch_topo_tests():
+    topo_name   = 'SingleSwitchTopo'
+    topo_args   = '3'
+    fwding_pols = ['static_fwding_single', 'mac_learner']
+    generic_topo_tests(topo_name, topo_args, fwding_pols)
+
+def cycle_topo_tests():
+    topo_name = 'CycleTopo'
+    topo_args = '3,3'
+    fwding_pols = ['static_fwding_cycle', 'mac_learner']
+    generic_topo_tests(topo_name, topo_args, fwding_pols)
+
+def print_failed_tests():
+    print "Failed tests:"
+    assert len(failed_tests) == len(fails_counts)
+    for t in range(0, len(failed_tests)):
+        print failed_tests[t]
+        print fails_counts[t]
 
 if __name__ == "__main__":
-    all_tests()
+    cycle_topo_tests()
+    single_switch_topo_tests()
+
+    print "===== TESTS COMPLETE ====="
+    print "%d tests passed, %d failed" % (num_passed, num_failed)
+    if failed_tests:
+        print_failed_tests()
