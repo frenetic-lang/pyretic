@@ -32,7 +32,6 @@ import subprocess, shlex
 import signal
 import time
 import re
-from pyretic.tests.tshark_filter import *
 from mininet.log import setLogLevel
 from mininet.topo import *
 from pyretic.evaluations.extratopos import *
@@ -235,6 +234,52 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts):
         passfail.write("Bucket: %s\n" % str(buckets_counts))
     passfail.close()
 
+### Helpers to extract specific headers from tshark output ###
+
+def __get_frame_len(line):
+    return line.split(',')[0]
+
+def __get_ip_srcip(line):
+    return line.split(',')[1]
+
+def __get_ip_dstip(line):
+    return line.split(',')[2]
+
+def __get_arp_srcip(line):
+    return line.split(',')[3]
+
+def __get_arp_dstip(line):
+    return line.split(',')[4]
+
+def __get_interface_id(line):
+    return line.split(',')[5]
+
+def get_bytes(l):
+    return int(__get_frame_len(l))
+
+def get_bytes_cooked_capture(l):
+    return int(__get_frame_len(l))-2
+
+def ip_pkt_srcip(target_ip, l):
+    return __get_ip_srcip(l) == target_ip
+
+def ip_pkt_dstip(target_ip, l):
+    return __get_ip_dstip(l) == target_ip
+
+def arp_pkt_srcip(target_ip, l):
+    return __get_arp_srcip(l) == target_ip
+
+def arp_pkt_dstip(target_ip, l):
+    return __get_arp_dstip(l) == target_ip
+
+def pkt_srcip(target_ip, l):
+    return ((__get_ip_srcip(l) == target_ip) or
+            (__get_arp_srcip(l) == target_ip))
+
+def pkt_dstip(target_ip, l):
+    return ((__get_ip_dstip(l) == target_ip) or
+            (__get_arp_dstip(l) == target_ip))
+
 ### Filter functions to parse tshark output for various test cases ###
 ip1 = '10.0.0.1'
 ip2 = '10.0.0.2'
@@ -244,40 +289,40 @@ def filt_test0(l):
     return True
 
 def filt_test1(l):
-    return pkt_srcip(ip1)(l)
+    return pkt_srcip(ip1, l)
 
 def filt_test2_b0(l):
-    return ip_pkt_srcip(ip1)(l) or ip_pkt_srcip(ip3)(l)
+    return ip_pkt_srcip(ip1, l) or ip_pkt_srcip(ip3, l)
 
 def filt_test2_b1(l):
-    return ip_pkt_srcip(ip2)(l)
+    return ip_pkt_srcip(ip2, l)
 
 def filt_test3_b0(l):
-    return pkt_srcip(ip1)(l) or pkt_srcip(ip3)(l)
+    return pkt_srcip(ip1, l) or pkt_srcip(ip3, l)
 
 def filt_test3_b1(l):
-    return pkt_srcip(ip2)(l)
+    return pkt_srcip(ip2, l)
 
 def filt_test4_b0(l):
-    return pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+    return pkt_srcip(ip1, l) and pkt_dstip(ip2, l)
 
 def filt_test4_b1(l):
-    return pkt_srcip(ip1)(l) and pkt_dstip(ip2)(l)
+    return pkt_srcip(ip1, l) and pkt_dstip(ip2, l)
 
 def filt_test4_b2(l):
-    return pkt_srcip(ip1)(l) and pkt_dstip(ip3)(l)
+    return pkt_srcip(ip1, l) and pkt_dstip(ip3, l)
 
 def filt_test5(l):
     return (
-        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip2)(l)) or
-        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip3)(l)) or
-        ((not pkt_srcip(ip1)(l)) and pkt_dstip(ip1)(l)))
+        ((not pkt_srcip(ip1, l)) and pkt_dstip(ip2, l)) or
+        ((not pkt_srcip(ip1, l)) and pkt_dstip(ip3, l)) or
+        ((not pkt_srcip(ip1, l)) and pkt_dstip(ip1, l)))
 
 def filt_test6(l):
-    return not pkt_srcip(ip1)(l)
+    return not pkt_srcip(ip1, l)
 
 def filt_test7(l):
-    return pkt_srcip(ip1)(l)
+    return pkt_srcip(ip1, l)
 
 ### Interfaces map for packet capture ###
 
