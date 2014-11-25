@@ -43,6 +43,9 @@ def __get_arp_srcip(line):
 def __get_arp_dstip(line):
     return line.split(',')[4]
 
+def __get_interface_id(line):
+    return line.split(',')[5]
+
 def get_bytes(l):
     return int(__get_frame_len(l))
 

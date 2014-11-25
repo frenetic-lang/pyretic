@@ -67,7 +67,7 @@ def get_mininet(topo_args, listen_port):
     net.start()
     return (net, net.hosts, net.switches)
 
-def capture_packets(t_out, t_err):
+def capture_packets(t_out, t_err, ints_list):
     t_outfile = open(t_out, 'w')
     t_errfile = open(t_err, 'w')
     """ tshark command below prints the following specific fields only for
@@ -79,10 +79,12 @@ def capture_packets(t_out, t_err):
     - ip dst for ARP packets
     If more fields are needed, the command needs to be modified accordingly.
     """
-    cmd = ("tshark -i any -f 'inbound and net 10.0.0/24' -T fields " +
+    cmd = ("tshark -f 'inbound and net 10.0.0/24' -T fields " +
            "-e frame.len -e ip.src " +
            "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
-           "-E separator=,")
+           "-e frame.interface_id " +
+           "-E separator=, " +
+           reduce(lambda a,i: a + '-i ' + i + ' ', ints_list, ''))
     t = subprocess.Popen(shlex.split(cmd), stdout=t_outfile, stderr=t_errfile)
     return (t, t_outfile, t_errfile)
 
@@ -150,7 +152,8 @@ def test_bucket_single_test():
     print "Starting tshark capture..."
     t_outfile = adjust_path("tshark-stdout.txt")
     t_errfile = adjust_path("tshark-stderr.txt")
-    (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile)
+    ints_list = globals()[args.interface_map]()[0]
+    (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list)
     time.sleep(tshark_slack_sec)
 
     """ Workload """
@@ -205,6 +208,9 @@ def parse_args():
                         default=5)
     parser.add_argument("--success_file", help="File to write test pass/fail",
                         default="pass-fail.txt")
+    parser.add_argument("--interface_map", default="map_any",
+                        help="Map that defines interfaces to run packet capture")
+
     args = parser.parse_args()
     return args
 
@@ -272,6 +278,17 @@ def filt_test6(l):
 
 def filt_test7(l):
     return pkt_srcip(ip1)(l)
+
+### Interfaces map for packet capture ###
+
+def map_any():
+    return (["any"], {'any': 0})
+
+def map_chain_3_3():
+    ints_list = ["s1-eth1", "s1-eth2", "s2-eth1", "s2-eth2",
+                 "s2-eth3", "s3-eth1", "s3-eth2"]
+    ints_map  = {i: ints_list.index(i) for i in ints_list}
+    return (ints_list, ints_map)
 
 ### The main thread.
 if __name__ == "__main__":
