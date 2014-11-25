@@ -66,7 +66,7 @@ def get_mininet(topo_args, listen_port):
     net.start()
     return (net, net.hosts, net.switches)
 
-def capture_packets(t_out, t_err, ints_list):
+def capture_packets(t_out, t_err, ints_list, capture_dir):
     t_outfile = open(t_out, 'w')
     t_errfile = open(t_err, 'w')
     """ tshark command below prints the following specific fields only for
@@ -78,7 +78,7 @@ def capture_packets(t_out, t_err, ints_list):
     - ip dst for ARP packets
     If more fields are needed, the command needs to be modified accordingly.
     """
-    cmd = ("tshark -f 'inbound and net 10.0.0/24' -T fields " +
+    cmd = ("tshark -f '" + capture_dir + " and net 10.0.0/24' -T fields " +
            "-e frame.len -e ip.src " +
            "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
            "-e frame.interface_id " +
@@ -152,6 +152,7 @@ def test_bucket_single_test():
     t_outfile = adjust_path("tshark-stdout.txt")
     t_errfile = adjust_path("tshark-stderr.txt")
     ints_list = globals()[args.interface_map]()[0]
+    capture_dir = args.capture_dir
     (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list)
     time.sleep(tshark_slack_sec)
 
@@ -209,6 +210,9 @@ def parse_args():
                         default="pass-fail.txt")
     parser.add_argument("--interface_map", default="map_any",
                         help="Map that defines interfaces to run packet capture")
+    parser.add_argument("--capture_dir", default="inbound",
+                        choices=['inbound', 'outbound'],
+                        help="Direction of packet movement to capture")
 
     args = parser.parse_args()
     return args
