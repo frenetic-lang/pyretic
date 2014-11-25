@@ -41,7 +41,7 @@ from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
 from pyretic.evaluations.mininet_setup import mn_cleanup, wait_switch_rules_installed, get_abort_handler, get_adjust_path
 
-def pyretic_controller(ctlr_params, c_out, c_err, pythonpath):
+def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err, pythonpath):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
     # Hackety hack. I don't know of any other way to supply the PYTHONPATH
@@ -50,7 +50,7 @@ def pyretic_controller(ctlr_params, c_out, c_err, pythonpath):
     if not "PYTHONPATH" in py_env:
         py_env["PYTHONPATH"] = pythonpath
 
-    cmd = ("pyretic.py -m p0 pyretic.examples.bucket " +
+    cmd = ("pyretic.py -m p0 pyretic.examples." + ctlr_name + ' ' +
            reduce(lambda r, k: r + ("--" + k + "=" + ctlr_params[k] + " "),
                   ctlr_params.keys(), " "))
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
@@ -130,11 +130,12 @@ def test_bucket_single_test():
     """ Controller """
     print "Setting up controller..."
     c_params = {'query': args.query, 'fwding': args.fwding}
+    c_name   = args.ctlr
     c_outfile = adjust_path("pyretic-stdout.txt")
     c_errfile = adjust_path("pyretic-stderr.txt")
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
-    (ctlr, c_out, c_err) = pyretic_controller(c_params, c_outfile, c_errfile,
-                                              pypath)
+    (ctlr, c_out, c_err) = pyretic_controller(c_name, c_params, c_outfile,
+                                              c_errfile, pypath)
 
     """ Network """
     print "Setting up mininet..."
@@ -176,6 +177,9 @@ def test_bucket_single_test():
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run correctness tests for buckets")
+    parser.add_argument("-c", "--ctlr", default="bucket",
+                        choices=['bucket', 'path_query'],
+                        help="Controller to test")
     parser.add_argument("-q", "--query", default="test0",
                         help="Query policy to run")
     parser.add_argument("-f", "--fwding", default="mac_learner",

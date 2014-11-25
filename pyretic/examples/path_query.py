@@ -49,33 +49,36 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
 
-static_fwding_chain_2_2 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2))))
-    )
+def static_fwding_chain_2_2():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2))))
+        )
 
-static_fwding_chain_3_3_only_h1_h3 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2))))
-    )
+def static_fwding_chain_3_3_only_h1_h3():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2))))
+        )
 
-static_fwding_chain_3_3 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2))))
-    )
+def static_fwding_chain_3_3():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2))))
+        )
 
 def query_func(bucket, interval):
     while True:
@@ -438,11 +441,29 @@ def path_test_25():
     p.register_callback(query_callback(25))
     return p
 
+def get_query(kwargs, default):
+    params = dict(kwargs)
+    if 'query' in params:
+        path_query = globals()[str(params['query'])]
+    else:
+        path_query = default
+    return path_query
+
+def get_fwding(kwargs, default):
+    params = dict(kwargs)
+    if 'fwding' in params:
+        fwding_policy = globals()[str(params['fwding'])]
+    else:
+        fwding_policy = default
+    return fwding_policy
+
 # type: unit -> path list
 def path_main(**kwargs):
-    return path_test_waypoint_violation_general()
+    default = path_test_waypoint_violation_general
+    return get_query(kwargs, default)()
 
 def main(**kwargs):
 #    return mac_learner()
 #    return static_fwding_chain_3_3
-    return static_fwding_cycle_4_4_spanning_tree_1
+    default = static_fwding_cycle_4_4_spanning_tree_1
+    return get_fwding(kwargs, default)()
