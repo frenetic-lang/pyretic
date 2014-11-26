@@ -95,7 +95,7 @@ class Runtime(object):
             in_tag_policy = self.path_in_tagging >> self.policy
             self.forwarding = (in_tag_policy >> self.path_out_tagging)
             in_capture  = self.path_in_capture
-            out_capture = (in_tag_policy >> self.path_out_capture)
+            self.out_capture = (in_tag_policy >> self.path_out_capture)
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
 
@@ -109,6 +109,7 @@ class Runtime(object):
             # capture
             self.capture_compile()
             self.out_capture_compile()
+            self.full_out_capture_compile()
 
             # virtual tags
             self.vf_tag_compile()
@@ -116,7 +117,7 @@ class Runtime(object):
             
             self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
             self.vtag_in_capture = (self.virtual_tag >> in_capture)
-            self.vtag_out_capture = (self.virtual_tag >> out_capture)
+            self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
 
             self.vtag_fw_compile()
             self.vtag_in_capture_compile()
@@ -193,6 +194,11 @@ class Runtime(object):
 
     @stat.classifier_size
     @stat.elapsed_time
+    def full_out_capture_compile(self):
+        return self.out_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
     def tag_fwd_compile(self):
         return self.forwarding.compile()
 
@@ -210,7 +216,7 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_fw_compile(self):
-        return self.policy.compile()
+        return self.vtag_forwarding.compile()
 
 
     @stat.classifier_size

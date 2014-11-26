@@ -32,26 +32,45 @@ class eval_compilation:
     def compile(self, full_compile = False):
         stat.start(self.results_folder)
 
+        pathcomp.init(1022)
+        (self.path_in_tagging, self.path_in_capture, self.path_out_tagging, self.path_out_capture) = pathcomp.compile(self.path_policy)
+
+        in_tag_policy = self.path_in_tagging >> self.main_policy
+        self.forwarding = (in_tag_policy >> self.path_out_tagging)
+        in_capture  = self.path_in_capture
+        self.out_capture = (in_tag_policy >> self.path_out_capture)
+        
+        # forwarding
         self.forwarding_compile()
-        pathcomp.init_tag_field(1022)
-        (self.tagging, self.capture) = pathcomp.compile(self.path_policy)
         self.tagging_compile()
+        self.out_tagging_compile()
+        self.tag_fwd_compile()
+
+        # capture
         self.capture_compile()
-
-        self.policy = (self.tagging >> self.main_policy) + self.capture
-
-        self.tag_fw_cap_compile()
-
+        self.out_capture_compile()
+        self.full_out_capture_compile()
+        
+        
         if full_compile:
-            self.vf_tag_pol = self.get_vf_tagging_policy()
-            self.vf_untag_pol = self.get_vf_untagging_policy()
+            self.virtual_tag = virtual_field_tagging()
+            self.virtual_untag = virtual_field_untagging()
 
+            # virtual tags
             self.vf_tag_compile()
             self.vf_untag_compile()
+            
+            self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+            self.vtag_in_capture = (self.virtual_tag >> in_capture)
+            self.vtag_out_capture = (self.virtual_tag >> out_capture)
 
-            self.policy = self.vf_tag_pol >> self.policy >> self.vf_untag_pol
+            self.vtag_fw_compile()
+            self.vtag_in_capture_compile()
+            self.vtag_out_capture_compile()
 
+            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
             self.whole_policy_compile()
+
 
         stat.stop()
 
@@ -65,50 +84,77 @@ class eval_compilation:
         return None
 
 
+
     @stat.classifier_size
     @stat.elapsed_time
     def forwarding_compile(self):
         return self.main_policy.compile()
-
-
+     
     @stat.classifier_size
     @stat.elapsed_time
     def tagging_compile(self):
-        if self.tagging:
-            c = self.tagging.compile()
-            return c
-        return None
+        return self.path_in_tagging.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def out_tagging_compile(self):
+        return self.path_out_tagging.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def capture_compile(self):
-        if self.capture:
-            return self.capture.compile()
-        return None
+        return self.path_in_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def out_capture_compile(self):
+        return self.path_out_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def full_out_capture_compile(self):
+        return self.out_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fwd_compile(self):
+        return self.forwarding.compile()
+
 
     @stat.classifier_size
     @stat.elapsed_time
     def vf_tag_compile(self):
-        if self.vf_tag_pol:
-            return self.vf_tag_pol.compile()
-        return None
+        return self.virtual_tag.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def vf_untag_compile(self):
-        if self.vf_untag_pol:
-            return self.vf_untag_pol.compile()
-        return None
+        return self.virtual_untag.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
-    def tag_fw_cap_compile(self):
-        return self.policy.compile()
+    def vtag_fw_compile(self):
+        return self.vtag_forwarding.compile()
+
 
     @stat.classifier_size
     @stat.elapsed_time
-    def whole_policy_compile(self):
+    def vtag_in_capture_compile(self):
+        return self.vtag_in_capture.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def vtag_out_capture_compile(self):
+        return self.vtag_out_capture.compile()
+
+
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def whole_compile(self):
         return self.policy.compile()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluates compilation of path query toghether with the forwarding policy")
     parser.add_argument("-t", "--test", required=True
