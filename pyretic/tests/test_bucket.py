@@ -151,7 +151,7 @@ def test_bucket_single_test():
     print "Starting tshark capture..."
     t_outfile = adjust_path("tshark-stdout.txt")
     t_errfile = adjust_path("tshark-stderr.txt")
-    ints_list = globals()[args.interface_map]()[0]
+    ints_list = globals()[args.interface_map]()
     capture_dir = args.capture_dir
     (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list)
     time.sleep(tshark_slack_sec)
@@ -239,6 +239,7 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail.close()
 
 ### Helpers to extract specific headers from tshark output ###
+ints_map = {}
 
 def __get_frame_len(line):
     return line.split(',')[0]
@@ -284,11 +285,16 @@ def pkt_dstip(target_ip, l):
     return ((__get_ip_dstip(l) == target_ip) or
             (__get_arp_dstip(l) == target_ip))
 
+def pkt_interface(int_name, l):
+    global ints_map
+    return __get_interface_id(l) == ints_map[int_name]
+
 ### Filter functions to parse tshark output for various test cases ###
 ip1 = '10.0.0.1'
 ip2 = '10.0.0.2'
 ip3 = '10.0.0.3'
 
+## Bucket test cases.
 def filt_test0(l):
     return True
 
@@ -328,16 +334,24 @@ def filt_test6(l):
 def filt_test7(l):
     return pkt_srcip(ip1, l)
 
-### Interfaces map for packet capture ###
+## Path Query test cases
+def filt_path_test_0(l):
+    return (pkt_interface('s1-eth1', l) or
+            pkt_interface('s1-eth2', l) or
+            pkt_interface('s1-eth3', l))
 
+### Interfaces map for packet capture ###
 def map_any():
-    return (["any"], {'any': 0})
+    global ints_map
+    ints_map = {'any': 0}
+    return ["any"]
 
 def map_chain_3_3():
+    global ints_map
     ints_list = ["s1-eth1", "s1-eth2", "s2-eth1", "s2-eth2",
                  "s2-eth3", "s3-eth1", "s3-eth2"]
     ints_map  = {i: ints_list.index(i) for i in ints_list}
-    return (ints_list, ints_map)
+    return ints_list
 
 ### The main thread.
 if __name__ == "__main__":
