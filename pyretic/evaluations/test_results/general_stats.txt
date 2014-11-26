@@ -1,4 +1,0 @@
-capture edges: 1
-switch count: 7
-tagging edges: 6
-rule count: 449

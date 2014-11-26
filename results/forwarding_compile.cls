@@ -1,0 +1,30 @@
+classifier size: 13
+---------------------------------
+classifier size: 13
+print : match: ('switch', 1) ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([modify: ('outport', 2)])
+ match: ('switch', 2) ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('switch', 3) ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([])
+ match: ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('switch', 2) ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([modify: ('outport', 3)])
+ match: ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([])
+ match: ('switch', 1) ('dstip', IPv4Network('10.0.0.3/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('switch', 2) ('dstip', IPv4Network('10.0.0.3/32'))
+  -> set([modify: ('outport', 2)])
+ match: ('switch', 3) ('dstip', IPv4Network('10.0.0.3/32'))
+  -> set([modify: ('outport', 2)])
+ match: ('dstip', IPv4Network('10.0.0.3/32'))
+  -> set([])
+ identity
+  -> set([]) 
+---------------------------------

@@ -341,20 +341,44 @@ class Classifier(object):
 
     def __div__(c1, c2):
         #TODO: checks
+        #TODO: type error?
+        #TODO: parent?
+        from pyretic.core.language import identity
+
+        def check_classifier_structure(c):
+            rules = list(c.rules)
+            if len(rules) == 0:
+                raise TypeError
+
+            def_rule = rules[-1]
+            if def_rule.match != identity:
+                raise TypeError
+
+            body_rules = rules[:-1]
+            for r in body_rules:
+                if r.match == identity:
+                    raise TypeError
+            return (body_rules, def_rule)
+
+        (body1, def1) = check_classifier_structure(c1)
+        (body2, def2) = check_classifier_structure(c2)
+
         new_rules = list()
-        for r in c1.rules:
+        for r in body1:
             r_new = copy.copy(r)
-            r_new.parents = [r]
+            r_new.actions |= def2.actions 
+            r_new.parents = [r, def2]
             r_new.op = "div"
             new_rules.append(r_new)
         
-        new_rules = new_rules[:-1]
-        for r in c2.rules:
+        for r in body2:
             r_new = copy.copy(r)
-            r_new.parents = [r]
+            r_new.actions |= def1.actions
+            r_new.parents = [r, def1]
             r_new.op = "div"
             new_rules.append(r_new)
         
+        new_rules.append(Rule(identity, def1.actions|def2.actions, [def1, def2], "div"))
         c = Classifier(new_rules)
         c = c.optimize()
         return c

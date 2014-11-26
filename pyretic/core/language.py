@@ -120,10 +120,11 @@ class Policy(object):
             return sequential([self, other])
 
     def __div__(self, other):
-        if isinstance(other, disjoint):
-            return disjoint([self] + other.policies)
-        else:
-            return disjoint([self, other])
+        raise NotImplementedError
+        #if isinstance(other, disjoint):
+         #   return disjoint([self] + other.policies)
+        #else:
+         #   return disjoint([self, other])
 
 
     def __eq__(self, other):
@@ -1314,51 +1315,6 @@ class intersection(sequential,Filter):
             return intersection(self.policies + [pol])
         else:
             raise TypeError
-
-
-class disjoint(CombinatorPolicy):
-    
-    def __new__(self, policies=[]):
-        # Hackety hack.
-        if len(policies) == 0:
-            return drop
-        else:
-            rv = super(disjoint, self).__new__(disjoint, policies)
-            rv.__init__(policies)
-            return rv
-
-    def __init__(self, policies=[]):
-        if len(policies) == 0:
-            raise TypeError
-        super(disjoint, self).__init__(policies)
-
-    def __div__(self, pol):
-        if isinstance(pol,disjoint):
-            return disjoint(self.policies + pol.policies)
-        else:
-            return disjoint(self.policies + [pol])
-
-    def eval(self, pkt):
-        """
-        evaluates to the set union of the evaluation
-        of self.policies on pkt
-
-        :param pkt: the packet on which to be evaluated
-        :type pkt: Packet
-        :rtype: set Packet
-        """
-        output = set()
-        for policy in self.policies:
-            output |= policy.eval(pkt)
-        return output
-
-    def generate_classifier(self):
-        if len(self.policies) == 0:  # EMPTY PARALLEL IS A DROP
-            return drop.compile()
-        classifiers = map(lambda p: p.compile(), self.policies)
-        return reduce(lambda acc, c: acc / c, classifiers)
-
-
 
 ################################################################################
 # Derived Policies                                                             #

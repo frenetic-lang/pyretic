@@ -50,7 +50,7 @@ def stop():
     if monitoring:
         report_dfa(dfa_path, symbol_path, path)
         create_overall_report(path, rule_cnt_file, os.path.basename(dfa_path))
-        create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
+        #create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
 
     monitoring = False
 def report_dfa(dfa_path, symbol_path, results_path):

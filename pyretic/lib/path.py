@@ -26,7 +26,7 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
-from pyretic.core.language import identity, egress_network, Filter, drop, match
+from pyretic.core.language import identity, egress_network, Filter, drop, match, Policy
 from pyretic.core.language import modify, Query, FwdBucket, CountBucket
 from pyretic.core.language import PathBucket, DynamicFilter
 from pyretic.core.language_tools import ast_fold as policy_ast_fold
@@ -890,6 +890,63 @@ class path_inters(path_combinator):
             tree = tree & p.re_tree
         return tree
 
+#############################################################################
+###                      Optimizations                                    ###
+#############################################################################
+
+class QuerySwitch(Policy):
+
+    def __init__(self, tag, policy_dic, default):
+        #TODO (mina): add type checks
+
+        self.tag = tag
+        self.policy_dic = policy_dic
+        self.default = default
+
+    def eval(self, pkt):
+        def eval_defaults(pkt):
+            res = set()
+            for act in self.default:
+                res |= act.eval(pkt)
+            return res
+
+
+        for tag_value in self.policy_dic:
+            match_pol = match(**{self.tag:tag_value})
+            res = match_pol.eval(pkt)
+            if res:
+                pol_res = self.policy_dic[tag_value].eval(pkt)
+                if not pol_res:
+                    pol_res = eval_defaults(pkt)
+
+                return pol_res
+                    
+        return eval_defaults(pkt)
+       
+    def compile(self):
+        from pyretic.core.classifier import Rule, Classifier
+        final_rules = []
+        for tag_value in self.policy_dic:
+            p_rules = self.policy_dic[tag_value].compile().rules
+           
+            for r in p_rules:
+                new_match = r.match.intersect(match(**{self.tag : tag_value}))
+                if new_match == drop:
+                    raise TypeError
+                new_r = copy.copy(r)
+                new_r.match = new_match
+                new_r.parents = [r]
+                new_r.op = "switch"
+                final_rules.append(new_r)
+
+        for r in final_rules:
+            if not r.actions:
+                r.actions = self.default
+
+
+        final_rules.append(Rule(identity, self.default, [self], "switch"))
+        return Classifier(final_rules)
+
 
 #############################################################################
 ###                      Path query compilation                           ###
@@ -1065,7 +1122,7 @@ class pathcomp(object):
                        cls.__get_dead_state_pred__(dfa))
         in_capture = drop
         out_capture = drop
-
+        
         """ Generate transition/accept rules from DFA """
         edges = du.get_edges(dfa)
         for edge in edges:
@@ -1074,7 +1131,6 @@ class pathcomp(object):
             (pred, typ) = get_pred(edge)
             assert typ in [__in__, __out__]
             if not du.is_dead(dfa, src):
-                
                 tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
                 if typ == __in__:
                     in_tagging += tag_frag
@@ -1096,12 +1152,12 @@ class pathcomp(object):
                         out_capture += cap_frag
                         out_cap_rules += 1
         
-        stat.gather_general_states('in tagging edges', in_tag_rules, 0, False)
+        stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
         stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
-         stat.gather_general_states('out tagging edges', out_tag_rules, 0, False)
+        stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
         stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-        
+       
         return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:

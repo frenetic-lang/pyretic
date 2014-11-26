@@ -49,7 +49,7 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
 
-'''
+
 static_fwding_chain_2_2 = (
     (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
                           (match(switch=2) >> fwd(1)))) +
@@ -77,7 +77,7 @@ static_fwding_chain_3_3 = (
                           (match(switch=2) >> fwd(2)) +
                           (match(switch=3) >> fwd(2))))
     )
-'''
+
 def query_func(bucket, interval):
     while True:
         output = str(datetime.now())
@@ -236,7 +236,7 @@ def path_test_18():
     p = atom(identity)
     p.register_callback(query_callback(18))
     return p
-'''
+
 static_fwding_cycle_4_4_spanning_tree_1 = (
     (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
                           (match(switch=2) >> fwd(1)) +
@@ -274,7 +274,7 @@ static_fwding_cycle_4_4_spanning_tree_2 = (
                           (match(switch=3) >> fwd(2)) +
                           (match(switch=4) >> fwd(3))))
     )
-'''
+
 def path_test_waypoint_violation():
     """ This examples relies on the cycle,4,4 topology. Use one of the spanning
     tree forwarding policies static_fwding_cycle_4_4_spanning_tree_{1|2} as the
@@ -441,9 +441,12 @@ def path_test_25():
 
 # type: unit -> path list
 def path_main(**kwargs):
-    return path_test_waypoint_violation_general()
+    #return path_test_waypoint_violation_general()
+    p = atom(match(switch = 3))
+    p.register_callback(query_callback('test'))
+    return p
 
 def main(**kwargs):
 #    return mac_learner()
-#    return static_fwding_chain_3_3
-    return static_fwding_cycle_4_4_spanning_tree_1
+    return static_fwding_chain_3_3
+#    return static_fwding_cycle_4_4_spanning_tree_1
