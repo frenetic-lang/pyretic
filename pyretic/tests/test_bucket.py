@@ -97,14 +97,19 @@ def get_tshark_counts(t_outfile, tshark_filter_funs):
     return tshark_counts
 
 def tshark_filter_count(t_outfile, filter_fun):
+    global ints_map
     t_out = open(t_outfile, 'r')
     pkt_count = 0
     byte_count = 0
     filter_fun = globals()[filter_fun]
+    if 'any' not in ints_map:
+        bytes_fun = get_bytes
+    else:
+        bytes_fun = get_bytes_cooked_capture
     for line in t_out:
         if filter_fun(line.strip()):
             pkt_count  += 1
-            byte_count += get_bytes_cooked_capture(line)
+            byte_count += bytes_fun(line)
     return (pkt_count, byte_count)
 
 def ctlr_counts(c_outfile):
@@ -258,7 +263,7 @@ def __get_arp_dstip(line):
     return line.split(',')[4]
 
 def __get_interface_id(line):
-    return line.split(',')[5]
+    return int(line.split(',')[5])
 
 def get_bytes(l):
     return int(__get_frame_len(l))
@@ -337,9 +342,7 @@ def filt_test7(l):
 
 ## Path Query test cases
 def filt_path_test_0(l):
-    return (pkt_interface('s1-eth1', l) or
-            pkt_interface('s1-eth2', l) or
-            pkt_interface('s1-eth3', l))
+    return pkt_interface('s2-eth3', l)
 
 ### Interfaces map for packet capture ###
 def map_any():
