@@ -344,6 +344,11 @@ def filt_test7(l):
 def filt_path_test_0(l):
     return pkt_interface('s2-eth3', l)
 
+def filt_path_test_0_5(l):
+    return (pkt_srcip(ip2, l) or pkt_dstip(ip2, l) or
+            (pkt_srcip(ip3, l) and pkt_dstip(ip1, l)) or
+            (pkt_srcip(ip1, l) and pkt_dstip(ip2, l)))
+
 ### Interfaces map for packet capture ###
 def map_any():
     global ints_map
