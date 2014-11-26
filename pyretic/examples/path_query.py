@@ -49,6 +49,8 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
 
+only_count_results = False
+
 def static_fwding_chain_2_2():
     return (
         (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
@@ -90,11 +92,28 @@ def query_func(bucket, interval):
         time.sleep(interval)
 
 def query_callback(test_num):
+    global only_count_results
     def actual_callback(pkt):
         print '**************'
         print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
-        print pkt
+        if only_count_results:
+            if isinstance(pkt, pyretic.core.packet.Packet):
+                try:
+                    actual_callback.pkt_count  += 1
+                    actual_callback.byte_count += pkt['payload_len']
+                except AttributeError:
+                    actual_callback.pkt_count  = 1
+                    actual_callback.byte_count = pkt['payload_len']
+                print "Bucket %s (packet, byte) counts: [%d, %d]" % (
+                    str(test_num),
+                    actual_callback.pkt_count,
+                    actual_callback.byte_count)
+            else:
+                print "Bucket %s (packet, byte) counts: %s" % (
+                    str(test_num), pkt)
+        else:
+            print pkt
         print '**************'
     return actual_callback
 
@@ -156,7 +175,7 @@ def path_test_4_5():
     p = a1 ^ a2
     cb = CountBucket()
     p.set_bucket(cb)
-    p.register_callback(query_callback(4))
+    p.register_callback(query_callback("4.5"))
     query_thread = threading.Thread(target=query_func, args=(cb,5.0))
     query_thread.daemon = True
     query_thread.start()
@@ -459,8 +478,16 @@ def get_fwding(kwargs, default):
         fwding_policy = default
     return fwding_policy
 
+def check_only_count(kwargs):
+    global only_count_results
+    params = dict(kwargs)
+    if (('only_count_results' in params) and
+        (params['only_count_results'] == 'true')):
+        only_count_results = True
+
 # type: unit -> path list
 def path_main(**kwargs):
+    check_only_count(kwargs)
     default = path_test_waypoint_violation_general
     return get_query(kwargs, default)()
 
