@@ -115,11 +115,11 @@ def tshark_filter_count(t_outfile, filter_fun):
 def ctlr_counts(c_outfile):
     c_out = open(c_outfile, 'r')
     buckets_counts = {}
-    bucket_p = re.compile("Bucket [0-9]+ \(packet, byte\) counts: \[[0-9]+, [0-9]+\]")
+    bucket_p = re.compile("Bucket [0-9a-zA-Z._]+ \(packet, byte\) counts: \[[0-9]+, [0-9]+\]")
     for line in c_out:
         if bucket_p.match(line.strip()):
             parts = line.strip().split()
-            bucket_id = int(parts[1])
+            bucket_id = parts[1]
             pkt_count  = int(parts[-2][1:-1])
             byte_count = int(parts[-1][:-1])
             buckets_counts[bucket_id] = (pkt_count, byte_count)
