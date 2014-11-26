@@ -239,43 +239,45 @@ def path_test_18():
     p.register_callback(query_callback(18))
     return p
 
-static_fwding_cycle_4_4_spanning_tree_1 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(3)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip4) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(3))))
-    )
+def static_fwding_cycle_4_4_spanning_tree_1():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(3)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip4) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(3))))
+        )
 
-static_fwding_cycle_4_4_spanning_tree_2 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(2)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(3)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip4) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(3))))
-    )
+def static_fwding_cycle_4_4_spanning_tree_2():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(2)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(3)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip4) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(3))))
+        )
 
 def path_test_waypoint_violation():
     """ This examples relies on the cycle,4,4 topology. Use one of the spanning
