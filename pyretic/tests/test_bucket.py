@@ -236,12 +236,15 @@ def close_fds(fds, fd_str):
 
 def write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail = open(success_file, 'w')
+    output_str = ''
     if tshark_counts == buckets_counts:
-        passfail.write("PASS\n")
+        output_str += "PASS\n"
     else:
-        passfail.write("FAIL\n")
-        passfail.write("TShark: %s\n" % str(tshark_counts))
-        passfail.write("Bucket: %s\n" % str(buckets_counts))
+        output_str += "FAIL\n"
+        output_str += "TShark: %s\n" % str(tshark_counts)
+        output_str += "Bucket: %s\n" % str(buckets_counts)
+    print output_str
+    passfail.write(output_str)
     passfail.close()
 
 ### Helpers to extract specific headers from tshark output ###
