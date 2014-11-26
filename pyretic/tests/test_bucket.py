@@ -130,7 +130,8 @@ def test_bucket_single_test():
 
     """ Controller """
     print "Setting up controller..."
-    c_params = {'query': args.query, 'fwding': args.fwding}
+    c_params = {'query': args.query, 'fwding': args.fwding,
+                'only_count_results': 'true'}
     c_name   = args.ctlr
     c_outfile = adjust_path("pyretic-stdout.txt")
     c_errfile = adjust_path("pyretic-stderr.txt")
@@ -153,7 +154,7 @@ def test_bucket_single_test():
     t_errfile = adjust_path("tshark-stderr.txt")
     ints_list = globals()[args.interface_map]()
     capture_dir = args.capture_dir
-    (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list)
+    (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list, capture_dir)
     time.sleep(tshark_slack_sec)
 
     """ Workload """
