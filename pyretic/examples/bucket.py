@@ -49,24 +49,21 @@ ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
-fwding_single_3 = ( (match(dstip=ip1) >> fwd(1)) +
-                    (match(dstip=ip2) >> fwd(2)) +
-                    (match(dstip=ip3) >> fwd(3)) )
-fwding_cycle_3_3 = ( (match(dstip=ip1) >> match(switch=1) >> fwd(3)) +
-                     (match(dstip=ip1) >> match(switch=2) >> fwd(1)) +
-                     (match(dstip=ip1) >> match(switch=3) >> fwd(2)) +
-                     (match(dstip=ip2) >> match(switch=1) >> fwd(1)) +
-                     (match(dstip=ip2) >> match(switch=2) >> fwd(3)) +
-                     (match(dstip=ip2) >> match(switch=3) >> fwd(2)) +
-                     (match(dstip=ip3) >> match(switch=1) >> fwd(2)) +
-                     (match(dstip=ip3) >> match(switch=2) >> fwd(1)) +
-                     (match(dstip=ip3) >> match(switch=3) >> fwd(3)) )
+def static_fwding_single_3():
+    return ( (match(dstip=ip1) >> fwd(1)) +
+             (match(dstip=ip2) >> fwd(2)) +
+             (match(dstip=ip3) >> fwd(3)) )
 
-def static_fwding_single():
-    return fwding_single_3
-
-def static_fwding_cycle():
-    return fwding_cycle_3_3
+def static_fwding_cycle_3_3():
+    return ( (match(dstip=ip1) >> match(switch=1) >> fwd(3)) +
+             (match(dstip=ip1) >> match(switch=2) >> fwd(1)) +
+             (match(dstip=ip1) >> match(switch=3) >> fwd(2)) +
+             (match(dstip=ip2) >> match(switch=1) >> fwd(1)) +
+             (match(dstip=ip2) >> match(switch=2) >> fwd(3)) +
+             (match(dstip=ip2) >> match(switch=3) >> fwd(2)) +
+             (match(dstip=ip3) >> match(switch=1) >> fwd(2)) +
+             (match(dstip=ip3) >> match(switch=2) >> fwd(1)) +
+             (match(dstip=ip3) >> match(switch=3) >> fwd(3)) )
 
 class QueryTest(CountBucket):
     

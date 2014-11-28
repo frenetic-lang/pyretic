@@ -89,13 +89,13 @@ def generic_topo_tests(topo_name, topo_args, fwding_pols):
 def single_switch_topo_tests():
     topo_name   = 'SingleSwitchTopo'
     topo_args   = '3'
-    fwding_pols = ['static_fwding_single', 'mac_learner']
+    fwding_pols = ['static_fwding_single_3', 'mac_learner']
     generic_topo_tests(topo_name, topo_args, fwding_pols)
 
 def cycle_topo_tests():
     topo_name = 'CycleTopo'
     topo_args = '3,3'
-    fwding_pols = ['static_fwding_cycle', 'mac_learner']
+    fwding_pols = ['static_fwding_cycle_3_3', 'mac_learner']
     generic_topo_tests(topo_name, topo_args, fwding_pols)
 
 def print_failed_tests():
