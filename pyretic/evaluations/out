@@ -1,0 +1,324 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+{'test': 'path_packet_loss', 'n': '3'}
+-----1-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----3-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----4-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----5-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 6)
+-----------
+-----6-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----7-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----None-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----1-----
+sequential:
+    identity
+    modify: ('path_tag', 3)
+-----------
+-----3-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----4-----
+sequential:
+    identity
+    modify: ('path_tag', 5)
+-----------
+-----5-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----6-----
+sequential:
+    identity
+    modify: ('path_tag', 7)
+-----------
+-----7-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----None-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----1-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----3-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----4-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----5-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 6)
+-----------
+-----6-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----7-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----None-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----1-----
+sequential:
+    identity
+    modify: ('path_tag', 3)
+-----------
+-----3-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----4-----
+sequential:
+    identity
+    modify: ('path_tag', 5)
+-----------
+-----5-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----6-----
+sequential:
+    identity
+    modify: ('path_tag', 7)
+-----------
+-----7-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----None-----
+sequential:
+    identity
+    modify: ('path_tag', 2)
+-----------
+-----1-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----3-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 4)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----4-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----5-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 6)
+-----------
+-----6-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----7-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------
+-----None-----
+parallel:
+    sequential:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+        modify: ('path_tag', 1)
+    sequential:
+        match: ('switch', 2)
+        modify: ('path_tag', 2)
+    sequential:
+        match: ('switch', 3)
+        modify: ('path_tag', 2)
+-----------

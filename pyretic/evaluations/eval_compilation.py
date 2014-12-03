@@ -30,10 +30,12 @@ class eval_compilation:
                     shutil.rmtree(fpath)
 
     def compile(self, full_compile = False):
-        stat.start(self.results_folder)
+        #stat.start(self.results_folder)
 
         pathcomp.init(1022)
         (self.path_in_tagging, self.path_in_capture, self.path_out_tagging, self.path_out_capture) = pathcomp.compile(self.path_policy)
+        
+        return 
 
         in_tag_policy = self.path_in_tagging >> self.main_policy
         self.forwarding = (in_tag_policy >> self.path_out_tagging)
@@ -83,7 +85,7 @@ class eval_compilation:
     def get_vf_untagging_policy():
         return None
 
-
+## forwarding and tag
 
     @stat.classifier_size
     @stat.elapsed_time
@@ -100,6 +102,14 @@ class eval_compilation:
     def out_tagging_compile(self):
         return self.path_out_tagging.compile()
 
+    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fwd_compile(self):
+        return self.forwarding.compile()
+
+### capture
+    
     @stat.classifier_size
     @stat.elapsed_time
     def capture_compile(self):
@@ -115,11 +125,7 @@ class eval_compilation:
     def full_out_capture_compile(self):
         return self.out_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
-    def tag_fwd_compile(self):
-        return self.forwarding.compile()
-
+### virtual field 
 
     @stat.classifier_size
     @stat.elapsed_time
@@ -147,7 +153,7 @@ class eval_compilation:
     def vtag_out_capture_compile(self):
         return self.vtag_out_capture.compile()
 
-
+### whole policy
 
     @stat.classifier_size
     @stat.elapsed_time

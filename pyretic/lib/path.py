@@ -42,8 +42,9 @@ import pyretic.vendor
 import pydot
 import copy
 
+from pyretic.core.language import Controller, fwd, CombinatorPolicy
+from pyretic.core import util
 import pickle
-
 from pyretic.evaluations import stat
 
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
@@ -329,6 +330,15 @@ class re_tree_gen(object):
             pred = cls.symbol_to_pred[sym]
             output += (sym + ': ' + repr(pred) + '\n')
         return output
+
+    @classmethod
+    def get_leaf_pickles(cls):
+        output = ''
+        for sym in cls.symbol_to_pred:
+            pred = cls.symbol_to_pred[sym]
+            output += (sym + ': ' + pickle_dump(pred) + '\n')
+        return output
+
 
     @classmethod
     def get_dyn_preds(cls):
@@ -904,13 +914,17 @@ class QuerySwitch(Policy):
         self.default = default
 
     def eval(self, pkt):
+        from pyretic.core.language import _match
         def eval_defaults(pkt):
             res = set()
             for act in self.default:
                 res |= act.eval(pkt)
             return res
 
-
+        '''print 'evaluating :'
+        print pkt
+        print '-----------------'
+        '''
         for tag_value in self.policy_dic:
             match_pol = match(**{self.tag:tag_value})
             res = match_pol.eval(pkt)
@@ -918,36 +932,73 @@ class QuerySwitch(Policy):
                 pol_res = self.policy_dic[tag_value].eval(pkt)
                 if not pol_res:
                     pol_res = eval_defaults(pkt)
-
+                
+                '''print 'result is :'
+                print pol_res
+                print '----------------'
+                '''
                 return pol_res
-                    
+        
+        '''print 'results is :'
+        print eval_defaults(pkt)
+        print '------------------'
+        '''
         return eval_defaults(pkt)
-       
+    
     def compile(self):
         from pyretic.core.classifier import Rule, Classifier
+        
+        def resolve_virtual_fields(act):
+            try:
+                if isinstance(act, modify):
+                    r = act.compile().rules[0]
+                    (mod_act,) =  r.actions
+                    return mod_act
+                if isinstance(act, match):
+                    return act.compile().rules[0].match
+                
+                return act
+            except:
+                return act
+            
+
+        
+        comp_defaults = set(map(resolve_virtual_fields, self.default))
         final_rules = []
         for tag_value in self.policy_dic:
             p_rules = self.policy_dic[tag_value].compile().rules
-           
             for r in p_rules:
                 new_match = r.match.intersect(match(**{self.tag : tag_value}))
+                new_match = new_match.compile().rules[0].match
                 if new_match == drop:
                     raise TypeError
                 new_r = copy.copy(r)
                 new_r.match = new_match
+                if not new_r.actions:
+                    new_r.actions = comp_defaults
                 new_r.parents = [r]
                 new_r.op = "switch"
                 final_rules.append(new_r)
 
-        for r in final_rules:
-            if not r.actions:
-                r.actions = self.default
+        final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
+        c = Classifier(final_rules)
+        return c
 
+    def __repr__(self):
+        res = ''
+        res +=  '----------------------------\n'
+        res +=  str(self.tag) + '\n'
+        res +=  str(self.default) + '\n'
+        for tag, value in self.policy_dic.items():
+            res += str(tag) + "----is---> " + str(value) + '\n'
 
-        final_rules.append(Rule(identity, self.default, [self], "switch"))
-        return Classifier(final_rules)
+        res +=  '----------------------------\n'
+        return res
 
-
+    def __eq__(self, other):
+        return (isinstance(other, QuerySwitch) and self.tag == other.tag
+                and self.policy_dic == other.policy_dic
+                and self.default == other.default)
 #############################################################################
 ###                      Path query compilation                           ###
 #############################################################################
@@ -969,6 +1020,14 @@ class pathcomp(object):
             return match(path_tag=None)
         else:
             return match(path_tag=int(val))
+
+    @classmethod
+    def __get_tag_val__(cls, d, q):
+        val = dfa_utils.get_state_index(d, q)
+        if int(val) == 0:
+            return None
+        else:
+            return int(val)
 
     @classmethod
     def __get_pred__(cls, dfa, edge):
@@ -1075,8 +1134,11 @@ class pathcomp(object):
         __out_re_tree_gen__.clear()
 
 
+    import yappi
+
     @classmethod
-    @stat.elapsed_time
+    #@stat.elapsed_time
+    @yappi.profile(return_callback = stat.aggregate)
     def compile(cls, path_pol, max_states=1022):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
@@ -1111,47 +1173,101 @@ class pathcomp(object):
        
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
 
-        """ Initialize tagging and capture policies. """
-        in_tagging = (((in_cg.get_unaffected_pred() &
-                        ~(cls.__get_dead_state_pred__(dfa)))
-                       >> cls.__set_dead_state_tag__(dfa)) +
-                      cls.__get_dead_state_pred__(dfa))
-        out_tagging = (((out_cg.get_unaffected_pred() &
-                         ~(cls.__get_dead_state_pred__(dfa)))
-                        >> cls.__set_dead_state_tag__(dfa)) +
-                       cls.__get_dead_state_pred__(dfa))
-        in_capture = drop
-        out_capture = drop
-        
-        """ Generate transition/accept rules from DFA """
         edges = du.get_edges(dfa)
-        for edge in edges:
-            src = du.get_edge_src(dfa, edge)
-            dst = du.get_edge_dst(dfa, edge)
-            (pred, typ) = get_pred(edge)
-            assert typ in [__in__, __out__]
-            if not du.is_dead(dfa, src):
-                tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
-                if typ == __in__:
-                    in_tagging += tag_frag
-                    in_tag_rules += 1
-
-                elif typ == __out__:
-                    out_tagging += tag_frag
-                    out_tag_rules += 1
-
-            if du.is_accepting(dfa, dst):
-                ords = du.get_accepting_exps(dfa, dst)
-                for i in ords:
-
-                    cap_frag = ((match_tag(src) & pred) >> pol_list[i])
-                    if typ == __in__:
-                        in_capture += cap_frag
-                        in_cap_rules += 1
-                    elif typ == __out__:
-                        out_capture += cap_frag
-                        out_cap_rules += 1
         
+        optimize = True
+
+        in_tagging = None
+        out_tagging = None
+        in_capture = None
+        out_capture = None
+
+        if optimize:
+            in_tagging_dic = {}
+            out_tagging_dic = {}
+
+            in_capture = drop
+            out_capture = drop
+
+            for edge in edges:
+                src = du.get_edge_src(dfa, edge)
+                src_num = cls.__get_tag_val__(dfa, src)
+                dst = du.get_edge_dst(dfa, edge)
+                (pred, typ) = get_pred(edge)
+                assert typ in [__in__, __out__]
+
+                if not du.is_dead(dfa, src) and not du.is_dead(dfa, dst):
+                    tag_frag = (pred >> set_tag(dst))
+                    if typ == __in__:
+                        if not src_num in in_tagging_dic:
+                            in_tagging_dic[src_num] = tag_frag
+                        else:
+                            in_tagging_dic[src_num] += tag_frag
+                        in_tag_rules += 1
+
+                    elif typ == __out__:
+                        if not src in out_tagging_dic:
+                            out_tagging_dic[src_num] = tag_frag
+                        else:
+                            out_tagging_dic[src_num] += tag_frag
+                        out_tag_rules += 1
+
+                if du.is_accepting(dfa, dst):
+                    ords = du.get_accepting_exps(dfa, dst)
+                    for i in ords:
+
+                        cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                        if typ == __in__:
+                            in_capture += cap_frag
+                            in_cap_rules += 1
+                        elif typ == __out__:
+                            out_capture += cap_frag
+                            out_cap_rules += 1
+                 
+            tagging_default = set([cls.__set_dead_state_tag__(dfa)])
+            in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
+            out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
+        else:
+            """ Initialize tagging and capture policies. """
+            in_tagging = (((in_cg.get_unaffected_pred() &
+                            ~(cls.__get_dead_state_pred__(dfa)))
+                           >> cls.__set_dead_state_tag__(dfa)) +
+                          cls.__get_dead_state_pred__(dfa))
+            out_tagging = (((out_cg.get_unaffected_pred() &
+                             ~(cls.__get_dead_state_pred__(dfa)))
+                            >> cls.__set_dead_state_tag__(dfa)) +
+                           cls.__get_dead_state_pred__(dfa))
+            in_capture = drop
+            out_capture = drop
+            
+            """ Generate transition/accept rules from DFA """
+            for edge in edges:
+                src = du.get_edge_src(dfa, edge)
+                dst = du.get_edge_dst(dfa, edge)
+                (pred, typ) = get_pred(edge)
+                assert typ in [__in__, __out__]
+                if not du.is_dead(dfa, src):
+                    tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
+                    if typ == __in__:
+                        in_tagging += tag_frag
+                        in_tag_rules += 1
+
+                    elif typ == __out__:
+                        out_tagging += tag_frag
+                        out_tag_rules += 1
+
+                if du.is_accepting(dfa, dst):
+                    ords = du.get_accepting_exps(dfa, dst)
+                    for i in ords:
+
+                        cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                        if typ == __in__:
+                            in_capture += cap_frag
+                            in_cap_rules += 1
+                        elif typ == __out__:
+                            out_capture += cap_frag
+                            out_cap_rules += 1
+            
         stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
         stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
@@ -1529,5 +1645,67 @@ class dfa_utils(object):
         cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
+       
         cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
+
+        leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
+                      __out_re_tree_gen__.get_leaf_pickles())
+        
+        cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
         return dfa
+
+#############################################################################
+###                              Pickling                                 ###
+#############################################################################
+
+MARK = '('
+LIST_END = 'l'
+TUPLE_END = 't'
+DIC_END = 'd'
+INT = 'I'
+
+NEWOBJ = '\x81'
+OBJ = 'o'
+LOAD = 'c'
+DELIM = '\n'
+END = '.'
+
+
+## Extra possible features:
+# Query, Buckets, and PathQueries
+# Derived Policy, Dynamic Policy
+
+def pickle_dump(policy):
+    cls = policy.__class__.__name__
+    module = getattr(policy, '__module__', None)
+    if policy in [identity, drop, Controller]:
+        return LOAD + module + DELIM + cls + DELIM + END
+    if isinstance(policy, match) or isinstance(policy, modify):
+        args = {}
+        for k,v in policy.map.items():
+            if k in ['srcip', 'dstip']:
+                v = util.network_to_string(v)
+            args[k] = v
+
+        args_dump = pickle.dumps(args)[:-1]
+        return ( MARK + LOAD + module + DELIM + cls + DELIM
+               + args_dump + OBJ + END)
+    
+    if isinstance(policy, fwd):
+        return (MARK + LOAD + module + DELIM + cls + DELIM
+                + INT + str(policy.outport) + DELIM 
+                + OBJ + END)
+
+    if isinstance(policy, CombinatorPolicy):
+        res = LOAD + module + DELIM + cls + DELIM
+        res += MARK + MARK
+        for pol in policy.policies:
+            pol_dump = pickle_dump(pol)[:-1]
+            res += pol_dump
+        res += LIST_END + TUPLE_END + NEWOBJ + END
+        return res
+
+    print type(policy)
+    raise NotImplementedError
+
+

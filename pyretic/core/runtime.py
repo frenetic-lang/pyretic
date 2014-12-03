@@ -107,6 +107,14 @@ class Runtime(object):
             self.tag_fwd_compile()
 
             # capture
+            def cb(pkt):
+                pass
+                #print pkt
+                #print '-----------'
+            b = FwdBucket()
+            b.register_callback(cb)
+            
+            #self.out_capture = self.out_capture + (match(dstip='10.0.0.3') >> b)
             self.capture_compile()
             self.out_capture_compile()
             self.full_out_capture_compile()
@@ -122,8 +130,8 @@ class Runtime(object):
             self.vtag_fw_compile()
             self.vtag_in_capture_compile()
             self.vtag_out_capture_compile()
-
-            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+            
+            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
             self.whole_policy_compile()
 
             #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
@@ -260,10 +268,12 @@ class Runtime(object):
         self.num_packet_ins += 1
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-
+            
+            #print pyretic_pkt
+            #print '--------------'
+            
             # find the queries, if any in the policy, that will be evaluated
             queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
-
             # evaluate the policy
             output = self.policy.eval(pyretic_pkt)
 

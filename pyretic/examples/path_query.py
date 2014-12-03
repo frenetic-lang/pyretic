@@ -49,6 +49,10 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
 
+static_fwding_single_switch = (
+    (match(dstip = ip1) >> fwd(1)) + 
+    (match(dstip = ip2) >> fwd(2))
+    )
 
 static_fwding_chain_2_2 = (
     (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
@@ -439,14 +443,27 @@ def path_test_25():
     p.register_callback(query_callback(25))
     return p
 
+count = 0
+def print_callback(pkt):
+    global count
+    count += 1
+    print 'count is ' + str(count)
+    print 'calll baaack'
+    print pkt
+    print '-----------'
+
 # type: unit -> path list
 def path_main(**kwargs):
     #return path_test_waypoint_violation_general()
     p = atom(match(switch = 3))
-    p.register_callback(query_callback('test'))
+    p.register_callback(print_callback)
     return p
 
 def main(**kwargs):
 #    return mac_learner()
+    b = FwdBucket()
+    b.register_callback(query_callback('mina'))
+    #return static_fwding_single_switch
+    #return static_fwding_chain_3_3 + (identity >> b) 
     return static_fwding_chain_3_3
 #    return static_fwding_cycle_4_4_spanning_tree_1
