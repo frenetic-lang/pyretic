@@ -113,7 +113,7 @@ def test0():
     number of packets/bytes displayed by wireshark or tshark with these
     filters. They are designed to work under topology and policy updates.
     """
-    test_bucket = QueryTest(0)
+    test_bucket = QueryTest('0')
     return test_bucket
 
 def test1():

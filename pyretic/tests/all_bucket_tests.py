@@ -34,7 +34,7 @@ failed_tests = []
 fails_counts = []
 
 def single_test(fwding, query, filt_funs, topo_name, topo_args,
-                       results, pass_fail):
+                results, pass_fail, test_nums):
     global fails_counts
     cmd = ("sudo python pyretic/tests/test_bucket.py " +
            "--fwding=" + fwding + ' ' +
@@ -43,7 +43,8 @@ def single_test(fwding, query, filt_funs, topo_name, topo_args,
            "--topo_args=" + topo_args + ' ' +
            "--tshark_filter_funs=" + filt_funs + ' ' +
            "--results_folder=" + results + ' ' +
-           "--success_file=" + pass_fail)
+           "--success_file=" + pass_fail + ' ' +
+           "--test_nums=" + test_nums)
     test = subprocess.call(shlex.split(cmd))
     pf_file = os.path.join(results, pass_fail)
     f = open(pf_file, 'r')
@@ -70,13 +71,22 @@ def generic_topo_tests(topo_name, topo_args, fwding_pols):
                    'filt_test5',
                    'filt_test6',
                    'filt_test7']
+    test_nums   = ['0',
+                   '1',
+                   '2.b0,2.b1',
+                   '3.b0,3.b1',
+                   '4.b0,4.b1,4.b2',
+                   '5',
+                   '6',
+                   '7']
     results = './pyretic/evaluations/results'
     pass_fail = 'pass-fail.txt'
 
     for fwding in fwding_pols:
         for i in range(0, len(query_pols)):
             res = single_test(fwding, query_pols[i], filt_funs[i],
-                              topo_name, topo_args, results, pass_fail)
+                              topo_name, topo_args, results, pass_fail,
+                              test_nums[i])
             test_name = "%s %s on %s" % (query_pols[i], fwding, topo_name)
             if res:
                 print "===== TEST %s PASSED =====" % test_name
