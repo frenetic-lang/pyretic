@@ -327,12 +327,22 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts, ctlr):
 def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail = open(success_file, 'w')
     output_str = ''
-    if set(tshark_counts.values()) == set(buckets_counts.values()):
-        output_str += "PASS\n"
-    else:
+    if set(tshark_counts.keys()) != set(buckets_counts.keys()):
         output_str += "FAIL\n"
-        output_str += "TShark: %s\n" % str(tshark_counts)
-        output_str += "Bucket: %s\n" % str(buckets_counts)
+        output_str += "Query references mismatch:\n"
+        output_str += "TShark: %s\n" % str(tshark_counts.keys())
+        output_str += "Bucket: %s\n" % str(buckets_counts.keys())
+    elif True:
+        for q in tshark_counts.keys():
+            tc = tshark_counts[q]
+            bc = buckets_counts[q]
+            if tc != bc:
+                output_str += "FAIL\n"
+                output_str += "Query: %s\n" % q
+                output_str += "TShark: %s\n" % str(tc)
+                output_str += "Bucket: %s\n" % str(bc)
+    if output_str == '':
+        output_str += "PASS\n"
     print output_str
     passfail.write(output_str)
     passfail.close()
