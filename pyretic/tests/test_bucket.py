@@ -106,6 +106,9 @@ def bucket_get_tshark_counts(t_outfile, tshark_filter_funs):
                                tshark_filter_count(t_outfile, f))])
     return tshark_counts
 
+def path_query_get_tshark_counts(t_outfile, tshark_filter_funs):
+    pass
+
 def tshark_filter_count(t_outfile, filter_fun):
     global ints_map
     t_out = open(t_outfile, 'r')
@@ -276,9 +279,9 @@ def close_fds(fds, fd_str):
 
 def write_passfail_info(success_file, tshark_counts, buckets_counts, ctlr):
     if ctlr == 'bucket':
-        bucket_write_passfail_info()
+        bucket_write_passfail_info(success_file, tshark_counts, buckets_counts)
     elif ctlr == 'path_query':
-        path_query_write_passfail_info()
+        path_query_write_passfail_info(success_file, tshark_counts, buckets_counts)
     else:
         raise RuntimeError('unknown controller!')
 
