@@ -124,6 +124,7 @@ class Runtime(object):
         self.packet_in_time = 0
         self.num_packet_ins = 0
         self.update_dynamic_sub_pols()
+        self.total_packets_removed = 0 # pkt count from flow removed messages
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -1405,6 +1406,10 @@ class Runtime(object):
                 self.log.debug("Got removed flow\n%s with counts %d %d" %
                                (str(match_entry), f['packet_count'],
                                 f['byte_count']) )
+                if version > 0:
+                    self.total_packets_removed += f['packet_count']
+                    self.log.debug("Total packets removed: %d" %
+                                   self.total_packets_removed)
                 self.log.debug('Printing global structure for deleted rules:')
                 for k,v in self.global_outstanding_deletes.iteritems():
                     self.log.debug(str(k) + " : " + str(v))

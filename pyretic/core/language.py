@@ -709,6 +709,12 @@ class CountBucket(Query):
         self.byte_count_table = 0
         self.packet_count_persistent = 0
         self.byte_count_persistent = 0
+        self.packet_count_persistent_apply = 0
+        self.packet_count_persistent_removed = 0
+        self.packet_count_persistent_existing = 0
+        self.byte_count_persistent_apply = 0
+        self.byte_count_persistent_removed = 0
+        self.byte_count_persistent_existing = 0
         self.in_update_cv = Condition()
         self.in_update = False
         self.new_bucket = True
@@ -744,6 +750,8 @@ class CountBucket(Query):
                                + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['payload_len']
+                self.packet_count_persistent_apply += 1
+                self.byte_count_persistent_apply += pkt['payload_len']
             self.bucket.clear()
         self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
                        'persistent packet count is ' +
@@ -881,6 +889,8 @@ class CountBucket(Query):
                                          packet_count) ) )
                     self.packet_count_persistent += packet_count
                     self.byte_count_persistent += byte_count
+                    self.packet_count_persistent_removed += packet_count
+                    self.byte_count_persistent_removed += byte_count
                 # Note that there is no else action. We just forget
                 # that this rule was ever associated with the bucket
                 # if we get a "flow removed" message before we got
@@ -1034,6 +1044,10 @@ class CountBucket(Query):
                                                 ' %d') % id(self))
                                 self.packet_count_persistent -= extracted_pkts
                                 self.byte_count_persistent -= extracted_bytes
+                                self.packet_count_persistent_existing += (
+                                    extracted_pkts)
+                                self.byte_count_persistent_existing += (
+                                    extracted_bytes)
                                 self.clear_existing_rule_flag(me)
                     else:
                         raise RuntimeError("weird flow entry")
@@ -1048,6 +1062,15 @@ class CountBucket(Query):
                     self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
             self.log.debug("No outstanding switches; calling callbacks")
+            self.log.debug("*** Returning bucket %d counts.\n%s%s%s%s%s%s" % (
+                    id(self),
+                    "table counts: %d\n" % self.packet_count_table,
+                    "perst. apply: %d\n" % self.packet_count_persistent_apply,
+                    "perst. remov: %d\n" % self.packet_count_persistent_removed,
+                    "perst. exist: %d\n" % self.packet_count_persistent_existing,
+                    "perst. total: %d\n" % self.packet_count_persistent,
+                    "bucket total: %d\n" % (self.packet_count_table +
+                                            self.packet_count_persistent)))
             self.call_callbacks([(self.packet_count_table +
                                   self.packet_count_persistent),
                                  (self.byte_count_table   +
