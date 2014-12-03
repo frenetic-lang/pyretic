@@ -154,6 +154,8 @@ def path_query_tshark_filter_count(t_outfile, filter_fun):
             pred = get_key_str(line)
             (pkt_count, byte_count) = predwise_count.get(pred, (0, 0))
             predwise_count[pred] = (pkt_count + 1, byte_count + bytes_fun(line))
+            (pkt_count, byte_count) = predwise_count.get('total', (0, 0))
+            predwise_count['total'] = (pkt_count + 1, byte_count + bytes_fun(line))
     return predwise_count
 
 def ctlr_counts(c_outfile, c_name):
@@ -336,17 +338,83 @@ def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail.close()
 
 def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
-    print "In path query passfail info. I got the following counts:"
-    print "TShark:"
-    print "Bucket references:", tshark_counts.keys()
-    for vals in tshark_counts.values():
-        for (k, v) in vals.iteritems():
-            print k, v
-    print "Buckets:"
-    print "Bucket references:", buckets_counts.keys()
-    for vals in buckets_counts.values():
-        for (k, v) in vals.iteritems():
-            print k, v
+    """ Write pass/fail information summary for this test. This function takes
+    the following steps to determine if the output of the path query controller
+    is acceptable.
+    1. ensure the query references obtained from tshark & buckets are the same.
+    For each query reference,
+    2. is the total packet count the same?
+    3. is the difference between total byte counts bounded?*
+    4. is the set of keys generated from tshark & buckets the same?
+    For each key of each query reference,
+    5. is the packet count the same?
+    6. is the difference between byte counts bounded?*
+
+    * TODO(ngsrinivas): some packets show a 4 byte increase in payload size when
+      they come into the packet interpreter. This needs more investigation.
+    """
+    passfail = open(success_file, 'w')
+    output_str = ''
+    if set(tshark_counts.keys()) != set(buckets_counts.keys()):
+        """ Test numbers mismatch. """
+        output_str += 'FAIL\n'
+        output_str += 'Query references mismatch:\n'
+        output_str += 'TShark: %s\n' % str(tshark_counts.keys())
+        output_str += 'Bucket: %s\n' % str(buckets_counts.keys())
+    elif True:
+        """ Per-query-test checks. """
+        for q in tshark_counts.keys():
+            tc = tshark_counts[q]
+            bc = buckets_counts[q]
+            (tc_total_pkts, tc_total_bytes) = tc['total']
+            (bc_total_pkts, bc_total_bytes) = bc['total']
+            if tc_total_pkts != bc_total_pkts:
+                output_str += 'FAIL\n'
+                output_str += 'Query: %s\n' % q
+                output_str += 'Total packet counts mismatch:\n'
+                output_str += 'TShark: %d\n' % tc_total_pkts
+                output_str += 'Bucket: %d\n' % bc_total_pkts
+                break
+            elif abs(tc_total_bytes-bc_total_bytes) > 4*tc_total_pkts:
+                output_str += 'FAIL\n'
+                output_str += 'Query: %s\n' % q
+                output_str += 'Total byte count mismatch out of bounds:\n'
+                output_str += 'TShark: %d\n' % tc_total_bytes
+                output_str += 'Bucket: %d\n' % bc_total_bytes
+                break
+            elif set(tc.keys()) != set(bc.keys()):
+                output_str += 'FAIL\n'
+                output_str += 'Query: %s\n' % q
+                output_str += 'Groups of packets counted differ:\n'
+                output_str += 'TShark:\n%s\n' % ('\n'.join(tc.keys()))
+                output_str += 'Bucket:\n%s\n' % ('\n'.join(bc.keys()))
+                break
+            elif True:
+                for pred in tc.keys():
+                    """ Check each predicate within each query. """
+                    (tc_pred_pkts, tc_pred_bytes) = tc[pred]
+                    (bc_pred_pkts, bc_pred_bytes) = bc[pred]
+                    if tc_pred_pkts != bc_pred_pkts:
+                        output_str += 'FAIL\n'
+                        output_str += 'Query: %s\n' % q
+                        output_str += 'Predicate pkt counts mismatch:\n'
+                        output_str += 'Predicate: %s\n' % pred
+                        output_str += 'TShark: %d\n' % tc_pred_pkts
+                        output_str += 'Bucket: %d\n' % bc_pred_pkts
+                        break
+                    elif abs(tc_pred_bytes-bc_pred_bytes) > 4*tc_pred_pkts:
+                        output_str += 'FAIL\n'
+                        output_str += 'Query: %s\n' % q
+                        output_str += 'Predicate byte count mismatch out of bounds:\n'
+                        output_str += 'Predicate: %s\n' % pred
+                        output_str += 'TShark: %d\n' % tc_pred_bytes
+                        output_str += 'Bucket: %d\n' % bc_pred_bytes
+                        break
+    if output_str == '':
+        output_str += 'PASS\n'
+    print output_str
+    passfail.write(output_str)
+    passfail.close()
 
 ### Helpers to extract specific headers from tshark output ###
 ints_map = {}

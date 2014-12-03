@@ -145,6 +145,12 @@ def query_callback(test_num):
                     pkt_counts[pred],
                     byte_counts[pred])
 
+        def print_total_entries():
+            print "Bucket %s total counts: [%d, %d]" % (
+                str(test_num),
+                ac.pkt_count,
+                ac.byte_count)
+
         print '**************'
         print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
@@ -155,6 +161,7 @@ def query_callback(test_num):
                 ac.byte_count += pkt['payload_len']
                 update_predwise_counts(pkt)
                 print_predwise_entries()
+                print_total_entries()
             else:
                 print "Bucket %s (packet, byte) counts: %s" % (
                     str(test_num), pkt)
