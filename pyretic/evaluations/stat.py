@@ -10,6 +10,7 @@ monitoring = False
 path = '/home/mininet/pyretic/pyretic/evaluations/results/'
 dfa_path = '/tmp/pyretic-regexes.txt.dot'
 symbol_path = '/tmp/symbols.txt'
+pickle_path = '/tmp/pickle_symbols.txt'
 rule_cnt_file = 'rule-count.txt'
 clean_tmp = False
 
@@ -50,7 +51,7 @@ def stop():
     if monitoring:
         report_dfa(dfa_path, symbol_path, path)
         create_overall_report(path, rule_cnt_file, os.path.basename(dfa_path))
-        #create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
+        create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
 
     monitoring = False
 def report_dfa(dfa_path, symbol_path, results_path):
@@ -60,6 +61,7 @@ def report_dfa(dfa_path, symbol_path, results_path):
         try:
             shutil.copy(dfa_path, results_path)
             shutil.copy(symbol_path, results_path)
+            shutil.copy(pickle_path, results_path)
         except:
             print 'exception in dfa report'
 
@@ -133,8 +135,10 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
 
 
 def create_excel_report(results_path, rule_cnt, dfa_path):
-    cols = [ ["makeDFA_vector", 'compile', 'forwarding_compile', 'tagging_compile', 'capture_compile', 'tag_fw_cap_compile'],
-                ['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],
+    cols = [ ["makeDFA_vector", 'compile', 'forwarding_compile', 
+                'tagging_compile', 'out_tagging_compile', 'tag_fwd_compile',
+                'capture_compile', 'out_capture_compile', 'full_out_capture_compile'],
+                #['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],
             ]
 
     def adjust_func(file_path):
@@ -158,11 +162,10 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
             cpath = adjust_func(c + '.cls')
             if os.path.exists(cpath):
                 g = open(cpath, 'r')
+                cls = '\t'
                 for line in g.readlines():
-                    cls = "\t"
-                    if "classifier" in line:
+                    if "classifier size" in line:
                         cls = line[line.index(':') + 2 :-1] + "\t"
-
                 f.write(cls)
                 g.close()
 
@@ -180,35 +183,27 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
         pass
 
 
-    '''rule_cnt = 0
-    rule_avg = 0
-   
-    try:
-        g = open(adjust_func(rule_cnt), 'r')
-        for line in g.readlines():
-
-            if 'total rule count' in line:
-                rule_cnt = int(line[line.index(':') + 2 : -1])
-
-            elif 'average rule count' in line:
-                rule_avg = float(line[line.index(':') + 2 : -1])
-        g.close()
-    except:
-        pass'''
-
-    tagging_edge = 0
-    capture_edge = 0
+    in_tagging_edge = 0
+    out_tagging_edge = 0
+    in_capture_edge = 0
+    out_capture_edge = 0
     switch_cnt = 0
     rule_cnt = 0
 
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
         for line in g.readlines():
-            if "tagging edges" in line:
-                tagging_edge = int(line[line.index(':') + 2:-1])
+            if "in tagging edges" in line:
+                in_tagging_edge = int(line[line.index(':') + 2:-1])
 
-            elif 'capture edges' in line:
-                capture_edge = int(line[line.index(':') + 2 : -1])
+            elif "out tagging edges" in line:
+                out_tagging_edge = int(line[line.index(':') + 2:-1])
+
+            elif 'in capture edges' in line:
+                in_capture_edge = int(line[line.index(':') + 2 : -1])
+
+            elif 'out capture edges' in line:
+                out_capture_edge = int(line[line.index(':') + 2 : -1])
 
             elif 'switch count' in line:
                 switch_cnt = int(line[line.index(':') + 2 :-1])
@@ -224,7 +219,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
     if switch_cnt and rule_cnt:
         rule_avg = float(rule_cnt) / switch_cnt
 
-    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge]
+    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
 
     for gen in gen_list:
         f.write(str(gen) + "\t")
@@ -343,3 +338,122 @@ def elapsed_time(func):
         return res
 
     return profiled_func
+
+import yappi
+
+def aggregate(func, stats):
+    fname = "%s.profile" % (func.__name__)
+    stats.sort('tavg')
+    stats.print_all()
+    try:
+        stats.add(fname)
+    except IOError:
+        pass
+    stats.save(fname)
+
+################################################################################
+##                     Older Table Types                                      ##
+################################################################################
+
+def create_excel_report_simple(results_path, rule_cnt, dfa_path):
+    cols = [ ["makeDFA_vector", 'compile', 'forwarding_compile', 'tagging_compile', 'capture_compile', 'tag_fw_cap_compile'],
+                ['vf_tag_compile', 'vf_untag_compile', 'whole_policy_compile'],
+            ]
+
+    def adjust_func(file_path):
+        return os.path.join(results_path, file_path)
+
+    f = open(adjust_func('excel_report.txt'), 'w')
+
+    for col in cols:
+        for c in col:
+            cpath = adjust_func(c + '.profile')
+            if os.path.exists(cpath):
+                g = open(cpath, 'r')
+                for line in g.readlines():
+                    if "average" in line:
+                        f.write(line[line.index(':') + 2 :-1] + "\t")
+                        break
+                g.close()
+            else:
+                f.write('0\t')
+
+            cpath = adjust_func(c + '.cls')
+            if os.path.exists(cpath):
+                g = open(cpath, 'r')
+                for line in g.readlines():
+                    cls = "\t"
+                    if "classifier" in line:
+                        cls = line[line.index(':') + 2 :-1] + "\t"
+
+                f.write(cls)
+                g.close()
+
+        f.write('\n')
+
+    dfa_state_cnt = 0
+    try:
+        g = open(adjust_func(dfa_path), 'r')
+        for line in g.readlines():
+            if 'shape' in line:
+                dfa_state_cnt += 1
+
+        g.close()
+    except:
+        pass
+
+
+    '''rule_cnt = 0
+    rule_avg = 0
+   
+    try:
+        g = open(adjust_func(rule_cnt), 'r')
+        for line in g.readlines():
+
+            if 'total rule count' in line:
+                rule_cnt = int(line[line.index(':') + 2 : -1])
+
+            elif 'average rule count' in line:
+                rule_avg = float(line[line.index(':') + 2 : -1])
+        g.close()
+    except:
+        pass'''
+
+    tagging_edge = 0
+    capture_edge = 0
+    switch_cnt = 0
+    rule_cnt = 0
+
+    try:
+        g = open(adjust_func('general_stats.txt'), 'r')
+        for line in g.readlines():
+            if "tagging edges" in line:
+                tagging_edge = int(line[line.index(':') + 2:-1])
+
+            elif 'capture edges' in line:
+                capture_edge = int(line[line.index(':') + 2 : -1])
+
+            elif 'switch count' in line:
+                switch_cnt = int(line[line.index(':') + 2 :-1])
+
+            elif 'rule count' in line:
+                rule_cnt = int(line[line.index(':') + 2 : -1])
+
+        g.close()
+    except:
+        pass
+
+    rule_avg = 0
+    if switch_cnt and rule_cnt:
+        rule_avg = float(rule_cnt) / switch_cnt
+
+    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, tagging_edge, capture_edge]
+
+    for gen in gen_list:
+        f.write(str(gen) + "\t")
+    f.write('\n')
+
+    f.close()
+
+
+

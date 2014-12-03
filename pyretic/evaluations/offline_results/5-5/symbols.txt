@@ -1,0 +1,39 @@
+A: match: ('switch', 10)
+C: match: ('switch', 2)
+E: match: ('switch', 3)
+G: match: ('switch', 4)
+I: match: ('switch', 5)
+H: intersection:
+    identity
+    negate:
+        match: ('switch', 1)
+    negate:
+        match: ('switch', 11)
+    negate:
+        match: ('switch', 12)
+    negate:
+        match: ('switch', 6)
+    negate:
+        match: ('switch', 7)
+    negate:
+        match: ('switch', 8)
+    negate:
+        match: ('switch', 9)
+    negate:
+        match: ('switch', 10)
+    negate:
+        match: ('switch', 2)
+    negate:
+        match: ('switch', 3)
+    negate:
+        match: ('switch', 4)
+    negate:
+        match: ('switch', 5)
+1: match: ('switch', 1)
+5: match: ('switch', 11)
+7: match: ('switch', 12)
+9: match: ('switch', 6)
+;: match: ('switch', 7)
+=: match: ('switch', 8)
+?: match: ('switch', 9)
+2: identity

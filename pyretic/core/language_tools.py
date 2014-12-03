@@ -99,6 +99,7 @@ def ast_map(fun, policy):
 
 def ast_fold(fun, acc, policy):
     import pyretic.lib.query as query
+    from pyretic.lib.path import QuerySwitch
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -123,6 +124,20 @@ def ast_fold(fun, acc, policy):
           isinstance(policy,query.packets)):
         acc = fun(acc,policy)
         return ast_fold(fun,acc,policy.policy)
+    elif isinstance(policy, QuerySwitch):
+        cases = copy.copy(policy.policy_dic)
+        if not cases:
+            def_policy = drop
+            for act in policy.default:
+                def_policy += act
+            return ast_fold(fun, acc, def_policy)
+
+        tag_value, sub_policy  = cases.popitem()
+        match_tag = match(**{policy.tag:tag_value})  
+        sub_policy = (match_tag >> sub_policy)
+        acc = ast_fold(fun, acc, sub_policy)
+        return ast_fold(fun, acc, ~match_tag >> QuerySwitch(policy.tag, cases, policy.default))
+        
     else:
         raise NotImplementedError
     
@@ -144,6 +159,7 @@ def add_all_sub_pols(acc, policy):
     return acc | {policy}
 
 def queries_in_eval(acc, policy):
+    from pyretic.lib.path import QuerySwitch
     res,pkts = acc
     if policy == drop:
         acc = (res,set())
@@ -173,6 +189,20 @@ def queries_in_eval(acc, policy):
             acc = queries_in_eval(acc,sub_pol)
             if not acc[1]:
                 break
+    elif isinstance(policy, QuerySwitch):
+        cases = copy.copy(policy.policy_dic)
+        if not cases:
+            def_policy = drop
+            for act in policy.default:
+                def_policy += act
+            acc = queries_in_eval(acc, def_policy)
+        else:
+            tag_value, sub_policy  = cases.popitem()
+            match_tag = match(**{policy.tag:tag_value})  
+            sub_policy = (match_tag >> sub_policy)
+            sub_acc = queries_in_eval((res,pkts), sub_policy)
+            res_acc = queries_in_eval((res,pkts), ~match_tag >> QuerySwitch(policy.tag, cases, policy.default))
+            acc = (sub_acc[0] | res_acc[0], sub_acc[1] | res_acc[1]) 
     return acc
 
 
@@ -209,6 +239,7 @@ def on_recompile_path_set(acc,pol_id,policy):
         raise NotImplementedError
 
 def on_recompile_path_list(pol_id,policy):
+    from pyretic.lib.path import QuerySwitch
     if (  policy == identity or
           policy == drop or
           isinstance(policy,match) or
@@ -237,5 +268,20 @@ def on_recompile_path_list(pol_id,policy):
                 return [policy] + sub_acc
             else:
                 return list()
+    elif isinstance(policy, QuerySwitch):
+        cases = copy.copy(policy.policy_dic)
+        if not cases:
+            def_policy = drop
+            for act in policy.default:
+                def_policy += act
+            return on_recompile_path_list(pol_id, def_policy)
+
+        tag_value, sub_policy  = cases.popitem()
+        match_tag = match(**{policy.tag:tag_value})  
+        sub_policy = (match_tag >> sub_policy)
+        sub_acc = on_recompile_path_list(pol_id, sub_policy)
+        return sub_acc + on_recompile_path_list(pol_id, ~match_tag >> QuerySwitch(policy.tag, cases, policy.default))
+        
+
     else:
         raise NotImplementedError

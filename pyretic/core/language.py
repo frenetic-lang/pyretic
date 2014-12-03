@@ -320,6 +320,7 @@ class match(Filter):
     :param *args: field matches in argument format
     :param **kwargs: field matches in keyword-argument format
     """
+   
     def __init__(self, *args, **kwargs):
 
         def _get_processed_map(*args, **kwargs):
@@ -349,7 +350,6 @@ class match(Filter):
     def generate_classifier(self):
         c = _match(**self.map).generate_classifier()
         
-        stat.print_compile_detail("match : %d :" % len(c.rules))
         return c
 
     def __eq__(self, other):
@@ -581,8 +581,17 @@ class Query(Filter):
         :type pkt: Packet
         :rtype: set Packet
         """
+          
         with self.bucket_lock:
             self.bucket.add(pkt)
+            
+            '''print "-------- in bucket eval ----------"
+            print id(self)
+            print pkt
+            import traceback
+            traceback.print_stack()
+            print '-------- end eval ----------'
+            '''
         return set()
         
     ### register_callback : (Packet -> X) -> unit
