@@ -39,6 +39,8 @@ from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
 from pyretic.lib.query import counts
+from pyretic.core import util
+import copy
 import threading
 
 import time
@@ -93,22 +95,66 @@ def query_func(bucket, interval):
 
 def query_callback(test_num):
     global only_count_results
+
     def actual_callback(pkt):
+        ac = actual_callback
+
+        def touch_vars():
+            """ Initialize function-specific counters, if uninitialized. """
+            try:
+                val = ac.pkt_count
+                val = ac.byte_count
+                val = ac.predwise_pkt_count
+                val = ac.predwise_byte_count
+            except AttributeError:
+                ac.pkt_count = 0
+                ac.byte_count = 0
+                ac.predwise_pkt_count = {}
+                ac.predwise_byte_count = {}
+
+        def get_count_key(pkt):
+            predwise_count_key = ['ethtype', 'srcip', 'dstip', 'switch', 'inport']
+            return util.frozendict({k: pkt[k] for k in predwise_count_key})
+
+        def update_predwise_counts(pkt):
+            curr_key = get_count_key(pkt)
+            curr_pkt_count = ac.predwise_pkt_count.get(curr_key, 0)
+            ac.predwise_pkt_count[curr_key] = curr_pkt_count + 1
+            curr_byte_count = ac.predwise_byte_count.get(curr_key, 0)
+            ac.predwise_byte_count[curr_key] = (curr_byte_count +
+                                                pkt['payload_len'])
+
+        def get_key_str(pred):
+            try:
+                out = "int:%s,ethtype:%s,srcip:%s,dstip:%s" % (
+                    "s%d-eth%d" % (pred['switch'], pred['inport']),
+                    "ip" if pred['ethtype']==2048 else "arp",
+                    str(pred['srcip']), str(pred['dstip']))
+            except KeyError:
+                raise RuntimeError("Missing keys from count predicate!")
+            return out
+
+        def print_predwise_entries():
+            pkt_counts  = ac.predwise_pkt_count
+            byte_counts = ac.predwise_byte_count
+            for pred in pkt_counts.keys():
+                assert pred in byte_counts.keys()
+                print "Bucket %s %s counts: [%d, %d]" % (
+                    str(test_num),
+                    get_key_str(pred),
+                    pkt_counts[pred],
+                    byte_counts[pred])
+
         print '**************'
         print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
         if only_count_results:
             if isinstance(pkt, pyretic.core.packet.Packet):
-                try:
-                    actual_callback.pkt_count  += 1
-                    actual_callback.byte_count += pkt['payload_len']
-                except AttributeError:
-                    actual_callback.pkt_count  = 1
-                    actual_callback.byte_count = pkt['payload_len']
-                print "Bucket %s (packet, byte) counts: [%d, %d]" % (
-                    str(test_num),
-                    actual_callback.pkt_count,
-                    actual_callback.byte_count)
+                touch_vars()
+                ac.pkt_count  += 1
+                ac.byte_count += pkt['payload_len']
+                update_predwise_counts(pkt)
+                print_predwise_entries()
             else:
                 print "Bucket %s (packet, byte) counts: %s" % (
                     str(test_num), pkt)
