@@ -90,26 +90,26 @@ def capture_packets(t_out, t_err, ints_list, capture_dir):
 def workload(net, hosts):
     net.pingAll()
 
-def get_tshark_counts(t_outfile, tshark_filter_funs, ctlr):
+def get_tshark_counts(t_outfile, params, ctlr):
+    filter_funs = params['filter_funs'].split(',')
+    test_nums   = params['test_nums'].split(',')
+    assert len(filter_funs) == len(test_nums)
+    tshark_counts = {}
+
     if ctlr == 'bucket':
-        return bucket_get_tshark_counts(t_outfile, tshark_filter_funs)
+        counting_fun = bucket_tshark_filter_count
     elif ctlr == 'path_query':
-        return path_query_get_tshark_counts(t_outfile, tshark_filter_funs)
+        counting_fun = path_query_tshark_filter_count
     else:
         raise RuntimeError('unknown controller!')
 
-def bucket_get_tshark_counts(t_outfile, tshark_filter_funs):
-    tshark_counts = {}
-    for f in tshark_filter_funs.split(','):
-        count_ref = len(tshark_counts.keys())
-        tshark_counts.update([(count_ref,
-                               tshark_filter_count(t_outfile, f))])
+    for i in range(0, len(filter_funs)):
+        bucket_ref = test_nums[i]
+        f = filter_funs[i]
+        tshark_counts.update([(bucket_ref, counting_fun(t_outfile, f))])
     return tshark_counts
 
-def path_query_get_tshark_counts(t_outfile, tshark_filter_funs):
-    pass
-
-def tshark_filter_count(t_outfile, filter_fun):
+def bucket_tshark_filter_count(t_outfile, filter_fun):
     global ints_map
     t_out = open(t_outfile, 'r')
     pkt_count = 0
@@ -124,6 +124,37 @@ def tshark_filter_count(t_outfile, filter_fun):
             pkt_count  += 1
             byte_count += bytes_fun(line)
     return (pkt_count, byte_count)
+
+def get_key_str(line):
+    """ This function matches closely with the get_key_str() function in
+    path_query.py, since they both generate keys to aggregate the same set of
+    packets in different ways -- the latter to group packet counts retrieved
+    from query-matched packets, and this one to group packets filtered from
+    tshark."""
+    global rev_ints_map
+    ethtype = 'ip' if __get_ip_srcip(line) != '' else 'arp'
+    srcip_fun = __get_ip_srcip if ethtype == 'ip' else __get_arp_srcip
+    dstip_fun = __get_ip_dstip if ethtype == 'ip' else __get_arp_dstip
+    pred = "int:%s,ethtype:%s,srcip:%s,dstip:%s" % (
+        rev_ints_map[__get_interface_id(line)],
+        ethtype, srcip_fun(line), dstip_fun(line))
+    return pred
+
+def path_query_tshark_filter_count(t_outfile, filter_fun):
+    global ints_map
+    t_out = open(t_outfile, 'r')
+    predwise_count = {}
+    filter_fun = globals()[filter_fun]
+    if 'any' not in ints_map:
+        bytes_fun = get_bytes
+    else:
+        bytes_fun = get_bytes_cooked_capture
+    for line in t_out:
+        if filter_fun(line.strip()):
+            pred = get_key_str(line)
+            (pkt_count, byte_count) = predwise_count.get(pred, (0, 0))
+            predwise_count[pred] = (pkt_count + 1, byte_count + bytes_fun(line))
+    return predwise_count
 
 def ctlr_counts(c_outfile, c_name):
     c_out = open(c_outfile, 'r')
@@ -159,8 +190,9 @@ def path_query_ctlr_counts(c_out):
     bucket_p = re.compile("Bucket [0-9a-zA-Z._]+ [0-9a-zA-Z,:._\-]+ counts: \[[0-9]+, [0-9]+\]$")
     for line in c_out:
         if bucket_p.match(line.strip()):
-            (bucket_id, pkt_count, byte_count, pred) = (
+            (bucket_id, pkt_count, byte_count, inter_str) = (
                 __parse_ctlr_count_line__(line))
+            pred = inter_str.split()[0]
             try:
                 buckets_preds_counts[bucket_id][pred] = (pkt_count, byte_count)
             except KeyError:
@@ -220,7 +252,9 @@ def test_bucket_single_test():
 
     """ Verify results """
     print "Verifying correctness..."
-    tshark_counts = get_tshark_counts(t_outfile, args.tshark_filter_funs, c_name)
+    tshark_filter_params = {'filter_funs': args.tshark_filter_funs,
+                            'test_nums': args.test_nums }
+    tshark_counts = get_tshark_counts(t_outfile, tshark_filter_params, c_name)
     buckets_counts = ctlr_counts(c_outfile, c_name)
     success_file = adjust_path(args.success_file)
     write_passfail_info(success_file, tshark_counts, buckets_counts, c_name)
@@ -241,6 +275,9 @@ def parse_args():
     parser.add_argument("--tshark_filter_funs", default="filt_test0",
                         help="Filter functions to parse tshark output " +
                         "(multiple values can be comma separated")
+    parser.add_argument("--test_nums", default="0",
+                        help="Test numbers to distinguish controller outputs" +
+                        " (multiple values can be comma separated)")
     parser.add_argument("--topo_args", default="3",
                         help="Arguments to the topology class constructor " +
                         "(separated by commas)")
@@ -298,8 +335,18 @@ def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail.write(output_str)
     passfail.close()
 
-def path_query_write_passfail_info():
-    pass
+def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
+    print "In path query passfail info. I got the following counts:"
+    print "TShark:"
+    print "Bucket references:", tshark_counts.keys()
+    for vals in tshark_counts.values():
+        for (k, v) in vals.iteritems():
+            print k, v
+    print "Buckets:"
+    print "Bucket references:", buckets_counts.keys()
+    for vals in buckets_counts.values():
+        for (k, v) in vals.iteritems():
+            print k, v
 
 ### Helpers to extract specific headers from tshark output ###
 ints_map = {}
