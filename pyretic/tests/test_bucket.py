@@ -90,10 +90,20 @@ def capture_packets(t_out, t_err, ints_list, capture_dir):
 def workload(net, hosts):
     net.pingAll()
 
-def get_tshark_counts(t_outfile, tshark_filter_funs):
-    tshark_counts = set()
+def get_tshark_counts(t_outfile, tshark_filter_funs, ctlr):
+    if ctlr == 'bucket':
+        return bucket_get_tshark_counts(t_outfile, tshark_filter_funs)
+    elif ctlr == 'path_query':
+        return path_query_get_tshark_counts(t_outfile, tshark_filter_funs)
+    else:
+        raise RuntimeError('unknown controller!')
+
+def bucket_get_tshark_counts(t_outfile, tshark_filter_funs):
+    tshark_counts = {}
     for f in tshark_filter_funs.split(','):
-        tshark_counts.add(tshark_filter_count(t_outfile, f))
+        count_ref = len(tshark_counts.keys())
+        tshark_counts.update([(count_ref,
+                               tshark_filter_count(t_outfile, f))])
     return tshark_counts
 
 def tshark_filter_count(t_outfile, filter_fun):
@@ -112,18 +122,48 @@ def tshark_filter_count(t_outfile, filter_fun):
             byte_count += bytes_fun(line)
     return (pkt_count, byte_count)
 
-def ctlr_counts(c_outfile):
+def ctlr_counts(c_outfile, c_name):
     c_out = open(c_outfile, 'r')
+    if c_name == 'bucket':
+        count_dict = bucket_ctlr_counts(c_out)
+    elif c_name == 'path_query':
+        count_dict = path_query_ctlr_counts(c_out)
+    else:
+        raise RuntimeError('unknown controller!')
+    c_out.close()
+    return count_dict
+
+def __parse_ctlr_count_line__(line):
+    parts = line.strip().split()
+    bucket_id = parts[1]
+    pkt_count  = int(parts[-2][1:-1])
+    byte_count = int(parts[-1][:-1])
+    inter_str = ' '.join(parts[2:-2])
+    return (bucket_id, pkt_count, byte_count, inter_str)
+
+def bucket_ctlr_counts(c_out):
     buckets_counts = {}
     bucket_p = re.compile("Bucket [0-9a-zA-Z._]+ \(packet, byte\) counts: \[[0-9]+, [0-9]+\]")
     for line in c_out:
         if bucket_p.match(line.strip()):
-            parts = line.strip().split()
-            bucket_id = parts[1]
-            pkt_count  = int(parts[-2][1:-1])
-            byte_count = int(parts[-1][:-1])
+            (bucket_id, pkt_count, byte_count, _) = (
+                __parse_ctlr_count_line__(line))
             buckets_counts[bucket_id] = (pkt_count, byte_count)
-    return set(buckets_counts.values())
+    return buckets_counts
+
+def path_query_ctlr_counts(c_out):
+    buckets_preds_counts = {}
+    bucket_p = re.compile("Bucket [0-9a-zA-Z._]+ [0-9a-zA-Z,:._\-]+ counts: \[[0-9]+, [0-9]+\]$")
+    for line in c_out:
+        if bucket_p.match(line.strip()):
+            (bucket_id, pkt_count, byte_count, pred) = (
+                __parse_ctlr_count_line__(line))
+            try:
+                buckets_preds_counts[bucket_id][pred] = (pkt_count, byte_count)
+            except KeyError:
+                buckets_preds_counts[bucket_id] = {}
+                buckets_preds_counts[bucket_id][pred] = (pkt_count, byte_count)
+    return buckets_preds_counts
 
 def test_bucket_single_test():
     """ Main function for a single test case. """
@@ -177,10 +217,10 @@ def test_bucket_single_test():
 
     """ Verify results """
     print "Verifying correctness..."
-    tshark_counts = get_tshark_counts(t_outfile, args.tshark_filter_funs)
-    buckets_counts = ctlr_counts(c_outfile)
+    tshark_counts = get_tshark_counts(t_outfile, args.tshark_filter_funs, c_name)
+    buckets_counts = ctlr_counts(c_outfile, c_name)
     success_file = adjust_path(args.success_file)
-    write_passfail_info(success_file, tshark_counts, buckets_counts)
+    write_passfail_info(success_file, tshark_counts, buckets_counts, c_name)
 
 #### Helper functions #####
 
@@ -234,10 +274,18 @@ def close_fds(fds, fd_str):
         fd.close()
     print "Closed", fd_str, "file descriptors"
 
-def write_passfail_info(success_file, tshark_counts, buckets_counts):
+def write_passfail_info(success_file, tshark_counts, buckets_counts, ctlr):
+    if ctlr == 'bucket':
+        bucket_write_passfail_info()
+    elif ctlr == 'path_query':
+        path_query_write_passfail_info()
+    else:
+        raise RuntimeError('unknown controller!')
+
+def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail = open(success_file, 'w')
     output_str = ''
-    if tshark_counts == buckets_counts:
+    if set(tshark_counts.values()) == set(buckets_counts.values()):
         output_str += "PASS\n"
     else:
         output_str += "FAIL\n"
@@ -247,8 +295,12 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts):
     passfail.write(output_str)
     passfail.close()
 
+def path_query_write_passfail_info():
+    pass
+
 ### Helpers to extract specific headers from tshark output ###
 ints_map = {}
+rev_ints_map = {}
 
 def __get_frame_len(line):
     return line.split(',')[0]
@@ -354,15 +406,17 @@ def filt_path_test_0_5(l):
 
 ### Interfaces map for packet capture ###
 def map_any():
-    global ints_map
+    global ints_map, rev_ints_map
     ints_map = {'any': 0}
+    rev_ints_map = {0: 'any'}
     return ["any"]
 
 def map_chain_3_3():
-    global ints_map
+    global ints_map, rev_ints_map
     ints_list = ["s1-eth1", "s1-eth2", "s2-eth1", "s2-eth2",
                  "s2-eth3", "s3-eth1", "s3-eth2"]
     ints_map  = {i: ints_list.index(i) for i in ints_list}
+    rev_ints_map = {j: ints_list[j] for j in range(0, len(ints_list))}
     return ints_list
 
 ### The main thread.
