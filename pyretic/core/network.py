@@ -191,11 +191,12 @@ class MAC(EthAddr):
 # Tools
 ################################################################################
 class Port(object):
-    def __init__(self, port_no, config=True, status=True,linked_to=None):
+    def __init__(self,port_no,config=True,status=True,port_type=[],linked_to=None):
         self.port_no = port_no
         self.config = config
         self.status = status
         self.linked_to = linked_to
+        self.port_type = port_type
 
     def definitely_down(self):
         return not self.config and not self.status
@@ -214,7 +215,7 @@ class Port(object):
                 self.linked_to == other.linked_to)
 
     def __repr__(self):
-        return "%d:config_up=%s:status_up=%s:linked_to=%s" % (self.port_no,self.config,self.status,self.linked_to)
+        return "%d:config_up=%s:status_up=%s:linked_to=%s:port_type=%s" % (self.port_no,self.config,self.status,self.linked_to,self.port_type)
 
 
 
@@ -243,11 +244,22 @@ class Topology(nx.Graph):
             return e1 == e2
         return nx.is_isomorphic(self,other,node_match=exact_node_match,edge_match=exact_edge_match)
 
+    def switch_list(self):
+        return self.nodes()
+
+    def switch_with_port_ids_list(self):
+        return [(switch,attrs['ports'].keys()) 
+                for switch,attrs in self.nodes(data=True)]
+    
+    def switch_with_ports_list(self):
+        return [(switch,attrs['ports'].values()) 
+                for switch,attrs in self.nodes(data=True)]
+
     def add_switch(self,switch):
         self.add_node(switch, name=switch, ports={})  
 
-    def add_port(self,switch,port_no,config,status):
-        self.node[switch]["ports"][port_no] = Port(port_no,config,status)
+    def add_port(self,switch,port_no,config,status,port_type):
+        self.node[switch]["ports"][port_no] = Port(port_no,config,status,port_type)
 
     def add_link(self,loc1,loc2):
         self.add_edge(loc1.switch, loc2.switch, {loc1.switch: loc1.port_no, loc2.switch: loc2.port_no})
@@ -476,3 +488,12 @@ class Network(object):
         network = Network(topology)
         network.inject_packet = self.inject_packet
         return network
+
+    def switch_list(self):
+        return self.topology.switch_list()
+
+    def switch_with_port_ids_list(self):
+        return self.topology.switch_with_port_ids_list()
+
+    def switch_with_ports_list(self):
+        return self.topology.switch_with_ports_list()

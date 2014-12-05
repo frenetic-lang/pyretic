@@ -1544,10 +1544,11 @@ class flood(DynamicPolicy):
         if changed:
             self.log.debug("Printing updated MST:\n %s" % str(updated_mst))
             self.policy = parallel([
-                    match(switch=switch) >>
-                        parallel(map(xfwd,attrs['ports'].keys()))
-                    for switch,attrs in self.mst.nodes(data=True)])
-
+                match(switch=switch) >>
+                parallel(map(xfwd,ports))
+                for switch,ports 
+                in self.mst.switch_with_port_ids_list()])
+                
     def __repr__(self):
         try:
             return "flood on:\n%s" % self.mst

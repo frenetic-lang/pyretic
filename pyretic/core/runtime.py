@@ -223,7 +223,7 @@ class Runtime(object):
         with self.network_lock:
 
             # if the topology hasn't changed, ignore
-            if self.network.topology == self.prev_network.topology:
+            if self.network == self.prev_network:
                 return
 
             # otherwise copy the network object
@@ -880,9 +880,7 @@ class Runtime(object):
             :param classifier: the input classifer
             :type classifier: Classifier
             """
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switch_list()
 
             for s in switches:
                 self.send_barrier(s)
@@ -915,9 +913,7 @@ class Runtime(object):
                     new_rules.append(r + (version,))
                 return new_rules
 
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switch_list()
 
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
@@ -1016,9 +1012,7 @@ class Runtime(object):
             :type classifier_version_no: int
             """
             (to_add, to_delete, to_modify, to_stay) = diff_lists
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switch_list()
 
             # If the controller just came up, clear out the switches.
             if classifier_version_no == 1 or self.mode == 'proactive0':
@@ -1118,10 +1112,10 @@ class Runtime(object):
             if 'switch' in concrete_pred:
                 switch_id = concrete_pred['switch']
                 if ((not switch_id in switch_list) and
-                    (switch_id in self.network.topology.nodes())):
+                    (switch_id in self.network.switch_list())):
                     switch_list.append(switch_id)
             else:
-                switch_list = self.network.topology.nodes()
+                switch_list = self.network.switch_list()
                 break
         self.log.info('Pulling stats from switches '
                       + str(switch_list) + ' for bucket ' +
@@ -1282,7 +1276,7 @@ class Runtime(object):
 
     def clear_all(self):
         def f():
-            switches = self.network.topology.nodes()
+            switches = self.network.switch_list()
             for s in switches:
                 self.send_barrier(s)
                 self.send_clear(s)
@@ -1309,11 +1303,11 @@ class Runtime(object):
     def handle_switch_part(self,switch_id):
         self.network.handle_switch_part(switch_id)
 
-    def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
+    def handle_port_join(self,switch_id,port_id,conf_up,stat_up,port_type):
+        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up,port_type)
 
-    def handle_port_mod(self, switch, port_no, config, status):
-        self.network.handle_port_mod(switch, port_no, config, status)
+    def handle_port_mod(self,switch_id,port_id,conf_up,stat_up,port_type):
+        self.network.handle_port_mod(switch_id,port_id,conf_up,stat_up,port_type)
 
     def handle_port_part(self, switch, port_no):
         self.network.handle_port_part(switch, port_no)
@@ -1569,10 +1563,10 @@ class ConcreteNetwork(Network):
         self.debug_log.debug(str(self.next_topo))
         self.queue_update(self.get_update_no())
         
-    def handle_port_join(self, switch, port_no, config, status):
+    def handle_port_join(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         this_update_no = self.get_update_no()
-        self.next_topo.add_port(switch,port_no,config,status)
+        self.next_topo.add_port(switch,port_no,config,status,port_type)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.next_topo))
@@ -1588,12 +1582,13 @@ class ConcreteNetwork(Network):
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
-    def handle_port_mod(self, switch, port_no, config, status):
+    def handle_port_mod(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
         # GET PREV VALUES
         try:
             prev_config = self.next_topo.node[switch]["ports"][port_no].config
             prev_status = self.next_topo.node[switch]["ports"][port_no].status
+            prev_port_type = self.next_topo.node[switch]["ports"][port_no].port_type
         except KeyError:
             self.log.warning("KeyError CASE!!!!!!!!")
             self.port_down(switch, port_no)
@@ -1602,6 +1597,8 @@ class ConcreteNetwork(Network):
         # UPDATE VALUES
         self.next_topo.node[switch]["ports"][port_no].config = config
         self.next_topo.node[switch]["ports"][port_no].status = status
+        self.next_topo.node[switch]["ports"][port_no].port_type = port_type
+        
 
         # DETERMINE IF/WHAT CHANGED
         if (prev_config and not config):
@@ -1665,7 +1662,13 @@ class ConcreteNetwork(Network):
         if p1.possibly_up() and p2.possibly_up():
             self.next_topo.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
             self.next_topo.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
-            self.next_topo.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
+            pt1 = self.next_topo.node[s1]["ports"][p_no1].port_type 
+            pt2 = self.next_topo.node[s2]["ports"][p_no2].port_type 
+            if pt1 != pt2:
+                print "MISMATCH ",
+                print pt1
+                print pt2
+            self.next_topo.add_edge(s1, s2, {s1: p_no1, s2: p_no2, 'type' : pt1})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         self.debug_log.debug(self.next_topo)
