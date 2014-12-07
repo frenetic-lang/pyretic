@@ -42,6 +42,7 @@ import logging
 from multiprocessing import Queue, Process
 import pyretic.core.util as util
 import yappi
+import shlex
 
 of_client = None
 enable_profile = False
@@ -87,6 +88,8 @@ def parseArgs():
     op.add_option( '--mode', '-m', type='choice',
                      choices=['interpreted','i','reactive0','r0','proactive0','p0','proactive1','p1'], 
                      help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}'] )  )
+    op.add_option( '--nx', action="store_true",
+                   dest="nx", help="use nicira extensions in pox" )
     op.add_option( '--verbosity', '-v', type='choice',
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
@@ -95,7 +98,8 @@ def parseArgs():
                    dest="enable_profile",
                    help = 'enable yappi multithreaded profiler' )
 
-    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False)
+    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False,
+                    nx=False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -194,9 +198,9 @@ def main():
         python=sys.executable
         # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
         # other log file descriptor if necessary
-        of_client = subprocess.Popen([python, 
-                                      pox_exec,
-                                      'of_client.pox_client' ],
+        pox_cmd = "python %s of_client.pox_client %s" % (
+            pox_exec, '--use_nx' if options.nx else '')
+        of_client = subprocess.Popen(shlex.split(pox_cmd),
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
 

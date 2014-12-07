@@ -732,7 +732,7 @@ class POXClient(revent.EventMixin):
         self.send_to_pyretic(['packet',received])
         
        
-def launch():
+def launch(use_nx=False):
 
     class asyncore_loop(threading.Thread):
         def run(self):
