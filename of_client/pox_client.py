@@ -145,10 +145,11 @@ class BackendChannel(asynchat.async_chat):
 
 class POXClient(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT):
+    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT,use_nx=False):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
+        self.use_nx = use_nx
         self.packetno = 0
         self.channel_lock = threading.Lock()
         self.send_time = 0.0
@@ -309,8 +310,13 @@ class POXClient(revent.EventMixin):
             if 'ethtype' in pred:
                 match.eth_type = pred['ethtype']
         else:
-            match = of.ofp_match()
-            match.in_port = inport
+            if self.use_nx:
+                match = nx.nx_match()
+                if inport:
+                    match.in_port = inport
+            else:
+                match = of.ofp_match()
+                match.in_port = inport
             if 'ethtype' in pred:
                 match.dl_type = pred['ethtype']
 
@@ -334,6 +340,39 @@ class POXClient(revent.EventMixin):
             match.tp_src = pred['srcport']
         if 'dstport' in pred:
             match.tp_dst = pred['dstport']
+        return match
+
+    def build_nx_match(self,switch,inport,pred):
+        ### BUILD NX MATCH
+        match = nx.nx_match()
+        if inport:
+            match.of_in_port = inport
+        if 'ethtype' in pred:
+            match.of_eth_type = pred['ethtype']
+
+        if 'srcmac' in pred:
+            match.append(nx.NXM_OF_ETH_SRC(pred['srcmac']))
+        if 'dstmac' in pred:
+            match.append(nx.NXM_OF_ETH_DST(pred['dstmac']))
+        if 'vlan_id' in pred:
+            assert 'vlan_pcp' in pred
+            match.of_vlan_tci = (int(pred['vlan_id']) |
+                                 int(pred['vlan_pcp']) << 12)
+        if 'protocol' in pred:
+            match.of_ip_proto = pred['protocol']
+        if 'srcip' in pred:
+            match.append(nx.NXM_OF_IP_SRC(pred['srcip']))
+        if 'dstip' in pred:
+            match.append(nx.NXM_OF_IP_DST(pred['srcip']))
+        if 'tos' in pred:
+            match.of_ip_tos = pred['tos']
+        if 'srcport' in pred or 'dstport' in pred:
+            print "WARNING: IP_PROTO value must be set in pred %s" % str(pred)
+            match.of_ip_proto = "TCP" # TODO: Set the correct value here
+        if 'srcport' in pred:
+            match.append(nx.NXM_OF_TCP_SRC(pred['srcport']))
+        if 'dstport' in pred:
+            match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
         return match
 
     def build_of_actions(self,inport,action_list):
@@ -378,7 +417,10 @@ class POXClient(revent.EventMixin):
             inport = pred['inport']
         else:
             inport = None
-        match = self.build_of_match(switch,inport,pred)
+        if self.use_nx:
+            match = self.build_nx_match(switch,inport,pred)
+        else:
+            match = self.build_of_match(switch,inport,pred)
         of_actions = self.build_of_actions(inport,action_list)
         flags = 0
         if notify:
@@ -393,6 +435,18 @@ class POXClient(revent.EventMixin):
                                  flags=flags,
                                  cookie=cookie,
                                  actions=of_actions)
+
+        elif self.use_nx:
+            msg = nx.nx_flow_mod(command=command,
+                                 priority=priority,
+                                 idle_timeout=of.OFP_FLOW_PERMANENT,
+                                 hard_timeout=of.OFP_FLOW_PERMANENT,
+                                 match=match,
+                                 flags=flags,
+                                 cookie=cookie,
+                                 actions=of_actions,
+                                 table_id=1)
+
         else:
             msg = of.ofp_flow_mod(command=command,
                                   priority=priority,
@@ -454,7 +508,10 @@ class POXClient(revent.EventMixin):
             for switch in self.switches.keys():
                 self.clear(switch)
         else:
-            d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
+            if self.use_nx:
+                d = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id=1)
+            else:
+                d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
             self.switches[switch]['connection'].send(d) 
 
     def _handle_ConnectionUp(self, event):
@@ -464,9 +521,29 @@ class POXClient(revent.EventMixin):
         self.switches[event.dpid]['connection'] = event.connection
         self.switches[event.dpid]['ports'] = {}
 
-        msg = of.ofp_flow_mod(match = of.ofp_match())
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        self.switches[event.dpid]['connection'].send(msg) 
+        if self.use_nx:
+            """ Enable multi-stage table with nicira extensions """
+            msg = nx.nx_flow_mod_table_id()
+            self.switches[event.dpid]['connection'].send(msg)
+            """ Clear table 1 """
+            msg = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id = 1)
+            self.switches[event.dpid]['connection'].send(msg)
+            """ Initialize table 0. Fallthrough to table 1 """
+            msg = nx.nx_flow_mod()
+            msg.priority = 1
+            msg.match = nx.nx_match()
+            msg.actions.append(nx.nx_action_resubmit.resubmit_table(table = 1))
+            self.switches[event.dpid]['connection'].send(msg)
+            """ Initialize table 1 """
+            msg = nx.nx_flow_mod()
+            msg.table_id = 1
+            msg.priority = 3
+            msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+            self.switches[event.dpid]['connection'].send(msg)
+        else:
+            msg = of.ofp_flow_mod(match = of.ofp_match())
+            msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+            self.switches[event.dpid]['connection'].send(msg)
 
         self.send_to_pyretic(['switch','join',event.dpid,'BEGIN'])
 
@@ -738,7 +815,7 @@ def launch(use_nx=False):
         def run(self):
             asyncore.loop()
 
-    POXClient()
+    POXClient(use_nx=use_nx)
     al = asyncore_loop()
     al.start()
 
