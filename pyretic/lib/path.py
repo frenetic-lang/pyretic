@@ -144,6 +144,19 @@ class re_tree_gen(object):
     dyn_preds      = []
 
     @classmethod
+    def char_in_lexer_language(cls, char):
+        return char in ['*','+','|','{','}','(',
+                        ')','-','^','.','&','?',
+                        '"',"'",'%','$',',','/',"\\",
+                        '=','>','<', ';', '`', '_', '[', ']', '@']
+    @classmethod    
+    def char_from_token(cls, tok):
+        try:
+            return char(tok)
+        except:
+            return unichr(tok)
+
+    @classmethod
     def repr_state(cls):
         assert (sorted(cls.pred_to_symbol.keys()) ==
                 sorted(cls.pred_to_atoms.keys()))
@@ -184,6 +197,11 @@ class re_tree_gen(object):
     def __new_symbol__(cls):
         """ Returns a new token/symbol for a leaf-level predicate. """
         cls.token += 1
+        token_char = cls.char_from_token(cls.token)
+        while cls.char_in_lexer_language(token_char):
+            cls.token += 1
+            token_char = cls.char_from_token(cls.token)
+
         try:
             return chr(cls.token)
         except:
@@ -1134,11 +1152,8 @@ class pathcomp(object):
         __out_re_tree_gen__.clear()
 
 
-    import yappi
-
     @classmethod
-    #@stat.elapsed_time
-    @yappi.profile(return_callback = stat.aggregate)
+    @stat.elapsed_time
     def compile(cls, path_pol, max_states=1022):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
@@ -1159,6 +1174,9 @@ class pathcomp(object):
         ast_fold(path_pol, prep_trees, None)
 
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
+        #return [r.re_string_repr() for r in re_list]
+        
+    
         dfa = du.regexes_to_dfa(re_list)
         assert du.get_num_states(dfa) <= max_states
         match_tag = lambda q: cls.__match_tag__(dfa, q)
@@ -1634,6 +1652,7 @@ class dfa_utils(object):
 
 
     @classmethod
+    @stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),

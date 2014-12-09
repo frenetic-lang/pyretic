@@ -15,6 +15,9 @@ import argparse
 class eval_compilation:
 
     def __init__(self, results_folder, **kwargs):
+        
+        self.main_policy = eval_path.main(**kwargs)
+        
         self.main_policy = eval_path.main(**kwargs)
         self.path_policy = eval_path.path_main(**kwargs)
         self.params = kwargs
@@ -30,14 +33,25 @@ class eval_compilation:
                     shutil.rmtree(fpath)
 
     def compile(self, full_compile = False):
-        #stat.start(self.results_folder)
+
+        stat.start(self.results_folder)
 
         pathcomp.init(1022)
         (self.path_in_tagging, self.path_in_capture, self.path_out_tagging, self.path_out_capture) = pathcomp.compile(self.path_policy)
-        
-        return 
+        return
+        self.in_policy = (self.path_in_tagging + self.path_in_capture)
+        self.out_policy = (self.path_out_capture + self.path_out_capture)
 
-        in_tag_policy = self.path_in_tagging >> self.main_policy
+        # multi-table
+        self.forwarding_compile()
+        self.tagging_compile()
+        self.capture_compile() 
+        self.in_policy_compile()
+
+        self.out_tagging_compile()
+        self.out_capture_compile()
+        self.out_policy_compile()
+        '''in_tag_policy = self.path_in_tagging >> self.main_policy
         self.forwarding = (in_tag_policy >> self.path_out_tagging)
         in_capture  = self.path_in_capture
         self.out_capture = (in_tag_policy >> self.path_out_capture)
@@ -53,7 +67,7 @@ class eval_compilation:
         self.out_capture_compile()
         self.full_out_capture_compile()
         
-        
+        '''
         if full_compile:
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
@@ -161,6 +175,18 @@ class eval_compilation:
         return self.policy.compile()
 
 
+### multi-table mode
+    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def in_policy_compile(self):
+        return self.in_policy.compile()
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def out_policy_compile(self):
+        return self.out_policy.compile()
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluates compilation of path query toghether with the forwarding policy")
     parser.add_argument("-t", "--test", required=True
@@ -188,8 +214,41 @@ def get_testwise_params(args):
     print params
     return params
 
+def get_input(re_list):
+    lex_input = ''
+    expr_num = 0 
+    for r in re_list:
+        lex_input += (r + ' => ( T.expr_' + str(expr_num) + ' );')
+        lex_input += '\n'
+        expr_num += 1
+    return lex_input
 
+def ml_ulex(args):
+    import time
+    start = time.time()
+    p = eval_path.path_main(**get_testwise_params(args))
+    print 'hi'
+    re_list = pathcomp.compile(p)
+    print time.time() - start
+    lex_input = get_input(re_list) 
+    f = open('lex_input.txt', 'w')
+    f.write(lex_input)
+    f.close()
+    return
+    start = time.time()
+    output = subprocess.check_output(["ml-ulex", "--dot", 'lex_input.txt'])
+    print time.time() - start
+
+def profile(args):
+    import cProfile as profile
+
+    p = profile.run('pathcomp.compile(p)', sort='tottime')
+    
 if __name__ == '__main__':
     args = parse_args()
+    
+    #p = eval_path.path_main(**get_testwise_params(args))
+    #profile(args)
+    #ml_ulex(args)
     eval_comp = eval_compilation(args.results_folder, **get_testwise_params(args))
     eval_comp.compile()

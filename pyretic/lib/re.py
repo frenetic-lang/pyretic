@@ -217,7 +217,7 @@ class re_concat(re_combinator):
         return KEY_CONCAT
 
     def re_string_repr(self):
-        return ('(' + self.re1.re_string_repr() + ') ^ (' +
+        return ('(' + self.re1.re_string_repr() + ')(' +
                 self.re2.re_string_repr() + ')')
 
     def __repr__(self):
@@ -237,11 +237,11 @@ class re_alter(re_combinator):
 
     def re_string_repr(self):
         words = map(lambda x: x.re_string_repr(), self.re_list)
-        return '(' + string.join(words, ') | (') + ')'
+        return '(' + string.join(words, ')|(') + ')'
 
     def __repr__(self):
         words = map(lambda x: repr(x), self.re_list)
-        return '(' + string.join(words, ') | (') + ')'
+        return '(' + string.join(words, ')|(') + ')'
 
 class re_star(re_combinator):
     def __init__(self, re):
@@ -275,11 +275,11 @@ class re_inters(re_combinator):
 
     def re_string_repr(self):
         words = map(lambda x: x.re_string_repr(), self.re_list)
-        return '(' + string.join(words, ') & (') + ')'
+        return '(' + string.join(words, ')&(') + ')'
 
     def __repr__(self):
         words = map(lambda x: repr(x), self.re_list)
-        return '(' + string.join(words, ') & (') + ')'
+        return '(' + string.join(words, ')&(') + ')'
 
 class re_negate(re_combinator):
     def __init__(self, re):

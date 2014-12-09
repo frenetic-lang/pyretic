@@ -131,7 +131,12 @@ class Runtime(object):
             self.vtag_in_capture_compile()
             self.vtag_out_capture_compile()
             
-            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
+            #self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
+            self.policy = (
+                    self.virtual_tag >> (self.path_in_tagging + self.path_in_capture) >> 
+                    self.policy >> (self.path_out_tagging + self.path_out_capture) >>
+                    self.virtual_untag
+                    )
             self.whole_policy_compile()
 
             #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
