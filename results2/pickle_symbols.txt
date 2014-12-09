@@ -1,0 +1,10 @@
+1: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I3
+so.
+2: cpyretic.core.language
+identity
+.
