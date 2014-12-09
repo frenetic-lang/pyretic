@@ -14,15 +14,16 @@ import argparse
 
 class eval_compilation:
 
-    def __init__(self, results_folder, **kwargs):
+    def __init__(self, args, **kwargs):
         
-        self.main_policy = eval_path.main(**kwargs)
-        
-        self.main_policy = eval_path.main(**kwargs)
+        self.policy = eval_path.main(**kwargs)
         self.path_policy = eval_path.path_main(**kwargs)
         self.params = kwargs
-        self.results_folder = results_folder
+        self.results_folder = args.results_folder
 
+        self.disjoint_enabled = args.disjoint_enabled
+        self.integrate_enabled = args.integrate_enabled
+        self.multitable_enabled = args.multitable_enabled
 
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
@@ -37,75 +38,127 @@ class eval_compilation:
         stat.start(self.results_folder)
 
         pathcomp.init(1022)
-        (self.path_in_tagging, self.path_in_capture, self.path_out_tagging, self.path_out_capture) = pathcomp.compile(self.path_policy)
-        return
-        self.in_policy = (self.path_in_tagging + self.path_in_capture)
-        self.out_policy = (self.path_out_capture + self.path_out_capture)
-
-        # multi-table
-        self.forwarding_compile()
-        self.tagging_compile()
-        self.capture_compile() 
-        self.in_policy_compile()
-
-        self.out_tagging_compile()
-        self.out_capture_compile()
-        self.out_policy_compile()
-        '''in_tag_policy = self.path_in_tagging >> self.main_policy
-        self.forwarding = (in_tag_policy >> self.path_out_tagging)
-        in_capture  = self.path_in_capture
-        self.out_capture = (in_tag_policy >> self.path_out_capture)
         
-        # forwarding
-        self.forwarding_compile()
-        self.tagging_compile()
-        self.out_tagging_compile()
-        self.tag_fwd_compile()
+        policy_fragments = pathcomp.compile(self.path_policy, 1022, 
+                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled)
 
-        # capture
-        self.capture_compile()
-        self.out_capture_compile()
-        self.full_out_capture_compile()
+        if self.multitable_enabled and self.integrate_enabled:
+            (self.path_in_table, self.path_out_table) = policy_fragments
+        else:
+            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+            self.path_in_tagging  = in_tag
+            self.path_in_capture = in_cap
+            self.path_out_tagging= out_tag
+            self.path_out_capture = out_cap
+
+                
+        if self.multitable_enabled:
+            if self.integrate_enabled:
+                self.in_table_compile()
+                self.out_table_compile()
+                
+                self.policy = (self.path_in_table >> self.policy
+                                >> self.path_out_table)
+
+                self.whole_compile()
+            else:
+                
+                self.forwarding_compile()
+                self.tagging_compile()
+                self.out_tagging_compile()
+                self.capture_compile()
+                self.out_capture_compile()
+                
+                self.path_in_table = self.path_in_tagging + self.path_in_capture
+                self.path_out_table = self.path_in_tagging + self.path_out_capture
+                
+                self.in_table_compile()
+                self.out_table_compile()
+
+                
+                self.policy = (
+                self.path_in_table >> 
+                self.policy >> self.path_out_table
+                )
+                
+                self.whole_compile()
+        else:
+            
+            in_tag_policy = self.path_in_tagging >> self.policy
+            self.forwarding = (in_tag_policy >> self.path_out_tagging)
+            in_capture  = self.path_in_capture
+            self.out_capture = (in_tag_policy >> self.path_out_capture)
+
+            ## gathering stats
+            # forwarding
+            self.forwarding_compile()
+            self.tagging_compile()
+            self.out_tagging_compile()
+            self.tag_fwd_compile()
+
         
-        '''
+            #capture
+            self.capture_compile()
+            self.out_capture_compile()
+            self.full_out_capture_compile()
+
+
         if full_compile:
-            self.virtual_tag = virtual_field_tagging()
-            self.virtual_untag = virtual_field_untagging()
+            self.virtual_tag = self.get_vf_tagging_policy()
+            self.virtual_untag = self.get_vf_untagging_policy()
 
             # virtual tags
             self.vf_tag_compile()
             self.vf_untag_compile()
             
-            self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
-            self.vtag_in_capture = (self.virtual_tag >> in_capture)
-            self.vtag_out_capture = (self.virtual_tag >> out_capture)
+            
+            if multitable_enabled:
+                self.policy = self.virtual_tag >> self.policy >> self.virtual_untag
+                self.whole_policy_compile()
 
-            self.vtag_fw_compile()
-            self.vtag_in_capture_compile()
-            self.vtag_out_capture_compile()
+            else:
+                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+                self.vtag_in_capture = (self.virtual_tag >> in_capture)
+                self.vtag_out_capture = (self.virtual_tag >> out_capture)
 
-            self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
-            self.whole_policy_compile()
+                self.vtag_fw_compile()
+                self.vtag_in_capture_compile()
+                self.vtag_out_capture_compile()
+
+                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+                self.whole_policy_compile()
 
 
         stat.stop()
 
 
 
-    def get_vf_tagging_policy():
+    def get_vf_tagging_policy(self):
         return None
 
 
-    def get_vf_untagging_policy():
+    def get_vf_untagging_policy(self):
         return None
 
-## forwarding and tag
+######################
+# Stat Methods 
+######################
 
+    ##### general methods ######
+    
     @stat.classifier_size
     @stat.elapsed_time
     def forwarding_compile(self):
-        return self.main_policy.compile()
+        return self.policy.compile()
      
+    @stat.classifier_size
+    @stat.elapsed_time
+    def whole_compile(self):
+        return self.policy.compile()
+
+    
+    ##### tagging methods ######
+
     @stat.classifier_size
     @stat.elapsed_time
     def tagging_compile(self):
@@ -116,14 +169,7 @@ class eval_compilation:
     def out_tagging_compile(self):
         return self.path_out_tagging.compile()
 
-    
-    @stat.classifier_size
-    @stat.elapsed_time
-    def tag_fwd_compile(self):
-        return self.forwarding.compile()
-
-### capture
-    
+    ##### capture methods ######
     @stat.classifier_size
     @stat.elapsed_time
     def capture_compile(self):
@@ -134,13 +180,8 @@ class eval_compilation:
     def out_capture_compile(self):
         return self.path_out_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
-    def full_out_capture_compile(self):
-        return self.out_capture.compile()
-
-### virtual field 
-
+    
+    ##### virtual tags methods ######
     @stat.classifier_size
     @stat.elapsed_time
     def vf_tag_compile(self):
@@ -151,41 +192,59 @@ class eval_compilation:
     def vf_untag_compile(self):
         return self.virtual_untag.compile()
 
+
+    
+    ############## composed methods #################
+    
+    ### single table ###
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fwd_compile(self):
+
+        ## this is in_tag >> forwarding >> out_tag 
+        return self.forwarding.compile()
+
+    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def full_out_capture_compile(self):
+        ## this is in_tag_fwd >> path_out_capture
+        ## tag_fwd is in_tag >> forwarding which is already compiled
+        return self.out_capture.compile()
+
+    
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_fw_compile(self):
+        ## this is vtag >> tag_fwd >> vuntag
         return self.vtag_forwarding.compile()
 
 
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_in_capture_compile(self):
+        ## this is vtag >> in_capture
         return self.vtag_in_capture.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_out_capture_compile(self):
+        ## this is vtag >> out_captre
         return self.vtag_out_capture.compile()
 
-### whole policy
+    ### multi table ###
+    @stat.classifier_size
+    @stat.elapsed_time
+    def in_table_compile(self):
+        return self.path_in_table.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
-    def whole_compile(self):
-        return self.policy.compile()
+    def out_table_compile(self):
+        return self.path_out_table.compile()
 
 
-### multi-table mode
-    
-    @stat.classifier_size
-    @stat.elapsed_time
-    def in_policy_compile(self):
-        return self.in_policy.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def out_policy_compile(self):
-        return self.out_policy.compile()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluates compilation of path query toghether with the forwarding policy")
@@ -259,8 +318,9 @@ def profile(args):
 if __name__ == '__main__':
     args = parse_args()
     
+    print args
     #p = eval_path.path_main(**get_testwise_params(args))
     #profile(args)
     #ml_ulex(args)
-    eval_comp = eval_compilation(args.results_folder, **get_testwise_params(args))
+    eval_comp = eval_compilation(args, **get_testwise_params(args))
     eval_comp.compile()
