@@ -197,6 +197,18 @@ def parse_args():
 
     parser.add_argument("-polargs", "--policy_args", nargs='+')
 
+    parser.add_argument( '--enable_disjoint', '-d', action="store_true",
+                    dest="disjoint_enabled",
+                    help = 'enable disjoint optimization')
+
+    parser.add_argument('--enable_integration', '-i', action="store_true",
+                    dest='integrate_enabled',
+                    help = 'enable integration of tag and capture optimization, only works with multitable on')
+
+    parser.add_argument('--enable_multitable', '-u', action="store_true",
+                    dest = 'multitable_enabled',
+                    help = 'enable multitable optimization')
+
     args = parser.parse_args()
 
     return args
