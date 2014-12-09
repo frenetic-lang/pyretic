@@ -43,6 +43,9 @@ from pyretic.backend.comm import *
 
 import time
 
+IP_TYPE = 0x800
+ARP_TYPE = 0x806
+
 def inport_value_hack(outport):
     if outport > 1:
         return 1
@@ -347,31 +350,42 @@ class POXClient(revent.EventMixin):
         match = nx.nx_match()
         if inport:
             match.of_in_port = inport
-        if 'ethtype' in pred:
-            match.of_eth_type = pred['ethtype']
 
         if 'srcmac' in pred:
-            match.append(nx.NXM_OF_ETH_SRC(pred['srcmac']))
+            match.of_eth_src = packetaddr.EthAddr(pred['srcmac'])
         if 'dstmac' in pred:
-            match.append(nx.NXM_OF_ETH_DST(pred['dstmac']))
+            match.of_eth_dst = packetaddr.EthAddr(pred['dstmac'])
+        if 'ethtype' in pred:
+            match.of_eth_type = pred['ethtype']
         if 'vlan_id' in pred:
             assert 'vlan_pcp' in pred
             match.of_vlan_tci = (int(pred['vlan_id']) |
                                  int(pred['vlan_pcp']) << 12)
-        if 'protocol' in pred:
-            match.of_ip_proto = pred['protocol']
         if 'srcip' in pred:
-            match.append(nx.NXM_OF_IP_SRC(pred['srcip']))
+            assert 'ethtype' in pred
+            if pred['ethtype'] == IP_TYPE:
+                match.of_ip_src = packetaddr.IPAddr(pred['srcip'])
+            elif pred['ethtype'] == ARP_TYPE:
+                match.arp_spa = packetaddr.IPAddr(pred['srcip'])
+            else:
+                raise RuntimeError("Unknown ethtype for srcip match!")
         if 'dstip' in pred:
-            match.append(nx.NXM_OF_IP_DST(pred['srcip']))
+            assert 'ethtype' in pred
+            if pred['ethtype'] == IP_TYPE:
+                match.of_ip_dst = packetaddr.IPAddr(pred['dstip'])
+            elif pred['ethtype'] == ARP_TYPE:
+                match.arp_tpa = packetaddr.IPAddr(pred['dstip'])
+            else:
+                raise RuntimeError("Unknown ethtype for dstip match!")
         if 'tos' in pred:
             match.of_ip_tos = pred['tos']
-        if 'srcport' in pred or 'dstport' in pred:
-            print "WARNING: IP_PROTO value must be set in pred %s" % str(pred)
-            match.of_ip_proto = "TCP" # TODO: Set the correct value here
+        if 'protocol' in pred:
+            match.of_ip_proto = pred['protocol']
         if 'srcport' in pred:
+            assert 'protocol' in pred
             match.append(nx.NXM_OF_TCP_SRC(pred['srcport']))
         if 'dstport' in pred:
+            assert 'protocol' in pred
             match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
         return match
 

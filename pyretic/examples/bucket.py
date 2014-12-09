@@ -49,6 +49,10 @@ ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
+def static_fwding_single_2():
+    return ( (match(dstip=ip1) >> fwd(1)) +
+             (match(dstip=ip2) >> fwd(2)) )
+
 def static_fwding_single_3():
     return ( (match(dstip=ip1) >> fwd(1)) +
              (match(dstip=ip2) >> fwd(2)) +
@@ -295,5 +299,5 @@ def parse_args(kwargs, defaults):
 
 def main(**kwargs):
     defaults = (test0, mac_learner)
-    (fwding, query) = parse_args(kwargs, defaults)
+    (query, fwding) = parse_args(kwargs, defaults)
     return fwding() + query()
