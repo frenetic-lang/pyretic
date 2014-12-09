@@ -352,12 +352,19 @@ class POXClient(revent.EventMixin):
             match.of_eth_src = packetaddr.EthAddr(pred['srcmac'])
         if 'dstmac' in pred:
             match.of_eth_dst = packetaddr.EthAddr(pred['dstmac'])
-        if 'ethtype' in pred:
-            match.of_eth_type = pred['ethtype']
         if 'vlan_id' in pred:
             assert 'vlan_pcp' in pred
-            match.of_vlan_tci = (int(pred['vlan_id']) |
-                                 int(pred['vlan_pcp']) << 12)
+            # Setting the 16-bit TCI: (from highest to least significant bits):
+            # 3 bits vlan_pcp
+            # 1 bit CFI forced to 1
+            # 12 bits vlan_id
+            # Ref: manpages.ubuntu.com/manpages/trusty/man8/ovs-ofctl.8.html
+            vlan_16bit = ((int(pred['vlan_pcp']) << 13) |
+                          0x1000 |
+                          (int(pred['vlan_id'])))
+            match.of_vlan_tci = vlan_16bit
+        if 'ethtype' in pred:
+            match.of_eth_type = pred['ethtype']
         if 'srcip' in pred:
             assert 'ethtype' in pred
             if pred['ethtype'] == IP_TYPE:
