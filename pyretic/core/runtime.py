@@ -45,6 +45,7 @@ TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
 STATS_REQUERY_THRESHOLD_SEC = 10
 NUM_PATH_TAGS=1022
+DEFAULT_NX_TABLE_ID=1
 
 class Runtime(object):
     """
@@ -249,14 +250,14 @@ class Runtime(object):
             self.in_network_update = False
 
     
-    def update_switch_classifiers(self):
+    def update_switch_classifiers(self, table_id=DEFAULT_NX_TABLE_ID):
         """
         Updates switch classifiers
         """
         classifier = None
         
         if self.mode == 'reactive0':
-            self.clear_all() 
+            self.clear_all(table_id)
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             classifier = self.policy.compile()
@@ -439,28 +440,31 @@ class Runtime(object):
 # PROACTIVE COMPILATION 
 #########################
 
-    def install_defaults(self, s):
+    def install_defaults(self, s, table_id):
         """ Install backup rules on switch s by default. """
         # Fallback "send to controller" rule under table miss
         self.install_rule(({'switch' : s},
                            TABLE_MISS_PRIORITY,
                            [{'outport' : OFPP_CONTROLLER}],
                            self.default_cookie,
-                           False))
+                           False,
+                           table_id))
         # Send all LLDP packets to controller for topology maintenance
         self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
                            TABLE_START_PRIORITY + 2,
                            [{'outport' : OFPP_CONTROLLER}],
                            self.default_cookie,
-                           False))
+                           False,
+                           table_id))
         # Drop all IPv6 packets by default.
         self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
                            TABLE_START_PRIORITY + 1,
                            [],
                            self.default_cookie,
-                           False))
+                           False,
+                           table_id))
 
-    def install_classifier(self, classifier):
+    def install_classifier(self, classifier, table_id=DEFAULT_NX_TABLE_ID):
         """
         Proactively installs switch table entries based on the input classifier
 
@@ -612,7 +616,7 @@ class Runtime(object):
                 """
                 bucket_list = {}
                 for rule in rules:
-                    (_,_,actions,_) = rule
+                    (_,_,actions,_,_) = rule
                     for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
@@ -620,7 +624,7 @@ class Runtime(object):
                 return bucket_list
 
             def update_rules_for_buckets(rule, op):
-                (match, priority, actions, version) = rule
+                (match, priority, actions, version, table_id) = rule
                 hashable_match = util.frozendict(match)
                 rule_key = (hashable_match, priority, version)
                 for act in actions:
@@ -680,13 +684,13 @@ class Runtime(object):
             for lst in diff_lists:
                 new_lst = []
                 for rule in lst:
-                    (match,priority,acts,version) = rule
+                    (match,priority,acts,version,table_id) = rule
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
                     if len(new_acts) < len(acts):
-                        new_rule = (match, priority, new_acts, version, True)
+                        new_rule = (match, priority, new_acts, version, True, table_id)
                     else:
-                        new_rule = (match, priority, new_acts, version, False)
+                        new_rule = (match, priority, new_acts, version, False, table_id)
                     new_lst.append(new_rule)
                 new_diff_lists.append(new_lst)
             return new_diff_lists
@@ -864,7 +868,7 @@ class Runtime(object):
 
         ### UPDATE LOGIC
 
-        def nuclear_install(new_rules, curr_classifier_no):
+        def nuclear_install(new_rules, curr_classifier_no, table_id):
             """Delete all rules currently installed on switches and then install
             input classifier from scratch. This function installs the new
             classifier through send_clear's first followed by install_rule's,
@@ -884,9 +888,9 @@ class Runtime(object):
 
             for s in switches:
                 self.send_barrier(s)
-                self.send_clear(s)
+                self.send_clear(s, table_id)
                 self.send_barrier(s)
-                self.install_defaults(s)
+                self.install_defaults(s, table_id)
 
             for rule in new_rules:
                 self.install_rule(rule)
@@ -906,11 +910,11 @@ class Runtime(object):
                     return rule
             return None
 
-        def get_new_rules(classifier, curr_classifier_no):
-            def add_version(rules, version):
+        def get_new_rules(classifier, curr_classifier_no, table_id):
+            def add_field(rules, field):
                 new_rules = []
                 for r in rules:
-                    new_rules.append(r + (version,))
+                    new_rules.append(r + (field,))
                 return new_rules
 
             switches = self.network.switch_list()
@@ -920,7 +924,8 @@ class Runtime(object):
             classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
-            new_rules = add_version(new_rules, curr_classifier_no)
+            new_rules = add_field(new_rules, curr_classifier_no)
+            new_rules = add_field(new_rules, table_id)
             return new_rules
 
         def get_nuclear_diff(new_rules):
@@ -999,7 +1004,7 @@ class Runtime(object):
             elif self.mode == 'proactive1':
                 return get_incremental_diff(new_rules)
 
-        def install_diff_lists(diff_lists, classifier_version_no):
+        def install_diff_lists(diff_lists, classifier_version_no, table_id):
             """Install the difference between the input classifier and the
             current switch tables. The function takes the set of rules (added,
             deleted, modified, untouched), and does necessary flow
@@ -1018,9 +1023,9 @@ class Runtime(object):
             if classifier_version_no == 1 or self.mode == 'proactive0':
                 for s in switches:
                     self.send_barrier(s)
-                    self.send_clear(s)
+                    self.send_clear(s, table_id)
                     self.send_barrier(s)
-                    self.install_defaults(s)
+                    self.install_defaults(s, table_id)
 
             # There's no need to delete rules if nuclear install:
             if self.mode == 'proactive0':
@@ -1046,10 +1051,10 @@ class Runtime(object):
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(diff_lists,curr_version_no):
+        def f(diff_lists,curr_version_no,table_id):
             self.send_reset_install_time()
             with self.switch_lock:
-                install_diff_lists(diff_lists,curr_version_no)
+                install_diff_lists(diff_lists,curr_version_no,table_id)
 
         curr_version_no = None
         with self.classifier_version_lock:
@@ -1076,7 +1081,7 @@ class Runtime(object):
         # bookkeeping and removing of bucket actions happens at the end of the
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
-        new_rules = get_new_rules(classifier, curr_version_no)
+        new_rules = get_new_rules(classifier, curr_version_no, table_id)
         self.log.debug("Number of rules in classifier: %d" % len(new_rules))
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
@@ -1088,7 +1093,7 @@ class Runtime(object):
             self.log.debug(str(rule))
         self.log.debug('================================')
 
-        p = Process(target=f, args=(diff_lists,curr_version_no))
+        p = Process(target=f, args=(diff_lists,curr_version_no,table_id))
         p.daemon = True
         p.start()
 
@@ -1254,16 +1259,16 @@ class Runtime(object):
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
-    def install_rule(self,(concrete_pred,priority,action_list,cookie,notify)):
+    def install_rule(self,(concrete_pred,priority,action_list,cookie,notify,table_id)):
         self.log.debug(
             '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
                 "sending openflow rule:",
                 (str(priority) + " " + repr(concrete_pred) + " "+
                  repr(action_list) + " " + repr(cookie))))
-        self.backend.send_install(concrete_pred,priority,action_list,cookie,notify)
+        self.backend.send_install(concrete_pred,priority,action_list,cookie,notify,table_id)
 
-    def modify_rule(self, (concrete_pred,priority,action_list,cookie,notify)):
-        self.backend.send_modify(concrete_pred,priority,action_list,cookie,notify)
+    def modify_rule(self, (concrete_pred,priority,action_list,cookie,notify,table_id)):
+        self.backend.send_modify(concrete_pred,priority,action_list,cookie,notify,table_id)
 
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
@@ -1271,17 +1276,17 @@ class Runtime(object):
     def send_barrier(self,switch):
         self.backend.send_barrier(switch)
 
-    def send_clear(self,switch):
-        self.backend.send_clear(switch)
+    def send_clear(self,switch,table_id):
+        self.backend.send_clear(switch,table_id)
 
-    def clear_all(self):
+    def clear_all(self, table_id):
         def f():
             switches = self.network.switch_list()
             for s in switches:
                 self.send_barrier(s)
-                self.send_clear(s)
+                self.send_clear(s, table_id)
                 self.send_barrier(s)
-                self.install_defaults(s)
+                self.install_defaults(s, table_id)
         p = Process(target=f)
         p.daemon = True
         p.start()

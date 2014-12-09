@@ -124,10 +124,11 @@ class BackendChannel(asynchat.async_chat):
             actions = map(self.dict2OF,msg[3])
             cookie = int(msg[4])
             notify = bool(msg[5])
+            table_id = int(msg[6])
             if msg[0] == 'install':
-                self.of_client.install_flow(pred,priority,actions,cookie,notify)
+                self.of_client.install_flow(pred,priority,actions,cookie,notify,table_id)
             else:
-                self.of_client.modify_flow(pred,priority,actions,cookie,notify)
+                self.of_client.modify_flow(pred,priority,actions,cookie,notify,table_id)
             self.interval = time.time() - self.start_time
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
@@ -135,7 +136,8 @@ class BackendChannel(asynchat.async_chat):
             self.of_client.delete_flow(pred,priority)
         elif msg[0] == 'clear':
             switch = int(msg[1])
-            self.of_client.clear(switch)
+            table_id = int(msg[2])
+            self.of_client.clear(switch, table_id)
         elif msg[0] == 'barrier':
             switch = msg[1]
             self.of_client.barrier(switch)
@@ -313,13 +315,8 @@ class POXClient(revent.EventMixin):
             if 'ethtype' in pred:
                 match.eth_type = pred['ethtype']
         else:
-            if self.use_nx:
-                match = nx.nx_match()
-                if inport:
-                    match.in_port = inport
-            else:
-                match = of.ofp_match()
-                match.in_port = inport
+            match = of.ofp_match()
+            match.in_port = inport
             if 'ethtype' in pred:
                 match.dl_type = pred['ethtype']
 
@@ -425,7 +422,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def flow_mod_action(self,pred,priority,action_list,cookie,command,notify):
+    def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
         switch = pred['switch']
         if 'inport' in pred:        
             inport = pred['inport']
@@ -459,7 +456,7 @@ class POXClient(revent.EventMixin):
                                  flags=flags,
                                  cookie=cookie,
                                  actions=of_actions,
-                                 table_id=1)
+                                 table_id=table_id)
 
         else:
             msg = of.ofp_flow_mod(command=command,
@@ -477,11 +474,11 @@ class POXClient(revent.EventMixin):
         except KeyError, e:
             print "WARNING:install_flow: No connection to switch %d available" % switch
 
-    def install_flow(self,pred,priority,action_list,cookie,notify):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD,notify)
+    def install_flow(self,pred,priority,action_list,cookie,notify,table_id):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD,notify,table_id)
 
-    def modify_flow(self,pred,priority,action_list,cookie,notify):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT,notify)
+    def modify_flow(self,pred,priority,action_list,cookie,notify,table_id):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT,notify,table_id)
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
@@ -517,13 +514,13 @@ class POXClient(revent.EventMixin):
             print ( ("ERROR:flow_stats_request: No connection to switch %d" +
                      " available") % switch )
     
-    def clear(self,switch=None):
+    def clear(self,switch=None,table_id=0):
         if switch is None:
             for switch in self.switches.keys():
                 self.clear(switch)
         else:
             if self.use_nx:
-                d = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id=1)
+                d = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id=table_id)
             else:
                 d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
             self.switches[switch]['connection'].send(d) 

@@ -139,17 +139,17 @@ class Backend(object):
     def send_packet(self,packet):
         self.send_to_OF_client(['packet',packet])
 
-    def send_install(self,pred,priority,action_list,cookie,notify=False):
-        self.send_to_OF_client(['install',pred,priority,action_list,cookie,notify])
+    def send_install(self,pred,priority,action_list,cookie,notify=False,table_id=0):
+        self.send_to_OF_client(['install',pred,priority,action_list,cookie,notify,table_id])
 
-    def send_modify(self,pred,priority,action_list,cookie,notify=False):
-        self.send_to_OF_client(['modify',pred,priority,action_list,cookie,notify])
+    def send_modify(self,pred,priority,action_list,cookie,notify=False,table_id=0):
+        self.send_to_OF_client(['modify',pred,priority,action_list,cookie,notify,table_id])
 
     def send_delete(self,pred,priority):
         self.send_to_OF_client(['delete',pred,priority])
         
-    def send_clear(self,switch):
-        self.send_to_OF_client(['clear',switch])
+    def send_clear(self,switch,table_id):
+        self.send_to_OF_client(['clear',switch,table_id])
 
     def send_flow_stats_request(self,switch):
         self.send_to_OF_client(['flow_stats_request',switch])
