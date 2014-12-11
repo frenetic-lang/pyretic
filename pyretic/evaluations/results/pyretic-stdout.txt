@@ -1,0 +1,67 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-02 2] connected
+INFO:openflow.of_01:[00-00-00-00-00-04 1] connected
+INFO:openflow.of_01:[00-00-00-00-00-05 4] connected
+INFO:openflow.of_01:[00-00-00-00-00-03 5] connected
+INFO:openflow.of_01:[00-00-00-00-00-01 3] connected
+location:      	3	1	2
+source:        	10.0.0.1	8a:2e:e2:7e:5e:e1
+dest:          	10.0.0.3	ff:ff:ff:ff:ff:ff
+md5:           6617686b3754805aff3630dbf8c13f1a
+ethtype:       	2054
+header_len:    	14
+payload_len:   	46
+protocol:      	1
+vlan_id:       	21
+location:      	3	1	2
+source:        	10.0.0.1	8a:2e:e2:7e:5e:e1
+dest:          	10.0.0.3	06:53:69:58:88:b5
+md5:           31b925479a706492de619962c41ff6c0
+ethtype:       	2048
+header_len:    	14
+payload_len:   	102
+protocol:      	1
+srcport:       	8
+vlan_id:       	21
+location:      	3	1	2
+source:        	10.0.0.2	c6:15:81:4a:0d:81
+dest:          	10.0.0.3	ff:ff:ff:ff:ff:ff
+md5:           ada6a3b3affbff9bad089cfa66563287
+ethtype:       	2054
+header_len:    	14
+payload_len:   	46
+protocol:      	1
+vlan_id:       	11
+location:      	3	1	2
+source:        	10.0.0.2	c6:15:81:4a:0d:81
+dest:          	10.0.0.3	06:53:69:58:88:b5
+md5:           5e50c9fb63bcc3769482e6326beb8deb
+ethtype:       	2048
+header_len:    	14
+payload_len:   	102
+protocol:      	1
+srcport:       	8
+vlan_id:       	11
+location:      	3	1	2
+source:        	10.0.0.1	8a:2e:e2:7e:5e:e1
+dest:          	10.0.0.3	06:53:69:58:88:b5
+md5:           2f8f8f1d4664624a6cf882af122f3965
+ethtype:       	2048
+header_len:    	14
+payload_len:   	102
+protocol:      	1
+vlan_id:       	21
+location:      	3	1	2
+source:        	10.0.0.2	c6:15:81:4a:0d:81
+dest:          	10.0.0.3	06:53:69:58:88:b5
+md5:           63f61ffc4ea61d430626a8c0a1f543e4
+ethtype:       	2048
+header_len:    	14
+payload_len:   	102
+protocol:      	1
+vlan_id:       	11
+
+----starting pyretic shutdown------
+attempting to kill of_client
+pyretic.py done
