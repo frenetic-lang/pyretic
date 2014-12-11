@@ -3,23 +3,37 @@ match
 (dp0
 S'switch'
 p1
+I2
+so.
+1: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I1
+so.
+5: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
 I4
 so.
-C: (cpyretic.core.language
+7: (cpyretic.core.language
 match
 (dp0
 S'switch'
 p1
 I5
 so.
-E: (cpyretic.core.language
+9: (cpyretic.core.language
 match
 (dp0
 S'switch'
 p1
-I2
+I3
 so.
-D: cpyretic.core.language
+:: cpyretic.core.language
 intersection
 ((cpyretic.core.language
 identity
@@ -38,30 +52,6 @@ match
 (dp0
 S'switch'
 p1
-I6
-soltÅcpyretic.core.language
-negate
-(((cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I7
-soltÅcpyretic.core.language
-negate
-(((cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I3
-soltÅcpyretic.core.language
-negate
-(((cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
 I4
 soltÅcpyretic.core.language
 negate
@@ -78,36 +68,16 @@ match
 (dp0
 S'switch'
 p1
+I3
+soltÅcpyretic.core.language
+negate
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
 I2
 soltÅltÅ.
-1: (cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I1
-so.
-5: (cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I6
-so.
-7: (cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I7
-so.
-9: (cpyretic.core.language
-match
-(dp0
-S'switch'
-p1
-I3
-so.
 2: cpyretic.core.language
 identity
 .

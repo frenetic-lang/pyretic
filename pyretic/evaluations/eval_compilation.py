@@ -54,13 +54,14 @@ class eval_compilation:
                 
         if self.multitable_enabled:
             if self.integrate_enabled:
+                self.forwarding_compile()
                 self.in_table_compile()
                 self.out_table_compile()
                 
-                self.policy = (self.path_in_table >> self.policy
-                                >> self.path_out_table)
+                #self.policy = (self.path_in_table >> self.policy
+                #                >> self.path_out_table)
 
-                self.whole_compile()
+                #self.whole_compile()
             else:
                 
                 self.forwarding_compile()
@@ -76,12 +77,12 @@ class eval_compilation:
                 self.out_table_compile()
 
                 
-                self.policy = (
-                self.path_in_table >> 
-                self.policy >> self.path_out_table
-                )
+                #self.policy = (
+                #self.path_in_table >> 
+                #self.policy >> self.path_out_table
+                #)
                 
-                self.whole_compile()
+                #self.whole_compile()
         else:
             
             in_tag_policy = self.path_in_tagging >> self.policy

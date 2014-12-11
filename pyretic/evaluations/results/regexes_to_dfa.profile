@@ -1,5 +1,5 @@
 number of calls: 1
-total time: 1.860264
-average time: 1.860264
+total time: 1.156751
+average time: 1.156751
 ---times----
-[1.8602640628814697]
+[1.1567509174346924]
