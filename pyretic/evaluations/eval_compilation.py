@@ -35,7 +35,7 @@ class eval_compilation:
 
     def compile(self, full_compile = False):
 
-        stat.start(self.results_folder)
+        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled))
 
         pathcomp.init(1022)
         
@@ -319,7 +319,6 @@ def profile(args):
 if __name__ == '__main__':
     args = parse_args()
     
-    print args
     #p = eval_path.path_main(**get_testwise_params(args))
     #profile(args)
     #ml_ulex(args)
