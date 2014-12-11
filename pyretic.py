@@ -90,6 +90,9 @@ def parseArgs():
                      help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}'] )  )
     op.add_option( '--nx', action="store_true",
                    dest="nx", help="use nicira extensions in pox" )
+    op.add_option( '--pipeline', dest="pipeline",
+                   help="pipeline configuration (if --nx enabled)",
+                   default="default_pipeline")
     op.add_option( '--verbosity', '-v', type='choice',
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
@@ -200,7 +203,7 @@ def main():
         # other log file descriptor if necessary
         pox_cmd = "python %s of_client.pox_client %s %s" % (
             pox_exec, '--use_nx' if options.nx else '',
-            "--pipeline=path_query_pipeline" if options.nx else '')
+            "--pipeline=%s" % options.pipeline if options.nx else '')
         of_client = subprocess.Popen(shlex.split(pox_cmd),
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)

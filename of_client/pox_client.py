@@ -158,9 +158,9 @@ class POXClient(revent.EventMixin):
         self.use_nx = use_nx
         if pipeline:
             pipe_config_fun = globals()[str(pipeline)]
-            self.pipeline = globals()[str(pipeline)]
+            self.pipeline = globals()[str(pipeline)]()
         else:
-            self.pipeline = None
+            self.pipeline = default_pipeline()
         self.packetno = 0
         self.channel_lock = threading.Lock()
         self.send_time = 0.0
@@ -399,11 +399,16 @@ class POXClient(revent.EventMixin):
             match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
         return match
 
-    def build_of_actions(self,inport,action_list):
+    def build_of_actions(self,inport,action_list,table_id):
         ### BUILD OF ACTIONS
         of_actions = []
+        ctlr_outport = False
+        some_outport = False
         for actions in action_list:
             outport = actions['outport']
+            some_outport = True
+            if outport == of.OFPP_CONTROLLER:
+                ctlr_outport = True
             del actions['outport']
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
@@ -433,6 +438,16 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
             else:
                 of_actions.append(of.ofp_action_output(port=outport))
+
+        if self.use_nx:
+            """ Add an action to also go to the "next table" according to the
+            pipeline configuration, assuming the action set of the rule
+            satisfies certain conditions."""
+            if some_outport and not ctlr_outport:
+                p = self.pipeline
+                if table_id in p.edges: # i.e., there is a next table.
+                    dst_t = p.edges[table_id]
+                    of_actions.append(nx.nx_action_resubmit.resubmit_table(table=dst_t))
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
@@ -445,7 +460,7 @@ class POXClient(revent.EventMixin):
             match = self.build_nx_match(switch,inport,pred)
         else:
             match = self.build_of_match(switch,inport,pred)
-        of_actions = self.build_of_actions(inport,action_list)
+        of_actions = self.build_of_actions(inport,action_list,table_id)
         flags = 0
         if notify:
             flags = of.OFPFF_SEND_FLOW_REM
@@ -538,6 +553,27 @@ class POXClient(revent.EventMixin):
                 d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
             self.switches[switch]['connection'].send(d) 
 
+    def __nx_switch_pipeline_init(self, dpid, p):
+        """ Initialize switch `dpid` according to the input pipeline
+        configuration `p`. """
+        """ Clear all tables; install default actions. """
+        for t in range(0, p.num_tables):
+            msg = nx.nx_flow_mod(command=of.OFPFC_DELETE, table_id=t)
+            self.switches[dpid]['connection'].send(msg)
+            msg = nx.nx_flow_mod()
+            msg.table_id = t
+            msg.priority = 1
+            msg.match = nx.nx_match()
+            if (t+1) < p.num_tables and t in p.edges:
+                """ If not last table in the pipeline, fallthrough to next. """
+                dst_t = p.edges[t]
+                msg.actions.append(nx.nx_action_resubmit.resubmit_table(table=dst_t))
+            else:
+                """ If last table in pipeline, or no further edges, send to
+                controller. """
+                msg.actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
+            self.switches[dpid]['connection'].send(msg)
+
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switches
         
@@ -549,21 +585,7 @@ class POXClient(revent.EventMixin):
             """ Enable multi-stage table with nicira extensions """
             msg = nx.nx_flow_mod_table_id()
             self.switches[event.dpid]['connection'].send(msg)
-            """ Clear table 1 """
-            msg = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id = 1)
-            self.switches[event.dpid]['connection'].send(msg)
-            """ Initialize table 0. Fallthrough to table 1 """
-            msg = nx.nx_flow_mod()
-            msg.priority = 1
-            msg.match = nx.nx_match()
-            msg.actions.append(nx.nx_action_resubmit.resubmit_table(table = 1))
-            self.switches[event.dpid]['connection'].send(msg)
-            """ Initialize table 1 """
-            msg = nx.nx_flow_mod()
-            msg.table_id = 1
-            msg.priority = 3
-            msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-            self.switches[event.dpid]['connection'].send(msg)
+            self.__nx_switch_pipeline_init(event.dpid, self.pipeline)
         else:
             msg = of.ofp_flow_mod(match = of.ofp_match())
             msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
