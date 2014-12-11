@@ -178,8 +178,8 @@ def main():
     handler = util.QueueStreamHandler(logging_queue)
     logger.addHandler(handler)
     logger.setLevel(log_level)
-    
-    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity)
+
+    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity,options.nx)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
@@ -198,8 +198,9 @@ def main():
         python=sys.executable
         # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
         # other log file descriptor if necessary
-        pox_cmd = "python %s of_client.pox_client %s" % (
-            pox_exec, '--use_nx' if options.nx else '')
+        pox_cmd = "python %s of_client.pox_client %s %s" % (
+            pox_exec, '--use_nx' if options.nx else '',
+            "--pipeline=path_query_pipeline" if options.nx else '')
         of_client = subprocess.Popen(shlex.split(pox_cmd),
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)

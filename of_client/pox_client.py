@@ -40,6 +40,7 @@ from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
 from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
+from pyretic.mt_config.mtcs import *
 
 import time
 
@@ -150,11 +151,16 @@ class BackendChannel(asynchat.async_chat):
 
 class POXClient(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT,use_nx=False):
+    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT,use_nx=False,pipeline=None):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
         self.use_nx = use_nx
+        if pipeline:
+            pipe_config_fun = globals()[str(pipeline)]
+            self.pipeline = globals()[str(pipeline)]
+        else:
+            self.pipeline = None
         self.packetno = 0
         self.channel_lock = threading.Lock()
         self.send_time = 0.0
@@ -827,13 +833,13 @@ class POXClient(revent.EventMixin):
         self.send_to_pyretic(['packet',received])
         
        
-def launch(use_nx=False):
+def launch(use_nx=False, pipeline=None):
 
     class asyncore_loop(threading.Thread):
         def run(self):
             asyncore.loop()
 
-    POXClient(use_nx=use_nx)
+    POXClient(use_nx=use_nx,pipeline=pipeline)
     al = asyncore_loop()
     al.start()
 

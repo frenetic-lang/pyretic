@@ -62,10 +62,13 @@ class Runtime(object):
     :type mode: string
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
+    :param use_nx: use nicira extensions for multi-table rule installation
+    :type use_nx: boolean
     """
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
-                 verbosity='normal'):
+                 verbosity='normal',use_nx=False):
         self.verbosity = self.verbosity_numeric(verbosity)
+        self.use_nx = use_nx
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
