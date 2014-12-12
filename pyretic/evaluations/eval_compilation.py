@@ -42,7 +42,6 @@ class eval_compilation:
         policy_fragments = pathcomp.compile(self.path_policy, 1022, 
                 self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled)
 
-        return
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
         else:
@@ -351,6 +350,6 @@ if __name__ == '__main__':
     #p = eval_path.path_main(**get_testwise_params(args))
     #profile(args)
     #ml_ulex(args)
-    ragel(args)
-    #eval_comp = eval_compilation(args, **get_testwise_params(args))
-    #eval_comp.compile()
+    #ragel(args)
+    eval_comp = eval_compilation(args, **get_testwise_params(args))
+    eval_comp.compile()
