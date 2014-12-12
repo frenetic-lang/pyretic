@@ -23,6 +23,8 @@ print_enabled = False
 disjoint_enabled = False
 integrate_enabled = False
 multitable_enabled = False
+ragel_enabled = False
+
 
 def start(results_folder=None, opt_flags = None):
     global path
@@ -34,12 +36,13 @@ def start(results_folder=None, opt_flags = None):
     global disjoint_enabled
     global integrate_enabled
     global multitable_enabled
+    global ragel_enabled
 
     if results_folder:
         path = results_folder
 
     if opt_flags:
-        (disjoint_enabled, integrate_enabled, multitable_enabled) = opt_flags
+        (disjoint_enabled, integrate_enabled, multitable_enabled, ragel_enabled) = opt_flags
 
     if not os.path.exists(results_folder):
         os.mkdir(results_folder)
@@ -60,18 +63,21 @@ def stop():
     global symbol_path
     global rule_cnt_file
 
+    global ragel_enabled
+
     if monitoring:
-        report_dfa(dfa_path, symbol_path, path)
+        report_dfa(dfa_path, symbol_path, path, ragel_enabled)
         create_overall_report(path, rule_cnt_file, os.path.basename(dfa_path))
         create_excel_report(path, rule_cnt_file, os.path.basename(dfa_path))
 
     monitoring = False
-def report_dfa(dfa_path, symbol_path, results_path):
+def report_dfa(dfa_path, symbol_path, results_path, ragel_enabled):
     global clean_tmp
     if clean_tmp:
         import shutil
         try:
-            shutil.copy(dfa_path, results_path)
+            if not ragel_enabled:
+                shutil.copy(dfa_path, results_path)
             shutil.copy(symbol_path, results_path)
             shutil.copy(pickle_path, results_path)
         except:
@@ -103,23 +109,6 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
         g.close()
     except:
         pass
-
-    # dfa state count
-    try:
-        g = open(adjust_func(dfa_path), 'r')
-        state_cnt = 0
-        for line in g.readlines():
-            if 'shape' in line:
-                state_cnt += 1
-        g.close()
-
-        g.close()
-        f.write('dfa report \n')
-        f.write('dfa state count : %d \n' % state_cnt)
-        f.write('--------------------------------------\n')
-    except:
-        pass
-
 
     # compile times
     def getFileName(file_name):
@@ -153,9 +142,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
     if multitable_enabled:
         if integrate_enabled:
             row =  ["makeDFA_vector", 'compile', 'forwarding_compile', 
-                    'tagging_compile', 'out_tagging_compile', 
-                    'capture_compile', 'out_capture_compile', 
-                    'in_table_compile', 'tab', 'out_table_compile', 'tab']
+                    'in_table_compile', 'out_table_compile']
             row.extend(['tab'] * 13)
 
 
@@ -335,17 +322,6 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             #    f.write('\n')
 
     dfa_state_cnt = 0
-    try:
-        g = open(adjust_func(dfa_path), 'r')
-        for line in g.readlines():
-            if 'shape' in line:
-                dfa_state_cnt += 1
-
-        g.close()
-    except:
-        pass
-
-
     in_tagging_edge = 0
     out_tagging_edge = 0
     in_capture_edge = 0
@@ -373,6 +349,10 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
 
             elif 'rule count' in line:
                 rule_cnt = int(line[line.index(':') + 2 : -1])
+            
+            elif 'dfa state count' in line:
+                dfa_state_cnt = int(line[line.index(':') + 2 : -1])
+
 
         g.close()
     except:

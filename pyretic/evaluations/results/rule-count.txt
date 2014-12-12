@@ -1,0 +1,12 @@
+rule count statistics: 
+switch count: 6
+total rule count: 162
+average rule count: 27.0
+------details-------
+s3 -> 37
+s2 -> 39
+s1 -> 37
+s6 -> 14
+s5 -> 14
+s4 -> 21
+--------end--------

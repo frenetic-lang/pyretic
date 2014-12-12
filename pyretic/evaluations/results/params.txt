@@ -1,0 +1,14 @@
+profile False
+cli False
+listen_port 6634
+integrate_enabled False
+test_duration_sec 30
+multitable_enabled False
+total_traffic_prefix total-traffic
+slack_factor 5.0
+topo_args [2, 2]
+disjoint_enabled True
+results_folder ./results/
+policy_args ['n', '2', 'm', '2']
+ragel_enabled True
+test congested_link
