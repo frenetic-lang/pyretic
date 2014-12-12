@@ -42,6 +42,7 @@ class eval_compilation:
         policy_fragments = pathcomp.compile(self.path_policy, 1022, 
                 self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled)
 
+        return
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
         else:
@@ -286,11 +287,12 @@ def get_testwise_params(args):
     print params
     return params
 
+#### ml_ulex
 def get_input(re_list):
     lex_input = ''
     expr_num = 0 
     for r in re_list:
-        lex_input += (r + ' => ( T.expr_' + str(expr_num) + ' );')
+        lex_input += (r.ml_ulex_repr() + ' => ( T.expr_' + str(expr_num) + ' );')
         lex_input += '\n'
         expr_num += 1
     return lex_input
@@ -306,21 +308,49 @@ def ml_ulex(args):
     f = open('lex_input.txt', 'w')
     f.write(lex_input)
     f.close()
-    return
     start = time.time()
     output = subprocess.check_output(["ml-ulex", "--dot", 'lex_input.txt'])
     print time.time() - start
 
+#### profiling
 def profile(args):
     import cProfile as profile
 
     p = profile.run('pathcomp.compile(p)', sort='tottime')
+
+
+#### ragel
+def get_ragel_input(re_list):
+    res = '%%{\n\tmachine pyretic;\n'
+    for i in range(len(re_list)):
+        res += '\taction _%d {}\n' % i
     
+    re_list_str = '\tmain := '
+    for i,q in re_list:
+        re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
+    res += re_list_str[:-1] + ';}%%\n%% write data;'
+    return res
+
+def ragel(args):
+    p = eval_path.path_main(**get_testwise_params(args))
+    re_list = pathcomp.compile(p)
+    re_list = zip(range(len(re_list)), re_list)
+    lex_input = get_ragel_input(re_list) 
+    f = open('ragel_lex_input.txt', 'w')
+    f.write(lex_input)
+    f.close()
+    output = subprocess.check_output(["ragel", "-V", 'ragel_lex_input.txt'])
+    import pydot
+    g = pydot.graph_from_dot_data(output)
+    print g.get_node_list()
+
+
 if __name__ == '__main__':
     args = parse_args()
     
     #p = eval_path.path_main(**get_testwise_params(args))
     #profile(args)
     #ml_ulex(args)
-    eval_comp = eval_compilation(args, **get_testwise_params(args))
-    eval_comp.compile()
+    ragel(args)
+    #eval_comp = eval_compilation(args, **get_testwise_params(args))
+    #eval_comp.compile()
