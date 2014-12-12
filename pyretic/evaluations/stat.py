@@ -152,7 +152,13 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
     row = None
     if multitable_enabled:
         if integrate_enabled:
-            pass
+            row =  ["makeDFA_vector", 'compile', 'forwarding_compile', 
+                    'tagging_compile', 'out_tagging_compile', 
+                    'capture_compile', 'out_capture_compile', 
+                    'in_table_compile', 'tab', 'out_table_compile', 'tab']
+            row.extend(['tab'] * 13)
+
+
         else:
             row =  ["makeDFA_vector", 'compile', 'forwarding_compile', 
                     'tagging_compile', 'out_tagging_compile', 
