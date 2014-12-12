@@ -78,7 +78,7 @@ class Runtime(object):
         self.policy = main(**kwargs)
 
         """ If there are path-policies, initialize path query components. """
-        self.init_path_query(path_main)
+        self.init_path_query(path_main, kwargs)
 
         """ Initialize a `policy map', which determines how the network policy
         is mapped onto the tables on switches. By default (i.e., a single stage
@@ -1531,7 +1531,7 @@ class Runtime(object):
 # PATH QUERY INITIALIZATION
 ###############################
 
-    def init_path_query(self, path_main):
+    def init_path_query(self, path_main, kwargs):
         self.path_policy = None
         self.path_in_tagging  = DynamicPolicy(identity)
         self.path_in_capture  = DynamicPolicy(drop)
