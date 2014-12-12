@@ -46,14 +46,14 @@ def path_query_pipeline():
     """ Create a pipeline configuration for path queries. This pipeline has a
     structure:
 
-    virtual_tagging ->
-    in_tagging + in_capture ->
+    (virtual_tagging >>
+     in_tagging + in_capture) ->
     forwarding ->
-    out_tagging + out_capture ->
-    virtual_untagging
+    ((out_tagging + out_capture) >>
+     virtual_untagging)
     """
-    pqc = pipeline_config(5)
-    for i in range(0, 4):
+    pqc = pipeline_config(3)
+    for i in range(0, 2):
         pqc.add_edge(i, i+1)
     return pqc
 

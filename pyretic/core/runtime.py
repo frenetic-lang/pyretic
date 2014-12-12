@@ -64,37 +64,27 @@ class Runtime(object):
     :type verbosity: string
     :param use_nx: use nicira extensions for multi-table rule installation
     :type use_nx: boolean
+    :param pipeline: for multi-stage switches, a pipeline configuration
+    :type pipeline: pipeline_config
     """
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
-                 verbosity='normal',use_nx=False):
+                 verbosity='normal',use_nx=False, pipeline="default_pipeline"):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
+        self.pipeline = pipeline
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.policy = main(**kwargs)
-        self.path_policy = None
-        self.path_in_tagging  = DynamicPolicy(identity)
-        self.path_in_capture  = DynamicPolicy(drop)
-        self.path_out_tagging = DynamicPolicy(identity)
-        self.path_out_capture = DynamicPolicy(drop)
-        self.dynamic_sub_path_pols = set()
-        self.dynamic_path_preds    = set()
 
-        if path_main:
-            from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS)
-            self.path_policy = path_main(**kwargs)
-            self.handle_path_change()
-            in_tag_policy = self.path_in_tagging >> self.policy
-            forwarding = (in_tag_policy >> self.path_out_tagging)
-            in_capture  = self.path_in_capture
-            out_capture = (in_tag_policy >> self.path_out_capture)
-            virtual_tag = virtual_field_tagging()
-            virtual_untag = virtual_field_untagging()
-            self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
-                           (virtual_tag >> in_capture) +
-                           (virtual_tag >> out_capture))
+        """ If there are path-policies, initialize path query components. """
+        self.init_path_query(path_main)
+
+        """ Initialize a `policy map', which determines how the network policy
+        is mapped onto the tables on switches. By default (i.e., a single stage
+        table), the entire policy goes into the first table on each switch.
+        """
+        self.set_policy_map()
 
         self.mode = mode
         self.backend = backend
@@ -253,7 +243,7 @@ class Runtime(object):
             self.in_network_update = False
 
     
-    def update_switch_classifiers(self, table_id=DEFAULT_NX_TABLE_ID):
+    def update_switch_classifiers(self):
         """
         Updates switch classifiers
         """
@@ -263,14 +253,32 @@ class Runtime(object):
             self.clear_all(table_id)
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-            classifier = self.policy.compile()
-            self.log.debug(
-                '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                                              "generate classifier",
-                                              "policy=\n"+repr(self.policy),
-                                              "classifier=\n"+repr(classifier)))
-            self.install_classifier(classifier)
-
+            if not self.use_nx:
+                classifier = self.policy.compile()
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  "generate classifier",
+                                                  "policy=\n"+repr(self.policy),
+                                                  "classifier=\n"+repr(classifier)))
+                self.install_classifier(classifier)
+            else:
+                classifier_map = {}
+                table_list = []
+                classifier_string = ''
+                for (table, pol) in self.policy_map.iteritems():
+                    if not pol.has_active_classifier():
+                        table_list.append(table)
+                        classifier_map[table] = pol.compile()
+                        classifier_string += "%s\n%s\n" % (
+                            "Table %d classifier:" % table,
+                            repr(classifier_map[table]))
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  "generate classifier",
+                                                  "policy=\n"+repr(self.policy),
+                                                  classifier_string))
+                for table in table_list:
+                    self.install_classifier(classifier_map[table], table)
 
     def update_dynamic_sub_pols(self):
         """
@@ -1458,6 +1466,83 @@ class Runtime(object):
 
     def get_fwding_policy(self):
         return self.policy
+
+################################################################################
+# MULTI-STAGE TABLE CONFIGURATION
+################################################################################
+
+    def set_policy_map(self):
+        """ Set up the mapping between specific policies and tables in a
+        multi-stage pipeline. This loosely corresponds to the ``configuration''
+        phase of a reprogrammable switch, such as RMT.
+        """
+        use_nx = self.use_nx
+        pipeline = self.pipeline
+        assert pipeline in ['default_pipeline', 'path_query_pipeline']
+        if use_nx and pipeline == 'default_pipeline':
+            self.policy_map = self.default_pipeline_policy_map(self.policy)
+        elif use_nx and pipeline == 'path_query_pipeline' and path_main:
+            self.policy_map = self.path_query_pipeline_policy_map(
+                self.virtual_tag, self.virtual_untag,
+                self.path_in_tagging, self.path_in_capture,
+                self.policy,
+                self.path_out_tagging, self.path_out_capture)
+        elif use_nx:
+            raise RuntimeError("No table to policy map configuration defined for"
+                               "this pipeline! %s" % pipeline)
+        else:
+            self.policy_map = single_stage_policy_map(self.policy)
+
+    def single_stage_policy_map(self, pol):
+        """ A dummy policy map for single-stage tables. Useful for
+        uniformity. """
+        return {0: pol}
+
+    def default_pipeline_policy_map(self, pol):
+        """ The default pipeline for multi-stage tables with pyretic. Simple
+        configuration:
+
+        table with a single fallthrough rule ->
+        actual rule with _full_ policy
+        """
+        return {0: identity,
+                1: pol}
+
+    def path_query_pipeline_policy_map(self, virtual_tag, virtual_untag,
+                                   in_tagging, in_capture, forwarding,
+                                   out_tagging, out_capture):
+        return {0: virtual_tag >> (in_tagging + in_capture),
+                1: forwarding,
+                2: (out_tagging + out_capture) >> virtual_untag}
+
+
+###############################
+# PATH QUERY INITIALIZATION
+###############################
+
+    def init_path_query(self, path_main):
+        self.path_policy = None
+        self.path_in_tagging  = DynamicPolicy(identity)
+        self.path_in_capture  = DynamicPolicy(drop)
+        self.path_out_tagging = DynamicPolicy(identity)
+        self.path_out_capture = DynamicPolicy(drop)
+        self.dynamic_sub_path_pols = set()
+        self.dynamic_path_preds    = set()
+
+        if path_main:
+            from pyretic.lib.path import pathcomp
+            pathcomp.init(NUM_PATH_TAGS)
+            self.path_policy = path_main(**kwargs)
+            self.handle_path_change()
+            self.virtual_tag = virtual_field_tagging()
+            self.virtual_untag = virtual_field_untagging()
+            self.forwarding = self.policy
+            self.policy = (self.virtual_tag >>
+                           (self.path_in_tagging + self.path_in_capture) >>
+                           self.forwarding >>
+                           (self.path_out_tagging + self.path_out_capture) >>
+                           self.virtual_untag)
+
 
 ##########################
 # VIRTUAL HEADER SUPPORT 

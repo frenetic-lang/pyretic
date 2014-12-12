@@ -81,6 +81,9 @@ class Policy(object):
     def invalidate_classifier(self):
         self._classifier = None
 
+    def has_active_classifier(self):
+        return True if self._classifier else False
+
     def compile(self):
         """
         Produce a Classifier for this policy

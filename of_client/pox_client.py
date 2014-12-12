@@ -399,16 +399,17 @@ class POXClient(revent.EventMixin):
             match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
         return match
 
-    def build_of_actions(self,inport,action_list,table_id):
+    def build_of_actions(self,inport,action_list,table_id,use_nx,pipeline):
         ### BUILD OF ACTIONS
         of_actions = []
         ctlr_outport = False
-        some_outport = False
+        outport_list = list()
         for actions in action_list:
             outport = actions['outport']
-            some_outport = True
             if outport == of.OFPP_CONTROLLER:
                 ctlr_outport = True
+            else:
+                outport_list.append(outport)
             del actions['outport']
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
@@ -439,15 +440,19 @@ class POXClient(revent.EventMixin):
             else:
                 of_actions.append(of.ofp_action_output(port=outport))
 
-        if self.use_nx:
+        if use_nx:
             """ Add an action to also go to the "next table" according to the
             pipeline configuration, assuming the action set of the rule
-            satisfies certain conditions."""
-            if some_outport and not ctlr_outport:
-                p = self.pipeline
+            satisfies certain conditions:
+            -- the packet is not dropped (i.e., at least one physical outport)
+            -- the packet is not sent to the controller
+            """
+            if len(outport_list) > 0 and not ctlr_outport:
+                p = pipeline
                 if table_id in p.edges: # i.e., there is a next table.
                     dst_t = p.edges[table_id]
-                    of_actions.append(nx.nx_action_resubmit.resubmit_table(table=dst_t))
+                    for pt in outport_list:
+                        of_actions.append(nx.nx_action_resubmit.resubmit_table(in_port=pt,table=dst_t))
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
@@ -460,7 +465,8 @@ class POXClient(revent.EventMixin):
             match = self.build_nx_match(switch,inport,pred)
         else:
             match = self.build_of_match(switch,inport,pred)
-        of_actions = self.build_of_actions(inport,action_list,table_id)
+        of_actions = self.build_of_actions(inport, action_list, table_id,
+                                           self.use_nx, self.pipeline)
         flags = 0
         if notify:
             flags = of.OFPFF_SEND_FLOW_REM

@@ -182,7 +182,7 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(log_level)
 
-    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity,options.nx)
+    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity,options.nx,options.pipeline)
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
