@@ -24,6 +24,7 @@ class eval_compilation:
         self.disjoint_enabled = args.disjoint_enabled
         self.integrate_enabled = args.integrate_enabled
         self.multitable_enabled = args.multitable_enabled
+        self.ragel_enabled = args.ragel_enabled
 
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
@@ -35,12 +36,12 @@ class eval_compilation:
 
     def compile(self, full_compile = False):
 
-        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled))
+        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
 
         pathcomp.init(1022)
         
         policy_fragments = pathcomp.compile(self.path_policy, 1022, 
-                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled)
+                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
 
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
@@ -251,7 +252,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Evaluates compilation of path query toghether with the forwarding policy")
     parser.add_argument("-t", "--test", required=True
                         , help="Test case to run")
-    parser.add_argument("-r", "--results_folder",
+    parser.add_argument("-f", "--results_folder",
                         default="./results/",
                         help="Folder to put the raw results data into")
 
@@ -269,6 +270,12 @@ def parse_args():
                     dest = 'multitable_enabled',
                     help = 'enable multitable optimization')
 
+    parser.add_argument('--enable_ragel', '-r', action="store_true",
+                    dest = 'ragel_enabled',
+                    help = 'enable ragel optimization')
+
+
+    
     args = parser.parse_args()
 
     return args
@@ -285,6 +292,19 @@ def get_testwise_params(args):
     params['test'] = args.test
     print params
     return params
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    
+    eval_comp = eval_compilation(args, **get_testwise_params(args))
+    eval_comp.compile()
+
+
+
+#######################################################
+###             Previous Tests                      ###
+#######################################################
 
 #### ml_ulex
 def get_input(re_list):
@@ -344,12 +364,3 @@ def ragel(args):
     print g.get_node_list()
 
 
-if __name__ == '__main__':
-    args = parse_args()
-    
-    #p = eval_path.path_main(**get_testwise_params(args))
-    #profile(args)
-    #ml_ulex(args)
-    #ragel(args)
-    eval_comp = eval_compilation(args, **get_testwise_params(args))
-    eval_comp.compile()

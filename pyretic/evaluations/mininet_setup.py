@@ -96,6 +96,8 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath, results_
         optimize_flags += '-i '
     if args.multitable_enabled:
         optimize_flags += '-u '
+    if args.ragel_enabled:
+        optimize_flags += '-r '
 
     cmd = ("pyretic.py " + optimize_flags + " -m p0 pyretic.evaluations.eval_path -e " + results_path  + " --test=" + test +
            reduce(lambda r, k: r + ("--" + k + "=" + testwise_params[k] + " "),
@@ -292,7 +294,7 @@ def parse_args():
                         , help="Test case to run")
     parser.add_argument("-l", "--listen_port", default=6634, type=int,
                         help="Starting port for OVS switches to listen on")
-    parser.add_argument("-r", "--results_folder",
+    parser.add_argument("-f", "--results_folder",
                         default="./results/",
                         help="Folder to put the raw results data into")
 
@@ -316,6 +318,12 @@ def parse_args():
                     dest = 'multitable_enabled',
                     help = 'enable multitable optimization')
 
+    parser.add_argument('--enable_ragel', '-r', action="store_true",
+                    dest = 'ragel_enabled',
+                    help = 'enable ragel optimization')
+
+
+    
     #traffic arguments
     parser.add_argument("--total_traffic_prefix", default="total-traffic",
                         help="Naming prefix for total traffic measurement")

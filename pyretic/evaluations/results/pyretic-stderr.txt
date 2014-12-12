@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/mininet/pyretic/pyretic.py", line 249, in <module>
+    main()
+  File "/home/mininet/pyretic/pyretic.py", line 215, in main
+    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity, 
+  File "/home/mininet/pyretic/pyretic/backend/backend.py", line 130, in __init__
+    self.backend_server = BackendServer(self,address)
+  File "/home/mininet/pyretic/pyretic/backend/backend.py", line 40, in __init__
+    self.bind(address)
+  File "/usr/lib/python2.7/asyncore.py", line 342, in bind
+    return self.socket.bind(addr)
+  File "/usr/lib/python2.7/socket.py", line 224, in meth
+    return getattr(self._sock,name)(*args)
+socket.error: [Errno 98] Address already in use
