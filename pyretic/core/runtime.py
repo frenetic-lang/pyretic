@@ -84,7 +84,7 @@ class Runtime(object):
         is mapped onto the tables on switches. By default (i.e., a single stage
         table), the entire policy goes into the first table on each switch.
         """
-        self.set_policy_map()
+        self.set_policy_map(path_main)
 
         self.mode = mode
         self.backend = backend
@@ -499,9 +499,14 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: a != identity,rule.actions))
-                              for rule in classifier.rules)
+            if not self.use_nx:
+                """ Remove identity policies if using single-stage table. """
+                return Classifier(Rule(rule.match,
+                                       filter(lambda a: a != identity,rule.actions))
+                                  for rule in classifier.rules)
+            else:
+                """ Don't remove identity actions from multi-stage policies. """
+                return classifier
 
         def remove_path_buckets(classifier):
             """
@@ -596,7 +601,9 @@ class Runtime(object):
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
                     for action in rule.actions:
-                        if action == Controller or isinstance(action, CountBucket):
+                        if ((action == Controller) or
+                            isinstance(action, CountBucket) or
+                            (self.use_nx and action == identity)):
                             pass
                         elif len(action.map) > 1:
                             arp_bug = True
@@ -762,6 +769,8 @@ class Runtime(object):
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
                         return { k:v for (k,v) in a.map.iteritems() }
+                    elif self.use_nx and a == identity:
+                        return {'outport' : CUSTOM_NEXT_TABLE_PORT }
                     else: # default
                         return a
                 m = concretize_match(rule.match)
@@ -831,9 +840,11 @@ class Runtime(object):
 
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: (not isinstance(a, CountBucket)
-                                                 and a['outport'] != OFPP_CONTROLLER
-                                                 and a['outport'] != OFPP_IN_PORT),
+                phys_actions = filter(lambda a: (
+                        not isinstance(a, CountBucket)
+                        and a['outport'] != OFPP_CONTROLLER
+                        and a['outport'] != OFPP_IN_PORT
+                        and a['outport'] != CUSTOM_NEXT_TABLE_PORT),
                                       rule.actions)
                 outports_used = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
@@ -1471,7 +1482,7 @@ class Runtime(object):
 # MULTI-STAGE TABLE CONFIGURATION
 ################################################################################
 
-    def set_policy_map(self):
+    def set_policy_map(self, path_main):
         """ Set up the mapping between specific policies and tables in a
         multi-stage pipeline. This loosely corresponds to the ``configuration''
         phase of a reprogrammable switch, such as RMT.
@@ -1489,7 +1500,7 @@ class Runtime(object):
                 self.path_out_tagging, self.path_out_capture)
         elif use_nx:
             raise RuntimeError("No table to policy map configuration defined for"
-                               "this pipeline! %s" % pipeline)
+                               " this pipeline! %s" % pipeline)
         else:
             self.policy_map = single_stage_policy_map(self.policy)
 

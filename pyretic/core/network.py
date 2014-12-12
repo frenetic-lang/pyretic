@@ -38,6 +38,11 @@ from pyretic.core import util
 ### DEFINITIONS
 OFPP_IN_PORT = 0xfff8
 OFPP_CONTROLLER = 0xfffd
+# TODO: "Next table" port:
+# Custom; not openflow spec-compliant.
+# This number is also used in pox_client, so will need to be updated at both
+# places, eventually.
+CUSTOM_NEXT_TABLE_PORT = 0xfff4
 
 LLDP_TYPE = 0x88cc
 ARP_TYPE = 0x806

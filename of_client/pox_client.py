@@ -47,6 +47,11 @@ import time
 IP_TYPE = 0x800
 ARP_TYPE = 0x806
 
+# TODO: This "next table" port number is custom; not OF compliant.
+# Since it also appears in the pyretic frontend (network.py), it will require
+# updating in both places eventually.
+CUSTOM_NEXT_TABLE_PORT = 0xfff4
+
 def inport_value_hack(outport):
     if outport > 1:
         return 1
@@ -436,8 +441,16 @@ class POXClient(revent.EventMixin):
                 else:
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
             if (not inport is None) and (outport == inport):
+                """ If outport matches inport, use OF IN_PORT action. """
                 of_actions.append(of.ofp_action_output(port=of.OFPP_IN_PORT))
+            elif use_nx and outport == CUSTOM_NEXT_TABLE_PORT:
+                """ If we are using multi-stage tables, and the "next table"
+                special port value is used, don't add the forwarding action for
+                this port.
+                """
+                pass
             else:
+                """ Add outport as usual. """
                 of_actions.append(of.ofp_action_output(port=outport))
 
         if use_nx:
@@ -446,13 +459,22 @@ class POXClient(revent.EventMixin):
             satisfies certain conditions:
             -- the packet is not dropped (i.e., at least one physical outport)
             -- the packet is not sent to the controller
+
+            Note that a sole `identity' action on some set of packets is
+            compiled down to a rule which sends a packet to a specific outport
+            (denoted as CUSTOM_NEXT_TABLE_PORT). So, both conditions necessary
+            to resubmit to the next table are satisfied, even if a corresponding
+            OF action isn't added.
             """
             if len(outport_list) > 0 and not ctlr_outport:
                 p = pipeline
                 if table_id in p.edges: # i.e., there is a next table.
                     dst_t = p.edges[table_id]
                     for pt in outport_list:
-                        of_actions.append(nx.nx_action_resubmit.resubmit_table(in_port=pt,table=dst_t))
+                        if pt != CUSTOM_NEXT_TABLE_PORT:
+                            of_actions.append(nx.nx_action_resubmit.resubmit_table(in_port=pt,table=dst_t))
+                        else:
+                            of_actions.append(nx.nx_action_resubmit.resubmit_table(table=dst_t))
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
