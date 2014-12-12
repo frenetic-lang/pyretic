@@ -478,11 +478,15 @@ class POXClient(revent.EventMixin):
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
+        def port_helper(pred):
+            if 'inport' in pred:
+                return pred['inport']
+            elif self.use_nx and 'outport' in pred:
+                return pred['outport']
+            else:
+                return None
         switch = pred['switch']
-        if 'inport' in pred:        
-            inport = pred['inport']
-        else:
-            inport = None
+        inport = port_helper(pred)
         if self.use_nx:
             match = self.build_nx_match(switch,inport,pred)
         else:

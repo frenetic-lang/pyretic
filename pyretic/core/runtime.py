@@ -75,7 +75,7 @@ class Runtime(object):
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
-        self.policy = main(**kwargs)
+        self.forwarding = main(**kwargs)
 
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs)
@@ -83,6 +83,10 @@ class Runtime(object):
         """ Initialize a `policy map', which determines how the network policy
         is mapped onto the tables on switches. By default (i.e., a single stage
         table), the entire policy goes into the first table on each switch.
+
+        Based on the policy map, the member variable `self.policy' is also
+        initialized, which denotes the final network policy that is installed on
+        devices.
         """
         self.set_policy_map(path_main)
 
@@ -265,13 +269,17 @@ class Runtime(object):
                 classifier_map = {}
                 table_list = []
                 classifier_string = ''
+                classifier_lens = ''
                 for (table, pol) in self.policy_map.iteritems():
-                    if not pol.has_active_classifier():
+                    if ((not pol.has_active_classifier()) or
+                        self.in_network_update):
                         table_list.append(table)
                         classifier_map[table] = pol.compile()
                         classifier_string += "%s\n%s\n" % (
                             "Table %d classifier:" % table,
                             repr(classifier_map[table]))
+                        classifier_lens += "Table %d: %d rules\n" % (
+                            table, len(classifier_map[table].rules))
                 self.log.debug(
                     '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                                   "generate classifier",
@@ -1507,18 +1515,23 @@ class Runtime(object):
         pipeline = self.pipeline
         assert pipeline in ['default_pipeline', 'path_query_pipeline']
         if use_nx and pipeline == 'default_pipeline':
-            self.policy_map = self.default_pipeline_policy_map(self.policy)
+            self.policy_map = self.default_pipeline_policy_map(self.forwarding)
+            self.policy = self.policy_map[1]
         elif use_nx and pipeline == 'path_query_pipeline' and path_main:
             self.policy_map = self.path_query_pipeline_policy_map(
                 self.virtual_tag, self.virtual_untag,
                 self.path_in_tagging, self.path_in_capture,
-                self.policy,
+                self.forwarding,
                 self.path_out_tagging, self.path_out_capture)
+            self.policy = (self.policy_map[0] >>
+                           self.policy_map[1] >>
+                           self.policy_map[2])
         elif use_nx:
             raise RuntimeError("No table to policy map configuration defined for"
                                " this pipeline! %s" % pipeline)
         else:
-            self.policy_map = single_stage_policy_map(self.policy)
+            self.policy_map = single_stage_policy_map(self.forwarding)
+            self.policy = self.policy_map[0]
 
     def single_stage_policy_map(self, pol):
         """ A dummy policy map for single-stage tables. Useful for
@@ -1563,12 +1576,6 @@ class Runtime(object):
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
-            self.forwarding = self.policy
-            self.policy = (self.virtual_tag >>
-                           (self.path_in_tagging + self.path_in_capture) >>
-                           self.forwarding >>
-                           (self.path_out_tagging + self.path_out_capture) >>
-                           self.virtual_untag)
 
 
 ##########################
