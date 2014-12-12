@@ -783,6 +783,20 @@ class Runtime(object):
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
 
+        def set_next_table_port(classifier):
+            def set_next_table_outport(acts):
+                """ If an action in acts does not contain an outport, add the
+                "next table" outport to it. Applicable only in multi-stage table
+                mode."""
+                new_acts = []
+                for act in acts:
+                    if not isinstance(act, Query) and not 'outport' in act:
+                        act['outport'] = CUSTOM_NEXT_TABLE_PORT
+                    new_acts.append(act)
+                return new_acts
+            return Classifier([Rule(r.match, set_next_table_outport(r.actions))
+                               for r in classifier.rules])
+
         def check_OF_rules(classifier):
             def check_OF_rule_has_outport(r):
                 for a in r.actions:
@@ -943,6 +957,8 @@ class Runtime(object):
 
             classifier = switchify(classifier,switches)
             classifier = concretize(classifier)
+            if self.use_nx:
+                classifier = set_next_table_port(classifier)
             classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
