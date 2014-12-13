@@ -1511,11 +1511,17 @@ class Runtime(object):
         multi-stage pipeline. This loosely corresponds to the ``configuration''
         phase of a reprogrammable switch, such as RMT.
         """
+        def get_effective_forwarding_policy(path_main):
+            if path_main:
+                return self.path_based_forwarding
+            else:
+                return self.forwarding
         use_nx = self.use_nx
         pipeline = self.pipeline
         assert pipeline in ['default_pipeline', 'path_query_pipeline']
         if use_nx and pipeline == 'default_pipeline':
-            self.policy_map = self.default_pipeline_policy_map(self.forwarding)
+            self.policy_map = self.default_pipeline_policy_map(
+                get_effective_forwarding_policy(path_main))
             self.policy = self.policy_map[1]
         elif use_nx and pipeline == 'path_query_pipeline' and path_main:
             self.policy_map = self.path_query_pipeline_policy_map(
@@ -1530,7 +1536,8 @@ class Runtime(object):
             raise RuntimeError("No table to policy map configuration defined for"
                                " this pipeline! %s" % pipeline)
         else:
-            self.policy_map = single_stage_policy_map(self.forwarding)
+            self.policy_map = self.single_stage_policy_map(
+                get_effective_forwarding_policy(path_main))
             self.policy = self.policy_map[0]
 
     def single_stage_policy_map(self, pol):
@@ -1576,7 +1583,13 @@ class Runtime(object):
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
-
+            self.path_based_forwarding = (self.virtual_tag >>
+                                          (self.path_in_tagging +
+                                           self.path_in_capture) >>
+                                          self.forwarding >>
+                                          (self.path_out_tagging +
+                                           self.path_out_capture) >>
+                                          self.virtual_untag)
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
