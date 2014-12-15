@@ -84,14 +84,10 @@ class LinkCongestionStats:
             s2 = m + n + 2
 
         pairs = [ (int(pair[0][1:]), int(pair[1][1:]) ) for pair in itertools.product(ingress, egress)]
-        #p = path_epsilon()
         p = None
         for pair in pairs:
-            star_match = +atom(~(match(switch = pair[0]) | match(switch = s1) | match(switch = s2) | match(switch = pair[1])))
-            #partial_query = atom(match(switch = pair[0])) ^ +atom(~(match(switch = s1))) ^ atom(match(switch = s1)) ^ atom(match(switch = s2)) ^ +atom(~match(switch = pair[1])) ^ atom(match(switch = pair[1]))
-            
             partial_query = atom(match(switch = pair[0])) ** atom(match(switch = s1)) ^ atom(match(switch = s2)) ** atom(match(switch = pair[1]))
- 
+            partial_query.register_callback(query_callback(pair)) 
             cb = CountBucket()
             #partial_query.set_bucket(cb)
             self.buckets[pair] = cb

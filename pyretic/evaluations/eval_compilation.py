@@ -42,7 +42,6 @@ class eval_compilation:
         
         policy_fragments = pathcomp.compile(self.path_policy, 1022, 
                 self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
-
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
         else:
@@ -132,7 +131,7 @@ class eval_compilation:
 
 
         stat.stop()
-
+        print 'heeere'
 
 
     def get_vf_tagging_policy(self):
@@ -298,7 +297,10 @@ if __name__ == '__main__':
     args = parse_args()
     
     eval_comp = eval_compilation(args, **get_testwise_params(args))
+    import time
+    t_s = time.time()
     eval_comp.compile()
+    print time.time() - t_s
 
 
 
