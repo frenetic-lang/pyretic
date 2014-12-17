@@ -1007,10 +1007,16 @@ class POXClient(revent.EventMixin):
         if self.use_nx:
             assert isinstance(event.ofp, nx.nxt_packet_in)
             cookie = event.ofp.cookie
+            reg2_entry = event.ofp.match.find(nx.NXM_NX_REG2)
+            if reg2_entry:
+                outport = reg2_entry.value
+            else:
+                outport = None
         else:
             cookie = 0
+            outport = None
 
-        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data)
+        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data, outport=outport)
         self.send_to_pyretic(['packet',received,cookie])
         
        

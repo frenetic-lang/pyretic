@@ -1274,6 +1274,7 @@ class Runtime(object):
         packet['raw'] = raw_pkt['raw']
         packet['switch'] = raw_pkt['switch']
         packet['inport'] = raw_pkt['inport']
+        packet['outport'] = raw_pkt['outport']
 
         def convert(h,val):
             if h in ['srcmac','dstmac']:
