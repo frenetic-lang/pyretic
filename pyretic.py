@@ -201,8 +201,10 @@ def main():
         python=sys.executable
         # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
         # other log file descriptor if necessary
-        pox_cmd = "python %s of_client.pox_client %s %s" % (
-            pox_exec, '--use_nx' if options.nx else '',
+        pox_cmd = "python %s %s of_client.pox_client %s %s" % (
+            pox_exec,
+            'openflow.nicira --convert-packet-in' if options.nx else '',
+            '--use_nx' if options.nx else '',
             "--pipeline=%s" % options.pipeline if options.nx else '')
         of_client = subprocess.Popen(shlex.split(pox_cmd),
                                      stdout=sys.stdout,

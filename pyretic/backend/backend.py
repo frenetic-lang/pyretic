@@ -105,7 +105,8 @@ class BackendChannel(asynchat.async_chat):
             self.backend.runtime.handle_link_update(msg[1],msg[2],msg[3],msg[4])
         elif msg[0] == 'packet':
             packet = msg[1]
-            self.backend.runtime.handle_packet_in(packet)
+            cookie = msg[2]
+            self.backend.runtime.handle_packet_in(packet, cookie)
         elif msg[0] == 'flow_stats_reply':
             self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])
         elif msg[0] == 'flow_removed':

@@ -732,6 +732,9 @@ class POXClient(revent.EventMixin):
         self.switches[event.dpid]['ports'] = {}
 
         if self.use_nx:
+            """ Enable nicira packet-ins (e.g., to get rule cookies) """
+            msg = nx.nx_packet_in_format()
+            self.switches[event.dpid]['connection'].send(msg)
             """ Enable multi-stage table with nicira extensions """
             msg = nx.nx_flow_mod_table_id()
             self.switches[event.dpid]['connection'].send(msg)
@@ -1001,8 +1004,14 @@ class POXClient(revent.EventMixin):
             print "dpid\t%s" % event.dpid
             print
 
+        if self.use_nx:
+            assert isinstance(event.ofp, nx.nxt_packet_in)
+            cookie = event.ofp.cookie
+        else:
+            cookie = 0
+
         received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data)
-        self.send_to_pyretic(['packet',received])
+        self.send_to_pyretic(['packet',received,cookie])
         
        
 def launch(use_nx=False, pipeline=None):

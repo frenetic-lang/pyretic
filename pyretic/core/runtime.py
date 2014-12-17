@@ -136,7 +136,7 @@ class Runtime(object):
 # PACKET INTERPRETER 
 ######################
 
-    def handle_packet_in(self, concrete_pkt):
+    def handle_packet_in(self, concrete_pkt, cookie):
         """
         The packet interpreter.
         
@@ -148,11 +148,18 @@ class Runtime(object):
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
+            # Set policy to be used for evaluation, depending on whether
+            # multiple tables are enabled, and the table packet is coming from.
+            eff_policy = self.policy
+            if self.use_nx:
+                (version, table) = self.get_version_table_from_cookie(cookie)
+                eff_policy = self.get_effective_policy_from_table(table)
+
             # find the queries, if any in the policy, that will be evaluated
-            queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
+            queries,pkts = queries_in_eval((set(),{pyretic_pkt}),eff_policy)
 
             # evaluate the policy
-            output = self.policy.eval(pyretic_pkt)
+            output = eff_policy.eval(pyretic_pkt)
 
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
@@ -459,27 +466,39 @@ class Runtime(object):
 # PROACTIVE COMPILATION 
 #########################
 
+    def get_cookie(self, version, table_id):
+        """ Set a cookie which contains information both about the
+        classifier version of the rule as well as the table it's going
+        into. """
+        return (((table_id & 0b11) << 14) | (version & 0x3fff))
+
+    def get_version_table_from_cookie(self, cookie):
+        """ Return a classifier version number and table_id from a cookie. """
+        table_id = (cookie >> 14) & 0b11
+        version  = cookie & 0x3fff
+        return (version, table_id)
+
     def install_defaults(self, s, table_id):
         """ Install backup rules on switch s by default. """
         # Fallback "send to controller" rule under table miss
         self.install_rule(({'switch' : s},
                            TABLE_MISS_PRIORITY,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie,
+                           self.get_cookie(self.default_cookie, table_id),
                            False,
                            table_id))
         # Send all LLDP packets to controller for topology maintenance
         self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
                            TABLE_START_PRIORITY + 2,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie,
+                           self.get_cookie(self.default_cookie, table_id),
                            False,
                            table_id))
         # Drop all IPv6 packets by default.
         self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
                            TABLE_START_PRIORITY + 1,
                            [],
-                           self.default_cookie,
+                           self.get_cookie(self.default_cookie, table_id),
                            False,
                            table_id))
 
@@ -970,7 +989,8 @@ class Runtime(object):
             classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
-            new_rules = add_field(new_rules, curr_classifier_no)
+            cookie = self.get_cookie(curr_classifier_no, table_id)
+            new_rules = add_field(new_rules, cookie)
             new_rules = add_field(new_rules, table_id)
             return new_rules
 
@@ -1539,6 +1559,15 @@ class Runtime(object):
             self.policy_map = self.single_stage_policy_map(
                 get_effective_forwarding_policy(path_main))
             self.policy = self.policy_map[0]
+
+    def get_effective_policy_from_table(self, table_id):
+        """ Return the effective policy to evaluate a policy, if a packet is
+        sent to controller from table `table_id`.
+        """
+        num_tables = len(self.policy_map.keys())
+        """ Assume a sequential pipeline of policies. """
+        seq_list = [self.policy_map[k] for k in range(table_id, num_tables)]
+        return sequential(seq_list)
 
     def single_stage_policy_map(self, pol):
         """ A dummy policy map for single-stage tables. Useful for
