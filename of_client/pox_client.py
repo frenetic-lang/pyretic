@@ -590,7 +590,10 @@ class POXClient(revent.EventMixin):
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
                 PORT_TYPE = self.active_ofp_port_features(port.curr)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
+                if not CONF_UP:
+                    self.send_to_pyretic(['port','part',event.dpid,event.port])
+                else:
+                    self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
             else:
                 raise RuntimeException("Unknown port status event")
 
