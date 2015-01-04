@@ -165,10 +165,15 @@ class re_symbol(re_base):
                 other.char == self.char)
 
     def sort_key(self):
-        return ord(self.char)
+        return self.char
+        #return ord(self.char)
+
+    def ml_ulex_repr(self):
+        return self.char
 
     def re_string_repr(self):
-        return self.char
+        #return "'%s'"%self.char
+        return str(self.char)
 
 ### The following classes are only to be used internally to represent various
 ### regular expression combinators as ASTs. They should *not* be used to
@@ -216,8 +221,13 @@ class re_concat(re_combinator):
     def sort_key(self):
         return KEY_CONCAT
 
+    def ml_ulex_repr(self):
+        return ('(' + self.re1.ml_ulex_repr() + ')(' +
+                self.re2.ml_ulex_repr() + ')')
+
+
     def re_string_repr(self):
-        return ('(' + self.re1.re_string_repr() + ')(' +
+        return ('(' + self.re1.re_string_repr() + ').(' +
                 self.re2.re_string_repr() + ')')
 
     def __repr__(self):
@@ -234,6 +244,11 @@ class re_alter(re_combinator):
 
     def sort_key(self):
         return KEY_ALTER
+
+    def ml_ulex_repr(self):
+        words = map(lambda x: x.ml_ulex_repr(), self.re_list)
+        return '(' + string.join(words, ')|(') + ')'
+
 
     def re_string_repr(self):
         words = map(lambda x: x.re_string_repr(), self.re_list)
@@ -256,6 +271,9 @@ class re_star(re_combinator):
     def sort_key(self):
         return KEY_STAR
 
+    def ml_ulex_repr(self):
+        return '(' + self.re.ml_ulex_repr() + ')*'
+
     def re_string_repr(self):
         return '(' + self.re.re_string_repr() + ')*'
 
@@ -272,6 +290,10 @@ class re_inters(re_combinator):
 
     def sort_key(self):
         return KEY_INTERS
+
+    def ml_ulex_repr(self):
+        words = map(lambda x: x.ml_ulex_repr(), self.re_list)
+        return '(' + string.join(words, ')&(') + ')'
 
     def re_string_repr(self):
         words = map(lambda x: x.re_string_repr(), self.re_list)
@@ -294,11 +316,14 @@ class re_negate(re_combinator):
     def sort_key(self):
         return KEY_NEGATE
 
+    def ml_ulex_repr(self):
+        return '~(' + self.re.ml_ulex_repr() + ')'
+
     def re_string_repr(self):
-        return '~(' + self.re.re_string_repr() + ')'
+        return '!(' + self.re.re_string_repr() + ')'
 
     def __repr__(self):
-        return '~(' + repr(self.re) + ')'
+        return '!(' + repr(self.re) + ')'
 
 # Nullable function
 def nullable(r):
@@ -751,11 +776,17 @@ class re_transition_table(dfa_transition_table):
     """ The transition table for the DFA """
     def __init__(self):
         def symcheck(s, typ):
-            return isinstance(s, typ) and len(s) == 1
+            return isinstance(s, typ)
+            #return isinstance(s, typ) and len(s) == 1
+        #super(re_transition_table, self).__init__(re_deriv,
+         #                                         isinstance,
+          #                                        str,
+           #                                       symcheck)
         super(re_transition_table, self).__init__(re_deriv,
                                                   isinstance,
-                                                  str,
+                                                  int,
                                                   symcheck)
+
         self.transition_to_metadata = {} # map: re -> (map: symbol -> metadata
                                          # list)
 
@@ -787,7 +818,8 @@ class re_transition_table(dfa_transition_table):
                 return None
 
         assert isinstance(state, re_deriv)
-        assert isinstance(symbol, str) and len(symbol) == 1
+        #assert isinstance(symbol, str) and len(symbol) == 1
+        assert isinstance(symbol, int)
         create_meta_list_if_not_exists(self.transition_to_metadata,
                                        state, symbol)
         meta_list = self.transition_to_metadata[state][symbol]
@@ -798,8 +830,11 @@ class re_transition_table(dfa_transition_table):
         from state `q` over the symbol `s`.
         """
         assert isinstance(q, re_deriv) and q in self.transition_to_metadata
-        assert (isinstance(s, str) and len(s) == 1 and
+        #assert (isinstance(s, str) and len(s) == 1 and
+         #       s in self.transition_to_metadata[q])
+        assert (isinstance(s, int) and
                 s in self.transition_to_metadata[q])
+
         return self.transition_to_metadata[q][s]
 
     def __repr__(self):
@@ -996,7 +1031,8 @@ class dfa_base(object):
         assert state_type_check_fun(init_state, state_type)
         assert isinstance(final_states, state_table_type)
         assert isinstance(transition_table, tt_type)
-        is_strlist = lambda acc, x: acc and isinstance(x, str) and len(x) == 1
+        #is_strlist = lambda acc, x: acc and isinstance(x, str) and len(x) == 1
+        is_strlist = lambda acc, x: acc and isinstance(x, int)
         assert reduce(is_strlist, symbol_list, True)
         self.all_states = all_states
         self.init_state = init_state
@@ -1090,7 +1126,8 @@ def get_transition_exps_metadata(q, c, Q):
     metadata objects consumed in the transition.
     """
     assert isinstance(q, re_deriv)
-    assert isinstance(c, str) and len(c) == 1
+    #assert isinstance(c, str) and len(c) == 1
+    assert isinstance(c, int)
     exps = Q.get_expressions(q)
     sc = re_symbol(c)
     dst_expressions = []
@@ -1105,10 +1142,14 @@ def typecheck_goto(q, c, tt, states, alphabet_list,
                    state_type, state_type_check_fun,
                    tt_type, states_table_type):
     assert state_type_check_fun(q, state_type)
-    assert isinstance(c, str) and len(c) == 1
+    #assert isinstance(c, str) and len(c) == 1
+    assert isinstance(c, int)
     assert isinstance(tt, tt_type)
     assert isinstance(states, states_table_type)
-    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+    #assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+     #                  alphabet_list))
+      #      == len(alphabet_list))
+    assert (len(filter(lambda x: isinstance(x, int),
                        alphabet_list))
             == len(alphabet_list))
 
@@ -1135,9 +1176,13 @@ def typecheck_explore(states, tt, q, alphabet_list, state_table_type, tt_type,
     assert isinstance(states, state_table_type)
     assert isinstance(tt, tt_type)
     assert state_type_check_fun(q, state_type)
-    assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+    #assert (len(filter(lambda x: isinstance(x, str) and len(x) == 1,
+     #                  alphabet_list))
+      #      == len(alphabet_list))
+    assert (len(filter(lambda x: isinstance(x, int),
                        alphabet_list))
             == len(alphabet_list))
+
 
 def explore(states, tt, q, alphabet_list):
     """ Explore all the transitions through any symbol in alphabet_list on the
@@ -1216,11 +1261,19 @@ class re_vector_state_table(dfa_state_table):
 class re_vector_transition_table(dfa_transition_table):
     def __init__(self, component_dfas):
         def symcheck(c, typ):
-            return isinstance(c, typ) and len(c) == 1
+            return isinstance(c, typ)
+            #return isinstance(c, typ) and len(c) == 1
+        
+        #super(re_vector_transition_table, self).__init__(
+         #   re_deriv,
+          #  list_isinstance,
+           # str,
+            #symcheck)
+
         super(re_vector_transition_table, self).__init__(
             re_deriv,
             list_isinstance,
-            str,
+            int,
             symcheck)
         self.component_dfas = component_dfas
 
@@ -1228,7 +1281,8 @@ class re_vector_transition_table(dfa_transition_table):
         """ Get metadata on a vector transition using the scalar DFAs & their
         transition metadata.
         """
-        assert isinstance(c, str) and len(c) == 1
+        #assert isinstance(c, str) and len(c) == 1
+        assert isinstance(c, int)
         meta_list = []
         for i in range(0, len(qvec)):
             q = qvec[i]

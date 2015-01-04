@@ -1,2 +1,0 @@
-1: match: ('switch', 3)
-2: identity

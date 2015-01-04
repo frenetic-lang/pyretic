@@ -6,7 +6,6 @@ from pyretic.evaluations import stat
 # Classifiers
 # an intermediate representation for proactive compilation.
 
-
 class Rule(object):
     """
     A rule contains a filter and the parallel composition of zero or more

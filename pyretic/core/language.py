@@ -282,7 +282,9 @@ class drop(Singleton):
         return set()
 
     def generate_classifier(self):
-        return Classifier([Rule(identity,set(),[self])])
+        if not self._classifier:
+            self._classifier =  Classifier([Rule(identity,set(),[self])])
+        return self._classifier
 
     def intersect(self, other):
         return self
@@ -414,10 +416,13 @@ class match(Filter):
         # Return identity if self matches every packet that other matches (and maybe more).
         # eg. if other is specific on any field that self lacks.
         def map_check(a, b):
-            """ Return true if match 'a' contains match 'b'."""
+            ''' 
             if set(a.keys()) - set(b.keys()):
                 return False
+            '''
             for (f,v) in a.items():
+                if not f in b:
+                    return False
                 other_v = b[f]
                 if (f=='srcip' or f=='dstip'):
                     if v != other_v:
@@ -426,7 +431,7 @@ class match(Filter):
                 elif v != other_v:
                     return False
             return True
-
+            
         try:
             return map_check(self.map, other.map)
         except AttributeError:
@@ -518,7 +523,6 @@ class modify(Policy):
 
     def generate_classifier(self):
         c = _modify(**self.map).generate_classifier()
-        stat.print_compile_detail("modify : %d :" % len(c.rules))
         return c
 
 

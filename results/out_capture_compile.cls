@@ -1,17 +1,7 @@
-classifier size: 2
+classifier size: 3
 print : match: ('vlan_pcp', 0) ('vlan_id', 2)
   -> set([Controller])
- identity
-  -> set([]) 
----------------------------------
-classifier size: 2
-print : match: ('vlan_pcp', 0) ('vlan_id', 2)
-  -> set([Controller])
- identity
-  -> set([]) 
----------------------------------
-classifier size: 2
-print : match: ('vlan_pcp', 0) ('vlan_id', 2)
+ match: ('vlan_pcp', 0) ('vlan_id', 3)
   -> set([Controller])
  identity
   -> set([]) 

@@ -48,6 +48,7 @@ of_client = None
 enable_profile = False
 eval_profile_enabled = False
 
+
 def signal_handler(signal, frame):
     print '\n----starting pyretic shutdown------'
     # for thread in threading.enumerate():
@@ -106,7 +107,27 @@ def parseArgs():
                     type='string', dest='eval_result_path', 
                    )
 
-    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False)
+    op.add_option( '--enable_disjoint', '-d', action="store_true",
+                    dest="disjoint_enabled",
+                    help = 'enable disjoint optimization')
+
+    op.add_option('--enable_integration', '-i', action="store_true",
+                    dest='integrate_enabled',
+                    help = 'enable integration of tag and capture optimization, only works with multitable on')
+
+    op.add_option('--enable_multitable', '-u', action="store_true",
+                    dest = 'multitable_enabled',
+                    help = 'enable multitable optimization')
+
+    op.add_option('--enable_ragel', '-r', action="store_true",
+                    dest = 'ragel_enabled',
+                    help = 'enable ragel optimization')
+
+
+    
+    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False, 
+                    disjoint_enabled=False, integrate_enabled = False, multitable_enabled = False,
+                    ragel_enabled = False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -191,7 +212,9 @@ def main():
         eval_profile_enabled = True
         stat.start(options.eval_result_path)
     
-    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity)
+    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity, 
+            (options.disjoint_enabled, options.integrate_enabled, options.multitable_enabled, options.ragel_enabled)
+            )
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()

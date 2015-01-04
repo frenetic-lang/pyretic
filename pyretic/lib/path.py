@@ -43,11 +43,15 @@ import pydot
 import copy
 
 from pyretic.core.language import Controller, fwd, CombinatorPolicy
+from pyretic.core.language import negate, union, intersection
 from pyretic.core import util
 import pickle
 from pyretic.evaluations import stat
+from netaddr import IPNetwork, cidr_merge
+import time
 
-TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
+TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
+TOKEN_END_VALUE = 0xFFFFFFFF 
 # token type definitions
 TOK_INGRESS = "ingress"
 TOK_EGRESS = "egress"
@@ -81,6 +85,7 @@ class classifier_utils(object):
     @classmethod
     def is_not_drop(cls, p):
         """ Return true if policy p is effectively a drop. """
+        return sat_utils.is_not_drop(p)
         p_class = cls.__get_classifier__(p)
         return cls.__is_not_drop_classifier__(p_class)
 
@@ -90,28 +95,56 @@ class classifier_utils(object):
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
+        
         return cls.is_not_drop(p1 & p2)
+        '''res1 = sat_utils.is_not_drop(p1 & p2)  
+        res2 = cls.is_not_drop(p1 & p2)
+        if res1 != res2:
+            print '-------diff-----------'
+            print p1
+            print p2
+            print res1
+            print res2
+            print '----------------------'
+        return res2'''
+        '''
+        res = None
+        if isinstance(p1, match):
+            res =  intersection_utils.match_tree_intersect(p1, p2, False)
+        
+        elif isinstance(p2, match):
+            res = intersection_utils.match_tree_intersect(p2, p1, False)
+        else:
+            res = sat_utils.is_not_drop(p1 & p2)
+       
+        return res'''
 
     @classmethod
-    def get_overlap_mode(cls, pred, new_pred):
+    def get_overlap_mode(cls, pred, pred_neg, new_pred, new_pred_neg):
         """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
         booleans, depending on whether pred is equal, is a superset of, is a subset
         of, or just intersects new_pred.
         """
-        assert isinstance(new_pred, Filter) and isinstance(pred, Filter)
+        #t_s = time.time()
+        assert isinstance(new_pred, Filter) and isinstance(pred, Filter) and isinstance(pred_neg, Filter) and isinstance(new_pred_neg, Filter)
         ne_inters = cls.has_nonempty_intersection
         (is_equal,is_superset,is_subset,intersects) = (False,False,False,False)
-        if  (not ne_inters( pred, ~new_pred) and
-             not ne_inters(~pred,  new_pred)):
+
+        res_0 = ne_inters(pred, new_pred_neg)
+        res_1 = ne_inters(pred_neg, new_pred)
+        if  (not res_0 and
+             not res_1):
             is_equal = True
-        elif not ne_inters(~pred,  new_pred):
+        elif not res_1:
             is_superset = True
-        elif not ne_inters( pred, ~new_pred):
+        elif not res_0:
             is_subset = True
         elif ne_inters(pred, new_pred):
             intersects = True
         else:
             pass
+
+        #print time.time() - t_s
         return (is_equal, is_superset, is_subset, intersects)
 
     @classmethod
@@ -143,16 +176,20 @@ class re_tree_gen(object):
     symbol_to_pred = {}
     dyn_preds      = []
 
+    pred_to_neg = {}
+
     @classmethod
     def char_in_lexer_language(cls, char):
-        return char in ['*','+','|','{','}','(',
-                        ')','-','^','.','&','?',
-                        '"',"'",'%','$',',','/',"\\",
-                        '=','>','<', ';', '`', '_', '[', ']', '@']
+        return char in ['*', '%', '+', '(', ')', '<', '>',
+                        '?', '=', '"', "'", '[', ']', '-', 
+                        '|', ',', '^', '.', '\\', '{', '}',
+                        '&', '~', ';', '$', '/', '`', '_',
+                        '@', ':', '!']
+        
     @classmethod    
     def char_from_token(cls, tok):
         try:
-            return char(tok)
+            return chr(tok)
         except:
             return unichr(tok)
 
@@ -171,13 +208,17 @@ class re_tree_gen(object):
         return output
 
     @classmethod
-    def __add_pred__(cls, pred, symbol, atoms):
+    def __add_pred__(cls, pred, symbol, atoms, pred_neg):
         """ Add a new predicate to the global state. """
         assert not pred in cls.pred_to_symbol
         assert not pred in cls.pred_to_atoms
+        assert not pred in cls.pred_to_neg
+        
+        
         cls.pred_to_symbol[pred] = symbol
         cls.pred_to_atoms[pred] = atoms
         cls.symbol_to_pred[symbol] = pred
+        cls.pred_to_neg[pred] = pred_neg
 
     @classmethod
     def __add_dyn_preds__(cls, preds, atom):
@@ -192,20 +233,26 @@ class re_tree_gen(object):
         del cls.symbol_to_pred[sym]
         del cls.pred_to_symbol[pred]
         del cls.pred_to_atoms[pred]
+        del cls.pred_to_neg[pred]
+
+    @classmethod
+    def __new_token__(cls):
+        cls.token += 1
+        if cls.token > TOKEN_END_VALUE:
+            cls.token = TOKEN_START_VALUE
 
     @classmethod
     def __new_symbol__(cls):
         """ Returns a new token/symbol for a leaf-level predicate. """
-        cls.token += 1
-        token_char = cls.char_from_token(cls.token)
-        while cls.char_in_lexer_language(token_char):
-            cls.token += 1
-            token_char = cls.char_from_token(cls.token)
+        cls.__new_token__()
+        in_list = __in_re_tree_gen__.symbol_to_pred
+        out_list = __out_re_tree_gen__.symbol_to_pred
+        while (
+                cls.token in in_list
+                or cls.token in out_list):
+            cls.__new_token__()
 
-        try:
-            return chr(cls.token)
-        except:
-            return unichr(cls.token)
+        return cls.token
 
     @classmethod
     def __replace_pred__(cls, old_pred, new_preds):
@@ -265,6 +312,7 @@ class re_tree_gen(object):
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
+
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
 
@@ -285,47 +333,55 @@ class re_tree_gen(object):
             """ If new_pred contains a dynamic predicate, it must be remembered
             explicitly to set up recompilation routines in the runtime."""
             cls.__add_dyn_preds__(dyn_pols, at.policy)
-
+        
+        new_pred_neg = ~new_pred
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
             pred_symbol = cls.pred_to_symbol[pred]
-            (is_equal,is_superset,is_subset,intersects) = ovlap(pred, new_pred)
+            pred_neg = cls.pred_to_neg[pred]
+            (is_equal,is_superset,is_subset,intersects) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
             if is_equal:
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
                 return re_tree
             elif is_superset:
-                add_pred(pred & ~new_pred, new_sym(), pred_atoms)
-                add_pred(new_pred, new_sym(), pred_atoms + [at])
-                replace_pred(pred, [pred & ~new_pred, new_pred])
+                inter = pred & new_pred_neg
+                inter_neg = ~inter
+                add_pred(pred & new_pred_neg, new_sym(), pred_atoms, inter_neg)
+                add_pred(new_pred, new_sym(), pred_atoms + [at], new_pred_neg)
+                replace_pred(pred, [inter, new_pred])
                 del_pred(pred)
                 added_sym = cls.pred_to_symbol[new_pred]
                 re_tree |= re_symbol(added_sym, metadata=at)
                 return re_tree
             elif is_subset:
-                new_pred = new_pred & ~pred
+                new_pred = new_pred & pred_neg
+                new_pred_neg = ~new_pred
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
             elif intersects:
-                add_pred(pred & ~new_pred, new_sym(), pred_atoms)
-                add_pred(pred &  new_pred, new_sym(), pred_atoms + [at])
-                replace_pred(pred, [pred & ~new_pred, pred & new_pred])
+                inter = pred & new_pred_neg
+                inter_neg = ~inter
+                inter_p = pred & new_pred
+                inter_p_neg = ~inter_p
+                add_pred(inter, new_sym(), pred_atoms, inter_neg)
+                add_pred(inter_p, new_sym(), pred_atoms + [at], inter_p_neg)
+                replace_pred(pred, [inter, inter_p])
                 del_pred(pred)
-                added_sym = cls.pred_to_symbol[pred & new_pred]
+                added_sym = cls.pred_to_symbol[inter_p]
                 re_tree |= re_symbol(added_sym, metadata=at)
-                new_pred = new_pred & ~pred
+                new_pred = new_pred & pred_neg
+                new_pred_neg = ~new_pred
             else:
                 pass
-
         if is_not_drop(new_pred):
             """ The new predicate should be added if some part of it doesn't
             intersect any existing predicate, i.e., new_pred is not drop.
             """
-            add_pred(new_pred, new_sym(), [at])
+            add_pred(new_pred, new_sym(), [at], new_pred_neg)
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
-
         return re_tree
 
     @classmethod
@@ -346,7 +402,7 @@ class re_tree_gen(object):
         output = ''
         for sym in cls.symbol_to_pred:
             pred = cls.symbol_to_pred[sym]
-            output += (sym + ': ' + repr(pred) + '\n')
+            output += (str(sym) + ': ' + repr(pred) + '\n')
         return output
 
     @classmethod
@@ -354,7 +410,7 @@ class re_tree_gen(object):
         output = ''
         for sym in cls.symbol_to_pred:
             pred = cls.symbol_to_pred[sym]
-            output += (sym + ': ' + pickle_dump(pred) + '\n')
+            output += (str(sym) + ': ' + pickle_dump(pred) + '\n')
         return output
 
 
@@ -939,10 +995,6 @@ class QuerySwitch(Policy):
                 res |= act.eval(pkt)
             return res
 
-        '''print 'evaluating :'
-        print pkt
-        print '-----------------'
-        '''
         for tag_value in self.policy_dic:
             match_pol = match(**{self.tag:tag_value})
             res = match_pol.eval(pkt)
@@ -951,16 +1003,8 @@ class QuerySwitch(Policy):
                 if not pol_res:
                     pol_res = eval_defaults(pkt)
                 
-                '''print 'result is :'
-                print pol_res
-                print '----------------'
-                '''
                 return pol_res
         
-        '''print 'results is :'
-        print eval_defaults(pkt)
-        print '------------------'
-        '''
         return eval_defaults(pkt)
     
     def compile(self):
@@ -1040,12 +1084,18 @@ class pathcomp(object):
             return match(path_tag=int(val))
 
     @classmethod
-    def __get_tag_val__(cls, d, q):
-        val = dfa_utils.get_state_index(d, q)
-        if int(val) == 0:
-            return None
+    def __num_set_tag__(cls, num):
+        if num == 0:
+            return modify(path_tag=None)
         else:
-            return int(val)
+            return modify(path_tag=num)
+
+    @classmethod
+    def __num_match_tag__(cls, num):
+        if num == 0:
+            return match(path_tag=None)
+        else:
+            return match(path_tag=num)
 
     @classmethod
     def __get_pred__(cls, dfa, edge):
@@ -1080,18 +1130,19 @@ class pathcomp(object):
         return (cg.symbol_to_pred[edge_label], typ)
 
     @classmethod
-    def __get_dead_state_pred__(cls, dfa):
-        dead = dfa_utils.get_dead_state(dfa)
+    def __get_dead_state_pred__(cls, du, dfa):
+        dead = du.get_dead_state(dfa)
         if dead:
-            return cls.__match_tag__(dfa, dead)
+            return cls.__num_match_tag__(dead)
         else:
             return drop
 
     @classmethod
-    def __set_dead_state_tag__(cls, dfa):
-        dead = dfa_utils.get_dead_state(dfa)
+    def __set_dead_state_tag__(cls, du, dfa):
+        dead = du.get_dead_state(dfa)
         if dead:
-            return cls.__set_tag__(dfa, dead)
+           
+            return cls.__num_set_tag__(dead)
         else:
             return identity
 
@@ -1154,11 +1205,11 @@ class pathcomp(object):
 
     @classmethod
     @stat.elapsed_time
-    def compile(cls, path_pol, max_states=1022):
+    def compile(cls, path_pol, max_states=1022, disjoint_enabled=False, integrate_enabled=False, ragel_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
-        du = dfa_utils
+        du = common_dfa_utils
         in_cg = __in_re_tree_gen__
         out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
@@ -1166,6 +1217,9 @@ class pathcomp(object):
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
+        
+        import time
+        t_s = time.time()
         in_cg.clear()
         out_cg.clear()
 
@@ -1174,33 +1228,100 @@ class pathcomp(object):
         ast_fold(path_pol, prep_trees, None)
 
         (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
-        #return [r.re_string_repr() for r in re_list]
-        
-    
-        dfa = du.regexes_to_dfa(re_list)
-        assert du.get_num_states(dfa) <= max_states
-        match_tag = lambda q: cls.__match_tag__(dfa, q)
-        set_tag   = lambda q: cls.__set_tag__(dfa, q)
-
-        
+        #print '\n'.join([r.re_string_repr() for r in re_list])
+        #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
+        print time.time() - t_s
         in_tag_rules = 0
         in_cap_rules = 0
 
         out_tag_rules = 0
         out_cap_rules = 0
        
-        get_pred  = lambda e: cls.__get_pred__(dfa, e)
-
-        edges = du.get_edges(dfa)
-        
-        optimize = True
-
         in_tagging = None
         out_tagging = None
         in_capture = None
         out_capture = None
 
-        if optimize:
+        match_tag = cls.__num_match_tag__
+        set_tag   = cls.__num_set_tag__
+
+        get_edge_attributes = None
+
+        if ragel_enabled:
+            du = ragel_dfa_utils
+        else:
+            du = dfa_utils
+        
+        dfa = du.regexes_to_dfa(re_list)
+        assert du.get_num_states(dfa) <= max_states
+        
+        stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
+        
+        get_pred  = lambda e: cls.__get_pred__(dfa, e)
+        edges = du.get_edges(dfa)
+        get_edge_attributes = du.get_edge_attributes
+       
+
+        if integrate_enabled:
+            in_table_dic = {}
+            out_table_dic = {}
+
+            for edge in edges:
+                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                assert typ in [__in__, __out__]
+                
+                action_frag = None
+
+                if not du.is_dead(dfa, src) and not du.is_dead(dfa, dst):
+                    action_frag = set_tag(dst_num)
+
+                    if typ == __in__:
+                        in_tag_rules += 1
+                    else:
+                        out_tag_rules += 1
+                    
+                if du.is_accepting(dfa, dst):
+                    ords = du.get_accepting_exps(dfa, edge, dst)
+                    for i in ords:
+                        if action_frag is None:
+                            action_frag = pol_list[i]
+                        else:
+                            action_frag += pol_list[i]
+                       
+                        if typ == __in__:
+                            in_cap_rules += 1
+                        else:
+                            out_cap_rules += 1
+                
+                if action_frag is not None:
+                    table_frag = pred >> action_frag
+                    if typ == __in__:
+                        if not src_num in in_table_dic:
+                            in_table_dic[src_num] = table_frag
+                        else:
+                            in_table_dic[src_num] += table_frag
+
+                    elif typ == __out__:
+                        if not src in out_table_dic:
+                            out_table_dic[src_num] = table_frag
+                        else:
+                            out_table_dic[src_num] += table_frag
+
+            table_default = set([cls.__set_dead_state_tag__(du, dfa)])
+            in_table = QuerySwitch('path_tag', in_table_dic, table_default)
+            out_table = QuerySwitch('path_tag', out_table_dic, table_default)
+            
+            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+
+            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+
+            return (in_table, out_table)
+
+ 
+        
+        if disjoint_enabled:
             in_tagging_dic = {}
             out_tagging_dic = {}
 
@@ -1208,14 +1329,11 @@ class pathcomp(object):
             out_capture = drop
 
             for edge in edges:
-                src = du.get_edge_src(dfa, edge)
-                src_num = cls.__get_tag_val__(dfa, src)
-                dst = du.get_edge_dst(dfa, edge)
-                (pred, typ) = get_pred(edge)
+                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                 assert typ in [__in__, __out__]
 
                 if not du.is_dead(dfa, src) and not du.is_dead(dfa, dst):
-                    tag_frag = (pred >> set_tag(dst))
+                    tag_frag = (pred >> set_tag(dst_num))
                     if typ == __in__:
                         if not src_num in in_tagging_dic:
                             in_tagging_dic[src_num] = tag_frag
@@ -1231,10 +1349,10 @@ class pathcomp(object):
                         out_tag_rules += 1
 
                 if du.is_accepting(dfa, dst):
-                    ords = du.get_accepting_exps(dfa, dst)
+                    ords = du.get_accepting_exps(dfa, edge, dst)
                     for i in ords:
 
-                        cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                        cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
                         if typ == __in__:
                             in_capture += cap_frag
                             in_cap_rules += 1
@@ -1242,30 +1360,37 @@ class pathcomp(object):
                             out_capture += cap_frag
                             out_cap_rules += 1
                  
-            tagging_default = set([cls.__set_dead_state_tag__(dfa)])
+            tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
             in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
             out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
+            
+            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+
+            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+
+            return (in_tagging, in_capture, out_tagging, out_capture)
+
         else:
             """ Initialize tagging and capture policies. """
             in_tagging = (((in_cg.get_unaffected_pred() &
-                            ~(cls.__get_dead_state_pred__(dfa)))
-                           >> cls.__set_dead_state_tag__(dfa)) +
-                          cls.__get_dead_state_pred__(dfa))
+                            ~(cls.__get_dead_state_pred__(du,dfa)))
+                           >> cls.__set_dead_state_tag__(du, dfa)) +
+                          cls.__get_dead_state_pred__(du,dfa))
             out_tagging = (((out_cg.get_unaffected_pred() &
-                             ~(cls.__get_dead_state_pred__(dfa)))
-                            >> cls.__set_dead_state_tag__(dfa)) +
-                           cls.__get_dead_state_pred__(dfa))
+                             ~(cls.__get_dead_state_pred__(du,dfa)))
+                            >> cls.__set_dead_state_tag__(du,dfa)) +
+                           cls.__get_dead_state_pred__(du, dfa))
             in_capture = drop
             out_capture = drop
             
             """ Generate transition/accept rules from DFA """
             for edge in edges:
-                src = du.get_edge_src(dfa, edge)
-                dst = du.get_edge_dst(dfa, edge)
-                (pred, typ) = get_pred(edge)
+                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                 assert typ in [__in__, __out__]
                 if not du.is_dead(dfa, src):
-                    tag_frag = ((match_tag(src) & pred) >> set_tag(dst))
+                    tag_frag = ((match_tag(src_num) & pred) >> set_tag(dst_num))
                     if typ == __in__:
                         in_tagging += tag_frag
                         in_tag_rules += 1
@@ -1275,10 +1400,10 @@ class pathcomp(object):
                         out_tag_rules += 1
 
                 if du.is_accepting(dfa, dst):
-                    ords = du.get_accepting_exps(dfa, dst)
+                    ords = du.get_accepting_exps(dfa, edge, dst)
                     for i in ords:
 
-                        cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                        cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
                         if typ == __in__:
                             in_capture += cap_frag
                             in_cap_rules += 1
@@ -1286,13 +1411,13 @@ class pathcomp(object):
                             out_capture += cap_frag
                             out_cap_rules += 1
             
-        stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-        stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
-        stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-        stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-       
-        return (in_tagging, in_capture, out_tagging, out_capture)
+            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+           
+            return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
         def __init__(self):
@@ -1529,7 +1654,35 @@ class pathcomp(object):
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
 #############################################################################
 
-class dfa_utils(object):
+class common_dfa_utils(object):
+    @classmethod
+    def regexes_to_dfa(cls, re_exp, sym_list=None):
+        raise NotImplementedError
+
+    @classmethod
+    def get_edges(cls):
+        raise NotImplementedError
+    @classmethod
+    def get_edge_attributes(cls, dfa, edge):
+        raise NotImplementedError
+
+    @classmethod
+    def is_dead(cls, dfa, q):
+        raise NotImplementedError
+
+    @classmethod
+    def is_accepting(cls, dfa, q):
+        raise NotImplementedError
+
+    @classmethod
+    def get_accepting_exps(cls, dfa, edge, q):
+        raise NotImplementedError
+
+    @classmethod
+    def get_num_states(cls, dfa):
+        raise NotImplementedError
+
+class dfa_utils(common_dfa_utils):
     @classmethod
     def print_dfa(cls, d):
         """ Print a DFA object d. """
@@ -1597,10 +1750,11 @@ class dfa_utils(object):
 
     @classmethod
     def get_dead_state(cls, d):
-        return d.all_states.get_dead_state()
+        dead = d.all_states.get_dead_state()
+        return cls.get_state_index(d, dead)
 
     @classmethod
-    def get_accepting_exps(cls, d, q):
+    def get_accepting_exps(cls, d, edge, q):
         assert isinstance(d, dfa_base) # dfa object
         assert isinstance(d.all_states, re_vector_state_table)
         assert cls.is_accepting(d, q)
@@ -1646,17 +1800,67 @@ class dfa_utils(object):
         output = ''
         for sym in re_tree_gen.symbol_to_pred:
             pred = re_tree_gen.symbol_to_pred[sym]
-            print pred
             output += (sym + ': ' + pickle.dumps(pred) + '\n')
         return output
 
+    @classmethod
+    def __get_pred__(cls, dfa, edge):
+        """ Get predicate and atom type corresponding to an edge. """
+        def __sym_in_class__(cg, sym):
+            return sym in cg.symbol_to_pred
 
+        def __get_atoms_cg_typ__(atoms, sym):
+            if len(atoms) > 1:
+                typ = type(atoms[0])
+                for a in atoms[1:]:
+                    assert typ == type(a)
+                if typ == __in__:
+                    return (__in_re_tree_gen__, __in__)
+                elif typ == __out__:
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Atoms can only be in or out typed.")
+            else:
+                if __sym_in_class__(__in_re_tree_gen__, sym):
+                    return (__in_re_tree_gen__, __in__)
+                elif __sym_in_class__(__out_re_tree_gen__, sym):
+                    return (__out_re_tree_gen__, __out__)
+                else:
+                    raise TypeError("Symbol can only be in or out typed.")
+
+        edge_label = cls.get_edge_label(edge)
+        atoms_list = reduce(lambda a,x: a + x,
+                            cls.get_edge_atoms(dfa,edge),
+                            [])
+        (cg, typ) = __get_atoms_cg_typ__(atoms_list, edge_label)
+        return (cg.symbol_to_pred[edge_label], typ)
+   
+    
+    @classmethod
+    def __get_tag_val__(cls, d, q):
+        val = dfa_utils.get_state_index(d, q)
+        if int(val) == 0:
+            return None
+        else:
+            return int(val)
+
+    
+    @classmethod
+    def get_edge_attributes(cls, dfa, edge):
+        src = cls.get_edge_src(dfa, edge)
+        src_num = cls.__get_tag_val__(dfa, src)
+        dst = cls.get_edge_dst(dfa, edge)
+        dst_num = cls.__get_tag_val__(dfa, dst)
+        (pred, typ) = cls.__get_pred__(dfa, edge)
+        return (src, src_num, dst, dst_num, pred, typ)
+    
     @classmethod
     @stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
                       re_exps, True)
+        
         if not symlist:
             symlist = (__in_re_tree_gen__.get_symlist() +
                        __out_re_tree_gen__.get_symlist())
@@ -1673,6 +1877,452 @@ class dfa_utils(object):
         cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
         return dfa
 
+   
+class ragel_dfa_utils(common_dfa_utils):
+    @classmethod
+    def get_accepting_states(cls, data):
+        acc_seen = False
+        res = []
+        for line in data.splitlines():
+            if 'node' in line and 'doublecircle' in line:
+                acc_seen = True
+            elif acc_seen:
+                if 'node' in line:
+                    break
+                else:
+                    res.append(cls.get_state(line.strip()[:-1]))
+        
+        state_num = max(res) + 1
+        return (res, state_num)
+    
+    @classmethod
+    def get_state(cls, q):
+        if q == '1':
+            return None
+        return int(q) - 1
+
+    @classmethod
+    def is_accepting(cls, dfa, q):
+        return q in cls._accepting_states
+
+    @classmethod
+    def get_accepting_exps(cls, dfa, edge, q):
+        return cls._edge_ordinal[edge]
+
+    
+    @classmethod
+    def get_extended_edges(cls, output):
+        res = []
+        edge_ordinals = {}
+       
+        for line in output.splitlines():
+            if not '->' in line or 'IN' in line or 'main' in line:
+                continue
+            
+            line = line.strip()
+
+            label = line[line.index('=') + 3: line.index(']') - 2]
+            
+            dst = line[line.index('->') + 3 : line.index('[') - 1]
+            src = line[:line.index('->') - 1]
+            dst = cls.get_state(dst)
+            src = cls.get_state(src)
+
+            parts = [s.strip() for s in label.split('/')]
+            exp_list = []
+            if len(parts) > 1:
+                for exp_num in [s.strip() for s in parts[1].split(',')]:
+                    try:
+                        exp_num = int(exp_num[1:])
+                        exp_list.append(exp_num)
+                    except:
+                        pass
+
+            syms = [s.strip().replace('"','') for s in parts[0].split(',')]
+            for s in syms:
+                if '..' in s:
+                    index = s.index('..')
+                    start = int(s[:index])
+                    end = int(s[index + 2:])
+                    for i in range(start, end + 1):
+                        res.append( (src, i, dst))
+                else:
+                    edge = (src, int(s), dst)
+                    res.append(edge)
+                    edge_ordinals[edge] = exp_list
+        return (res, edge_ordinals)
+
+    @classmethod
+    def get_edges(cls, dfa):
+        return cls._edges
+
+    @classmethod
+    def get_edge_attributes(cls, dfa, edge):
+        assert len(edge) == 3
+        src = edge[0]
+        try:
+            src_num = int(src)
+        except:
+            src_num = None
+      
+        dst = edge[2]
+        try:
+            dst_num = int(dst)
+        except:
+            dst_num = None
+        
+        in_list = __in_re_tree_gen__.symbol_to_pred
+        out_list = __out_re_tree_gen__.symbol_to_pred
+        sym = edge[1]
+        if sym in in_list:
+            typ = __in__
+            pred = in_list[sym]
+        elif sym in out_list:
+            typ = __out__
+            pred = out_list[sym]
+        else:
+            raise TypeError
+
+        return (src, src_num, dst, dst_num, pred, typ)
+        
+        
+    @classmethod
+    def is_dead(cls, dfa, q):
+        return False
+
+    @classmethod
+    def get_num_states(cls, dfa):
+        return cls._state_num
+   
+    @classmethod
+    def get_dead_state(cls, dfa):
+        return cls.get_num_states(dfa)
+
+    @classmethod
+    def regex_to_ragel_format(cls, re_list):
+        res = '%%{\n\tmachine pyretic;\n\talphtype unsigned int;\n'
+        for i in range(len(re_list)):
+            res += '\taction _%d {}\n' % i
+        
+        re_list_str = '\tmain := '
+        for i,q in re_list:
+            re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
+        res += re_list_str[:-1] + ';}%%\n%% write data;'
+        return res
+       
+    @classmethod
+    @stat.elapsed_time
+    def regexes_to_dfa(cls, re_list):
+        re_list = zip(range(len(re_list)), re_list)
+        lex_input = cls.regex_to_ragel_format(re_list)
+       
+        lex_input_file = '/tmp/pyretic-regexes.txt'
+        f = open(lex_input_file, 'w')
+        f.write(lex_input)
+        f.close()
+
+        try:
+            output = subprocess.check_output(['ragel', '-V', lex_input_file])
+        except subprocess.CalledProcessError:
+            print "Error occured while running ragel"
+
+        (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
+        (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
+        
+        leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
+                      __out_re_tree_gen__.get_leaf_preds())
+       
+        dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
+
+        leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
+                      __out_re_tree_gen__.get_leaf_pickles())
+        
+        dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
+        
+        return None
+
+
+#############################################################################
+###                       Match Intersection                              ###
+#############################################################################
+
+class intersection_utils(object):
+
+    @classmethod
+    def match_intersect(cls, m1, m2):
+        '''print 'in match'
+        print m1
+        print m2
+        print '-----------------'
+        '''
+        
+        m2_map = m2.map
+
+        for k,v1 in m1.map.items():
+            if k in m2_map:
+                v2 = m2_map[k]
+                if k == 'srcip' or k == 'dstip':
+                    if not v1 in v2 and not v2 in v1:
+                        return False
+
+                elif v1 != v2:
+                    return False
+
+        return True
+
+    @classmethod
+    def match_neg_intersect(cls, m1, m2):
+        '''print 'in match_neg'
+        print m1
+        print m2
+        print '-----------------'
+        '''
+        
+        m1_map = m1.map
+
+        for k, v2 in m2.policies[0].map.items():
+            if not k in m1_map:
+                return True
+            v1 = m1_map[k]
+            if k == 'srcip' or k == 'dstip':
+                if not v1 in v2:
+                    return True
+            elif v1 != v2:
+                return True
+        return False
+    
+    @classmethod
+    def match_neg_neg_intersect(cls, m1, m2):
+        '''
+        print 'in match_neg_neg'
+        print m1
+        print m2
+        print '-----------------'
+        '''
+        
+        m1_map = m1.map
+
+        for k, v2 in m2.map.items():
+            if not k in m1_map:
+                return True
+            v1 = m1_map[k]
+            if k == 'srcip' or k == 'dstip':
+                v1 = IPNetwork(util.network_to_string(v1))
+                v2 = IPNetwork(util.network_to_string(v2))
+                u = cidr_merge([v1, v2])
+                if len(u) > 1 or u.prefixlen > 0:
+                    return True
+            else:
+                return True
+        return False
+
+    @classmethod
+    def match_neg_tree_intersect(cls, m1, m2, neg):
+        '''
+        print 'in match_neg_tree'
+        print m1
+        print m2
+        print neg
+        print '-----------------'
+        '''
+        
+        inner_policy = m2.policies[0]
+        if isinstance(inner_policy, match):
+            if neg:
+                return cls.match_intersect(m1, inner_policy)
+            else:
+                return cls.match_neg_intersect(m1, m2)
+        elif inner_policy == drop:
+            if neg:
+                return False
+            else:
+                return classifier_utils.is_not_drop(m1)
+        elif inner_policy == identity:
+            if neg:
+                return classifier_utils.is_not_drop(m1)
+            else:
+                return False
+
+        elif isinstance(inner_policy, negate):
+            return cls.match_tree_intersect(m1, inner_policy.policies[0], neg)
+        elif isinstance(inner_policy, intersection):
+            return cls.match_intersect_tree_intersect(m1, inner_policy, not neg)
+        elif isinstance(inner_policy, union):
+            return cls.match_union_tree_intersect(m1, inner_policy, not neg)
+        raise TypeError
+
+    @classmethod
+    def match_intersect_tree_intersect(cls, m1, m2, neg):
+        '''
+        print 'in match_intersect_tree'
+        print m1
+        print m2
+        print neg
+        print '-----------------'
+        '''
+        
+        if neg:
+            for pol in m2.policies:
+                if cls.match_tree_intersect(m1, pol, neg):
+                    return True
+            return False
+        else:
+            for pol in m2.policies:
+                if not cls.match_tree_intersect(m1, pol, neg):
+                    return False
+            return True
+
+    @classmethod
+    def match_union_tree_intersect(cls, m1, m2, neg):
+        '''
+        print 'in match_union_tree'
+        print m1
+        print m2
+        print neg
+        print '-----------------'
+        '''
+
+        if neg:
+            for pol in m2.policies:
+                if not cls.match_tree_intersect(m1, pol, neg):
+                    return False
+            return True
+        else:
+            for pol in m2.policies:
+                if cls.match_tree_intersect(m1, pol, neg):
+                    return True
+            return False
+
+    @classmethod
+    def match_tree_intersect(cls, m1, m2, neg):
+        assert isinstance(m1, match)
+        '''
+        print 'in match_tree'
+        print m1
+        print m2
+        print neg
+        print '-----------------'
+        '''
+        if isinstance(m2, match):
+            if not neg:
+                return cls.match_intersect(m1, m2)
+            else:
+                return cls.match_neg_intersect(m1, ~m2)
+        elif m2 == drop:
+            if neg:
+                return classifier_utils.is_not_drop(m1)
+            else:
+                return False
+        elif m2 == identity:
+            if neg:
+                return False
+            else:
+                return classifier_utils.is_not_drop(m1)
+
+        elif isinstance(m2, negate):
+            return cls.match_neg_tree_intersect(m1, m2, neg)
+        elif isinstance(m2, intersection):
+            return cls.match_intersect_tree_intersect(m1, m2, neg)
+        elif isinstance(m2, union):
+            return cls.match_union_tree_intersect(m1, m2, neg)
+
+        raise TypeError
+   
+
+class sat_utils:
+    @classmethod
+    def union_set(cls, s1, s2):
+        def_1 = s1[1]
+        def_2 = s2[1]
+
+        map_1 = s1[0]
+        map_2 = s2[0]
+        for k, v1 in map_1.items():
+            if v1:
+                if k in map_2:
+                    del map_2[k]
+            elif k in map_2:
+                map_1[k] = map_2[k]
+                del map_2[k]
+            else:
+                map_1[k] = def_2       
+        if def_1:
+            return (map_1, def_1)
+
+        for k, v2 in map_2.items():
+            map_1[k] = v2
+        
+        return (map_1, def_1 or def_2)
+
+    @classmethod
+    def intersect_set(cls, s1, s2):
+        def_1 = s1[1]
+        def_2 = s2[1]
+
+        map_1 = s1[0]
+        map_2 = s2[0]
+        for k, v1 in map_1.items():
+            if not v1:
+                if k in map_2:
+                    del map_2[k]
+            elif k in map_2:
+                map_1[k] = map_2[k]
+                del map_2[k]
+            else:
+                map_1[k] = def_2  
+        
+        if not def_1:
+            return (map_1, def_1)
+        for k, v2 in map_2.items():
+            map_1[k] = v2
+
+        return (map_1, def_1 and def_2)
+    @classmethod
+    def is_not_drop_set(cls, p, neg):
+        if p == identity:
+            if neg:
+                return ({}, False)
+            else:
+                return  ({}, True)
+        elif p == drop:
+            if neg:
+                return ({}, True) 
+            else:
+                return ({}, False)
+        else:
+            p_type = type(p) 
+            if p_type == match:
+                if neg:
+                    return ({p.map['switch']:False}, True)
+                else:
+                    return ({p.map['switch']:True}, False)
+            elif p_type == negate:
+                return cls.is_not_drop_set(p.policies[0], not neg)
+
+            elif (not neg and p_type == intersection) or (neg and p_type == union):
+                res = ({},True)
+                for pol in p.policies:
+                    res = cls.intersect_set(cls.is_not_drop_set(pol, neg), res)
+                return res
+            elif (not neg and p_type == union) or (neg and p_type == intersection):
+                res = ({}, False)
+                for pol in p.policies:
+                    res = cls.union_set(cls.is_not_drop_set(pol, neg), res)
+                return res
+            raise TypeError
+
+    @classmethod
+    def is_not_drop(cls, p):
+        res = cls.is_not_drop_set(p, False)
+        if res[1]:
+            return True
+        else:
+            for v in res[0].values():
+                if v:
+                    return True
+
+            return False
+    
 #############################################################################
 ###                              Pickling                                 ###
 #############################################################################
