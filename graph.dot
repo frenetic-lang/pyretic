@@ -1,0 +1,16 @@
+digraph pyretic {
+	rankdir=LR;
+	node [ shape = point ];
+	ENTRY;
+	en_1;
+	node [ shape = circle, height = 0.2 ];
+	node [ fixedsize = true, height = 0.65, shape = doublecircle ];
+	4;
+	node [ shape = circle ];
+	1 -> 2 [ label = "49" ];
+	1 -> 3 [ label = "51" ];
+	2 -> 4 [ label = "50 / _0" ];
+	3 -> 4 [ label = "50 / _1" ];
+	ENTRY -> 1 [ label = "IN" ];
+	en_1 -> 1 [ label = "main" ];
+}

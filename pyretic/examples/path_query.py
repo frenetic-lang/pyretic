@@ -452,18 +452,29 @@ def print_callback(pkt):
     print pkt
     print '-----------'
 
+
+def print_callback_2(pkt):
+    global count
+    count += 1
+    print 'count is ' + str(count)
+    print 'calll baaack 2'
+    print pkt
+    print '-----------'
+
+
 # type: unit -> path list
 def path_main(**kwargs):
     #return path_test_waypoint_violation_general()
-    p = atom(match(switch = 3))
-    p.register_callback(print_callback)
-    return p
+    p1 = atom(match(switch = 3)) 
+    p1.register_callback(print_callback)
+    p2 = atom(match(switch = 1))
+    p2.register_callback(print_callback_2)
+    p = p1 + p2
+    #return p
+    return path_test_3()
 
 def main(**kwargs):
 #    return mac_learner()
-    b = FwdBucket()
-    b.register_callback(query_callback('mina'))
     #return static_fwding_single_switch
-    #return static_fwding_chain_3_3 + (identity >> b) 
     return static_fwding_chain_3_3
 #    return static_fwding_cycle_4_4_spanning_tree_1

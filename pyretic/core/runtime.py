@@ -67,7 +67,7 @@ class Runtime(object):
     
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
-                 verbosity='normal'):
+                 verbosity='normal', opt_flags = None):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
@@ -83,65 +83,104 @@ class Runtime(object):
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
 
+        self.path_in_table = DynamicPolicy(identity)
+        self.path_out_table = DynamicPolicy(identity)
         self.vf_tag_pol = None
         self.vf_untag_pol = None
 
         if path_main:
+            if opt_flags is None:
+                self.disjoint_enabled = False
+                self.integrate_enabled = False
+                self.multitable_enabled = False
+            else:
+                self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled = opt_flags
+            
             from pyretic.lib.path import pathcomp
             pathcomp.init(NUM_PATH_TAGS)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
 
-            in_tag_policy = self.path_in_tagging >> self.policy
-            self.forwarding = (in_tag_policy >> self.path_out_tagging)
-            in_capture  = self.path_in_capture
-            self.out_capture = (in_tag_policy >> self.path_out_capture)
+            
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
+                    
+            if self.multitable_enabled:
+                if self.integrate_enabled:
+                    self.in_table_compile()
+                    self.out_table_compile()
+                    
+                    self.vf_tag_compile()
+                    self.vf_untag_compile()
 
-            ## gathering stats
-            # forwarding
-            self.forwarding_compile()
-            self.tagging_compile()
-            self.out_tagging_compile()
-            self.tag_fwd_compile()
+                    self.policy = (self.virtual_tag >> self.path_in_table >> self.policy
+                                    >> self.path_out_table >> self.virtual_untag)
 
-            # capture
-            def cb(pkt):
-                pass
-                #print pkt
-                #print '-----------'
-            b = FwdBucket()
-            b.register_callback(cb)
-            
-            #self.out_capture = self.out_capture + (match(dstip='10.0.0.3') >> b)
-            self.capture_compile()
-            self.out_capture_compile()
-            self.full_out_capture_compile()
+                    self.whole_compile()
+                else:
+                    
+                    self.forwarding_compile()
+                    self.tagging_compile()
+                    self.out_tagging_compile()
+                    self.capture_compile()
+                    self.out_capture_compile()
+                    
+                    self.path_in_table = self.path_in_tagging + self.path_in_capture
+                    self.path_out_table = self.path_in_tagging + self.path_out_capture
+                    
+                    self.in_table_compile()
+                    self.out_table_compile()
 
-            # virtual tags
-            self.vf_tag_compile()
-            self.vf_untag_compile()
-            
-            self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
-            self.vtag_in_capture = (self.virtual_tag >> in_capture)
-            self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
-
-            self.vtag_fw_compile()
-            self.vtag_in_capture_compile()
-            self.vtag_out_capture_compile()
-            
-            #self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
-            self.policy = (
-                    self.virtual_tag >> (self.path_in_tagging + self.path_in_capture) >> 
-                    self.policy >> (self.path_out_tagging + self.path_out_capture) >>
+                    self.vf_tag_compile()
+                    self.vf_untag_compile()
+                    
+                    self.policy = (
+                    self.virtual_tag >> self.path_in_table >> 
+                    self.policy >> self.path_out_table >>
                     self.virtual_untag
                     )
-            self.whole_policy_compile()
+                    
+                    self.whole_compile()
+            else:
+                
+                in_tag_policy = self.path_in_tagging >> self.policy
+                self.forwarding = (in_tag_policy >> self.path_out_tagging)
+                in_capture  = self.path_in_capture
+                self.out_capture = (in_tag_policy >> self.path_out_capture)
 
-            #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
-             #              (virtual_tag >> in_capture) +
-              #             (virtual_tag >> out_capture))
+                ## gathering stats
+                # forwarding
+                self.forwarding_compile()
+                self.tagging_compile()
+                self.out_tagging_compile()
+                self.tag_fwd_compile()
+
+            
+                #capture
+                self.capture_compile()
+                self.out_capture_compile()
+                self.full_out_capture_compile()
+
+                # virtual tags
+                self.vf_tag_compile()
+                self.vf_untag_compile()
+            
+                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+                self.vtag_in_capture = (self.virtual_tag >> in_capture)
+                self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
+
+                self.vtag_fw_compile()
+                self.vtag_in_capture_compile()
+                self.vtag_out_capture_compile()
+            
+                
+                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
+            
+                self.whole_compile()
+
+                #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
+                #              (virtual_tag >> in_capture) +
+                #             (virtual_tag >> out_capture))
 
         self.mode = mode
         self.backend = backend
@@ -180,11 +219,21 @@ class Runtime(object):
 # Stat Methods 
 ######################
 
+    ##### general methods ######
+    
     @stat.classifier_size
     @stat.elapsed_time
     def forwarding_compile(self):
         return self.policy.compile()
      
+    @stat.classifier_size
+    @stat.elapsed_time
+    def whole_compile(self):
+        return self.policy.compile()
+
+    
+    ##### tagging methods ######
+
     @stat.classifier_size
     @stat.elapsed_time
     def tagging_compile(self):
@@ -195,6 +244,7 @@ class Runtime(object):
     def out_tagging_compile(self):
         return self.path_out_tagging.compile()
 
+    ##### capture methods ######
     @stat.classifier_size
     @stat.elapsed_time
     def capture_compile(self):
@@ -205,17 +255,8 @@ class Runtime(object):
     def out_capture_compile(self):
         return self.path_out_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
-    def full_out_capture_compile(self):
-        return self.out_capture.compile()
-
-    @stat.classifier_size
-    @stat.elapsed_time
-    def tag_fwd_compile(self):
-        return self.forwarding.compile()
-
-
+    
+    ##### virtual tags methods ######
     @stat.classifier_size
     @stat.elapsed_time
     def vf_tag_compile(self):
@@ -226,30 +267,61 @@ class Runtime(object):
     def vf_untag_compile(self):
         return self.virtual_untag.compile()
 
+
+    
+    ############## composed methods #################
+    
+    ### single table ###
+
+    @stat.classifier_size
+    @stat.elapsed_time
+    def tag_fwd_compile(self):
+
+        ## this is in_tag >> forwarding >> out_tag 
+        return self.forwarding.compile()
+
+    
+    @stat.classifier_size
+    @stat.elapsed_time
+    def full_out_capture_compile(self):
+        ## this is in_tag_fwd >> path_out_capture
+        ## tag_fwd is in_tag >> forwarding which is already compiled
+        return self.out_capture.compile()
+
+    
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_fw_compile(self):
+        ## this is vtag >> tag_fwd >> vuntag
         return self.vtag_forwarding.compile()
 
 
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_in_capture_compile(self):
+        ## this is vtag >> in_capture
         return self.vtag_in_capture.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
     def vtag_out_capture_compile(self):
+        ## this is vtag >> out_captre
         return self.vtag_out_capture.compile()
 
-
+    ### multi table ###
+    @stat.classifier_size
+    @stat.elapsed_time
+    def in_table_compile(self):
+        return self.path_in_table.compile()
 
     @stat.classifier_size
     @stat.elapsed_time
-    def whole_compile(self):
-        return self.policy.compile()
+    def out_table_compile(self):
+        return self.path_out_table.compile()
 
 
+
+   
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,
@@ -274,8 +346,6 @@ class Runtime(object):
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
             
-            #print pyretic_pkt
-            #print '--------------'
             
             # find the queries, if any in the policy, that will be evaluated
             queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
@@ -479,12 +549,17 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS)
-        (in_tag, in_cap, out_tag, out_cap) = policy_fragments
-        self.path_in_tagging.policy  = in_tag
-        self.path_in_capture.policy  = in_cap
-        self.path_out_tagging.policy = out_tag
-        self.path_out_capture.policy = out_cap
+        policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
+                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
+
+        if self.multitable_enabled and self.integrate_enabled:
+            (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
+        else:
+            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+            self.path_in_tagging.policy  = in_tag
+            self.path_in_capture.policy  = in_cap
+            self.path_out_tagging.policy = out_tag
+            self.path_out_capture.policy = out_cap
 
 
 #######################
