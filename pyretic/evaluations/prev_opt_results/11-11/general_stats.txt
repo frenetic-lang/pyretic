@@ -1,0 +1,4 @@
+out capture edges: 121
+in tagging edges: 4136
+in capture edges: 0
+out tagging edges: 165

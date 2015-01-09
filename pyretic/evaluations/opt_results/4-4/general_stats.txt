@@ -1,4 +1,5 @@
 out capture edges: 16
-in tagging edges: 356
+dfa state count: 45
+in tagging edges: 180
+out tagging edges: 28
 in capture edges: 0
-out tagging edges: 32

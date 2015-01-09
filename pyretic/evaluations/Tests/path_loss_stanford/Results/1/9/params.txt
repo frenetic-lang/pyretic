@@ -1,0 +1,11 @@
+profile True
+controller_debug_mode False
+cli False
+listen_port 6634
+test_duration_sec 30
+total_traffic_prefix total-traffic
+slack_factor 5.0
+topo_args [9]
+results_folder ./Reports/9
+policy_args ['n', '9']
+test path_packet_loss

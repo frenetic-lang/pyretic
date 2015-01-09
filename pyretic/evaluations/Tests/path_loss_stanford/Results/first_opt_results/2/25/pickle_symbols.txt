@@ -1,0 +1,186 @@
+1: (cpyretic.core.language
+match
+(dp0
+S'srcip'
+p1
+S'10.0.0.1'
+p2
+sS'switch'
+p3
+I1
+sS'dstip'
+p4
+S'10.0.0.2'
+p5
+so.
+3: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I2
+so.
+5: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I4
+so.
+4: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I3
+so.
+7: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I6
+so.
+6: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I5
+so.
+9: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I8
+so.
+8: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I7
+so.
+;: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I10
+so.
+:: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I9
+so.
+=: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I12
+so.
+<: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I11
+so.
+?: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I14
+so.
+>: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I13
+so.
+A: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I16
+so.
+@: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I15
+so.
+C: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I18
+so.
+B: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I17
+so.
+E: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I20
+so.
+D: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I19
+so.
+G: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I22
+so.
+F: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I21
+so.
+I: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I24
+so.
+H: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I23
+so.
+J: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I25
+so.
+2: cpyretic.core.language
+identity
+.

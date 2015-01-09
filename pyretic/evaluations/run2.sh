@@ -5,7 +5,7 @@ for i in {5..15}
 do 
 #    set $i
     #sudo python eval_compilation.py -t congested_link -polargs n $1 m $2 -r ./opt_results/$1-$2
-    python eval_compilation.py -d -u -i -r -t congested_link -polargs n $i m $i > out-$i
+    python eval_compilation.py -d -u -i -r -t congested_link -polargs n $i m $i > cor_check/out-$i
 
 #    sudo python eval_compilation.py -t path_packet_loss -polargs n $i -r ./opt_results/$i 
 done

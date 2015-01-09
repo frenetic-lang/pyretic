@@ -1,0 +1,16 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-02 2] connected
+INFO:openflow.of_01:[00-00-00-00-00-01 5] connected
+INFO:openflow.of_01:[00-00-00-00-00-04 1] connected
+INFO:openflow.of_01:[00-00-00-00-00-0a 3] connected
+INFO:openflow.of_01:[00-00-00-00-00-07 9] connected
+INFO:openflow.of_01:[00-00-00-00-00-08 6] connected
+INFO:openflow.of_01:[00-00-00-00-00-05 8] connected
+INFO:openflow.of_01:[00-00-00-00-00-09 4] connected
+INFO:openflow.of_01:[00-00-00-00-00-03 10] connected
+INFO:openflow.of_01:[00-00-00-00-00-06 7] connected
+
+----starting pyretic shutdown------
+attempting to kill of_client
+pyretic.py done
