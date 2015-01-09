@@ -1,0 +1,31 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+INFO:core:POX 0.1.0 (betta) is up.
+INFO:openflow.of_01:[00-00-00-00-00-10 2] connected
+INFO:openflow.of_01:[00-00-00-00-00-0f 12] connected
+INFO:openflow.of_01:[00-00-00-00-00-0b 5] connected
+INFO:openflow.of_01:[00-00-00-00-00-13 10] connected
+INFO:openflow.of_01:[00-00-00-00-00-11 1] connected
+INFO:openflow.of_01:[00-00-00-00-00-05 16] connected
+INFO:openflow.of_01:[00-00-00-00-00-04 3] connected
+INFO:openflow.of_01:[00-00-00-00-00-12 11] connected
+INFO:openflow.of_01:[00-00-00-00-00-0a 6] connected
+INFO:openflow.of_01:[00-00-00-00-00-08 14] connected
+INFO:openflow.of_01:[00-00-00-00-00-07 17] connected
+INFO:openflow.of_01:[00-00-00-00-00-15 9] connected
+INFO:openflow.of_01:[00-00-00-00-00-01 8] connected
+INFO:openflow.of_01:[00-00-00-00-00-02 4] connected
+INFO:openflow.of_01:[00-00-00-00-00-06 15] connected
+INFO:openflow.of_01:[00-00-00-00-00-09 7] connected
+INFO:openflow.of_01:[00-00-00-00-00-0e 13] connected
+INFO:openflow.of_01:[00-00-00-00-00-0d 18] connected
+INFO:openflow.of_01:[00-00-00-00-00-0c 19] connected
+INFO:openflow.of_01:[None 20] disconnected
+INFO:openflow.of_01:[None 21] disconnected
+INFO:openflow.of_01:[None 20] closed
+INFO:openflow.of_01:[None 21] closed
+INFO:openflow.of_01:[00-00-00-00-00-14 22] connected
+INFO:openflow.of_01:[00-00-00-00-00-03 23] connected
+
+----starting pyretic shutdown------
+attempting to kill of_client
+pyretic.py done

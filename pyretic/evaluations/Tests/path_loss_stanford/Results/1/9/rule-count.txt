@@ -1,0 +1,17 @@
+dfa state count : 11 
+--------------------
+rule count statistics: 
+switch count: 9
+total rule count: 827
+average rule count: 91.8888888889
+------details-------
+s9 -> 98
+s8 -> 94
+s3 -> 94
+s2 -> 94
+s1 -> 71
+s7 -> 94
+s6 -> 94
+s5 -> 94
+s4 -> 94
+--------end--------

@@ -1,0 +1,10 @@
+1: match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+3: match: ('switch', 2)
+5: match: ('switch', 4)
+4: match: ('switch', 3)
+7: match: ('switch', 6)
+6: match: ('switch', 5)
+9: match: ('switch', 8)
+8: match: ('switch', 7)
+:: match: ('switch', 9)
+2: identity

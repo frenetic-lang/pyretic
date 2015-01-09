@@ -14,8 +14,10 @@ import argparse
 
 class eval_compilation:
 
-    def __init__(self, args, **kwargs):
-        
+    def __init__(self, args, kwargs):
+        self.max_states = 65000
+        self.add_calls = 0
+
         self.policy = eval_path.main(**kwargs)
         self.path_policy = eval_path.path_main(**kwargs)
         self.params = kwargs
@@ -34,16 +36,19 @@ class eval_compilation:
                 elif os.path.isdir(fpath):
                     shutil.rmtree(fpath)
 
-    def compile(self, full_compile = False):
-
-        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
-
-        pathcomp.init(1022)
+    def add(self, full_compile, **aparams):
+        self.policy = eval_path.main(**aparams)
+        self.path_policy = eval_path.path_main(**aparams)
         
-        policy_fragments = pathcomp.compile(self.path_policy, 1022, 
+        self.add_calls += 1
+        results_folder = "%s_%d" % (self.results_folder[:-1], self.add_calls)
+        stat.start(results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
+        
+        
+        policy_fragments = pathcomp.add_query(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
         
-        return
+        #return
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
         else:
@@ -134,6 +139,107 @@ class eval_compilation:
 
         stat.stop()
 
+
+    def compile(self, full_compile = False):
+
+        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
+        
+        
+        pathcomp.init(self.max_states)
+        
+        policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
+                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
+        
+        #return
+        if self.multitable_enabled and self.integrate_enabled:
+            (self.path_in_table, self.path_out_table) = policy_fragments
+        else:
+            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+            self.path_in_tagging  = in_tag
+            self.path_in_capture = in_cap
+            self.path_out_tagging= out_tag
+            self.path_out_capture = out_cap
+
+                
+        if self.multitable_enabled:
+            if self.integrate_enabled:
+                self.forwarding_compile()
+                self.in_table_compile()
+                self.out_table_compile()
+                
+                #self.policy = (self.path_in_table >> self.policy
+                #                >> self.path_out_table)
+
+                #self.whole_compile()
+            else:
+                
+                self.forwarding_compile()
+                self.tagging_compile()
+                self.out_tagging_compile()
+                self.capture_compile()
+                self.out_capture_compile()
+                
+                self.path_in_table = self.path_in_tagging + self.path_in_capture
+                self.path_out_table = self.path_in_tagging + self.path_out_capture
+                
+                self.in_table_compile()
+                self.out_table_compile()
+
+                
+                #self.policy = (
+                #self.path_in_table >> 
+                #self.policy >> self.path_out_table
+                #)
+                
+                #self.whole_compile()
+        else:
+            
+            in_tag_policy = self.path_in_tagging >> self.policy
+            self.forwarding = (in_tag_policy >> self.path_out_tagging)
+            in_capture  = self.path_in_capture
+            self.out_capture = (in_tag_policy >> self.path_out_capture)
+
+            ## gathering stats
+            # forwarding
+            self.forwarding_compile()
+            self.tagging_compile()
+            self.out_tagging_compile()
+            self.tag_fwd_compile()
+
+        
+            #capture
+            self.capture_compile()
+            self.out_capture_compile()
+            self.full_out_capture_compile()
+
+
+        if full_compile:
+            self.virtual_tag = self.get_vf_tagging_policy()
+            self.virtual_untag = self.get_vf_untagging_policy()
+
+            # virtual tags
+            self.vf_tag_compile()
+            self.vf_untag_compile()
+            
+            
+            if multitable_enabled:
+                self.policy = self.virtual_tag >> self.policy >> self.virtual_untag
+                self.whole_policy_compile()
+
+            else:
+                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+                self.vtag_in_capture = (self.virtual_tag >> in_capture)
+                self.vtag_out_capture = (self.virtual_tag >> out_capture)
+
+                self.vtag_fw_compile()
+                self.vtag_in_capture_compile()
+                self.vtag_out_capture_compile()
+
+                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+                self.whole_policy_compile()
+
+
+        stat.stop()
 
     def get_vf_tagging_policy(self):
         return None
@@ -252,11 +358,17 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Evaluates compilation of path query toghether with the forwarding policy")
     parser.add_argument("-t", "--test", required=True
                         , help="Test case to run")
+    
+    parser.add_argument("-a", "--added_query"
+                        , help= "Test case to be added to the main test")
+
     parser.add_argument("-f", "--results_folder",
                         default="./results/",
                         help="Folder to put the raw results data into")
 
     parser.add_argument("-polargs", "--policy_args", nargs='+')
+
+    parser.add_argument("-apolargs", "--added_policy_args", nargs='+')
 
     parser.add_argument( '--enable_disjoint', '-d', action="store_true",
                     dest="disjoint_enabled",
@@ -293,6 +405,17 @@ def get_testwise_params(args):
     print params
     return params
 
+def get_added_query_params(args):
+    params = {}
+    if args.added_policy_args:
+        arg_iter = iter(args.added_policy_args)
+        for arg in arg_iter:
+            val = next(arg_iter)
+            params[arg] = val
+    params['test'] = args.added_query
+    print params
+    return params
+
 #### profiling
 def profile(args):
     import cProfile as profile
@@ -304,15 +427,21 @@ def profile(args):
 if __name__ == '__main__':
     args = parse_args()
 
-    p = eval_path.path_main(**get_testwise_params(args))
-    profile(args)
-    '''import time
-    eval_comp = eval_compilation(args, **get_testwise_params(args))
+    #p = eval_path.path_main(**get_testwise_params(args))
+    #profile(args)
+    import time
+
+    eval_comp = eval_compilation(args, get_testwise_params(args))
     t_s = time.time()
     eval_comp.compile()
     print time.time() - t_s
-    '''
-
+    
+    if args.added_query:
+        aparams = get_added_query_params(args)
+        t_s = time.time()
+        eval_comp.add(False, **aparams)
+        print time.time() - t_s
+    
 
 #######################################################
 ###             Previous Tests                      ###
