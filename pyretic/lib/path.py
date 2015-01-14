@@ -155,6 +155,20 @@ class re_tree_gen(object):
     symbol_to_pred = {}
     dyn_preds      = []
 
+    class dyn_pred_obj(object):
+        """ A dynamic predicate occuring as a sub-policy in a bigger predicate."""
+        def __init__(self, pred, pol):
+            self.pred = pred
+            self.pol  = pol
+
+        def __hash__(self):
+            return id(self.pred) * id(self.pol)
+
+        def __eq__(self, other):
+            return (isinstance(other, re_tree_gen.dyn_pred_obj) and
+                    id(self.pred) == id(other.pred) and
+                    id(self.pol)  == id(other.pol))
+
     @classmethod
     def repr_state(cls):
         assert (sorted(cls.pred_to_symbol.keys()) ==
@@ -179,11 +193,12 @@ class re_tree_gen(object):
         cls.symbol_to_pred[symbol] = pred
 
     @classmethod
-    def __add_dyn_preds__(cls, preds, atom):
+    def __add_dyn_preds__(cls, preds, atom_pol):
         """ Add each predicate in `preds` to list of dynamic predicates, with
         the corresponding `atom`. """
         for pred in preds:
-            cls.dyn_preds.append((pred, atom))
+            dyn_obj = cls.dyn_pred_obj(pred, atom_pol)
+            cls.dyn_preds.append(dyn_obj)
 
     @classmethod
     def __del_pred__(cls, pred):
@@ -290,6 +305,10 @@ class re_tree_gen(object):
             pred_atoms = cls.pred_to_atoms[pred]
             pred_symbol = cls.pred_to_symbol[pred]
             (is_equal,is_superset,is_subset,intersects) = ovlap(pred, new_pred)
+            if not is_not_drop(new_pred):
+                """ i.e., new_pred empty """
+                re_tree |= re_empty()
+                return re_tree
             if is_equal:
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
@@ -837,7 +856,7 @@ class path_combinator(path):
             except AttributeError:
                 return pre_spaces + extra_ind + repr(x)
         repr_paths = map(get_repr, self.paths)
-        return "%s%s:\n%s" % (pre_spaces, self.name(), '\n'.join(repr_paths))
+        return "%s%s:\n%s" % (pre_spaces, self.__class__.__name__, '\n'.join(repr_paths))
 
     def __repr__(self):
         return self.__repr_pretty__()
