@@ -1153,7 +1153,9 @@ class pathcomp(object):
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, dst)
                 for i in ords:
-                    cap_frag = ((match_tag(src) & pred) >> pol_list[i])
+                    cap_frag = ((match_tag(src) & pred) >>
+                                set_tag(dst) >>
+                                pol_list[i])
                     if typ == __in__:
                         in_capture += cap_frag
                     elif typ == __out__:
