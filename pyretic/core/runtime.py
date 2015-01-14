@@ -234,8 +234,17 @@ class Runtime(object):
             with self.policy_lock:
                 for policy in self.dynamic_sub_pols:
                     policy.set_network(self.network)
-                for (sub_pol, full_pol) in self.dynamic_path_preds:
-                    sub_pol.set_network(self.network)
+
+                """ Update network objects for dynamic predicates in path
+                queries as well. If any of them changed its policy, path queries
+                must be recompiled.
+                """
+                self.dyn_path_pred_changed = False
+                for dyn_pred_obj in self.dynamic_path_preds:
+                    dyn_pred_obj.pred.set_network(self.network)
+                if self.dyn_path_pred_changed:
+                    self.handle_path_change()
+                    self.dyn_path_pred_changed = False
 
                 # FIXME(joshreich) :-)
                 # This is a temporary fix. We need to specialize the check below
@@ -308,10 +317,17 @@ class Runtime(object):
         self.recompile_paths()
         self.update_dynamic_sub_path_pols(self.path_policy)
 
-    def handle_path_change_dyn_pred(self, sub_pol, full_pol):
-        recompile_list = on_recompile_path_list(id(sub_pol), full_pol)
-        map(lambda p: p.invalidate_classifier(), recompile_list)
-        self.handle_path_change()
+    def handle_path_change_dyn_pred(self, sub_pol):
+        dyn_preds = self.dynamic_path_preds
+        for policy_tuple in dyn_preds:
+            if id(policy_tuple.pred) == id(sub_pol):
+                full_pol = policy_tuple.pol
+                recomp_list = on_recompile_path_list(id(sub_pol), full_pol)
+                map(lambda p: p.invalidate_classifier(), recomp_list)
+        if not self.in_network_update:
+            self.handle_path_change()
+        else:
+            self.dyn_path_pred_changed = True
 
     def update_dynamic_sub_path_pols(self, path_pol):
         """ Update runtime internal structures which keep track of dynamic
@@ -330,14 +346,14 @@ class Runtime(object):
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
             pp.path_attach(self.handle_path_change)
         old_dynamic_path_preds = copy.copy(self.dynamic_path_preds)
+        dyn_preds_tuples = in_cg.get_dyn_preds() + out_cg.get_dyn_preds()
         self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
                                       out_cg.get_dyn_preds())
-        for (sp, fp) in (old_dynamic_path_preds - self.dynamic_path_preds):
-            sp.path_detach()
-        for (sp, fp) in (self.dynamic_path_preds - old_dynamic_path_preds):
-            sp.set_network(self.network)
-            f = lambda x: self.handle_path_change_dyn_pred(x, fp)
-            sp.path_attach(f)
+        for olds in (old_dynamic_path_preds - self.dynamic_path_preds):
+            olds.pred.path_detach()
+        for news in (self.dynamic_path_preds - old_dynamic_path_preds):
+            news.pred.set_network(self.network)
+            news.pred.path_attach(self.handle_path_change_dyn_pred)
 
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the

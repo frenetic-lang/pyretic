@@ -520,6 +520,34 @@ def path_test_25():
     p.register_callback(query_callback(25))
     return p
 
+def path_test_26():
+    p1 = (in_atom(match(srcip=ip1, switch=1)) ^
+          out_atom(match(switch=2, dstip=ip2)))
+    p2 = (in_atom(match(switch=1)) ^ in_out_atom(identity, match(switch=2)))
+    p1.register_callback(query_callback("26.p1"))
+    p2.register_callback(query_callback("26.p2"))
+    return p1 + p2
+
+def path_test_tm():
+    num_switches = 4
+    pset = path_empty()
+    ing = ingress_network
+    eg  = egress_network
+    for i in range(1, num_switches + 1):
+        for j in range(1, num_switches + 1):
+            if (i != j):
+                p = (in_atom(ing() & match(switch=i)) ^
+                     +in_atom(identity) ^
+                     out_atom(eg() & match(switch=j)))
+                cb = CountBucket()
+                cb.register_callback(query_callback("27.%d.%d" % (i, j)))
+                p.set_bucket(cb)
+                query_thread = threading.Thread(target=query_func, args=(cb,5.0))
+                query_thread.daemon = True
+                query_thread.start()
+                pset += p
+    return pset
+
 def get_query(kwargs, default):
     params = dict(kwargs)
     if 'query' in params:

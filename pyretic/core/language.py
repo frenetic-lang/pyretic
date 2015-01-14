@@ -1502,17 +1502,17 @@ class DynamicFilter(DynamicPolicy,Filter):
     """
     def __init__(self, policy=drop):
         super(DynamicFilter, self).__init__(policy)
-        self.path_notify = None
+        self.path_notify = []
 
     def path_attach(self, path_notify):
-        self.path_notify = path_notify
+        self.path_notify.append(path_notify)
 
     def path_detach(self):
-        self.path_notify = None
+        self.path_notify = []
 
     def changed(self):
-        if self.path_notify:
-            self.path_notify(self)
+        for f in self.path_notify:
+            f(self)
         if self.notify:
             self.notify(self)
 
