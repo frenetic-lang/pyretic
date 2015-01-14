@@ -527,6 +527,8 @@ class Runtime(object):
         """
         if classifier is None:
             return
+        if not self.use_nx:
+            table_id = 0
 
         ### CLASSIFIER TRANSFORMS 
 
