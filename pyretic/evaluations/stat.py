@@ -136,24 +136,29 @@ def create_overall_report(results_path, rule_cnt, dfa_path):
 def create_excel_report(results_path, rule_cnt, dfa_path):
     global multitable_enabled
     global integrate_enabled
+    global ragel_enabled
+
+    first_col = 'makeDFA_vector'
+    if ragel_enabled:
+        first_col = 'regexes_to_dfa'
 
     row = None
     if multitable_enabled:
         if integrate_enabled:
-            row =  ["makeDFA_vector", 'compile', 'forwarding_compile', 
+            row =  [first_col, 'compile', 'forwarding_compile', 
                     'in_table_compile', 'out_table_compile']
             row.extend(['tab'] * 13)
 
 
         else:
-            row =  ["makeDFA_vector", 'compile', 'forwarding_compile', 
+            row =  [first_col, 'compile', 'forwarding_compile', 
                     'tagging_compile', 'out_tagging_compile', 
                     'capture_compile', 'out_capture_compile', 
                     'in_table_compile', 'tab', 'out_table_compile', 'tab']
             row.extend(['tab'] * 13)
 
     else:
-        row = ["makeDFA_vector", 'compile', 'forwarding_compile', 
+        row = [first_col, 'compile', 'forwarding_compile', 
                 'tagging_compile', 'out_tagging_compile', 'tag_fwd_compile',
                 'capture_compile', 'out_capture_compile', 'full_out_capture_compile']            
         row.extend(['tab'] * 13)

@@ -1,0 +1,135 @@
+1: match: ('switch', 1)
+5: match: ('switch', 43)
+7: match: ('switch', 44)
+9: match: ('switch', 22)
+11: match: ('switch', 23)
+13: match: ('switch', 24)
+15: match: ('switch', 25)
+17: match: ('switch', 26)
+19: match: ('switch', 27)
+21: match: ('switch', 28)
+23: match: ('switch', 29)
+25: match: ('switch', 30)
+27: match: ('switch', 31)
+29: match: ('switch', 32)
+31: match: ('switch', 33)
+33: match: ('switch', 34)
+35: match: ('switch', 35)
+37: match: ('switch', 36)
+39: match: ('switch', 37)
+41: match: ('switch', 38)
+43: match: ('switch', 39)
+45: match: ('switch', 40)
+47: match: ('switch', 41)
+49: match: ('switch', 42)
+51: match: ('switch', 2)
+53: match: ('switch', 3)
+55: match: ('switch', 4)
+57: match: ('switch', 5)
+59: match: ('switch', 6)
+61: match: ('switch', 7)
+63: match: ('switch', 8)
+65: match: ('switch', 9)
+67: match: ('switch', 10)
+69: match: ('switch', 11)
+71: match: ('switch', 12)
+73: match: ('switch', 13)
+75: match: ('switch', 14)
+77: match: ('switch', 15)
+79: match: ('switch', 16)
+81: match: ('switch', 17)
+83: match: ('switch', 18)
+85: match: ('switch', 19)
+87: match: ('switch', 20)
+88: intersection:
+    identity
+    negate:
+        match: ('switch', 1)
+    negate:
+        match: ('switch', 43)
+    negate:
+        match: ('switch', 44)
+    negate:
+        match: ('switch', 22)
+    negate:
+        match: ('switch', 23)
+    negate:
+        match: ('switch', 24)
+    negate:
+        match: ('switch', 25)
+    negate:
+        match: ('switch', 26)
+    negate:
+        match: ('switch', 27)
+    negate:
+        match: ('switch', 28)
+    negate:
+        match: ('switch', 29)
+    negate:
+        match: ('switch', 30)
+    negate:
+        match: ('switch', 31)
+    negate:
+        match: ('switch', 32)
+    negate:
+        match: ('switch', 33)
+    negate:
+        match: ('switch', 34)
+    negate:
+        match: ('switch', 35)
+    negate:
+        match: ('switch', 36)
+    negate:
+        match: ('switch', 37)
+    negate:
+        match: ('switch', 38)
+    negate:
+        match: ('switch', 39)
+    negate:
+        match: ('switch', 40)
+    negate:
+        match: ('switch', 41)
+    negate:
+        match: ('switch', 42)
+    negate:
+        match: ('switch', 2)
+    negate:
+        match: ('switch', 3)
+    negate:
+        match: ('switch', 4)
+    negate:
+        match: ('switch', 5)
+    negate:
+        match: ('switch', 6)
+    negate:
+        match: ('switch', 7)
+    negate:
+        match: ('switch', 8)
+    negate:
+        match: ('switch', 9)
+    negate:
+        match: ('switch', 10)
+    negate:
+        match: ('switch', 11)
+    negate:
+        match: ('switch', 12)
+    negate:
+        match: ('switch', 13)
+    negate:
+        match: ('switch', 14)
+    negate:
+        match: ('switch', 15)
+    negate:
+        match: ('switch', 16)
+    negate:
+        match: ('switch', 17)
+    negate:
+        match: ('switch', 18)
+    negate:
+        match: ('switch', 19)
+    negate:
+        match: ('switch', 20)
+    negate:
+        match: ('switch', 21)
+89: match: ('switch', 21)
+2: identity

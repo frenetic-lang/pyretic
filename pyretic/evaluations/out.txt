@@ -1,10 +1,128 @@
-{'test': 'traffic_matrix'}
-2624.45268893
-65
+{'test': 'traffic_matrix', 'k': '2'}
+[3, 5]
+[path policy union]
+    path_concat:
+        [path policy]
+            in: intersection:
+    match: ('switch', 3)
+    union:
+        drop
+        match: ('inport', 0)
+out: identity
+expr:(1).((1)|(2))
+            >>>
+            FwdBucket 47562512
+
+        path_star:
+            [path policy]
+                in: identity
+out: identity
+expr:((1)|(2)).((1)|(2))
+                >>>
+                FwdBucket 47630224
+
+        [path policy]
+            in: identity
+out: intersection:
+    match: ('switch', 3)
+    union:
+        drop
+        match: ('outport', 0)
+expr:((1)|(2)).((4)|(6))
+            >>>
+            FwdBucket 47628880
+    path_concat:
+        [path policy]
+            in: intersection:
+    match: ('switch', 3)
+    union:
+        drop
+        match: ('inport', 0)
+out: identity
+expr:((5)|(6)).((3)|(4)|(5)|(6))
+            >>>
+            FwdBucket 47655376
+
+        path_star:
+            [path policy]
+                in: identity
+out: identity
+expr:((3)|(4)|(5)|(6)).((3)|(4)|(5)|(6))
+                >>>
+                FwdBucket 47656272
+
+        [path policy]
+            in: identity
+out: intersection:
+    match: ('switch', 5)
+    union:
+        drop
+        match: ('outport', 0)
+expr:((3)|(4)|(5)|(6)).(8)
+            >>>
+            FwdBucket 47655824
+    path_concat:
+        [path policy]
+            in: intersection:
+    match: ('switch', 5)
+    union:
+        drop
+        match: ('inport', 0)
+out: identity
+expr:((10)|(12)).((4)|(5)|(6)|(9)|(10)|(11)|(12))
+            >>>
+            FwdBucket 47665040
+
+        path_star:
+            [path policy]
+                in: identity
+out: identity
+expr:((4)|(5)|(6)|(9)|(10)|(11)|(12)).((4)|(5)|(6)|(9)|(10)|(11)|(12))
+                >>>
+                FwdBucket 47678288
+
+        [path policy]
+            in: identity
+out: intersection:
+    match: ('switch', 3)
+    union:
+        drop
+        match: ('outport', 0)
+expr:((4)|(5)|(6)|(9)|(10)|(11)|(12)).((4)|(6))
+            >>>
+            FwdBucket 47677840
+    path_concat:
+        [path policy]
+            in: intersection:
+    match: ('switch', 5)
+    union:
+        drop
+        match: ('inport', 0)
+out: identity
+expr:((10)|(12)).((4)|(5)|(6)|(9)|(10)|(11)|(12))
+            >>>
+            FwdBucket 47699280
+
+        path_star:
+            [path policy]
+                in: identity
+out: identity
+expr:((4)|(5)|(6)|(9)|(10)|(11)|(12)).((4)|(5)|(6)|(9)|(10)|(11)|(12))
+                >>>
+                FwdBucket 47700176
+
+        [path policy]
+            in: identity
+out: intersection:
+    match: ('switch', 5)
+    union:
+        drop
+        match: ('outport', 0)
+expr:((4)|(5)|(6)|(9)|(10)|(11)|(12)).((11)|(12))
+            >>>
+            FwdBucket 47699728
+
+0.0552091598511
+9
 3840
-2686.2471261
-{'test': 'path_loss_stanford'}
-95.7688670158
-100
-3840
-277.268981934
+1.11942791939

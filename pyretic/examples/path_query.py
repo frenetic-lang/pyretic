@@ -465,12 +465,10 @@ def print_callback_2(pkt):
 # type: unit -> path list
 def path_main(**kwargs):
     #return path_test_waypoint_violation_general()
-    p1 = atom(match(switch = 3)) 
-    p1.register_callback(print_callback)
-    p2 = atom(match(switch = 1))
-    p2.register_callback(print_callback_2)
-    p = p1 + p2
-    #return p
+    p1 = in_atom(match(switch = 1)) ^ out_atom(match(switch = 3))
+    p2 = in_atom(match(switch = 1, srcip="10.0.0.1")) ^ out_atom(match(switch = 3, dstip="10.0.0.2"))
+    p = p2 + p1
+    return p
     return path_test_3()
 
 def main(**kwargs):

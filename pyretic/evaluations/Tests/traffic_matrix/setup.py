@@ -2,7 +2,7 @@ from Topos import *
 
 
 def setup_topo(*params):
-    return StanfordTopology.StanfordTopo()
+    return FatTree.get_fattree_topo(*params)
 
 def setup_workload(net, n, m):
     hosts = net.topo.hosts()
