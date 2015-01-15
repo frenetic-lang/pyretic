@@ -1,5 +1,6 @@
 import sys
 sys.path.append('/home/mininet/pyretic')
+sys.path.append('/usr/local/lib/python2.7/dist-packages')
 import os
 import shutil
 

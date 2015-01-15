@@ -85,9 +85,17 @@ class classifier_utils(object):
     @classmethod
     def is_not_drop(cls, p):
         """ Return true if policy p is effectively a drop. """
-        return sat_utils.is_not_drop(p)
+
         p_class = cls.__get_classifier__(p)
-        return cls.__is_not_drop_classifier__(p_class)
+        res_1 = cls.__is_not_drop_classifier__(p_class)
+        '''res_2 = sat_utils.is_not_drop(p)
+        if res_1 != res_2:
+            print p
+            print res_1
+            print res_2
+            print '---------------------'''
+        return res_1
+        
 
     @classmethod
     def has_nonempty_intersection(cls, p1, p2):
@@ -95,19 +103,7 @@ class classifier_utils(object):
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-        
-        return cls.is_not_drop(p1 & p2)
-        '''res1 = sat_utils.is_not_drop(p1 & p2)  
-        res2 = cls.is_not_drop(p1 & p2)
-        if res1 != res2:
-            print '-------diff-----------'
-            print p1
-            print p2
-            print res1
-            print res2
-            print '----------------------'
-        return res2'''
-        '''
+        #return cls.is_not_drop(p1 & p2) 
         res = None
         if isinstance(p1, match):
             res =  intersection_utils.match_tree_intersect(p1, p2, False)
@@ -115,9 +111,8 @@ class classifier_utils(object):
         elif isinstance(p2, match):
             res = intersection_utils.match_tree_intersect(p2, p1, False)
         else:
-            res = sat_utils.is_not_drop(p1 & p2)
-       
-        return res'''
+            res = cls.is_not_drop(p1 & p2)
+        return res
 
     @classmethod
     def get_overlap_mode(cls, pred, pred_neg, new_pred, new_pred_neg):
@@ -125,27 +120,25 @@ class classifier_utils(object):
         booleans, depending on whether pred is equal, is a superset of, is a subset
         of, or just intersects new_pred.
         """
-        #t_s = time.time()
         assert isinstance(new_pred, Filter) and isinstance(pred, Filter) and isinstance(pred_neg, Filter) and isinstance(new_pred_neg, Filter)
         ne_inters = cls.has_nonempty_intersection
         (is_equal,is_superset,is_subset,intersects) = (False,False,False,False)
 
-        res_0 = ne_inters(pred, new_pred_neg)
-        res_1 = ne_inters(pred_neg, new_pred)
-        if  (not res_0 and
-             not res_1):
+        not_new_and_pred = ne_inters(pred, new_pred_neg)
+        new_and_not_pred = ne_inters(pred_neg, new_pred)
+        if  (not not_new_and_pred and
+             not new_and_not_pred):
             is_equal = True
-        elif not res_1:
+        elif not new_and_not_pred:
             is_superset = True
-        elif not res_0:
+        elif not not_new_and_pred:
             is_subset = True
         elif ne_inters(pred, new_pred):
             intersects = True
         else:
             pass
 
-        #print time.time() - t_s
-        return (is_equal, is_superset, is_subset, intersects)
+        return (is_equal, is_superset, is_subset, intersects, new_and_not_pred, not_new_and_pred)
 
     @classmethod
     def get_dropped_packets(cls, p):
@@ -335,12 +328,13 @@ class re_tree_gen(object):
             cls.__add_dyn_preds__(dyn_pols, at.policy)
         
         new_pred_neg = ~new_pred
+        new_pred_not_drop = None
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
             pred_symbol = cls.pred_to_symbol[pred]
             pred_neg = cls.pred_to_neg[pred]
-            (is_equal,is_superset,is_subset,intersects) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
+            (is_equal,is_superset,is_subset,intersects, new_and_not_pred, not_new_and_pred) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
             if is_equal:
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
@@ -357,6 +351,7 @@ class re_tree_gen(object):
                 return re_tree
             elif is_subset:
                 new_pred = new_pred & pred_neg
+                new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
@@ -372,10 +367,15 @@ class re_tree_gen(object):
                 added_sym = cls.pred_to_symbol[inter_p]
                 re_tree |= re_symbol(added_sym, metadata=at)
                 new_pred = new_pred & pred_neg
+                new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
             else:
                 pass
+        #if new_pred_not_drop is None:
+            #print 'here'
+            #new_pred_not_drop = is_not_drop(new_pred)
         if is_not_drop(new_pred):
+        #if new_pred_not_drop:
             """ The new predicate should be added if some part of it doesn't
             intersect any existing predicate, i.e., new_pred is not drop.
             """
@@ -495,6 +495,8 @@ class path_policy_union(path_policy):
     def __init__(self, ppols):
         assert len(ppols) > 1
         self.path_policies = ppols
+        for p in ppols:
+            assert not isinstance(p, path_policy_union)
         super(path_policy_union, self).__init__(path_empty, drop)
 
     def __repr_pretty__(self, pre_spaces=''):
@@ -504,6 +506,10 @@ class path_policy_union(path_policy):
             out += ppol.__repr_pretty__(pre_spaces + extra_ind)
         return out
 
+    def __add__(self,ppols):
+        if isinstance(ppols, path_policy_union):
+            return path_policy_union(self.path_policies + ppols.path_policies)
+        return path_policy_union(self.path_policies + [ppols])
     def __repr__(self):
         return self.__repr_pretty__()
 
@@ -869,7 +875,7 @@ class path_combinator(path):
             except AttributeError:
                 return pre_spaces + extra_ind + repr(x)
         repr_paths = map(get_repr, self.paths)
-        return "%s%s:\n%s" % (pre_spaces, self.name(), '\n'.join(repr_paths))
+        return "%s%s:\n%s" % (pre_spaces, self.__class__.__name__, '\n'.join(repr_paths))
 
     def __repr__(self):
         return self.__repr_pretty__()
@@ -1205,11 +1211,12 @@ class pathcomp(object):
 
     @classmethod
     @stat.elapsed_time
-    def compile(cls, path_pol, max_states=1022, disjoint_enabled=False, integrate_enabled=False, ragel_enabled = False):
+    def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, integrate_enabled=False, ragel_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
-        du = common_dfa_utils
+        cls.path_policy = path_pol
+
         in_cg = __in_re_tree_gen__
         out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
@@ -1224,13 +1231,44 @@ class pathcomp(object):
         out_cg.clear()
 
         ast_fold(path_pol, inv_trees, None)
-
         ast_fold(path_pol, prep_trees, None)
-
-        (re_list, pol_list) = ast_fold(path_pol, re_pols, ([], []))
+        
+        (cls.re_list, cls.pol_list) = ast_fold(path_pol, re_pols, ([], []))
         #print '\n'.join([r.re_string_repr() for r in re_list])
         #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
         print time.time() - t_s
+        res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled)
+         
+        return res
+
+    @classmethod
+    @stat.elapsed_time
+    def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, integrate_enabled = False, ragel_enabled = False):
+        ast_fold = path_policy_utils.path_policy_ast_fold
+        re_pols  = cls.__get_re_pols__
+        inv_trees = cls.__invalidate_re_trees__
+        prep_trees = cls.__prep_re_trees__
+
+        import time
+        t_s = time.time()
+
+        ast_fold(path_pol, inv_trees, None)
+        ast_fold(path_pol, prep_trees, None)
+        cls.path_policy += path_pol
+        (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
+        print time.time() - t_s
+        return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled)
+
+
+    @classmethod
+    def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled):
+        in_cg = __in_re_tree_gen__
+        out_cg = __out_re_tree_gen__
+ 
+        default_link = True
+        
+        du = common_dfa_utils
+        
         in_tag_rules = 0
         in_cap_rules = 0
 
@@ -1251,8 +1289,9 @@ class pathcomp(object):
             du = ragel_dfa_utils
         else:
             du = dfa_utils
-        
+      
         dfa = du.regexes_to_dfa(re_list)
+        print du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
         stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
@@ -1271,8 +1310,13 @@ class pathcomp(object):
                 assert typ in [__in__, __out__]
                 
                 action_frag = None
+               
+                
+                if_pred = not du.is_dead(dfa, src)
+                if default_link:
+                    if_pred = if_pred and not du.is_dead(dfa, dst)
 
-                if not du.is_dead(dfa, src) and not du.is_dead(dfa, dst):
+                if if_pred:
                     action_frag = set_tag(dst_num)
 
                     if typ == __in__:
@@ -1332,7 +1376,11 @@ class pathcomp(object):
                 (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                 assert typ in [__in__, __out__]
 
-                if not du.is_dead(dfa, src) and not du.is_dead(dfa, dst):
+                if_pred = not du.is_dead(dfa, src)
+                if default_link:
+                    if_pred = if_pred and not du.is_dead(dfa, dst)
+
+                if if_pred:
                     tag_frag = (pred >> set_tag(dst_num))
                     if typ == __in__:
                         if not src_num in in_tagging_dic:
@@ -1907,7 +1955,12 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def get_accepting_exps(cls, dfa, edge, q):
-        return cls._edge_ordinal[edge]
+        try:
+            return cls._edge_ordinal[edge]
+        except:
+            print edge
+            print cls._edge_ordinal
+            raise KeyError
 
     
     @classmethod
@@ -1945,7 +1998,9 @@ class ragel_dfa_utils(common_dfa_utils):
                     start = int(s[:index])
                     end = int(s[index + 2:])
                     for i in range(start, end + 1):
-                        res.append( (src, i, dst))
+                        edge = (src, i, dst)
+                        res.append( edge)
+                        edge_ordinals[edge] = exp_list
                 else:
                     edge = (src, int(s), dst)
                     res.append(edge)
@@ -1970,7 +2025,7 @@ class ragel_dfa_utils(common_dfa_utils):
             dst_num = int(dst)
         except:
             dst_num = None
-        
+       
         in_list = __in_re_tree_gen__.symbol_to_pred
         out_list = __out_re_tree_gen__.symbol_to_pred
         sym = edge[1]
@@ -2231,7 +2286,7 @@ class intersection_utils(object):
 
 class sat_utils:
     @classmethod
-    def union_set(cls, s1, s2):
+    def dim_union_set(cls, s1, s2):
         def_1 = s1[1]
         def_2 = s2[1]
 
@@ -2255,7 +2310,7 @@ class sat_utils:
         return (map_1, def_1 or def_2)
 
     @classmethod
-    def intersect_set(cls, s1, s2):
+    def dim_intersect_set(cls, s1, s2):
         def_1 = s1[1]
         def_2 = s2[1]
 
@@ -2277,52 +2332,175 @@ class sat_utils:
             map_1[k] = v2
 
         return (map_1, def_1 and def_2)
+   
+    @classmethod
+    def get_truth_value(cls, sp):
+        if len(sp) > 1 or not sp.items()[0][0] in ['identity', 'drop']:
+            return None
+        return sp.items()[0][1][1]
+
+    @classmethod
+    def union_set(cls, sp1, sp2):
+        res_sp = {}
+        
+        v1 = cls.get_truth_value(sp1)
+        v2 = cls.get_truth_value(sp2)
+
+        if not v1 is None and not v2 is None:
+            return {'identity' : ({}, v1 or v2)}
+        elif not v1 is None:
+            if v1:
+                return {'identity' : ({}, True)}
+            else:
+                return sp2
+        elif not v2 is None:
+            if v2:
+                return {'identity' : ({}, True)}
+            else:
+                return sp1
+
+        for field1, tbl1 in sp1.items():
+            if not field1 in sp2:
+                res_sp[field1] = tbl1
+            else:
+                res_sp[field1] = cls.dim_union_set(tbl1, sp2[field1])
+
+        for field2, tbl2 in sp2.items():
+            if not field2 in sp1:
+                res_sp[field2] = tbl2
+        return res_sp
+
+    @classmethod
+    def intersect_set(cls, sp1, sp2):
+        
+        res_sp = {}
+        
+        v1 = cls.get_truth_value(sp1)
+        v2 = cls.get_truth_value(sp2)
+
+        if not v1 is None and not v2 is None:
+            res_sp = {'identity' : ({}, v1 and v2)}
+        elif not v1 is None:
+            if not v1:
+                res_sp = {'identity' : ({}, False)}
+            else:
+                res_sp = sp2
+        elif not v2 is None:
+            if not v2:
+                res_sp = {'identity' : ({}, False)}
+            else:
+                res_sp = sp1
+        else:
+            for field1, tbl1 in sp1.items():
+                if not field1 in sp2:
+                    res_sp[field1] = tbl1
+                else:
+                    res_sp[field1] = cls.dim_intersect_set(tbl1, sp2[field1])
+
+            for field2, tbl2 in sp2.items():
+                if not field2 in sp1:
+                    res_sp[field2] = tbl2
+            
+        '''print 'in intersect'
+        print v1, sp1
+        print v2, sp2
+        print res_sp
+        print '-------------'
+        '''
+        
+        return res_sp
+
     @classmethod
     def is_not_drop_set(cls, p, neg):
         if p == identity:
             if neg:
-                return ({}, False)
+                return {'identity': ({}, False)}
             else:
-                return  ({}, True)
+                return  {'identity' : ({}, True)}
         elif p == drop:
             if neg:
-                return ({}, True) 
+                return {'drop' : ({}, True)} 
             else:
-                return ({}, False)
+                return {'drop' : ({}, False)}
         else:
             p_type = type(p) 
             if p_type == match:
                 if neg:
-                    return ({p.map['switch']:False}, True)
+                    #FIXME: the map may be empty
+                    space = {}
+                    for field, value in p.map.items():
+                        space[field] = ({value:False}, True)
+                    return space
                 else:
-                    return ({p.map['switch']:True}, False)
+                    #FIXME: the map may be empty
+                    space = {}
+                    for field, value in p.map.items():
+                        space[field] = ({value:True}, False)
+                    return space
+
             elif p_type == negate:
                 return cls.is_not_drop_set(p.policies[0], not neg)
 
             elif (not neg and p_type == intersection) or (neg and p_type == union):
-                res = ({},True)
-                for pol in p.policies:
-                    res = cls.intersect_set(cls.is_not_drop_set(pol, neg), res)
+                assert len(p.policies) >= 2
+                res = cls.intersect_set(cls.is_not_drop_set(p.policies[0], neg), cls.is_not_drop_set(p.policies[1], neg))
+                if len(p.policies) > 2:
+                    for pol in p.policies[2:]:
+                        res = cls.intersect_set(cls.is_not_drop_set(pol, neg), res)
                 return res
             elif (not neg and p_type == union) or (neg and p_type == intersection):
-                res = ({}, False)
-                for pol in p.policies:
-                    res = cls.union_set(cls.is_not_drop_set(pol, neg), res)
+                assert len(p.policies) >= 2
+                res = cls.union_set(cls.is_not_drop_set(p.policies[0], neg), cls.is_not_drop_set(p.policies[1], neg))
+                if len(p.policies) > 2:
+                    for pol in p.policies[2:]:
+                        res = cls.union_set(cls.is_not_drop_set(pol, neg), res)
                 return res
             raise TypeError
 
     @classmethod
     def is_not_drop(cls, p):
+        #print 'starting checking'
         res = cls.is_not_drop_set(p, False)
-        if res[1]:
-            return True
-        else:
-            for v in res[0].values():
-                if v:
-                    return True
+        for field, tbl in res.items():
+            if tbl[1]:
+                continue
+            else:
+                found = False
+                for v in tbl[0].values():
+                    if v:
+                        found = True
+                        break
+                if not found:
+                    return False
+        return True
 
+'''class z3_utils(object):
+    field_map = {'switch': z3.Int('s'), 'port' : z3.Int('p')}
+
+    @classmethod
+    def construct_pred(cls, p):
+        if p == identity:
+            return True
+        elif p == drop:
             return False
-    
+        else:
+            p_type = type(p)
+            if p_type == match:
+                pass
+
+    @classmethod
+    def is_not_drop(cls, p):
+        solver = z3.Solver()
+        pred = cls.construct_pred(p)
+        solver.add(pred)
+        res = solver.check()
+        if res == z3.sat:
+            return True
+        elif res == z3.unsat:
+            return False
+        else:
+            raise TypeError
+'''
 #############################################################################
 ###                              Pickling                                 ###
 #############################################################################

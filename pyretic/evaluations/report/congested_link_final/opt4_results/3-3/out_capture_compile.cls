@@ -1,0 +1,22 @@
+classifier size: 10
+print : match: ('vlan_pcp', 0) ('vlan_id', 8)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 9)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 10)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 26)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 27)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 28)
+  -> set([Controller])
+ identity
+  -> set([]) 
+---------------------------------

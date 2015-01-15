@@ -31,7 +31,9 @@ def all_packets_query():
 
 class TrafficMatrixStats:
     
-    def __init__(self, bucket_interval, report_interval):
+    def __init__(self, k, bucket_interval, report_interval):
+        self.k = k
+
         self.buckets = {}
         self.bucket_interval = bucket_interval
         self.report_interval = report_interval
@@ -50,11 +52,22 @@ class TrafficMatrixStats:
 
             time.sleep(self.report_interval)
             
-            
+    
+    def get_port_map(self):
+        core_cnt = (self.k / 2) ** 2
+        port_map = {}
+
+        for i in range(0, self.k):
+            start = core_cnt + 1 + (self.k * i) + (self.k / 2)
+            for j in range(0, self.k / 2):
+                port_map[start + j] = [0]
+
+        return port_map
+
     def traffic_matrix_query(self):
-        t = StanfordTopology.StanfordTopo()
-        ports = t.port_map
+        ports = self.get_port_map()
         switches = ports.keys()
+        print switches
         egress_pairs = itertools.product(switches, switches)
 
         pol = None
@@ -105,9 +118,10 @@ class TrafficMatrixStats:
         return callback_func 
  
 def path_main(**kwargs):
-    tms = TrafficMatrixStats(5, 10)
+    k = int(kwargs['k'])
+    tms = TrafficMatrixStats(k, 5, 10)
     path_policy = tms.traffic_matrix_query()
-    #print path_policy
+    print path_policy
     return path_policy
 
 ################### forwarding ################
@@ -249,5 +263,3 @@ def main(**kwargs):
     return StanfordForwarding()
 
 
-if __name__ == "__main__":
-    print get_forwarding_classifier()

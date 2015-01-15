@@ -1,0 +1,285 @@
+out capture edges: 10
+dfa state count: 21
+in tagging edges: 10
+out tagging edges: 10
+in capture edges: 0
+--------------------------------------
+out_tagging_compile
+number of calls: 1
+total time: 0.001168
+average time: 0.001168
+---times----
+[0.0011680126190185547]
+classifier size: 11
+print : match: ('vlan_pcp', 0) ('vlan_id', 2)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 12)])
+ match: ('vlan_pcp', 0) ('vlan_id', 3)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 13)])
+ match: ('vlan_pcp', 0) ('vlan_id', 4)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 14)])
+ match: ('vlan_pcp', 0) ('vlan_id', 5)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 15)])
+ match: ('vlan_pcp', 0) ('vlan_id', 6)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 16)])
+ match: ('vlan_pcp', 0) ('vlan_id', 7)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 17)])
+ match: ('vlan_pcp', 0) ('vlan_id', 8)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 18)])
+ match: ('vlan_pcp', 0) ('vlan_id', 9)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 19)])
+ match: ('vlan_pcp', 0) ('vlan_id', 10)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 20)])
+ match: ('vlan_pcp', 0) ('vlan_id', 11)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 21)])
+ identity
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)]) 
+---------------------------------
+--------------------------------------
+regexes_to_dfa
+number of calls: 1
+total time: 0.013502
+average time: 0.013502
+---times----
+[0.013501882553100586]
+--------------------------------------
+compile
+number of calls: 1
+total time: 0.032698
+average time: 0.032698
+---times----
+[0.03269791603088379]
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.000019
+average time: 0.000019
+---times----
+[1.9073486328125e-05]
+classifier size: 1
+print : identity
+  -> set([]) 
+---------------------------------
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 0.010903
+average time: 0.010903
+---times----
+[0.010902881622314453]
+classifier size: 21
+print : match: ('switch', 2) ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
+ match: ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 3) ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 4)])
+ match: ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 4) ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 5)])
+ match: ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 5) ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 6)])
+ match: ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 6) ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 7)])
+ match: ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 8)])
+ match: ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 9)])
+ match: ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 9) ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 10)])
+ match: ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 10) ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 11)])
+ match: ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')) ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 2)])
+ match: ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ identity
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)]) 
+---------------------------------
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.001713
+average time: 0.001713
+---times----
+[0.0017130374908447266]
+classifier size: 5
+print : match: ('switch', 1) ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([modify: ('outport', 2)])
+ match: ('dstip', IPv4Network('10.0.0.1/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([modify: ('outport', 1)])
+ match: ('dstip', IPv4Network('10.0.0.2/32'))
+  -> set([modify: ('outport', 2)])
+ identity
+  -> set([]) 
+---------------------------------
+--------------------------------------
+out_capture_compile
+number of calls: 1
+total time: 0.002643
+average time: 0.002643
+---times----
+[0.002643108367919922]
+classifier size: 11
+print : match: ('vlan_pcp', 0) ('vlan_id', 2)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 3)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 4)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 5)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 6)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 7)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 8)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 9)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 10)
+  -> set([Controller])
+ match: ('vlan_pcp', 0) ('vlan_id', 11)
+  -> set([Controller])
+ identity
+  -> set([]) 
+---------------------------------
+--------------------------------------
+out_table_compile
+number of calls: 1
+total time: 0.024637
+average time: 0.024637
+---times----
+[0.02463698387145996]
+classifier size: 31
+print : match: ('switch', 2) ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
+ match: ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 3) ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 4)])
+ match: ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 4) ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 5)])
+ match: ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 5) ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 6)])
+ match: ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 6) ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 7)])
+ match: ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 8)])
+ match: ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 9)])
+ match: ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 9) ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 10)])
+ match: ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 10) ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 11)])
+ match: ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')) ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 2)])
+ match: ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 2)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 3)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 4)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 5)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 6)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 7)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 8)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 9)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 10)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('vlan_pcp', 0) ('vlan_id', 11)
+  -> set([Controller, modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ identity
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)]) 
+---------------------------------
+--------------------------------------
+in_table_compile
+number of calls: 1
+total time: 0.010078
+average time: 0.010078
+---times----
+[0.010078191757202148]
+classifier size: 21
+print : match: ('switch', 2) ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 3)])
+ match: ('vlan_pcp', 0) ('vlan_id', 12)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 3) ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 4)])
+ match: ('vlan_pcp', 0) ('vlan_id', 13)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 4) ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 5)])
+ match: ('vlan_pcp', 0) ('vlan_id', 14)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 5) ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 6)])
+ match: ('vlan_pcp', 0) ('vlan_id', 15)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 6) ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 7)])
+ match: ('vlan_pcp', 0) ('vlan_id', 16)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 7) ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 8)])
+ match: ('vlan_pcp', 0) ('vlan_id', 17)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 8) ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 9)])
+ match: ('vlan_pcp', 0) ('vlan_id', 18)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 9) ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 10)])
+ match: ('vlan_pcp', 0) ('vlan_id', 19)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('switch', 10) ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 11)])
+ match: ('vlan_pcp', 0) ('vlan_id', 20)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')) ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 2)])
+ match: ('vlan_pcp', 0) ('vlan_id', 0)
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)])
+ identity
+  -> set([modify: ('vlan_pcp', 0) ('vlan_id', 22)]) 
+---------------------------------
+--------------------------------------
