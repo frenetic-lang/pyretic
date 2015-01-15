@@ -270,7 +270,7 @@ class Runtime(object):
         classifier = None
         
         if self.mode == 'reactive0':
-            self.clear_all(table_id)
+            self.clear_all()
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             if not self.use_nx:
@@ -446,10 +446,11 @@ class Runtime(object):
         concrete_pkt_in = self.pyretic2concrete(pkt_in)
         concrete_pred = self.match_on_all_fields(concrete_pkt_in)
         action_list = []
+        default_table = 0
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (concrete_pred,0,action_list,self.default_cookie,False)
+            return (concrete_pred,0,action_list,self.default_cookie,False,default_table)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -476,7 +477,7 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (concrete_pred,0,action_list,self.default_cookie,False)
+        return (concrete_pred,0,action_list,self.default_cookie,False,default_table)
 
 #########################
 # PROACTIVE COMPILATION 
@@ -1364,7 +1365,7 @@ class Runtime(object):
     def send_clear(self,switch,table_id):
         self.backend.send_clear(switch,table_id)
 
-    def clear_all(self, table_id):
+    def clear_all(self, table_id=0):
         def f():
             switches = self.network.switch_list()
             for s in switches:
