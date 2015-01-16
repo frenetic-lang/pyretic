@@ -68,6 +68,10 @@ class classifier_utils(object):
     various manipulations on policies.
     """
     @classmethod
+    def __set_init_vars__(cls, match_enabled):
+        cls.match_enabled = match_enabled
+    
+    @classmethod
     def __get_classifier__(cls, p):
         # Hackety hack
         if p._classifier:
@@ -103,16 +107,18 @@ class classifier_utils(object):
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-        #return cls.is_not_drop(p1 & p2) 
-        res = None
-        if isinstance(p1, match):
-            res =  intersection_utils.match_tree_intersect(p1, p2, False)
-        
-        elif isinstance(p2, match):
-            res = intersection_utils.match_tree_intersect(p2, p1, False)
+        if not cls.match_enabled:
+            return cls.is_not_drop(p1 & p2) 
         else:
-            res = cls.is_not_drop(p1 & p2)
-        return res
+            res = None
+            if isinstance(p1, match):
+                res =  intersection_utils.match_tree_intersect(p1, p2, False)
+            
+            elif isinstance(p2, match):
+                res = intersection_utils.match_tree_intersect(p2, p1, False)
+            else:
+                res = cls.is_not_drop(p1 & p2)
+            return res
 
     @classmethod
     def get_overlap_mode(cls, pred, pred_neg, new_pred, new_pred_neg):
@@ -1211,10 +1217,13 @@ class pathcomp(object):
 
     @classmethod
     @stat.elapsed_time
-    def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, integrate_enabled=False, ragel_enabled = False):
+    def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, default_enabled = False, 
+            integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
+        
+        classifier_utils.__set_init_vars__(match_enabled)
         cls.path_policy = path_pol
 
         in_cg = __in_re_tree_gen__
@@ -1237,13 +1246,17 @@ class pathcomp(object):
         #print '\n'.join([r.re_string_repr() for r in re_list])
         #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
         print time.time() - t_s
-        res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled)
+        res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
 
     @classmethod
     @stat.elapsed_time
-    def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, integrate_enabled = False, ragel_enabled = False):
+    def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, default_enabled = False, 
+            integrate_enabled = False, ragel_enabled = False, match_enabled = False):
+        
+        classifier_utils.__set_init_vars__(match_enabled)
+
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
         inv_trees = cls.__invalidate_re_trees__
@@ -1257,16 +1270,16 @@ class pathcomp(object):
         cls.path_policy += path_pol
         (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
         print time.time() - t_s
-        return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled)
+        return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
 
 
     @classmethod
-    def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, integrate_enabled, ragel_enabled):
+    def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
         in_cg = __in_re_tree_gen__
         out_cg = __out_re_tree_gen__
  
-        default_link = True
-        
+        default_link = default_enabled
+       
         du = common_dfa_utils
         
         in_tag_rules = 0
@@ -2078,8 +2091,13 @@ class ragel_dfa_utils(common_dfa_utils):
 
         try:
             output = subprocess.check_output(['ragel', '-V', lex_input_file])
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as e:
+            
             print "Error occured while running ragel"
+            print e.message
+            print e.returncode
+            print e.cmd
+            print e.output
 
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
