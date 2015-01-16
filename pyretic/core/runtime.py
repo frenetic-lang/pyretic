@@ -95,7 +95,8 @@ class Runtime(object):
                 self.integrate_enabled = False
                 self.multitable_enabled = False
             else:
-                self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled = opt_flags
+                (self.disjoint_enabled, self.default_enabled, self.integrate_enabled, 
+                        self.multitable_enabled, self.ragel_enabled, self.match_enabled) = opt_flags
             
             from pyretic.lib.path import pathcomp
             pathcomp.init(NUM_PATH_TAGS)
@@ -551,7 +552,8 @@ class Runtime(object):
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
-                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
+                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
+                self.ragel_enabled, self.match_enabled)
 
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
