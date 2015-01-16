@@ -67,7 +67,6 @@ class TrafficMatrixStats:
     def traffic_matrix_query(self):
         ports = self.get_port_map()
         switches = ports.keys()
-        print switches
         egress_pairs = itertools.product(switches, switches)
 
         pol = None
@@ -121,7 +120,7 @@ def path_main(**kwargs):
     k = int(kwargs['k'])
     tms = TrafficMatrixStats(k, 5, 10)
     path_policy = tms.traffic_matrix_query()
-    print path_policy
+    #print path_policy
     return path_policy
 
 ################### forwarding ################

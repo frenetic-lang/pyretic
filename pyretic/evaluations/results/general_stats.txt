@@ -1,5 +1,7 @@
-out capture edges: 4
-dfa state count: 9
-in tagging edges: 14
-out tagging edges: 12
+max switch rule count: 131
+out capture edges: 100
+dfa state count: 171
+average switch rule count: 131
+in tagging edges: 930
 in capture edges: 0
+out tagging edges: 130
