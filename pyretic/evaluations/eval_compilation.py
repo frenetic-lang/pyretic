@@ -1,6 +1,6 @@
 import sys
 sys.path.append('/home/mininet/pyretic')
-sys.path.append('/usr/local/lib/python2.7/dist-packages')
+sys.path.append('/home/mininet/mininet')
 import os
 import shutil
 
@@ -25,9 +25,11 @@ class eval_compilation:
         self.results_folder = args.results_folder
 
         self.disjoint_enabled = args.disjoint_enabled
+        self.default_enabled = args.default_enabled
         self.integrate_enabled = args.integrate_enabled
         self.multitable_enabled = args.multitable_enabled
         self.ragel_enabled = args.ragel_enabled
+        self.match_enabled = args.match_enabled
 
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
@@ -45,9 +47,9 @@ class eval_compilation:
         results_folder = "%s_%d" % (self.results_folder[:-1], self.add_calls)
         stat.start(results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        
         policy_fragments = pathcomp.add_query(self.path_policy, self.max_states, 
-                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
+                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
+                self.ragel_enabled, self.match_enabled)
         
         #return
         if self.multitable_enabled and self.integrate_enabled:
@@ -149,7 +151,8 @@ class eval_compilation:
         pathcomp.init(self.max_states)
         
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
-                self.disjoint_enabled, self.multitable_enabled and self.integrate_enabled, self.ragel_enabled)
+                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
+                self.ragel_enabled, self.match_enabled)
         
         #return
         if self.multitable_enabled and self.integrate_enabled:
@@ -375,6 +378,10 @@ def parse_args():
                     dest="disjoint_enabled",
                     help = 'enable disjoint optimization')
 
+    parser.add_argument( '--enable_default_link', '-l', action="store_true",
+                    dest="default_enabled",
+                    help = 'enable default link optimization, only works with disjoint on')
+
     parser.add_argument('--enable_integration', '-i', action="store_true",
                     dest='integrate_enabled',
                     help = 'enable integration of tag and capture optimization, only works with multitable on')
@@ -388,7 +395,10 @@ def parse_args():
                     help = 'enable ragel optimization')
 
 
-    
+    parser.add_argument('--enable_match', '-c', action="store_true",
+                    dest = 'match_enabled',
+                    help = 'enable match intersection optimization')
+ 
     args = parser.parse_args()
 
     return args
@@ -417,6 +427,14 @@ def get_added_query_params(args):
     print params
     return params
 
+def get_optimization_flags(args):
+    params = []
+    d = args.__dict__
+    for arg in d:
+        if 'enabled' in arg and d[arg]:
+            params.append(arg)
+
+    return params
 #### profiling
 def profile(args):
     import cProfile as profile
@@ -427,7 +445,7 @@ def profile(args):
 
 if __name__ == '__main__':
     args = parse_args()
-
+    print get_optimization_flags(args)
     #p = eval_path.path_main(**get_testwise_params(args))
     #profile(args)
     import time

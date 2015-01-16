@@ -185,6 +185,23 @@ def gather_general_stats(stat_name, stat_value, init, aggr=True):
         f.close()
 
 
+def classifier_size_per_switch(classifier):
+    res = {}
+    general = 0
+    for rule in classifier.rules:
+        try:
+            rule_map = rule.match.map
+            if 'switch' in rule_map:
+                s = rule_map['switch']
+                if not s in res:
+                    res[s] = 0
+                res[s] += 1
+            else:
+                general += 1
+        except Exception as e:
+            general += 1
+    return (res, general)
+
 def classifier_size(func):
     global classifier
     global path
@@ -201,12 +218,24 @@ def classifier_size(func):
                 classifier[fname] = 0
 
             classifier[fname] = len(res.rules)
-
             f = open(os.path.join(path, '%s.cls' % fname), 'a')
             f.write(('classifier size: %d' % classifier[fname]) + '\n')
             f.write('print : %s \n' % str(res))
             f.write('---------------------------------\n')
             f.close()
+
+            (per_switch, general_cnt) = classifier_size_per_switch(res)
+            per_switch_values = per_switch.values()
+            if len(per_switch_values) > 0:
+                max_cnt = max(per_switch_values) + general_cnt
+                mean_cnt = sum(per_switch_values) / len(per_switch) + general_cnt
+            else:
+                max_cnt = general_cnt
+                mean_cnt = general_cnt
+
+            gather_general_stats('max switch rule count', max_cnt, 0, False)
+            gather_general_stats('average switch rule count', mean_cnt, 0, False)
+
         return res
 
     return profiled_func
@@ -244,7 +273,7 @@ def elapsed_time(func):
         return res
 
     return profiled_func
-
+'''
 import yappi
 
 def aggregate(func, stats):
@@ -256,7 +285,7 @@ def aggregate(func, stats):
     except IOError:
         pass
     stats.save(fname)
-
+'''
 ################################################################################
 ##                     Older Table Types                                      ##
 ################################################################################
@@ -318,10 +347,10 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             elif 'out capture edges' in line:
                 out_capture_edge = int(line[line.index(':') + 2 : -1])
 
-            elif 'switch count' in line:
+            elif 'average switch rule count' in line:
                 switch_cnt = int(line[line.index(':') + 2 :-1])
 
-            elif 'rule count' in line:
+            elif 'max switch rule count' in line:
                 rule_cnt = int(line[line.index(':') + 2 : -1])
             
             elif 'dfa state count' in line:
@@ -331,11 +360,13 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
         g.close()
     except:
         pass
-
+    '''
     rule_avg = 0
     if switch_cnt and rule_cnt:
         rule_avg = float(rule_cnt) / switch_cnt
+    '''
 
+    rule_avg = switch_cnt
     gen_list = [rule_avg, rule_cnt, dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
 
     for gen in gen_list:
