@@ -215,14 +215,7 @@ def classifier_size(func):
             fname = func.__name__
 
             if fname not in classifier:
-                classifier[fname] = 0
-
-            classifier[fname] = len(res.rules)
-            f = open(os.path.join(path, '%s.cls' % fname), 'a')
-            f.write(('classifier size: %d' % classifier[fname]) + '\n')
-            f.write('print : %s \n' % str(res))
-            f.write('---------------------------------\n')
-            f.close()
+                classifier[fname] = (0, 0, 0)
 
             (per_switch, general_cnt) = classifier_size_per_switch(res)
             per_switch_values = per_switch.values()
@@ -233,9 +226,20 @@ def classifier_size(func):
                 max_cnt = general_cnt
                 mean_cnt = general_cnt
 
-            gather_general_stats('max switch rule count', max_cnt, 0, False)
-            gather_general_stats('average switch rule count', mean_cnt, 0, False)
+            
+            classifier[fname] = (len(res.rules), max_cnt, mean_cnt)
+            
+            f = open(os.path.join(path, '%s.cls' % fname), 'a')
+            f.write(('classifier size: %d' % classifier[fname][0]) + '\n')
+            f.write('max switch rule count: %d\n' % max_cnt)
+            f.write('average switch rule count: %d\n' % mean_cnt)
 
+            f.write('print : %s \n' % str(res))
+            f.write('---------------------------------\n')
+            f.close()
+
+
+            
         return res
 
     return profiled_func
@@ -312,10 +316,17 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             if os.path.exists(cpath):
                 g = open(cpath, 'r')
                 cls = '\t'
+                avg = ''
+                max_cnt = ''
                 for line in g.readlines():
                     if "classifier size" in line:
                         cls = line[line.index(':') + 2 :-1] + "\t"
-                f.write(cls)
+                    elif "average" in line:
+                        avg = line[line.index(':') + 2 :-1] + "\t"
+                    elif "max" in line:
+                        max_cnt = line[line.index(':') + 2 :-1] + "\t"
+
+                f.write(cls + avg + max_cnt)
                 g.close()
 
 
