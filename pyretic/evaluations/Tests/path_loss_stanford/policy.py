@@ -62,33 +62,33 @@ class PathPacketLossStats:
         
         # 2 Hop via S1
         partial_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        partial_query.register_callback(self.bucket_callback('2-1'))
-        p_2 = partial_query
+        #partial_query.register_callback(self.bucket_callback('2-1'))
+        #p_2 = partial_query
         partial_query = partial_query ^ atom(match(switch = 1))
         partial_query.register_callback(self.bucket_callback('2-2'))
-        p_2 += partial_query
+        p_2 = partial_query
         partial_query = partial_query ^ atom(match(switch = 5))
         partial_query.register_callback(self.bucket_callback('2-3'))
         p_2 += partial_query
 
         # 2 Hop via S2
         partial_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        partial_query.register_callback(self.bucket_callback('3-1'))
-        p_3 = partial_query
+        #partial_query.register_callback(self.bucket_callback('3-1'))
+        #p_3 = partial_query
         partial_query = partial_query ^ atom(match(switch = 2))
         partial_query.register_callback(self.bucket_callback('3-2'))
-        p_3 += partial_query
+        p_3 = partial_query
         partial_query = partial_query ^ atom(match(switch = 5))
         partial_query.register_callback(self.bucket_callback('3-3'))
         p_3 += partial_query
 
         # 3 Hop via S1 - S2
         partial_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        partial_query.register_callback(self.bucket_callback('4-1'))
-        p_4 = partial_query
+        #partial_query.register_callback(self.bucket_callback('4-1'))
+        #p_4 = partial_query
         partial_query = partial_query ^ atom(match(switch = 1))
         partial_query.register_callback(self.bucket_callback('4-2'))
-        p_4 += partial_query
+        p_4 = partial_query
         
         partial_query = partial_query ^ atom(match(switch = 2))
         partial_query.register_callback(self.bucket_callback('4-3'))
@@ -100,11 +100,11 @@ class PathPacketLossStats:
 
         # 3 Hop via S2 - S1
         partial_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        partial_query.register_callback(self.bucket_callback('5-1'))
-        p_5 = partial_query
+        #partial_query.register_callback(self.bucket_callback('5-1'))
+        #p_5 = partial_query
         partial_query = partial_query ^ atom(match(switch = 2))
         partial_query.register_callback(self.bucket_callback('5-2'))
-        p_5 += partial_query
+        p_5 = partial_query
         
         partial_query = partial_query ^ atom(match(switch = 1))
         partial_query.register_callback(self.bucket_callback('5-3'))
@@ -140,7 +140,8 @@ class PathPacketLossStats:
  
 def path_main(**kwargs):
     ppl = PathPacketLossStats(5,5)
-    return ppl.query(**kwargs)
+    query = ppl.query(**kwargs)
+    return query
     #return all_packets_query()
     #return link_congestion_query(['s1'], ['s2'], 3, 4)
 
