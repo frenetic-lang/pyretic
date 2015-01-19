@@ -148,8 +148,9 @@ class eval_compilation:
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
         
+        classifier_utils.__set_init_vars__(self.match_enabled)    
         pathcomp.init(self.max_states)
-        
+         
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
                 self.ragel_enabled, self.match_enabled)

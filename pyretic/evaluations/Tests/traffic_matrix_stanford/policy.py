@@ -56,18 +56,24 @@ class TrafficMatrixStats:
         ports = t.port_map
         switches = ports.keys()
         egress_pairs = itertools.product(switches, switches)
-
+	
         pol = None
         
         for pair in egress_pairs:
             partial_match_0 = drop
             for p in ports[pair[0]]:
-                partial_match_0 |= match(inport = p)
+                if partial_match_0 == drop:
+		            partial_match_0 = match(inport = p)
+                else:
+                    partial_match_0 |= match(inport = p)
             partial_match_0 = match(switch = pair[0]) & partial_match_0
             
             partial_match_1 = drop
             for p in ports[pair[1]]:
-                partial_match_1 |= match(outport = p)
+                if partial_match_1 == drop:
+                    partial_match_1 = match(outport = p)
+                else:
+                    partial_match_1 |= match(outport = p)
             partial_match_1 = match(switch = pair[1]) & partial_match_1
 
             
@@ -82,14 +88,38 @@ class TrafficMatrixStats:
                 pol = partial_query
             else:
                 pol += partial_query
+        
+        port_pol = None
 
+        for sw in switches:
+            sw_ports = ports[sw]
+            in_port_match = None
+            out_port_match = None
+            for p in sw_ports:
+                if in_port_match is None:
+                    in_port_match = match(inport = p)
+                else:
+                    in_port_match |= match(inport = p)
+
+                if out_port_match is None:
+                    out_port_match = match(outport = p)
+                else:
+                    out_port_match |= match(outport = p)
+
+            partial_port_pol = in_out_atom(match(switch = sw) & in_port_match, match(switch = sw) & out_port_match)
+
+            if port_pol is None:
+                port_pol = partial_port_pol
+            else:
+                port_pol += partial_port_pol
+     
         query_thread = threading.Thread(target = self.pull_buckets)
         #query_thread.start()
     
         report_thread = threading.Thread(target = self.report)
         #report_thread.start()
-        return pol        
-
+        return  pol + port_pol        
+        #return pol
     def pull_buckets(self):
         while True:
             for key in self.buckets:
@@ -107,7 +137,6 @@ class TrafficMatrixStats:
 def path_main(**kwargs):
     tms = TrafficMatrixStats(5, 10)
     path_policy = tms.traffic_matrix_query()
-    #print path_policy
     return path_policy
 
 ################### forwarding ################

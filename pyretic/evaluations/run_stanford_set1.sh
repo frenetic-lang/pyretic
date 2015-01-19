@@ -1,14 +1,29 @@
+#declare -a OPT_FLAGS_ARR=("-d -l -i -c" "-d -l -i" "-d -l" "-d" "-l" " ")
+
+#TEST='path_loss_stanford'
+
+#i=6
+#DCR=1
+#for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
+#do
+#    sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -u $OPT_FLAGS -t $TEST -f ./stanford/path_loss/pl_$i/
+#    i=$((i - DCR ))
+#    sleep 10
+#done
+
+
+declare -a OPT_FLAGS_ARR=("-l" " ")
+
 TEST='traffic_matrix_stanford'
 
-#sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -d -l -u -i -c -t $TEST -f ./stanford/tm_5/
-#sleep 10
-#sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -d -l -u -i -t $TEST -f ./stanford/tm_4/
-#sleep 10
-#sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -d -l -u -t $TEST -f ./stanford/tm_3/
-#sleep 10
-#sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -d -l -t $TEST  -f ./stanford/tm_2/
-#sleep 10
-sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -u -d -t $TEST -f ./stanford/tm_1/
-sleep 10
-sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -u -t $TEST -f ./stanford/tm_0/
+i=2
+DCR=1
+for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
+do
+    sudo /opt/pypy-2.4.0/bin/pypy eval_compilation.py -r -u $OPT_FLAGS -t $TEST -f ./stanford/traffic_matrix/tm_$i/
+    i=$((i - DCR ))
+    sleep 10
+done
+
+
 

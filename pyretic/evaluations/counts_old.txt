@@ -1,0 +1,9 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+['match_enabled', 'ragel_enabled', 'multitable_enabled', 'integrate_enabled', 'default_enabled', 'disjoint_enabled']
+{'test': 'traffic_matrix_stanford'}
+202.587332964
+overlap called 17277
+intersect called 38026
+65
+3840
+207.849536896
