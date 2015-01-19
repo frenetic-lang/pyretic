@@ -1,6 +1,6 @@
 import sys
-sys.path.append('/home/mininet/pyretic')
-sys.path.append('/home/mininet/mininet')
+sys.path.append('/home/mina/pyretic')
+sys.path.append('/home/mina/mininet')
 import os
 import shutil
 
