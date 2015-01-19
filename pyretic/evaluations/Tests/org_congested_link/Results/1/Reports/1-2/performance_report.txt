@@ -1,0 +1,92 @@
+dfa state count : 8 
+--------------------
+rule count statistics: 
+switch count: 5
+total rule count: 834
+average rule count: 166.8
+------details-------
+s3 -> 162
+s2 -> 162
+s1 -> 174
+s5 -> 168
+s4 -> 168
+--------end--------
+compile
+number of calls: 1
+total time: 0.389437
+average time: 0.389437
+---times----
+[0.3894369602203369]
+classifier size: 198
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.004191
+average time: 0.004191
+---times----
+[0.004191160202026367]
+classifier size: 9
+--------------------------------------
+first_whole_compile
+number of calls: 1
+total time: 0.239543
+average time: 0.239543
+---times----
+[0.23954296112060547]
+classifier size: 198
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 0.394660
+average time: 0.394660
+---times----
+[0.39465999603271484]
+classifier size: 210
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 0.533398
+average time: 0.533398
+---times----
+[0.533397912979126]
+classifier size: 54
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 0.768442
+average time: 0.768442
+---times----
+[0.7684421539306641]
+classifier size: 198
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.012086
+average time: 0.012086
+---times----
+[0.012086153030395508]
+classifier size: 13
+--------------------------------------
+vf_untag_compile
+number of calls: 1
+total time: 0.000114
+average time: 0.000114
+---times----
+[0.00011396408081054688]
+classifier size: 1
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 0.212548
+average time: 0.212548
+---times----
+[0.21254801750183105]
+--------------------------------------
+vf_tag_compile
+number of calls: 1
+total time: 0.000124
+average time: 0.000124
+---times----
+[0.0001239776611328125]
+classifier size: 1
+--------------------------------------
