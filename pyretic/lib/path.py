@@ -802,7 +802,7 @@ class in_out_atom(path):
                 self.out_pred == other.out_pred)
 
     def __repr__(self):
-        return "in: %s\nout: %s\nexpr:%s" % (repr(self.in_pred),
+        return "in: %s\n\tout: %s\n\texpr:%s" % (repr(self.in_pred),
                                              repr(self.out_pred),
                                              self.expr)
 
