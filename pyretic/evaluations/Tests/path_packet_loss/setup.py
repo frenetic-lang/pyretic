@@ -2,10 +2,11 @@ from Topos import *
 
 
 def setup_topo(*params):
-    return SimpleChainTopo.SimpleChainTopo(*params)
+    return FatTree.get_fattree_topo(*params)
 
-def setup_workload(net, n):
+def setup_workload(net, n, m):
     hosts = net.topo.hosts()
     hosts = [net.getNodeByName(h) for h in hosts]
-    return (hosts[0], hosts[1], ['1M'])
+    k = min(n,m)
+    return (hosts[:n][:k], hosts[n:n+m][:k], ['1M'] * k)
 

@@ -146,8 +146,7 @@ class eval_compilation:
     def compile(self, full_compile = False):
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
-        
-        
+                    
         pathcomp.init(self.max_states)
         
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 

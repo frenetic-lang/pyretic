@@ -46,25 +46,61 @@ class PathPacketLossStats:
                          
             time.sleep(self.report_interval)
             
-            
+    def get_edge_num(self, k, pod_num, edge_num):
+        core_cnt = (k/2) ** 2
+        return core_cnt + k * (pod_num - 1) + (k / 2) + edge_num
+    
+    def get_aggr_list(self, k, pod_num):
+        core_cnt = (k/2) ** 2
+        start = core_cnt + k * (pod_num - 1) + 1
+        return range(start, start + k/2)
+        
+    
+    def get_core_list(self, k, aggr_num):
+        core_cnt = (k/2) ** 2
+        in_pod_aggr_num = (aggr_num - core_cnt - 1) % (k/2)
+        start = k / 2 * (in_pod_aggr_num) + 1
+        return range(start, start + k/2)
+
+    def get_core_aggr(self, k, core_num, pod_num):
+        core_cnt = (k/2) ** 2
+        core_row = (core_num - 1)/ (k/ 2) + 1
+        return core_cnt + k * (pod_num - 1) + core_row
+
     def query(self, **kwargs):
         params = dict(**kwargs)
-        n = int(params['n'])
+        k = int(params['k'])
         
+        core_cnt = (k / 2) ** 2
+
+        src = self.get_edge_num(k, 1, 1)
+        dst = self.get_edge_num(k, k, k/2)
+       
+        paths = []
+        for aggr in self.get_aggr_list(k, 1):
+            for core in self.get_core_list(k, aggr):
+                paths.append([aggr, core, self.get_core_aggr(k, core, k), dst])
+      
         ip_h1 = '10.0.0.1'
         ip_h2 = '10.0.0.2'
-        partial_query = atom(match(switch = 1) & match(srcip=ip_h1) & match(dstip=ip_h2))
+        
+        
+        base_query = atom(match(switch = 1) & match(srcip=ip_h1) & match(dstip=ip_h2))
         #partial_query = atom(ingress_network() & match(srcip=ip_h1) & match(dstip=ip_h2))
-        partial_query.register_callback(self.bucket_callback(1))
-        p = partial_query
-        for i in range(2, n + 1):
-            partial_query = partial_query ^ atom(match(switch = i))
-            #cb = CountBucket()
-            #partial_query.set_bucket(cb)
-            #self.buckets[i] = cb
-            self.stat[i] = 0
-            partial_query.register_callback(self.bucket_callback(i))
-            p += partial_query
+        base_query.register_callback(self.bucket_callback(1))
+        p = base_query
+       
+        for path in paths:
+            partial_query = base_query
+            for hop in path:
+                partial_query = partial_query ^ atom(match(switch = hop))
+                #cb = CountBucket()
+                #partial_query.set_bucket(cb)
+                #self.buckets[i] = cb
+                #self.stat[i] = 0
+                partial_query.register_callback(self.bucket_callback(path))
+
+                p += partial_query
         
         query_thread = threading.Thread(target = self.pull_buckets)
         #query_thread.start()
@@ -96,7 +132,4 @@ def path_main(**kwargs):
 
 
 def main(**kwargs):
-    params = dict(**kwargs)
-    n = int(params['n'])
-    return SimpleChainTopo.SimpleChainTopo.get_static_forwarding(n) 
-
+    return identity
