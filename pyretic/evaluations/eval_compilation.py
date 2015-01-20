@@ -40,7 +40,6 @@ class eval_compilation:
                     shutil.rmtree(fpath)
 
     def add(self, full_compile, **aparams):
-        self.policy = eval_path.main(**aparams)
         self.path_policy = eval_path.path_main(**aparams)
         
         self.add_calls += 1
@@ -68,10 +67,6 @@ class eval_compilation:
                 self.in_table_compile()
                 self.out_table_compile()
                 
-                #self.policy = (self.path_in_table >> self.policy
-                #                >> self.path_out_table)
-
-                #self.whole_compile()
             else:
                 
                 self.forwarding_compile()
@@ -87,12 +82,6 @@ class eval_compilation:
                 self.out_table_compile()
 
                 
-                #self.policy = (
-                #self.path_in_table >> 
-                #self.policy >> self.path_out_table
-                #)
-                
-                #self.whole_compile()
         else:
             
             in_tag_policy = self.path_in_tagging >> self.policy
@@ -124,7 +113,7 @@ class eval_compilation:
             
             
             if multitable_enabled:
-                self.policy = self.virtual_tag >> self.policy >> self.virtual_untag
+                self.overall_policy = self.virtual_tag >> self.policy >> self.virtual_untag
                 self.whole_policy_compile()
 
             else:
@@ -136,7 +125,7 @@ class eval_compilation:
                 self.vtag_in_capture_compile()
                 self.vtag_out_capture_compile()
 
-                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+                self.overall_policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
                 self.whole_policy_compile()
 
 
@@ -147,8 +136,7 @@ class eval_compilation:
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        classifier_utils.__set_init_vars__(self.match_enabled)    
-                    
+        print self.path_policy 
         pathcomp.init(self.max_states)
          
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
@@ -172,10 +160,6 @@ class eval_compilation:
                 self.in_table_compile()
                 self.out_table_compile()
                 
-                #self.policy = (self.path_in_table >> self.policy
-                #                >> self.path_out_table)
-
-                #self.whole_compile()
             else:
                 
                 self.forwarding_compile()
@@ -190,13 +174,6 @@ class eval_compilation:
                 self.in_table_compile()
                 self.out_table_compile()
 
-                
-                #self.policy = (
-                #self.path_in_table >> 
-                #self.policy >> self.path_out_table
-                #)
-                
-                #self.whole_compile()
         else:
             
             in_tag_policy = self.path_in_tagging >> self.policy
@@ -228,7 +205,7 @@ class eval_compilation:
             
             
             if multitable_enabled:
-                self.policy = self.virtual_tag >> self.policy >> self.virtual_untag
+                self.overall_policy = self.virtual_tag >> self.policy >> self.virtual_untag
                 self.whole_policy_compile()
 
             else:
@@ -240,7 +217,7 @@ class eval_compilation:
                 self.vtag_in_capture_compile()
                 self.vtag_out_capture_compile()
 
-                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
+                self.overall_policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
                 self.whole_policy_compile()
 
 
@@ -266,8 +243,8 @@ class eval_compilation:
      
     @stat.classifier_size
     @stat.elapsed_time
-    def whole_compile(self):
-        return self.policy.compile()
+    def whole_policy_compile(self):
+        return self.overall_policy.compile()
 
     
     ##### tagging methods ######
@@ -364,7 +341,7 @@ def parse_args():
     parser.add_argument("-t", "--test", required=True
                         , help="Test case to run")
     
-    parser.add_argument("-a", "--added_query"
+    parser.add_argument("-a", "--added_query", nargs = '+'
                         , help= "Test case to be added to the main test")
 
     parser.add_argument("-f", "--results_folder",
@@ -457,10 +434,12 @@ if __name__ == '__main__':
     print time.time() - t_s
     
     if args.added_query:
-        aparams = get_added_query_params(args)
-        t_s = time.time()
-        eval_comp.add(False, **aparams)
-        print time.time() - t_s
+        for aq in args.added_query:
+            #aparams = get_added_query_params(args)
+            aparams = {'test': aq}
+            t_s = time.time()
+            eval_comp.add(False, **aparams)
+            print time.time() - t_s
     
 
 #######################################################
