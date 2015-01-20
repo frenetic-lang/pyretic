@@ -7,6 +7,9 @@ from Topos import *
 
 import threading
 import itertools
+import os
+import json
+import socket
 
 def query_callback(id_str, print_counts=True):
     def actual_callback(pkt):
@@ -26,7 +29,7 @@ def all_packets_query():
     return p
 
 
-class PathPacketLossStats:
+class LoopStats:
     
     def __init__(self, bucket_interval, report_interval):
         self.buckets = {}
@@ -39,48 +42,45 @@ class PathPacketLossStats:
     def report(self):
         while True:
             with self.stat_lock:
-                s = ""
-                for key in self.stat:
-                    s += 's%d ' % key
-                    print "%s: %d" % (key, self.stat[key])   
-                         
+                s = sum(self.stat.values())
+                if s == 0:
+                    print 'no traffic yet'
+                    continue
+                print self.stat
+
             time.sleep(self.report_interval)
             
             
-    def query(self, **kwargs):
+    def loop_detection_query(self):
+        t = StanfordTopology.StanfordTopo()
+        ports = t.port_map
+        switches = ports.keys()
+
+        pol = None
         
-        ip_h1 = '10.0.0.1'
-        ip_h2 = '10.0.0.2'
-        
-        paths = [[5], [1, 5], [2, 5], [1,2,5], [2,1,5]]
-        
-        
-        base_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        #partial_query = atom(ingress_network() & match(srcip=ip_h1) & match(dstip=ip_h2))
-        base_query.register_callback(self.bucket_callback(1))
-        p = base_query
-       
-        for path in paths:
-            partial_query = base_query
-            for hop in path:
-                partial_query = partial_query ^ atom(match(switch = hop))
-                #cb = CountBucket()
+        for sw in switches:
+            sw_ports = ports[sw]
+            for p in sw_ports:
+                partial_query = +(in_atom(identity)) ^ in_atom(match(switch = sw, inport = p)) ** in_atom(match(switch = sw, inport = p))
+                
+                pair = (sw, p)
+                partial_query.register_callback(query_callback(pair)) 
+                cb = CountBucket()
                 #partial_query.set_bucket(cb)
-                #self.buckets[i] = cb
-                #self.stat[i] = 0
-                partial_query.register_callback(self.bucket_callback(path))
+                self.buckets[pair] = cb
+                self.stat[pair] = 0
+                #partial_query.register_callback(self.bucket_callback(pair))
+                if pol is None:
+                    pol = partial_query
+                else:
+                    pol += partial_query
 
-                p += partial_query
-        
-
-       
         query_thread = threading.Thread(target = self.pull_buckets)
         #query_thread.start()
     
         report_thread = threading.Thread(target = self.report)
         #report_thread.start()
-
-        return p
+        return pol        
 
     def pull_buckets(self):
         while True:
@@ -92,16 +92,17 @@ class PathPacketLossStats:
     def bucket_callback(self, key):
         def callback_func(inp):
             #with self.stat_lock:
-             #   self.stat[key] += inp[0]
-            print key, inp
+             #   self.stat[key] += inp[1]
+            print inp
         return callback_func 
  
 def path_main(**kwargs):
-    ppl = PathPacketLossStats(5,5)
-    return ppl.query(**kwargs)
-    #return all_packets_query()
-    #return link_congestion_query(['s1'], ['s2'], 3, 4)
+    ls = LoopStats(5, 10)
+    path_policy = ls.loop_detection_query()
+    #print path_policy
+    return path_policy
 
+################### forwarding ################
 
 class StanfordForwarding(Policy):
     def __init__(self):
@@ -236,6 +237,9 @@ class StanfordForwarding(Policy):
         print policy_dic
         forwarding = QuerySwitch('switch', policy_dic, set([drop]))
 
-
 def main(**kwargs):
     return StanfordForwarding()
+
+
+if __name__ == "__main__":
+    print get_forwarding_classifier()
