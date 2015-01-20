@@ -108,20 +108,8 @@ class classifier_utils(object):
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
-
-        if not cls.match_enabled:
-            return cls.is_not_drop(p1 & p2) 
-        else:
-            res = None
-            if isinstance(p1, match):
-                res =  intersection_utils.match_tree_intersect(p1, p2, False)
-            
-            elif isinstance(p2, match):
-                res = intersection_utils.match_tree_intersect(p2, p1, False)
-            else:
-                res = cls.is_not_drop(p1 & p2)
-            return res
-
+        return cls.is_not_drop(p1 & p2) 
+           
     @classmethod
     def get_overlap_mode(cls, pred, pred_neg, new_pred, new_pred_neg):
         """ Returns a tuple (is_equal, is_superset, is_subset, intersects) of
