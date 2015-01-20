@@ -53,8 +53,7 @@ class PathPacketLossStats:
         ip_h2 = '10.0.0.2'
         
         paths = [[5], [1, 5], [2, 5], [1,2,5], [2,1,5]]
-        
-        
+       
         base_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
         #partial_query = atom(ingress_network() & match(srcip=ip_h1) & match(dstip=ip_h2))
         base_query.register_callback(self.bucket_callback(1))
@@ -98,7 +97,8 @@ class PathPacketLossStats:
  
 def path_main(**kwargs):
     ppl = PathPacketLossStats(5,5)
-    return ppl.query(**kwargs)
+    query = ppl.query(**kwargs)
+    return query
     #return all_packets_query()
     #return link_congestion_query(['s1'], ['s2'], 3, 4)
 

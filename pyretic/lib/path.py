@@ -70,7 +70,8 @@ class classifier_utils(object):
     @classmethod
     def __set_init_vars__(cls, match_enabled):
         cls.match_enabled = match_enabled
-    
+        cls.intersect_called = 0
+        cls.overlap_called = 0 
     @classmethod
     def __get_classifier__(cls, p):
         # Hackety hack
@@ -107,6 +108,7 @@ class classifier_utils(object):
         drop. Works by generating the classifiers for the intersection of the
         policies, and checking if there are anything other than drop rules.
         """
+
         if not cls.match_enabled:
             return cls.is_not_drop(p1 & p2) 
         else:
