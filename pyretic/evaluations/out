@@ -1,0 +1,189 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+[]
+{'test': 'path_packet_loss', 'k': '4', 'fout': '2'}
+__in_re_tree_gen__
+match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+[]
+[]
+match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__out_re_tree_gen__
+identity
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+[]
+identity
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[identity]
+-----------
+__in_re_tree_gen__
+match: ('switch', 5)
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 5)
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+[match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 17)
+[match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 17)
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 20)
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 20)
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 20), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 2)
+[match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 17), match: ('switch', 5), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 20), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 2)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 6)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 6)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 3)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 3)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 18)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 18)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+__in_re_tree_gen__
+match: ('switch', 4)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+match: ('switch', 4)
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 4), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), identity]
+[match: ('switch', 2), match: ('switch', 5), match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32')), match: ('switch', 4), match: ('switch', 17), match: ('switch', 18), match: ('switch', 3), match: ('switch', 6), match: ('switch', 20), intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))]
+-----------
+0.135786771774
+32

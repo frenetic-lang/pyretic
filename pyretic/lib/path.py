@@ -173,9 +173,9 @@ class re_tree_gen(object):
     pred_to_symbol = {}
     pred_to_atoms  = {}
     symbol_to_pred = {}
+    pred_to_neg = {}
     dyn_preds      = []
 
-    pred_to_neg = {}
 
     @classmethod
     def char_in_lexer_language(cls, char):
@@ -215,10 +215,10 @@ class re_tree_gen(object):
         
         
         cls.pred_to_symbol[pred] = symbol
-        cls.pred_to_atoms[pred] = atoms
         cls.symbol_to_pred[symbol] = pred
+        cls.pred_to_atoms[pred] = atoms
         cls.pred_to_neg[pred] = pred_neg
-
+       
     @classmethod
     def __add_dyn_preds__(cls, preds, atom):
         for pred in preds:
@@ -229,6 +229,7 @@ class re_tree_gen(object):
         """ Remove a predicate from existing global state of leaf-level
         predicates. """
         sym = cls.pred_to_symbol[pred]
+        
         del cls.symbol_to_pred[sym]
         del cls.pred_to_symbol[pred]
         del cls.pred_to_atoms[pred]
@@ -396,6 +397,7 @@ class re_tree_gen(object):
         cls.pred_to_symbol  = {}
         cls.pred_to_atoms   = {}
         cls.symbol_to_pred  = {}
+        cls.pred_to_neg = {}
         cls.dyn_preds       = []
 
     @classmethod
@@ -2088,7 +2090,7 @@ class ragel_dfa_utils(common_dfa_utils):
         f = open(lex_input_file, 'w')
         f.write(lex_input)
         f.close()
-
+        print 'here'
         try:
             output = subprocess.check_output(['ragel', '-V', lex_input_file])
         except subprocess.CalledProcessError as e:
@@ -2098,7 +2100,7 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.returncode
             print e.cmd
             print e.output
-
+        
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
         

@@ -7,6 +7,9 @@ from Topos import *
 
 import threading
 import itertools
+import os
+import json
+import socket
 
 def query_callback(id_str, print_counts=True):
     def actual_callback(pkt):
@@ -26,7 +29,7 @@ def all_packets_query():
     return p
 
 
-class PathPacketLossStats:
+class LinkCongestionStats:
     
     def __init__(self, bucket_interval, report_interval):
         self.buckets = {}
@@ -39,48 +42,65 @@ class PathPacketLossStats:
     def report(self):
         while True:
             with self.stat_lock:
-                s = ""
-                for key in self.stat:
-                    s += 's%d ' % key
-                    print "%s: %d" % (key, self.stat[key])   
-                         
+                s = sum(self.stat.values())
+                if s == 0:
+                    print 'no traffic yet'
+                    continue
+                m = 0
+                max_pair = None
+                rel_stats = {}
+
+                for k,v in self.stat.items():
+                    if max(v, m) == v:
+                        max_pair = k
+                        m = v
+
+                rel_stats[k] = float(v) / s
+
+            print rel_stats
             time.sleep(self.report_interval)
             
+                        
+    def link_congestion_query(self, **kwargs):
+        t = StanfordTopology.StanfordTopo()
+        ports = t.port_map
+        switches = ports.keys()
+        egress_pairs = itertools.product(switches, switches)
+
+        s1 = 1
+        s2 = 2
+ 
+        pol = None
+        
+        for pair in egress_pairs:
+            partial_match_0 = drop
+            for p in ports[pair[0]]:
+                partial_match_0 |= match(inport = p)
+            partial_match_0 = match(switch = pair[0]) & partial_match_0
             
-    def query(self, **kwargs):
-        
-        ip_h1 = '10.0.0.1'
-        ip_h2 = '10.0.0.2'
-        
-        paths = [[5], [1, 5], [2, 5], [1,2,5], [2,1,5]]
-        
-        
-        base_query = atom(match(switch = 3) & match(srcip=ip_h1) & match(dstip=ip_h2))
-        #partial_query = atom(ingress_network() & match(srcip=ip_h1) & match(dstip=ip_h2))
-        base_query.register_callback(self.bucket_callback(1))
-        p = base_query
-       
-        for path in paths:
-            partial_query = base_query
-            for hop in path:
-                partial_query = partial_query ^ atom(match(switch = hop))
-                #cb = CountBucket()
-                #partial_query.set_bucket(cb)
-                #self.buckets[i] = cb
-                #self.stat[i] = 0
-                partial_query.register_callback(self.bucket_callback(path))
+            partial_match_1 = drop
+            for p in ports[pair[1]]:
+                partial_match_1 |= match(outport = p)
+            partial_match_1 = match(switch = pair[1]) & partial_match_1
 
-                p += partial_query
-        
+            partial_query = atom(partial_match_0) ** atom(match(switch = s1)) ^ atom(match(switch = s2)) ** atom(partial_match_1)
+            partial_query.register_callback(query_callback(pair)) 
+            cb = CountBucket()
+            #partial_query.set_bucket(cb)
+            self.buckets[pair] = cb
+            self.stat[pair] = 0
+            partial_query.register_callback(self.bucket_callback(pair))
+            if pol is None:
+                pol = partial_query
+            else:
+                pol += partial_query
 
-       
         query_thread = threading.Thread(target = self.pull_buckets)
         #query_thread.start()
     
         report_thread = threading.Thread(target = self.report)
         #report_thread.start()
-
-        return p
+        return pol        
 
     def pull_buckets(self):
         while True:
@@ -92,16 +112,15 @@ class PathPacketLossStats:
     def bucket_callback(self, key):
         def callback_func(inp):
             #with self.stat_lock:
-             #   self.stat[key] += inp[0]
-            print key, inp
+             #   self.stat[key] += inp[1]
+            print inp
         return callback_func 
  
 def path_main(**kwargs):
-    ppl = PathPacketLossStats(5,5)
-    return ppl.query(**kwargs)
-    #return all_packets_query()
-    #return link_congestion_query(['s1'], ['s2'], 3, 4)
+    lcs = LinkCongestionStats(5,5)
+    return lcs.link_congestion_query(**kwargs)
 
+################### forwarding ################
 
 class StanfordForwarding(Policy):
     def __init__(self):
@@ -236,6 +255,9 @@ class StanfordForwarding(Policy):
         print policy_dic
         forwarding = QuerySwitch('switch', policy_dic, set([drop]))
 
-
 def main(**kwargs):
     return StanfordForwarding()
+
+
+if __name__ == "__main__":
+    print get_forwarding_classifier()
