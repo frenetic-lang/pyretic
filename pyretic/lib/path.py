@@ -696,7 +696,7 @@ class re_tree_gen(object):
 
     @classmethod
     def stats(cls):
-        print [len(s) for s in cls.part_symbol_to_pred.values()]
+        print [(k, len(v)) for (k, v) in cls.part_symbol_to_pred.items()]
 """ Character generator classes belonging to "ingress" and "egress" matching
 predicates, respectively. """
 class __in_re_tree_gen__(re_tree_gen):
@@ -1537,6 +1537,9 @@ class pathcomp(object):
         cls.path_policy += path_pol
         (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
         print time.time() - t_s
+        __in_re_tree_gen__.stats()
+        __out_re_tree_gen__.stats()
+
         return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
 
 
