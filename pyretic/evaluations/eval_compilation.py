@@ -42,6 +42,7 @@ class eval_compilation:
             self.switch_cnt = None
 
         self.cache_enabled = args.cache_enabled
+        self.edge_contraction_enabled = args.edge_contraction_enabled
 
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
@@ -148,7 +149,7 @@ class eval_compilation:
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        pathcomp.init(self.max_states, self.switch_cnt, self.cache_enabled)
+        pathcomp.init(self.max_states, self.switch_cnt, self.cache_enabled, self.edge_contraction_enabled)
          
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
@@ -391,6 +392,11 @@ def parse_args():
     parser.add_argument('--enable_cache', '-c', action="store_true",
                     dest = 'cache_enabled',
                     help = 'enable cache optimization')
+
+    parser.add_argument('--enable_edge_contraction', '-g', action="store_true",
+                    dest = 'edge_contraction_enabled',
+                    help = 'enable edge contratction optimization, works only with cache enabled')
+
 
     args = parser.parse_args()
 
