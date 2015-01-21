@@ -1,0 +1,572 @@
+Couldn't import dot_parser, loading of dot files will not be possible.
+['match_enabled', 'ragel_enabled', 'multitable_enabled', 'integrate_enabled', 'default_enabled', 'disjoint_enabled']
+{'test': 'traffic_matrix_stanford'}
+intersect_called 100
+intersect_called 200
+overlap called 100
+intersect_called 300
+intersect_called 400
+overlap called 200
+intersect_called 500
+intersect_called 600
+overlap called 300
+intersect_called 700
+intersect_called 800
+overlap called 400
+intersect_called 900
+intersect_called 1000
+overlap called 500
+intersect_called 1100
+intersect_called 1200
+intersect_called 1300
+overlap called 600
+intersect_called 1400
+intersect_called 1500
+overlap called 700
+intersect_called 1600
+intersect_called 1700
+overlap called 800
+intersect_called 1800
+intersect_called 1900
+overlap called 900
+intersect_called 2000
+intersect_called 2100
+overlap called 1000
+intersect_called 2200
+intersect_called 2300
+overlap called 1100
+intersect_called 2400
+intersect_called 2500
+intersect_called 2600
+overlap called 1200
+intersect_called 2700
+intersect_called 2800
+overlap called 1300
+intersect_called 2900
+intersect_called 3000
+overlap called 1400
+intersect_called 3100
+intersect_called 3200
+overlap called 1500
+intersect_called 3300
+intersect_called 3400
+overlap called 1600
+intersect_called 3500
+intersect_called 3600
+overlap called 1700
+intersect_called 3700
+intersect_called 3800
+intersect_called 3900
+overlap called 1800
+intersect_called 4000
+intersect_called 4100
+overlap called 1900
+intersect_called 4200
+intersect_called 4300
+overlap called 2000
+intersect_called 4400
+intersect_called 4500
+overlap called 2100
+intersect_called 4600
+intersect_called 4700
+overlap called 2200
+intersect_called 4800
+intersect_called 4900
+overlap called 2300
+intersect_called 5000
+intersect_called 5100
+intersect_called 5200
+overlap called 2400
+intersect_called 5300
+intersect_called 5400
+overlap called 2500
+intersect_called 5500
+intersect_called 5600
+overlap called 2600
+intersect_called 5700
+intersect_called 5800
+overlap called 2700
+intersect_called 5900
+intersect_called 6000
+overlap called 2800
+intersect_called 6100
+intersect_called 6200
+overlap called 2900
+intersect_called 6300
+intersect_called 6400
+intersect_called 6500
+overlap called 3000
+intersect_called 6600
+intersect_called 6700
+overlap called 3100
+intersect_called 6800
+intersect_called 6900
+overlap called 3200
+intersect_called 7000
+intersect_called 7100
+overlap called 3300
+intersect_called 7200
+intersect_called 7300
+overlap called 3400
+intersect_called 7400
+intersect_called 7500
+overlap called 3500
+intersect_called 7600
+intersect_called 7700
+intersect_called 7800
+overlap called 3600
+intersect_called 7900
+intersect_called 8000
+overlap called 3700
+intersect_called 8100
+intersect_called 8200
+overlap called 3800
+intersect_called 8300
+intersect_called 8400
+overlap called 3900
+intersect_called 8500
+intersect_called 8600
+overlap called 4000
+intersect_called 8700
+intersect_called 8800
+intersect_called 8900
+overlap called 4100
+intersect_called 9000
+intersect_called 9100
+overlap called 4200
+intersect_called 9200
+intersect_called 9300
+overlap called 4300
+intersect_called 9400
+intersect_called 9500
+overlap called 4400
+intersect_called 9600
+intersect_called 9700
+intersect_called 9800
+overlap called 4500
+intersect_called 9900
+intersect_called 10000
+overlap called 4600
+intersect_called 10100
+intersect_called 10200
+overlap called 4700
+intersect_called 10300
+intersect_called 10400
+overlap called 4800
+intersect_called 10500
+intersect_called 10600
+overlap called 4900
+intersect_called 10700
+intersect_called 10800
+overlap called 5000
+intersect_called 10900
+intersect_called 11000
+intersect_called 11100
+overlap called 5100
+intersect_called 11200
+intersect_called 11300
+overlap called 5200
+intersect_called 11400
+intersect_called 11500
+overlap called 5300
+intersect_called 11600
+intersect_called 11700
+overlap called 5400
+intersect_called 11800
+intersect_called 11900
+overlap called 5500
+intersect_called 12000
+intersect_called 12100
+overlap called 5600
+intersect_called 12200
+intersect_called 12300
+intersect_called 12400
+overlap called 5700
+intersect_called 12500
+intersect_called 12600
+overlap called 5800
+intersect_called 12700
+intersect_called 12800
+overlap called 5900
+intersect_called 12900
+intersect_called 13000
+overlap called 6000
+intersect_called 13100
+intersect_called 13200
+overlap called 6100
+intersect_called 13300
+intersect_called 13400
+intersect_called 13500
+overlap called 6200
+intersect_called 13600
+intersect_called 13700
+overlap called 6300
+intersect_called 13800
+intersect_called 13900
+overlap called 6400
+intersect_called 14000
+intersect_called 14100
+overlap called 6500
+intersect_called 14200
+intersect_called 14300
+overlap called 6600
+intersect_called 14400
+intersect_called 14500
+intersect_called 14600
+overlap called 6700
+intersect_called 14700
+intersect_called 14800
+overlap called 6800
+intersect_called 14900
+intersect_called 15000
+overlap called 6900
+intersect_called 15100
+intersect_called 15200
+overlap called 7000
+intersect_called 15300
+intersect_called 15400
+intersect_called 15500
+overlap called 7100
+intersect_called 15600
+intersect_called 15700
+overlap called 7200
+intersect_called 15800
+intersect_called 15900
+overlap called 7300
+intersect_called 16000
+intersect_called 16100
+overlap called 7400
+intersect_called 16200
+intersect_called 16300
+overlap called 7500
+intersect_called 16400
+intersect_called 16500
+intersect_called 16600
+overlap called 7600
+intersect_called 16700
+intersect_called 16800
+overlap called 7700
+intersect_called 16900
+intersect_called 17000
+overlap called 7800
+intersect_called 17100
+intersect_called 17200
+overlap called 7900
+intersect_called 17300
+intersect_called 17400
+overlap called 8000
+intersect_called 17500
+intersect_called 17600
+intersect_called 17700
+overlap called 8100
+intersect_called 17800
+intersect_called 17900
+overlap called 8200
+intersect_called 18000
+intersect_called 18100
+overlap called 8300
+intersect_called 18200
+intersect_called 18300
+overlap called 8400
+intersect_called 18400
+intersect_called 18500
+overlap called 8500
+intersect_called 18600
+intersect_called 18700
+overlap called 8600
+intersect_called 18800
+intersect_called 18900
+overlap called 8700
+intersect_called 19000
+intersect_called 19100
+intersect_called 19200
+overlap called 8800
+intersect_called 19300
+intersect_called 19400
+overlap called 8900
+intersect_called 19500
+intersect_called 19600
+overlap called 9000
+intersect_called 19700
+intersect_called 19800
+overlap called 9100
+intersect_called 19900
+intersect_called 20000
+overlap called 9200
+intersect_called 20100
+intersect_called 20200
+intersect_called 20300
+overlap called 9300
+intersect_called 20400
+intersect_called 20500
+overlap called 9400
+intersect_called 20600
+intersect_called 20700
+overlap called 9500
+intersect_called 20800
+intersect_called 20900
+overlap called 9600
+intersect_called 21000
+intersect_called 21100
+intersect_called 21200
+overlap called 9700
+intersect_called 21300
+intersect_called 21400
+overlap called 9800
+intersect_called 21500
+intersect_called 21600
+overlap called 9900
+intersect_called 21700
+intersect_called 21800
+overlap called 10000
+intersect_called 21900
+intersect_called 22000
+overlap called 10100
+intersect_called 22100
+intersect_called 22200
+intersect_called 22300
+overlap called 10200
+intersect_called 22400
+intersect_called 22500
+overlap called 10300
+intersect_called 22600
+intersect_called 22700
+overlap called 10400
+intersect_called 22800
+intersect_called 22900
+overlap called 10500
+intersect_called 23000
+intersect_called 23100
+overlap called 10600
+intersect_called 23200
+intersect_called 23300
+intersect_called 23400
+overlap called 10700
+intersect_called 23500
+intersect_called 23600
+overlap called 10800
+intersect_called 23700
+intersect_called 23800
+overlap called 10900
+intersect_called 23900
+intersect_called 24000
+overlap called 11000
+intersect_called 24100
+intersect_called 24200
+overlap called 11100
+intersect_called 24300
+intersect_called 24400
+intersect_called 24500
+overlap called 11200
+intersect_called 24600
+intersect_called 24700
+overlap called 11300
+intersect_called 24800
+intersect_called 24900
+overlap called 11400
+intersect_called 25000
+intersect_called 25100
+overlap called 11500
+intersect_called 25200
+intersect_called 25300
+overlap called 11600
+intersect_called 25400
+intersect_called 25500
+intersect_called 25600
+overlap called 11700
+intersect_called 25700
+intersect_called 25800
+overlap called 11800
+intersect_called 25900
+intersect_called 26000
+overlap called 11900
+intersect_called 26100
+intersect_called 26200
+overlap called 12000
+intersect_called 26300
+intersect_called 26400
+intersect_called 26500
+overlap called 12100
+intersect_called 26600
+intersect_called 26700
+overlap called 12200
+intersect_called 26800
+intersect_called 26900
+overlap called 12300
+intersect_called 27000
+intersect_called 27100
+overlap called 12400
+intersect_called 27200
+intersect_called 27300
+intersect_called 27400
+overlap called 12500
+intersect_called 27500
+intersect_called 27600
+overlap called 12600
+intersect_called 27700
+intersect_called 27800
+overlap called 12700
+intersect_called 27900
+intersect_called 28000
+overlap called 12800
+intersect_called 28100
+intersect_called 28200
+overlap called 12900
+intersect_called 28300
+intersect_called 28400
+intersect_called 28500
+overlap called 13000
+intersect_called 28600
+intersect_called 28700
+overlap called 13100
+intersect_called 28800
+intersect_called 28900
+overlap called 13200
+intersect_called 29000
+intersect_called 29100
+intersect_called 29200
+overlap called 13300
+intersect_called 29300
+intersect_called 29400
+overlap called 13400
+intersect_called 29500
+intersect_called 29600
+overlap called 13500
+intersect_called 29700
+intersect_called 29800
+overlap called 13600
+intersect_called 29900
+intersect_called 30000
+overlap called 13700
+intersect_called 30100
+intersect_called 30200
+intersect_called 30300
+overlap called 13800
+intersect_called 30400
+intersect_called 30500
+overlap called 13900
+intersect_called 30600
+intersect_called 30700
+overlap called 14000
+intersect_called 30800
+intersect_called 30900
+overlap called 14100
+intersect_called 31000
+intersect_called 31100
+intersect_called 31200
+overlap called 14200
+intersect_called 31300
+intersect_called 31400
+overlap called 14300
+intersect_called 31500
+intersect_called 31600
+overlap called 14400
+intersect_called 31700
+intersect_called 31800
+overlap called 14500
+intersect_called 31900
+intersect_called 32000
+overlap called 14600
+intersect_called 32100
+intersect_called 32200
+intersect_called 32300
+overlap called 14700
+intersect_called 32400
+intersect_called 32500
+overlap called 14800
+intersect_called 32600
+intersect_called 32700
+overlap called 14900
+intersect_called 32800
+intersect_called 32900
+overlap called 15000
+intersect_called 33000
+intersect_called 33100
+overlap called 15100
+intersect_called 33200
+intersect_called 33300
+overlap called 15200
+intersect_called 33400
+intersect_called 33500
+intersect_called 33600
+overlap called 15300
+intersect_called 33700
+intersect_called 33800
+overlap called 15400
+intersect_called 33900
+intersect_called 34000
+overlap called 15500
+intersect_called 34100
+intersect_called 34200
+overlap called 15600
+intersect_called 34300
+intersect_called 34400
+overlap called 15700
+intersect_called 34500
+intersect_called 34600
+overlap called 15800
+intersect_called 34700
+intersect_called 34800
+intersect_called 34900
+overlap called 15900
+intersect_called 35000
+intersect_called 35100
+overlap called 16000
+intersect_called 35200
+intersect_called 35300
+overlap called 16100
+intersect_called 35400
+intersect_called 35500
+intersect_called 35600
+overlap called 16200
+intersect_called 35700
+intersect_called 35800
+overlap called 16300
+intersect_called 35900
+intersect_called 36000
+overlap called 16400
+intersect_called 36100
+intersect_called 36200
+overlap called 16500
+intersect_called 36300
+intersect_called 36400
+overlap called 16600
+intersect_called 36500
+intersect_called 36600
+intersect_called 36700
+overlap called 16700
+intersect_called 36800
+intersect_called 36900
+overlap called 16800
+intersect_called 37000
+intersect_called 37100
+overlap called 16900
+intersect_called 37200
+intersect_called 37300
+intersect_called 37400
+overlap called 17000
+intersect_called 37500
+intersect_called 37600
+overlap called 17100
+intersect_called 37700
+intersect_called 37800
+overlap called 17200
+intersect_called 37900
+intersect_called 38000
+overlap called 17300
+intersect_called 38100
+intersect_called 38200
+intersect_called 38300
+overlap called 17400
+intersect_called 38400
+intersect_called 38500
+overlap called 17500
+intersect_called 38600
+intersect_called 38700
+intersect_called 38800
+overlap called 17600
+intersect_called 38900
+intersect_called 39000
+overlap called 17700
+intersect_called 39100
+intersect_called 39200

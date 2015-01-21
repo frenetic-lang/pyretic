@@ -21,6 +21,11 @@ class eval_compilation:
 
         self.policy = eval_path.main(**kwargs)
         self.path_policy = eval_path.path_main(**kwargs)
+        
+        #for aq in args.added_query:
+         #   self.path_policy += eval_path.path_main(test = aq)
+        
+        
         self.params = kwargs
         self.results_folder = args.results_folder
 
@@ -136,7 +141,6 @@ class eval_compilation:
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        print self.path_policy 
         pathcomp.init(self.max_states)
          
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
@@ -432,6 +436,7 @@ if __name__ == '__main__':
     t_s = time.time()
     eval_comp.compile()
     print time.time() - t_s
+    
     
     if args.added_query:
         for aq in args.added_query:
