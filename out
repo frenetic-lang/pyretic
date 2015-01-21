@@ -1,12 +1,106 @@
-0.0102200508118
-[(1, 2), (2, 1), (3, 2)]
-[(1, 1), (2, 1), (3, 1)]
-10
-INFO:core:POX 0.1.0 (betta) is up.
-INFO:core:Going down...
-
-killing log
-
-----starting pyretic shutdown------
-attempting to kill of_client
-pyretic.py done
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.2  26664  2180 ?        Ss   Jan19   0:27 /sbin/init
+root         2  0.0  0.0      0     0 ?        S    Jan19   0:00 [kthreadd]
+root         3  0.0  0.0      0     0 ?        S    Jan19   0:07 [ksoftirqd/0]
+root         5  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kworker/0:0H]
+root         7  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kworker/u:0H]
+root         8  0.0  0.0      0     0 ?        S    Jan19   0:00 [migration/0]
+root         9  0.0  0.0      0     0 ?        S    Jan19   0:00 [rcu_bh]
+root        10  0.0  0.0      0     0 ?        S    Jan19   0:07 [rcu_sched]
+root        11  0.0  0.0      0     0 ?        S    Jan19   0:02 [watchdog/0]
+root        12  0.0  0.0      0     0 ?        S<   Jan19   0:00 [cpuset]
+root        13  0.0  0.0      0     0 ?        S<   Jan19   0:00 [khelper]
+root        14  0.0  0.0      0     0 ?        S    Jan19   0:00 [kdevtmpfs]
+root        15  0.0  0.0      0     0 ?        S<   Jan19   0:00 [netns]
+root        16  0.0  0.0      0     0 ?        S    Jan19   0:00 [bdi-default]
+root        17  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kintegrityd]
+root        18  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kblockd]
+root        19  0.0  0.0      0     0 ?        S<   Jan19   0:00 [ata_sff]
+root        20  0.0  0.0      0     0 ?        S    Jan19   0:00 [khubd]
+root        21  0.0  0.0      0     0 ?        S<   Jan19   0:00 [md]
+root        22  0.0  0.0      0     0 ?        S<   Jan19   0:00 [devfreq_wq]
+root        24  0.0  0.0      0     0 ?        S    Jan19   0:00 [khungtaskd]
+root        25  0.0  0.0      0     0 ?        S    Jan19   1:56 [kswapd0]
+root        26  0.0  0.0      0     0 ?        SN   Jan19   0:00 [ksmd]
+root        27  0.0  0.0      0     0 ?        SN   Jan19   0:00 [khugepaged]
+root        28  0.0  0.0      0     0 ?        S    Jan19   0:00 [fsnotify_mark]
+root        29  0.0  0.0      0     0 ?        S    Jan19   0:00 [ecryptfs-kthrea]
+root        30  0.0  0.0      0     0 ?        S<   Jan19   0:00 [crypto]
+root        41  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kthrotld]
+root        43  0.0  0.0      0     0 ?        S<   Jan19   0:00 [binder]
+root        62  0.0  0.0      0     0 ?        S<   Jan19   0:00 [deferwq]
+root        63  0.0  0.0      0     0 ?        S<   Jan19   0:00 [charger_manager]
+root       194  0.0  0.0      0     0 ?        S<   Jan19   0:00 [mpt_poll_0]
+root       195  0.0  0.0      0     0 ?        S<   Jan19   0:00 [mpt/0]
+root       196  0.0  0.0      0     0 ?        S    Jan19   0:00 [scsi_eh_0]
+root       197  0.0  0.0      0     0 ?        S    Jan19   0:08 [kworker/u:2]
+root       211  0.0  0.0      0     0 ?        S    Jan19   0:04 [jbd2/sda1-8]
+root       212  0.0  0.0      0     0 ?        S<   Jan19   0:00 [ext4-dio-unwrit]
+root       318  0.0  0.0  15268   420 ?        S    Jan19   0:04 upstart-file-bridge --daemon
+root       344  0.0  0.0  17316   608 ?        S    Jan19   0:04 upstart-udev-bridge --daemon
+root       346  0.0  0.0  21552   916 ?        Ss   Jan19   0:00 /sbin/udevd --daemon
+root       423  0.0  0.0      0     0 ?        S<   Jan19   0:00 [kpsmoused]
+root       434  0.0  0.0      0     0 ?        S    Jan19   0:00 [kworker/0:2]
+102        458  0.0  0.0  23852   572 ?        Ss   Jan19   0:04 dbus-daemon --system --fork
+syslog     469  0.0  0.3 247848  3336 ?        Sl   Jan19   0:08 rsyslogd -c5
+root       576  0.0  0.0  21548   500 ?        S    Jan19   0:00 /sbin/udevd --daemon
+root       577  0.0  0.0  21548   476 ?        S    Jan19   0:00 /sbin/udevd --daemon
+root       653  0.0  0.0  10240   840 ?        Ss   Jan19   0:00 dhclient -1 -v -pf /run/dhclient.eth0.pid -lf /var/lib/dhcp/dhclient.eth0.leases eth0
+root       700  0.0  0.1  52252  1856 ?        Ss   Jan19   0:00 /usr/sbin/sshd -D
+root       748  0.0  0.0  15256   440 ?        S    Jan19   0:04 upstart-socket-bridge --daemon
+root       848  0.0  0.0  16068   700 tty4     Ss+  Jan19   0:00 /sbin/getty -8 38400 tty4
+root       851  0.0  0.0  16068   700 tty5     Ss+  Jan19   0:00 /sbin/getty -8 38400 tty5
+root       853  0.0  0.0  16068   700 tty2     Ss+  Jan19   0:00 /sbin/getty -8 38400 tty2
+root       856  0.0  0.0  16068   700 tty3     Ss+  Jan19   0:00 /sbin/getty -8 38400 tty3
+root       862  0.0  0.0  16068   700 tty6     Ss+  Jan19   0:00 /sbin/getty -8 38400 tty6
+root       872  0.0  0.0  21324   652 ?        Ss   Jan19   0:00 cron
+root       940  0.0  0.0      0     0 ?        S    Jan19   0:00 [ovs_workq]
+root       961  0.0  0.0  23000    24 ?        S<s  Jan19   0:00 ovsdb-server: monitoring pid 962 (healthy)                                                                                                                                                                                                                                                                                                                                                                                                                
+root       962  0.0  0.2  24488  2136 ?        S<   Jan19   0:09 ovsdb-server /etc/openvswitch/conf.db -vconsole:emer -vsyslog:err -vfile:info --remote=punix:/var/run/openvswitch/db.sock --remote=db:Open_vSwitch,Open_vSwitch,manager_options --private-key=db:Open_vSwitch,SSL,private_key --certificate=db:Open_vSwitch,SSL,certificate --bootstrap-ca-cert=db:Open_vSwitch,SSL,ca_cert --no-chdir --log-file=/var/log/openvswitch/ovsdb-server.log --pidfile=/var/run/openvswitch/ovsdb-server.pid --detach --monitor
+root       970  0.0  0.0  23408   348 ?        S<s  Jan19   0:00 ovs-vswitchd: monitoring pid 971 (healthy)                                                                                                                                                                                      
+root       971  0.0  0.7  24208  7520 ?        S<L  Jan19   0:08 ovs-vswitchd unix:/var/run/openvswitch/db.sock -vconsole:emer -vsyslog:err -vfile:info --mlockall --no-chdir --log-file=/var/log/openvswitch/ovs-vswitchd.log --pidfile=/var/run/openvswitch/ovs-vswitchd.pid --detach --monitor
+root       972  0.0  0.0  23412   788 ?        S<   Jan19   0:00 ovs-vswitchd: worker process for pid 971                                                                                                                                                                                        
+root      1028  0.0  0.0  60796   820 tty1     Ss   Jan19   0:00 /bin/login --        
+root      1031  0.0  0.0      0     0 ?        S    Jan19   0:02 [flush-8:0]
+root      1059  0.0  0.0      0     0 ?        S    Jan19   0:00 [kauditd]
+mininet   1072  0.0  0.0  23000   732 tty1     S+   Jan19   0:00 -bash
+mininet   1183  0.0  1.2  60752 12764 pts/1    S+   12:05   0:01 vim lib/path.py
+root      1189  0.0  0.1  79784  1868 ?        Ss   Jan19   0:00 sshd: mininet [priv]
+mininet   1203  0.0  0.0  79784   820 ?        S    Jan19   0:11 sshd: mininet@pts/2 
+mininet   1204  0.0  0.3  23520  3328 pts/2    Ss   Jan19   0:02 -bash
+root      1298  0.0  0.3  79784  3688 ?        Ss   12:17   0:00 sshd: mininet [priv]
+mininet   1312  0.0  0.1  79784  1772 ?        S    12:17   0:00 sshd: mininet@pts/5 
+mininet   1313  0.0  0.4  23052  4168 pts/5    Ss   12:17   0:00 -bash
+root      1596  0.0  0.0  12796   924 ?        Ss   12:28   0:00 /sbin/getty -L ttyS0 9600 vt102
+mininet   1597  1.0  0.5  26744  5512 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1598  0.0  0.3  26748  3964 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1599  0.0  0.3  26748  3980 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1600  0.0  0.3  26748  3980 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1601  0.0  0.3  26748  3980 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1602  0.0  0.3  26748  3976 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1603  0.0  0.3  26748  3980 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1604  0.0  0.3  26748  3984 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1605  0.0  0.3  26748  3980 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1606  0.0  0.3  26748  3984 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1607  0.0  0.3  26748  3976 pts/5    S+   12:28   0:00 python test_par.py
+mininet   1608  0.0  0.1  18692  1320 pts/2    R+   12:28   0:00 ps aux
+mininet   2832  0.2  0.1 258184  1612 pts/2    T    Jan19   5:20 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t congested_stanford
+mininet   3806  0.3  0.1 253892  1612 pts/2    T    Jan19   8:40 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t traffic_matrix_stanford -a path_loss_stanford firewall_stanford
+mininet   3913  0.0  0.1 232784  1612 pts/2    T    Jan19   0:28 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t traffic_matrix_stanford -a path_loss_stanford firewall_stanford
+mininet   3954  0.0  0.1 200488  1924 pts/2    T    Jan19   0:04 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t traffic_matrix_stanford -a path_loss_stanford firewall_stanford
+mininet   3977  0.3  0.1 253804  1604 pts/2    T    Jan19   7:53 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t traffic_matrix_stanford -a path_loss_stanford firewall_stanford
+mininet   4165  0.1  0.1 237200  1604 pts/2    T    Jan19   2:58 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -t traffic_matrix_stanford
+mininet   7089  0.1  8.9 262224 90940 pts/2    T    Jan20   3:37 /home/mininet/packages/pypy-2.4.0-linux64/bin/pypy eval_compilation.py -d -l -u -r -i -c 16 -t congested_stanford
+root      7094  0.0  0.0      0     0 ?        S<   Jan20   0:00 [kworker/0:1H]
+root      9167  0.0  0.3  79784  3692 ?        Ss   Jan20   0:00 sshd: mininet [priv]
+mininet   9181  0.0  0.1  79784  1776 ?        S    Jan20   0:07 sshd: mininet@pts/1 
+mininet   9182  0.0  0.4  23484  4612 pts/1    Ss   Jan20   0:00 -bash
+root     15239  0.0  0.3  79784  3692 ?        Ss   Jan20   0:00 sshd: mininet [priv]
+mininet  15254  0.0  0.1  79784  1776 ?        S    Jan20   0:08 sshd: mininet@pts/3 
+mininet  15255  0.0  0.4  23044  4168 pts/3    Ss   Jan20   0:00 -bash
+mininet  23956  0.0  7.0 119364 71812 pts/3    S+   05:22   0:05 vim examples/path_query.py
+root     24012  0.0  0.3  79784  3692 ?        Ss   05:26   0:00 sshd: mininet [priv]
+mininet  24026  0.0  0.1  79784  1776 ?        S    05:26   0:02 sshd: mininet@pts/4 
+mininet  24027  0.0  0.4  23464  4592 pts/4    Ss+  05:26   0:00 -bash
+root     32406  0.0  0.0      0     0 ?        S    10:09   0:00 [kworker/u:0]
+root     32494  0.0  0.0      0     0 ?        S    10:09   0:02 [kworker/0:1]

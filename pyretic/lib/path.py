@@ -358,6 +358,7 @@ class re_tree_gen(object):
             if new_pred in cls.cache:
                 new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
                 return new_re_tree
+        
 
         ne_inters   = classifier_utils.has_nonempty_intersection
         is_not_drop = classifier_utils.is_not_drop
@@ -434,8 +435,11 @@ class re_tree_gen(object):
             re_tree |= re_symbol(added_sym, metadata=at)
         
         if cls.cache_enabled:
-            print 'here'
             cls.cache[new_pred] = at
+        
+        elif len(cls.cache) == 0 and new_pred == identity:
+            cls.cache[new_pred] = at
+
         return re_tree
 
     @classmethod
@@ -718,6 +722,9 @@ class re_tree_gen(object):
        
         if cls.cache_enabled:
             cls.cache[new_pred] = at
+        elif len(cls.cache) == 0 and new_pred == identity:
+            cls.cache[new_pred] = at
+
         return re_tree
 
 
@@ -1540,7 +1547,7 @@ class pathcomp(object):
         __in_re_tree_gen__.clear()
         __out_re_tree_gen__.clear()
 
-        ragel_dfa_utils.init(cache_enabled and edge_contraction_enabled)
+        ragel_dfa_utils.init(edge_contraction_enabled)
 
 
     @classmethod
@@ -2619,6 +2626,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
+            print 'using contraction'
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
         else:
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
