@@ -468,7 +468,7 @@ def path_main(**kwargs):
     p1 = in_atom(match(switch = 1)) ^ out_atom(match(switch = 3))
     p2 = in_atom(match(switch = 1, srcip="10.0.0.1")) ^ out_atom(match(switch = 3, dstip="10.0.0.2"))
     p = p2 + p1
-    return p
+    #return p
     return path_test_3()
 
 def main(**kwargs):
