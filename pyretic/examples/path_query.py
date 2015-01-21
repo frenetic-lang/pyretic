@@ -465,14 +465,10 @@ def print_callback_2(pkt):
 # type: unit -> path list
 def path_main(**kwargs):
     #return path_test_waypoint_violation_general()
-    p1 = in_atom(match(switch = 1)) ^ out_atom(match(switch = 3))
-    p2 = in_atom(match(switch = 1, srcip="10.0.0.1")) ^ out_atom(match(switch = 3, dstip="10.0.0.2"))
-    p = p2 + p1
-    #return p
-    return path_test_3()
+    return path_test_23()
 
 def main(**kwargs):
 #    return mac_learner()
     #return static_fwding_single_switch
     return static_fwding_chain_3_3
-#    return static_fwding_cycle_4_4_spanning_tree_1
+#    return static_fwding_cycle_4_4_spanning_tree_2

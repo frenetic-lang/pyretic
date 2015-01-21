@@ -127,15 +127,18 @@ def parseArgs():
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
 
-    op.add_option('--enable_partition', '-c', type = int,
+    op.add_option('--enable_partition', '-s', type = int,
                     dest = 'switch_cnt',
                     help = 'enable partition optimization')
 
+    op.add_option('--enable_cache', '-c', action = "store_true",
+                    dest = 'cache_enabled',
+                    help = 'enable cache optimization')
 
     
     op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False, 
                     disjoint_enabled=False, default_enabled = False, integrate_enabled = False, multitable_enabled = False,
-                    ragel_enabled = False, switch_cnt = None)
+                    ragel_enabled = False, switch_cnt = None, cache_enabled = False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -222,7 +225,7 @@ def main():
     
     runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity, 
             (options.disjoint_enabled, options.default_enabled, options.integrate_enabled, 
-                options.multitable_enabled, options.ragel_enabled, options.switch_cnt)
+                options.multitable_enabled, options.ragel_enabled, options.switch_cnt, options.cache_enabled)
             )
     if not options.frontend_only:
         try:

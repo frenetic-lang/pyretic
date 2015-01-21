@@ -96,7 +96,8 @@ class Runtime(object):
                 self.multitable_enabled = False
             else:
                 (self.disjoint_enabled, self.default_enabled, self.integrate_enabled, 
-                        self.multitable_enabled, self.ragel_enabled, self.partition_cnt) = opt_flags
+                        self.multitable_enabled, self.ragel_enabled, self.partition_cnt,
+                        self.cache_enabled) = opt_flags
             
             if self.partition_cnt is None:
                 self.partition_enabled = False
@@ -104,7 +105,7 @@ class Runtime(object):
                 self.partition_enabled = True
 
             from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS, self.partition_cnt)
+            pathcomp.init(NUM_PATH_TAGS, self.partition_cnt, self.cache_enabled)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
 
