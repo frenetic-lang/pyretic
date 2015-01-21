@@ -90,7 +90,8 @@ class SliceStats:
         return res
 
     def slice_isolation_query(self, **kwargs):
-        s = int(kwargs['s'])
+        #s = int(kwargs['s'])
+        s = 2
         slices = self.get_slices(s)
         pairs = itertools.combinations(slices, 2)
         return self.get_alternate_query(pairs) 

@@ -167,6 +167,7 @@ class re_tree_gen(object):
     part_symbol_to_pred = {}
     pred_to_neg = {}
     dyn_preds      = []
+    cache = {}
 
     @classmethod
     def init(cls, switch_cnt = None):
@@ -416,6 +417,7 @@ class re_tree_gen(object):
             cls.symbol_to_pred  = {}
             cls.pred_to_neg = {}
             cls.dyn_preds       = []
+            cls.cache = {}
         else:
             cls.part_clear()
 
@@ -643,10 +645,35 @@ class re_tree_gen(object):
             re_tree |= re_symbol(added_sym, metadata=at)
         return re_tree
 
+    
     @classmethod
     def part_get_re_tree(cls, new_pred, at):
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
+        
+        def update_dicts(sym, at):
+            for i in range(1, cls.switch_cnt + 1):
+                if sym in cls.part_symbol_to_pred[i]:
+                    pred = cls.part_symbol_to_pred[i][sym]
+                    cls.pred_to_atoms[i][pred].append(at)
+                    break
+
+        def create_re_tree(eq_re_tree, at):
+            if isinstance(eq_re_tree, re_symbol):
+                sym = eq_re_tree.char
+                update_dicts(sym, at)
+                return re_symbol(sym, metadata = at)
+            elif isinstance(eq_re_tree, re_alter):
+                res = re_empty()
+                for sym in eq_re_tree.re_list:
+                    res |= create_re_tree(sym, at)
+                return res
+            else:
+                raise TypeError
+
+        if new_pred in cls.cache:
+            new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
+            return new_re_tree
 
         re_tree = re_empty()
         for i in range(1, cls.switch_cnt + 1):
@@ -656,7 +683,8 @@ class re_tree_gen(object):
                 res_tree = cls.get_re_tree_partition(part_pred, at, i)
                 if res_tree != re_empty():
                     re_tree |= res_tree
-
+        
+        cls.cache[new_pred] = at
         return re_tree
 
 
@@ -675,7 +703,7 @@ class re_tree_gen(object):
 
         cls.dyn_preds = []
         cls.symbol_to_pred = {}
-
+        cls.cache = {}
 
     @classmethod
     def get_predlist(cls):
