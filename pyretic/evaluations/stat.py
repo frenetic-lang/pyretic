@@ -304,6 +304,8 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             f.write('0\t')
             continue
         cpath = adjust_func(c + '.profile')
+        if c == 'compile' and not os.path.exists(cpath):
+            cpath = adjust_func('add_query.profile')
         if os.path.exists(cpath):
             g = open(cpath, 'r')
             for line in g.readlines():
