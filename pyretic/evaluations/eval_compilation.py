@@ -34,7 +34,12 @@ class eval_compilation:
         self.integrate_enabled = args.integrate_enabled
         self.multitable_enabled = args.multitable_enabled
         self.ragel_enabled = args.ragel_enabled
-        self.match_enabled = args.match_enabled
+        if args.switch_cnt:
+            self.partition_enabled = True
+            self.switch_cnt = args.switch_cnt
+        else:
+            self.partition_enabled = False
+            self.switch_cnt = None
 
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
@@ -53,7 +58,7 @@ class eval_compilation:
         
         policy_fragments = pathcomp.add_query(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.match_enabled)
+                self.ragel_enabled, self.partition_enabled)
         
         #return
         if self.multitable_enabled and self.integrate_enabled:
@@ -141,11 +146,11 @@ class eval_compilation:
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        pathcomp.init(self.max_states)
+        pathcomp.init(self.max_states, self.switch_cnt)
          
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.match_enabled)
+                self.ragel_enabled, self.partition_enabled)
         
         #return
         if self.multitable_enabled and self.integrate_enabled:
@@ -377,9 +382,9 @@ def parse_args():
                     help = 'enable ragel optimization')
 
 
-    parser.add_argument('--enable_match', '-c', action="store_true",
-                    dest = 'match_enabled',
-                    help = 'enable match intersection optimization')
+    parser.add_argument('--enable_partition', '-c', type=int,
+                    dest = 'switch_cnt',
+                    help = 'enable partition optimization')
  
     args = parser.parse_args()
 
