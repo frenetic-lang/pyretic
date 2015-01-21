@@ -336,6 +336,29 @@ class re_tree_gen(object):
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
 
+        def update_dicts(sym, at):
+            pred = cls.symbol_to_pred[sym]
+            cls.pred_to_atoms[pred].append(at)
+
+        def create_re_tree(eq_re_tree, at):
+            if isinstance(eq_re_tree, re_symbol):
+                sym = eq_re_tree.char
+                update_dicts(sym, at)
+                return re_symbol(sym, metadata = at)
+            elif isinstance(eq_re_tree, re_alter):
+                res = re_empty()
+                for sym in eq_re_tree.re_list:
+                    res |= create_re_tree(sym, at)
+                return res
+            else:
+                print type(eq_re_tree)
+                raise TypeError
+        
+        if cls.cache_enabled:
+            if new_pred in cls.cache:
+                new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
+                return new_re_tree
+
         ne_inters   = classifier_utils.has_nonempty_intersection
         is_not_drop = classifier_utils.is_not_drop
         add_pred = cls.__add_pred__
@@ -409,6 +432,10 @@ class re_tree_gen(object):
             add_pred(new_pred, new_sym(), [at], new_pred_neg)
             added_sym = cls.pred_to_symbol[new_pred]
             re_tree |= re_symbol(added_sym, metadata=at)
+        
+        if cls.cache_enabled:
+            print 'here'
+            cls.cache[new_pred] = at
         return re_tree
 
     @classmethod
@@ -1620,171 +1647,230 @@ class pathcomp(object):
         get_edge_attributes = du.get_edge_attributes
        
 
-        if integrate_enabled:
-            in_table_dic = {}
-            out_table_dic = {}
-
-            for edge in edges:
-                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
-                assert typ in [__in__, __out__]
-                
-                action_frag = None
-               
-                
-                if_pred = not du.is_dead(dfa, src)
-                if default_link:
-                    if_pred = if_pred and not du.is_dead(dfa, dst)
-
-                if if_pred:
-                    action_frag = set_tag(dst_num)
-
-                    if typ == __in__:
-                        in_tag_rules += 1
-                    else:
-                        out_tag_rules += 1
-                    
-                if du.is_accepting(dfa, dst):
-                    ords = du.get_accepting_exps(dfa, edge, dst)
-                    for i in ords:
-                        if action_frag is None:
-                            action_frag = pol_list[i]
-                        else:
-                            action_frag += pol_list[i]
-                       
-                        if typ == __in__:
-                            in_cap_rules += 1
-                        else:
-                            out_cap_rules += 1
-                
-                if action_frag is not None:
-                    table_frag = pred >> action_frag
-                    if typ == __in__:
-                        if not src_num in in_table_dic:
-                            in_table_dic[src_num] = table_frag
-                        else:
-                            in_table_dic[src_num] += table_frag
-
-                    elif typ == __out__:
-                        if not src in out_table_dic:
-                            out_table_dic[src_num] = table_frag
-                        else:
-                            out_table_dic[src_num] += table_frag
-
-            table_default = set([cls.__set_dead_state_tag__(du, dfa)])
-            in_table = QuerySwitch('path_tag', in_table_dic, table_default)
-            out_table = QuerySwitch('path_tag', out_table_dic, table_default)
-            
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
-            return (in_table, out_table)
-
+        
  
         
         if disjoint_enabled:
-            in_tagging_dic = {}
-            out_tagging_dic = {}
-
-            in_capture = drop
-            out_capture = drop
-
-            for edge in edges:
-                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
-                assert typ in [__in__, __out__]
-
-                if_pred = not du.is_dead(dfa, src)
-                if default_link:
-                    if_pred = if_pred and not du.is_dead(dfa, dst)
-
-                if if_pred:
-                    tag_frag = (pred >> set_tag(dst_num))
-                    if typ == __in__:
-                        if not src_num in in_tagging_dic:
-                            in_tagging_dic[src_num] = tag_frag
-                        else:
-                            in_tagging_dic[src_num] += tag_frag
-                        in_tag_rules += 1
-
-                    elif typ == __out__:
-                        if not src in out_tagging_dic:
-                            out_tagging_dic[src_num] = tag_frag
-                        else:
-                            out_tagging_dic[src_num] += tag_frag
-                        out_tag_rules += 1
-
-                if du.is_accepting(dfa, dst):
-                    ords = du.get_accepting_exps(dfa, edge, dst)
-                    for i in ords:
-
-                        cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
-                        if typ == __in__:
-                            in_capture += cap_frag
-                            in_cap_rules += 1
-                        elif typ == __out__:
-                            out_capture += cap_frag
-                            out_cap_rules += 1
-                 
-            tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
-            in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
-            out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
             
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+            if integrate_enabled:
+                in_table_dic = {}
+                out_table_dic = {}
 
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+                for edge in edges:
+                    (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                    assert typ in [__in__, __out__]
+                    
+                    action_frag = None
+                   
+                    
+                    if_pred = not du.is_dead(dfa, src)
+                    if default_link:
+                        if_pred = if_pred and not du.is_dead(dfa, dst)
 
-            return (in_tagging, in_capture, out_tagging, out_capture)
+                    if if_pred:
+                        action_frag = set_tag(dst_num)
+
+                        if typ == __in__:
+                            in_tag_rules += 1
+                        else:
+                            out_tag_rules += 1
+                    
+                    if du.is_accepting(dfa, dst):
+                        ords = du.get_accepting_exps(dfa, edge, dst)
+                        for i in ords:
+                            if action_frag is None:
+                                action_frag = pol_list[i]
+                            else:
+                                action_frag += pol_list[i]
+                           
+                            if typ == __in__:
+                                in_cap_rules += 1
+                            else:
+                                out_cap_rules += 1
+                    
+                    if action_frag is not None:
+                        table_frag = pred >> action_frag
+                        if typ == __in__:
+                            if not src_num in in_table_dic:
+                                in_table_dic[src_num] = table_frag
+                            else:
+                                in_table_dic[src_num] += table_frag
+
+                        elif typ == __out__:
+                            if not src in out_table_dic:
+                                out_table_dic[src_num] = table_frag
+                            else:
+                                out_table_dic[src_num] += table_frag
+
+                table_default = set([cls.__set_dead_state_tag__(du, dfa)])
+                in_table = QuerySwitch('path_tag', in_table_dic, table_default)
+                out_table = QuerySwitch('path_tag', out_table_dic, table_default)
+                
+                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+
+                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+
+                return (in_table, out_table)
+           
+            else:
+                in_tagging_dic = {}
+                out_tagging_dic = {}
+
+                in_capture = drop
+                out_capture = drop
+
+                for edge in edges:
+                    (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                    assert typ in [__in__, __out__]
+
+                    if_pred = not du.is_dead(dfa, src)
+                    if default_link:
+                        if_pred = if_pred and not du.is_dead(dfa, dst)
+
+                    if if_pred:
+                        tag_frag = (pred >> set_tag(dst_num))
+                        if typ == __in__:
+                            if not src_num in in_tagging_dic:
+                                in_tagging_dic[src_num] = tag_frag
+                            else:
+                                in_tagging_dic[src_num] += tag_frag
+                            in_tag_rules += 1
+
+                        elif typ == __out__:
+                            if not src in out_tagging_dic:
+                                out_tagging_dic[src_num] = tag_frag
+                            else:
+                                out_tagging_dic[src_num] += tag_frag
+                            out_tag_rules += 1
+
+                    if du.is_accepting(dfa, dst):
+                        ords = du.get_accepting_exps(dfa, edge, dst)
+                        for i in ords:
+
+                            cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
+                            if typ == __in__:
+                                in_capture += cap_frag
+                                in_cap_rules += 1
+                            elif typ == __out__:
+                                out_capture += cap_frag
+                                out_cap_rules += 1
+                     
+                tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
+                in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
+                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
+                
+                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+
+                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+
+                return (in_tagging, in_capture, out_tagging, out_capture)
 
         else:
-            """ Initialize tagging and capture policies. """
-            in_tagging = (((in_cg.get_unaffected_pred() &
-                            ~(cls.__get_dead_state_pred__(du,dfa)))
-                           >> cls.__set_dead_state_tag__(du, dfa)) +
-                          cls.__get_dead_state_pred__(du,dfa))
-            out_tagging = (((out_cg.get_unaffected_pred() &
-                             ~(cls.__get_dead_state_pred__(du,dfa)))
-                            >> cls.__set_dead_state_tag__(du,dfa)) +
-                           cls.__get_dead_state_pred__(du, dfa))
-            in_capture = drop
-            out_capture = drop
-            
-            """ Generate transition/accept rules from DFA """
-            for edge in edges:
-                (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
-                assert typ in [__in__, __out__]
-                if not du.is_dead(dfa, src):
-                    tag_frag = ((match_tag(src_num) & pred) >> set_tag(dst_num))
-                    if typ == __in__:
-                        in_tagging += tag_frag
-                        in_tag_rules += 1
+            if integrate_enabled:
+                in_default = (((in_cg.get_unaffected_pred() &
+                                ~(cls.__get_dead_state_pred__(du,dfa)))
+                               >> cls.__set_dead_state_tag__(du, dfa)) +
+                              cls.__get_dead_state_pred__(du,dfa))
+                out_default = (((out_cg.get_unaffected_pred() &
+                                 ~(cls.__get_dead_state_pred__(du,dfa)))
+                                >> cls.__set_dead_state_tag__(du,dfa)) +
+                               cls.__get_dead_state_pred__(du, dfa))
+                
+                in_table = in_default
+                out_table = out_default
+                for edge in edges:
+                    (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                    assert typ in [__in__, __out__]
+                    
+                    action_frag = None
+                   
+                    
+                    if not du.is_dead(dfa, src):
+                        action_frag = set_tag(dst_num)
 
-                    elif typ == __out__:
-                        out_tagging += tag_frag
-                        out_tag_rules += 1
-
-                if du.is_accepting(dfa, dst):
-                    ords = du.get_accepting_exps(dfa, edge, dst)
-                    for i in ords:
-
-                        cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
                         if typ == __in__:
-                            in_capture += cap_frag
-                            in_cap_rules += 1
+                            in_tag_rules += 1
+                        else:
+                            out_tag_rules += 1
+                    
+                    if du.is_accepting(dfa, dst):
+                        ords = du.get_accepting_exps(dfa, edge, dst)
+                        for i in ords:
+                            if action_frag is None:
+                                action_frag = pol_list[i]
+                            else:
+                                action_frag += pol_list[i]
+                           
+                            if typ == __in__:
+                                in_cap_rules += 1
+                            else:
+                                out_cap_rules += 1
+                    
+                    if action_frag is not None:
+                        tag_frag = (match_tag(src_num) & pred) >> action_frag
+                        if typ == __in__:
+                            in_table += tag_frag
                         elif typ == __out__:
-                            out_capture += cap_frag
-                            out_cap_rules += 1
-            
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+                            out_table += tag_frag
+                
+                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-           
-            return (in_tagging, in_capture, out_tagging, out_capture)
+                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+
+                return (in_table, out_table)
+
+            else:
+                """ Initialize tagging and capture policies. """
+                in_tagging = (((in_cg.get_unaffected_pred() &
+                                ~(cls.__get_dead_state_pred__(du,dfa)))
+                               >> cls.__set_dead_state_tag__(du, dfa)) +
+                              cls.__get_dead_state_pred__(du,dfa))
+                out_tagging = (((out_cg.get_unaffected_pred() &
+                                 ~(cls.__get_dead_state_pred__(du,dfa)))
+                                >> cls.__set_dead_state_tag__(du,dfa)) +
+                               cls.__get_dead_state_pred__(du, dfa))
+                in_capture = drop
+                out_capture = drop
+                
+                """ Generate transition/accept rules from DFA """
+                for edge in edges:
+                    (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                    assert typ in [__in__, __out__]
+                    if not du.is_dead(dfa, src):
+                        tag_frag = ((match_tag(src_num) & pred) >> set_tag(dst_num))
+                        if typ == __in__:
+                            in_tagging += tag_frag
+                            in_tag_rules += 1
+
+                        elif typ == __out__:
+                            out_tagging += tag_frag
+                            out_tag_rules += 1
+
+                    if du.is_accepting(dfa, dst):
+                        ords = du.get_accepting_exps(dfa, edge, dst)
+                        for i in ords:
+
+                            cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
+                            if typ == __in__:
+                                in_capture += cap_frag
+                                in_cap_rules += 1
+                            elif typ == __out__:
+                                out_capture += cap_frag
+                                out_cap_rules += 1
+                
+                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
+                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
+
+                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
+                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+               
+                return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
         def __init__(self):
@@ -2366,8 +2452,6 @@ class ragel_dfa_utils(common_dfa_utils):
                 in_id = create_id_list(in_cache[identity].re_tree)
             if in_out:
                 out_id = create_id_list(out_cache[identity].re_tree)
-            print in_id
-            print out_id
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
                 for (src, dst), dfa_list in dfa_dict.items():
@@ -2375,9 +2459,6 @@ class ragel_dfa_utils(common_dfa_utils):
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
                         edge_syms.sort()
-                        if src == 40 and dst == 41:
-                            print edge_syms
-                            print check_ordinals(dfa_list)
                         if edge_syms == out_id:
                             assert edge_syms != in_id
                             if check_ordinals(dfa_list):
