@@ -170,13 +170,14 @@ class re_tree_gen(object):
     cache = {}
 
     @classmethod
-    def init(cls, switch_cnt = None):
+    def init(cls, switch_cnt = None, cache_enabled = False):
         if switch_cnt is None:
             cls.simple = True
         else:
             cls.simple = False
         
         cls.switch_cnt = switch_cnt
+        cls.cache_enabled = cache_enabled
 
     @classmethod
     def char_in_lexer_language(cls, char):
@@ -670,10 +671,11 @@ class re_tree_gen(object):
                 return res
             else:
                 raise TypeError
-
-        if new_pred in cls.cache:
-            new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
-            return new_re_tree
+        
+        if cls.cache_enabled:
+            if new_pred in cls.cache:
+                new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
+                return new_re_tree
 
         re_tree = re_empty()
         for i in range(1, cls.switch_cnt + 1):
@@ -683,8 +685,9 @@ class re_tree_gen(object):
                 res_tree = cls.get_re_tree_partition(part_pred, at, i)
                 if res_tree != re_empty():
                     re_tree |= res_tree
-        
-        cls.cache[new_pred] = at
+       
+        if cls.cache_enabled:
+            cls.cache[new_pred] = at
         return re_tree
 
 
@@ -1498,12 +1501,12 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
-    def init(cls, numvals, switch_cnt = None):
+    def init(cls, numvals, switch_cnt = None, cache_enabled = False):
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
        
-        re_tree_gen.init(switch_cnt) 
+        re_tree_gen.init(switch_cnt, cache_enabled) 
         __in_re_tree_gen__.clear()
         __out_re_tree_gen__.clear()
 
@@ -2230,10 +2233,10 @@ class dfa_utils(common_dfa_utils):
        
         cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
-        leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
+        '''leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
                       __out_re_tree_gen__.get_leaf_pickles())
         
-        cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
+        cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')'''
         return dfa
 
    
@@ -2272,6 +2275,128 @@ class ragel_dfa_utils(common_dfa_utils):
             print edge
             print cls._edge_ordinal
             raise KeyError
+
+    
+    @classmethod
+    def get_extended_edges_contracted(cls, output):
+        res = []
+        edge_ordinals = {}
+      
+        dfa_dict = {}
+        for line in output.splitlines():
+            if not '->' in line or 'IN' in line or 'main' in line:
+                continue
+            
+            line = line.strip()
+
+            label = line[line.index('=') + 3: line.index(']') - 2]
+            
+            dst = line[line.index('->') + 3 : line.index('[') - 1]
+            src = line[:line.index('->') - 1]
+            dst = cls.get_state(dst)
+            src = cls.get_state(src)
+            
+            if not (src, dst) in dfa_dict:
+                dfa_dict[(src, dst)] = []
+
+            parts = [s.strip() for s in label.split('/')]
+            exp_list = []
+            if len(parts) > 1:
+                for exp_num in [s.strip() for s in parts[1].split(',')]:
+                    try:
+                        exp_num = int(exp_num[1:])
+                        exp_list.append(exp_num)
+                    except:
+                        pass
+
+            syms = [s.strip().replace('"','') for s in parts[0].split(',')]
+            for s in syms:
+                if '..' in s:
+                    index = s.index('..')
+                    start = int(s[:index])
+                    end = int(s[index + 2:])
+                    for i in range(start, end + 1):
+                        edge = (src, i, dst)
+                        dfa_dict[(src,dst)].append( edge)
+                        res.append(edge)
+                        edge_ordinals[edge] = exp_list
+                else:
+                    edge = (src, int(s), dst)
+                    dfa_dict[(src, dst)].append(edge)
+                    res.append(edge)
+                    edge_ordinals[edge] = exp_list
+
+
+        def create_id_list(re_tree):
+            if isinstance(re_tree, re_symbol):
+                return [re_tree.char]
+            elif isinstance(re_tree, re_alter):
+                res = []
+                for sym in re_tree.re_list:
+                    res.extend(create_id_list(sym))
+                res.sort()
+                return res
+            else:
+                raise TypeError
+        def check_ordinals(edge_list):
+            edge_ords = [edge_ordinals[e] for e in dfa_list]
+            for i in range(len(edge_ords) - 1):
+                if edge_ords[i] != edge_ords[i + 1]:
+                    return False
+            return True
+
+
+        in_cache = __in_re_tree_gen__.cache
+        out_cache = __out_re_tree_gen__.cache
+        in_in = identity in in_cache
+        in_out = identity in out_cache
+        if in_in or in_out:
+            in_id = []
+            out_id = []
+            if in_in:
+                in_id = create_id_list(in_cache[identity].re_tree)
+            if in_out:
+                out_id = create_id_list(out_cache[identity].re_tree)
+            print in_id
+            print out_id
+            if len(in_id) > 1 or len(out_id) > 1:
+                res = []
+                for (src, dst), dfa_list in dfa_dict.items():
+                    if len(dfa_list) > 1:
+                        
+                        edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
+                        edge_syms.sort()
+                        if src == 40 and dst == 41:
+                            print edge_syms
+                            print check_ordinals(dfa_list)
+                        if edge_syms == out_id:
+                            assert edge_syms != in_id
+                            if check_ordinals(dfa_list):
+                                new_edge = (src, 'OUT_ID', dst)
+                                new_ord = edge_ordinals[dfa_list[0]]
+                                for edge in dfa_list:
+                                    del edge_ordinals[edge]
+
+                                res.append(new_edge)
+                                edge_ordinals[new_edge] = new_ord
+
+                                continue
+
+                        elif edge_syms == in_id:
+                            if check_ordinals(dfa_list):
+                                new_edge = (src, 'IN_ID', dst)
+                                new_ord = edge_ordinals[dfa_list[0]]
+                                for edge in dfa_list:
+                                    del edge_ordinals[edge]
+
+                                res.append(new_edge)
+                                edge_ordinals[new_edge] = new_ord
+
+                                continue
+                            
+                    res.extend(dfa_list)
+        
+        return (res, edge_ordinals)
 
     
     @classmethod
@@ -2340,7 +2465,13 @@ class ragel_dfa_utils(common_dfa_utils):
         in_list = __in_re_tree_gen__.symbol_to_pred
         out_list = __out_re_tree_gen__.symbol_to_pred
         sym = edge[1]
-        if sym in in_list:
+        if sym == 'IN_ID':
+            typ = __in__
+            pred = identity
+        elif sym == 'OUT_ID':
+            typ = __out__
+            pred = identity
+        elif sym in in_list:
             typ = __in__
             pred = in_list[sym]
         elif sym in out_list:
@@ -2398,7 +2529,25 @@ class ragel_dfa_utils(common_dfa_utils):
         
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
-        
+       
+        def print_list(l):
+            for e in l:
+                print e
+            print '----------'
+
+        def print_dict(d):
+            for e,v in d.items():
+                print e,v
+
+            print '----------'
+        #(edge2, ord2) = cls.get_extended_edges_2(output)
+        #print '----prev----'
+        #print_list(cls._edges)
+        #print_dict(cls._edge_ordinal)
+        #print '----next---'
+        #print_list(edge2)
+        #print_dict(ord2)'''
+
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        
