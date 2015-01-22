@@ -1,0 +1,10 @@
+3: intersection:
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('dstip', IPv4Network('10.0.0.0/24'))
+4: match: ('srcip', IPv4Network('10.0.0.0/24')) ('dstip', IPv4Network('10.0.0.0/24'))
+5: intersection:
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('dstip', IPv4Network('10.0.1.0/24'))
+6: match: ('srcip', IPv4Network('10.0.1.0/24')) ('dstip', IPv4Network('10.0.1.0/24'))

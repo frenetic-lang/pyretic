@@ -1,0 +1,2880 @@
+96: intersection:
+    match: ('switch', 1)
+    intersection:
+        match: ('switch', 1)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 9)
+            match: ('inport', 10)
+            match: ('inport', 11)
+            match: ('inport', 13)
+            match: ('inport', 17)
+            match: ('inport', 18)
+            match: ('inport', 19)
+            match: ('inport', 20)
+            match: ('inport', 22)
+            match: ('inport', 23)
+            match: ('inport', 24)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+97: intersection:
+    match: ('switch', 1)
+    intersection:
+        match: ('switch', 1)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 9)
+            match: ('inport', 10)
+            match: ('inport', 11)
+            match: ('inport', 13)
+            match: ('inport', 17)
+            match: ('inport', 18)
+            match: ('inport', 19)
+            match: ('inport', 20)
+            match: ('inport', 22)
+            match: ('inport', 23)
+            match: ('inport', 24)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+98: intersection:
+    match: ('switch', 1)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            intersection:
+                match: ('switch', 1)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 13)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 19)
+                    match: ('inport', 20)
+                    match: ('inport', 22)
+                    match: ('inport', 23)
+                    match: ('inport', 24)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 1)
+                    intersection:
+                        match: ('switch', 1)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+                            match: ('inport', 13)
+                            match: ('inport', 17)
+                            match: ('inport', 18)
+                            match: ('inport', 19)
+                            match: ('inport', 20)
+                            match: ('inport', 22)
+                            match: ('inport', 23)
+                            match: ('inport', 24)
+99: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 1)
+            intersection:
+                match: ('switch', 1)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 13)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 19)
+                    match: ('inport', 20)
+                    match: ('inport', 22)
+                    match: ('inport', 23)
+                    match: ('inport', 24)
+100: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 2)
+            intersection:
+                match: ('switch', 2)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 16)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 21)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+101: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 2)
+            intersection:
+                match: ('switch', 2)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 16)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 21)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+102: intersection:
+    match: ('switch', 2)
+    intersection:
+        match: ('switch', 2)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 9)
+            match: ('inport', 10)
+            match: ('inport', 11)
+            match: ('inport', 12)
+            match: ('inport', 13)
+            match: ('inport', 16)
+            match: ('inport', 17)
+            match: ('inport', 18)
+            match: ('inport', 21)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 2)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 2)
+                            intersection:
+                                match: ('switch', 2)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+                                    match: ('inport', 8)
+                                    match: ('inport', 9)
+                                    match: ('inport', 10)
+                                    match: ('inport', 11)
+                                    match: ('inport', 12)
+                                    match: ('inport', 13)
+                                    match: ('inport', 16)
+                                    match: ('inport', 17)
+                                    match: ('inport', 18)
+                                    match: ('inport', 21)
+103: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 2)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 2)
+                    intersection:
+                        match: ('switch', 2)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+                            match: ('inport', 12)
+                            match: ('inport', 13)
+                            match: ('inport', 16)
+                            match: ('inport', 17)
+                            match: ('inport', 18)
+                            match: ('inport', 21)
+104: intersection:
+    match: ('switch', 3)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 3)
+            intersection:
+                match: ('switch', 3)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+105: intersection:
+    match: ('switch', 3)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 3)
+            intersection:
+                match: ('switch', 3)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+106: intersection:
+    match: ('switch', 3)
+    intersection:
+        match: ('switch', 3)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 9)
+            match: ('inport', 10)
+            match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 3)
+                            intersection:
+                                match: ('switch', 3)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+                                    match: ('inport', 9)
+                                    match: ('inport', 10)
+                                    match: ('inport', 11)
+107: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 3)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    intersection:
+                        match: ('switch', 3)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 9)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+108: intersection:
+    match: ('switch', 4)
+    intersection:
+        match: ('switch', 4)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 10)
+            match: ('inport', 11)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+109: intersection:
+    match: ('switch', 4)
+    intersection:
+        match: ('switch', 4)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 10)
+            match: ('inport', 11)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+110: intersection:
+    match: ('switch', 4)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 4)
+            intersection:
+                match: ('switch', 4)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 4)
+                    intersection:
+                        match: ('switch', 4)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+111: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 4)
+            intersection:
+                match: ('switch', 4)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+112: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 5)
+            intersection:
+                match: ('switch', 5)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+113: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 5)
+            intersection:
+                match: ('switch', 5)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+114: intersection:
+    match: ('switch', 5)
+    intersection:
+        match: ('switch', 5)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 5)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 5)
+                            intersection:
+                                match: ('switch', 5)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 8)
+115: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 5)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 5)
+                    intersection:
+                        match: ('switch', 5)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 8)
+116: intersection:
+    match: ('switch', 6)
+    intersection:
+        match: ('switch', 6)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.0.0/24'))
+117: intersection:
+    match: ('switch', 6)
+    intersection:
+        match: ('switch', 6)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.0.0/24'))
+118: intersection:
+    match: ('switch', 6)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 6)
+            intersection:
+                match: ('switch', 6)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 6)
+                    intersection:
+                        match: ('switch', 6)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 8)
+119: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 6)
+            intersection:
+                match: ('switch', 6)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+120: intersection:
+    match: ('switch', 7)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 7)
+            intersection:
+                match: ('switch', 7)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 15)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.0.0/24'))
+121: intersection:
+    match: ('switch', 7)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 7)
+            intersection:
+                match: ('switch', 7)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 15)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.0.0/24'))
+122: intersection:
+    match: ('switch', 7)
+    intersection:
+        match: ('switch', 7)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 10)
+            match: ('inport', 11)
+            match: ('inport', 12)
+            match: ('inport', 13)
+            match: ('inport', 15)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 7)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 7)
+                            intersection:
+                                match: ('switch', 7)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+                                    match: ('inport', 8)
+                                    match: ('inport', 10)
+                                    match: ('inport', 11)
+                                    match: ('inport', 12)
+                                    match: ('inport', 13)
+                                    match: ('inport', 15)
+123: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 7)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 7)
+                    intersection:
+                        match: ('switch', 7)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+                            match: ('inport', 12)
+                            match: ('inport', 13)
+                            match: ('inport', 15)
+124: intersection:
+    match: ('switch', 8)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 8)
+            intersection:
+                match: ('switch', 8)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 14)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.0.0/24'))
+125: intersection:
+    match: ('switch', 8)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 8)
+            intersection:
+                match: ('switch', 8)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 14)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.0.0/24'))
+126: intersection:
+    match: ('switch', 8)
+    intersection:
+        match: ('switch', 8)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 11)
+            match: ('inport', 12)
+            match: ('inport', 13)
+            match: ('inport', 14)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 8)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 8)
+                            intersection:
+                                match: ('switch', 8)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+                                    match: ('inport', 8)
+                                    match: ('inport', 11)
+                                    match: ('inport', 12)
+                                    match: ('inport', 13)
+                                    match: ('inport', 14)
+127: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 8)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 8)
+                    intersection:
+                        match: ('switch', 8)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+                            match: ('inport', 11)
+                            match: ('inport', 12)
+                            match: ('inport', 13)
+                            match: ('inport', 14)
+128: intersection:
+    match: ('switch', 9)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 9)
+            intersection:
+                match: ('switch', 9)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.0.0/24'))
+129: intersection:
+    match: ('switch', 9)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 9)
+            intersection:
+                match: ('switch', 9)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.0.0/24'))
+130: intersection:
+    match: ('switch', 9)
+    intersection:
+        match: ('switch', 9)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+            match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 9)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 9)
+                            intersection:
+                                match: ('switch', 9)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 8)
+                                    match: ('inport', 9)
+131: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 9)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 9)
+                    intersection:
+                        match: ('switch', 9)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+132: intersection:
+    match: ('switch', 10)
+    intersection:
+        match: ('switch', 10)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.0.0/24'))
+133: intersection:
+    match: ('switch', 10)
+    intersection:
+        match: ('switch', 10)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 9)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.0.0/24'))
+134: intersection:
+    match: ('switch', 10)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 10)
+            intersection:
+                match: ('switch', 10)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 10)
+                    intersection:
+                        match: ('switch', 10)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 9)
+135: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 10)
+            intersection:
+                match: ('switch', 10)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 9)
+136: intersection:
+    match: ('switch', 11)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 11)
+            intersection:
+                match: ('switch', 11)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.0.0/24'))
+137: intersection:
+    match: ('switch', 11)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 11)
+            intersection:
+                match: ('switch', 11)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.0.0/24'))
+138: intersection:
+    match: ('switch', 11)
+    intersection:
+        match: ('switch', 11)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 6)
+            match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 11)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 11)
+                            intersection:
+                                match: ('switch', 11)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+139: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 11)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 11)
+                    intersection:
+                        match: ('switch', 11)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+140: intersection:
+    match: ('switch', 12)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 12)
+            intersection:
+                match: ('switch', 12)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.0.0/24'))
+141: intersection:
+    match: ('switch', 12)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 12)
+            intersection:
+                match: ('switch', 12)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.0.0/24'))
+142: intersection:
+    match: ('switch', 12)
+    intersection:
+        match: ('switch', 12)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 7)
+            match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 12)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 12)
+                            intersection:
+                                match: ('switch', 12)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 7)
+                                    match: ('inport', 8)
+143: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 12)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 12)
+                    intersection:
+                        match: ('switch', 12)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+144: intersection:
+    match: ('switch', 13)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.0.0/24'))
+145: intersection:
+    match: ('switch', 13)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.0.0/24'))
+146: intersection:
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+            match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 13)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 13)
+                            intersection:
+                                match: ('switch', 13)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 8)
+                                    match: ('inport', 9)
+147: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 13)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 13)
+                    intersection:
+                        match: ('switch', 13)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+148: intersection:
+    match: ('switch', 14)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.0.0/24'))
+149: intersection:
+    match: ('switch', 14)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+                    match: ('inport', 5)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.0.0/24'))
+150: intersection:
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+            match: ('inport', 5)
+            match: ('inport', 8)
+            match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 14)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 14)
+                            intersection:
+                                match: ('switch', 14)
+                                union:
+                                    match: ('inport', 2)
+                                    match: ('inport', 3)
+                                    match: ('inport', 4)
+                                    match: ('inport', 5)
+                                    match: ('inport', 8)
+                                    match: ('inport', 9)
+151: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 14)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 14)
+                    intersection:
+                        match: ('switch', 14)
+                        union:
+                            match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
+                            match: ('inport', 5)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+152: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    match: ('inport', 1)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 14)
+                    match: ('inport', 15)
+                    match: ('inport', 16)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 19)
+                    match: ('inport', 21)
+                    match: ('inport', 22)
+                    match: ('inport', 23)
+                    match: ('inport', 24)
+                    match: ('inport', 25)
+                    match: ('inport', 26)
+                    match: ('inport', 27)
+                    match: ('inport', 28)
+                    match: ('inport', 29)
+                    match: ('inport', 30)
+                    match: ('inport', 31)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.0.0/24'))
+153: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    match: ('inport', 1)
+                    match: ('inport', 5)
+                    match: ('inport', 6)
+                    match: ('inport', 7)
+                    match: ('inport', 8)
+                    match: ('inport', 9)
+                    match: ('inport', 10)
+                    match: ('inport', 11)
+                    match: ('inport', 12)
+                    match: ('inport', 13)
+                    match: ('inport', 14)
+                    match: ('inport', 15)
+                    match: ('inport', 16)
+                    match: ('inport', 17)
+                    match: ('inport', 18)
+                    match: ('inport', 19)
+                    match: ('inport', 21)
+                    match: ('inport', 22)
+                    match: ('inport', 23)
+                    match: ('inport', 24)
+                    match: ('inport', 25)
+                    match: ('inport', 26)
+                    match: ('inport', 27)
+                    match: ('inport', 28)
+                    match: ('inport', 29)
+                    match: ('inport', 30)
+                    match: ('inport', 31)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.0.0/24'))
+154: intersection:
+    match: ('switch', 15)
+    intersection:
+        match: ('switch', 15)
+        union:
+            match: ('inport', 1)
+            match: ('inport', 5)
+            match: ('inport', 6)
+            match: ('inport', 7)
+            match: ('inport', 8)
+            match: ('inport', 9)
+            match: ('inport', 10)
+            match: ('inport', 11)
+            match: ('inport', 12)
+            match: ('inport', 13)
+            match: ('inport', 14)
+            match: ('inport', 15)
+            match: ('inport', 16)
+            match: ('inport', 17)
+            match: ('inport', 18)
+            match: ('inport', 19)
+            match: ('inport', 21)
+            match: ('inport', 22)
+            match: ('inport', 23)
+            match: ('inport', 24)
+            match: ('inport', 25)
+            match: ('inport', 26)
+            match: ('inport', 27)
+            match: ('inport', 28)
+            match: ('inport', 29)
+            match: ('inport', 30)
+            match: ('inport', 31)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 15)
+                            intersection:
+                                match: ('switch', 15)
+                                union:
+                                    match: ('inport', 1)
+                                    match: ('inport', 5)
+                                    match: ('inport', 6)
+                                    match: ('inport', 7)
+                                    match: ('inport', 8)
+                                    match: ('inport', 9)
+                                    match: ('inport', 10)
+                                    match: ('inport', 11)
+                                    match: ('inport', 12)
+                                    match: ('inport', 13)
+                                    match: ('inport', 14)
+                                    match: ('inport', 15)
+                                    match: ('inport', 16)
+                                    match: ('inport', 17)
+                                    match: ('inport', 18)
+                                    match: ('inport', 19)
+                                    match: ('inport', 21)
+                                    match: ('inport', 22)
+                                    match: ('inport', 23)
+                                    match: ('inport', 24)
+                                    match: ('inport', 25)
+                                    match: ('inport', 26)
+                                    match: ('inport', 27)
+                                    match: ('inport', 28)
+                                    match: ('inport', 29)
+                                    match: ('inport', 30)
+                                    match: ('inport', 31)
+155: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 15)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    intersection:
+                        match: ('switch', 15)
+                        union:
+                            match: ('inport', 1)
+                            match: ('inport', 5)
+                            match: ('inport', 6)
+                            match: ('inport', 7)
+                            match: ('inport', 8)
+                            match: ('inport', 9)
+                            match: ('inport', 10)
+                            match: ('inport', 11)
+                            match: ('inport', 12)
+                            match: ('inport', 13)
+                            match: ('inport', 14)
+                            match: ('inport', 15)
+                            match: ('inport', 16)
+                            match: ('inport', 17)
+                            match: ('inport', 18)
+                            match: ('inport', 19)
+                            match: ('inport', 21)
+                            match: ('inport', 22)
+                            match: ('inport', 23)
+                            match: ('inport', 24)
+                            match: ('inport', 25)
+                            match: ('inport', 26)
+                            match: ('inport', 27)
+                            match: ('inport', 28)
+                            match: ('inport', 29)
+                            match: ('inport', 30)
+                            match: ('inport', 31)
+156: intersection:
+    match: ('switch', 16)
+    intersection:
+        match: ('switch', 16)
+        union:
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 7)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.0.0/24'))
+157: intersection:
+    match: ('switch', 16)
+    intersection:
+        match: ('switch', 16)
+        union:
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 7)
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.0.0/24'))
+158: intersection:
+    match: ('switch', 16)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 16)
+            intersection:
+                match: ('switch', 16)
+                union:
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.0.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 16)
+                    intersection:
+                        match: ('switch', 16)
+                        union:
+                            match: ('inport', 1)
+                            match: ('inport', 2)
+                            match: ('inport', 7)
+159: intersection:
+    match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 16)
+            intersection:
+                match: ('switch', 16)
+                union:
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 7)
+160: intersection:
+    match: ('switch', 1)
+    intersection:
+        match: ('switch', 1)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 13)
+            match: ('outport', 17)
+            match: ('outport', 18)
+            match: ('outport', 19)
+            match: ('outport', 20)
+            match: ('outport', 22)
+            match: ('outport', 23)
+            match: ('outport', 24)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+161: intersection:
+    match: ('switch', 1)
+    intersection:
+        match: ('switch', 1)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 13)
+            match: ('outport', 17)
+            match: ('outport', 18)
+            match: ('outport', 19)
+            match: ('outport', 20)
+            match: ('outport', 22)
+            match: ('outport', 23)
+            match: ('outport', 24)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+162: intersection:
+    match: ('switch', 1)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            intersection:
+                match: ('switch', 1)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 13)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 19)
+                    match: ('outport', 20)
+                    match: ('outport', 22)
+                    match: ('outport', 23)
+                    match: ('outport', 24)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 1)
+                    intersection:
+                        match: ('switch', 1)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+                            match: ('outport', 13)
+                            match: ('outport', 17)
+                            match: ('outport', 18)
+                            match: ('outport', 19)
+                            match: ('outport', 20)
+                            match: ('outport', 22)
+                            match: ('outport', 23)
+                            match: ('outport', 24)
+163: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 1)
+            intersection:
+                match: ('switch', 1)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 13)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 19)
+                    match: ('outport', 20)
+                    match: ('outport', 22)
+                    match: ('outport', 23)
+                    match: ('outport', 24)
+164: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 2)
+            intersection:
+                match: ('switch', 2)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 16)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 21)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+165: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 2)
+            intersection:
+                match: ('switch', 2)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 16)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 21)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+166: intersection:
+    match: ('switch', 2)
+    intersection:
+        match: ('switch', 2)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 16)
+            match: ('outport', 17)
+            match: ('outport', 18)
+            match: ('outport', 21)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 2)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 2)
+                            intersection:
+                                match: ('switch', 2)
+                                union:
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 6)
+                                    match: ('outport', 7)
+                                    match: ('outport', 8)
+                                    match: ('outport', 9)
+                                    match: ('outport', 10)
+                                    match: ('outport', 11)
+                                    match: ('outport', 12)
+                                    match: ('outport', 13)
+                                    match: ('outport', 16)
+                                    match: ('outport', 17)
+                                    match: ('outport', 18)
+                                    match: ('outport', 21)
+167: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 2)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 2)
+                    intersection:
+                        match: ('switch', 2)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+                            match: ('outport', 12)
+                            match: ('outport', 13)
+                            match: ('outport', 16)
+                            match: ('outport', 17)
+                            match: ('outport', 18)
+                            match: ('outport', 21)
+168: intersection:
+    match: ('switch', 3)
+    intersection:
+        match: ('switch', 3)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+169: intersection:
+    match: ('switch', 3)
+    intersection:
+        match: ('switch', 3)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+170: intersection:
+    match: ('switch', 3)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 3)
+            intersection:
+                match: ('switch', 3)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    intersection:
+                        match: ('switch', 3)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 9)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+171: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 3)
+            intersection:
+                match: ('switch', 3)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+172: intersection:
+    match: ('switch', 4)
+    intersection:
+        match: ('switch', 4)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 10)
+            match: ('outport', 11)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+173: intersection:
+    match: ('switch', 4)
+    intersection:
+        match: ('switch', 4)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 10)
+            match: ('outport', 11)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+174: intersection:
+    match: ('switch', 4)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 4)
+            intersection:
+                match: ('switch', 4)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 4)
+                    intersection:
+                        match: ('switch', 4)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+175: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 4)
+            intersection:
+                match: ('switch', 4)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+176: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 5)
+            intersection:
+                match: ('switch', 5)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+177: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 5)
+            intersection:
+                match: ('switch', 5)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+178: intersection:
+    match: ('switch', 5)
+    intersection:
+        match: ('switch', 5)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 5)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 5)
+                            intersection:
+                                match: ('switch', 5)
+                                union:
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+                                    match: ('outport', 5)
+                                    match: ('outport', 8)
+179: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 5)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 5)
+                    intersection:
+                        match: ('switch', 5)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 8)
+180: intersection:
+    match: ('switch', 6)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 6)
+            intersection:
+                match: ('switch', 6)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.1.0/24'))
+181: intersection:
+    match: ('switch', 6)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 6)
+            intersection:
+                match: ('switch', 6)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.1.0/24'))
+182: intersection:
+    match: ('switch', 6)
+    intersection:
+        match: ('switch', 6)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 6)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 6)
+                            intersection:
+                                match: ('switch', 6)
+                                union:
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+                                    match: ('outport', 5)
+                                    match: ('outport', 8)
+183: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 6) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 6)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 6)
+                    intersection:
+                        match: ('switch', 6)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 8)
+184: intersection:
+    match: ('switch', 7)
+    intersection:
+        match: ('switch', 7)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 15)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.1.0/24'))
+185: intersection:
+    match: ('switch', 7)
+    intersection:
+        match: ('switch', 7)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 15)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.1.0/24'))
+186: intersection:
+    match: ('switch', 7)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 7)
+            intersection:
+                match: ('switch', 7)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 15)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 7)
+                    intersection:
+                        match: ('switch', 7)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+                            match: ('outport', 12)
+                            match: ('outport', 13)
+                            match: ('outport', 15)
+187: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 7) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 7)
+            intersection:
+                match: ('switch', 7)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 15)
+188: intersection:
+    match: ('switch', 8)
+    intersection:
+        match: ('switch', 8)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 14)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.1.0/24'))
+189: intersection:
+    match: ('switch', 8)
+    intersection:
+        match: ('switch', 8)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 14)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.1.0/24'))
+190: intersection:
+    match: ('switch', 8)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 8)
+            intersection:
+                match: ('switch', 8)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 14)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 8)
+                    intersection:
+                        match: ('switch', 8)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+                            match: ('outport', 11)
+                            match: ('outport', 12)
+                            match: ('outport', 13)
+                            match: ('outport', 14)
+191: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 8) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 8)
+            intersection:
+                match: ('switch', 8)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 14)
+192: intersection:
+    match: ('switch', 9)
+    intersection:
+        match: ('switch', 9)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+            match: ('outport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.1.0/24'))
+193: intersection:
+    match: ('switch', 9)
+    intersection:
+        match: ('switch', 9)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+            match: ('outport', 9)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.1.0/24'))
+194: intersection:
+    match: ('switch', 9)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 9)
+            intersection:
+                match: ('switch', 9)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 9)
+                    intersection:
+                        match: ('switch', 9)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+195: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 9) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 9)
+            intersection:
+                match: ('switch', 9)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+196: intersection:
+    match: ('switch', 10)
+    intersection:
+        match: ('switch', 10)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.1.0/24'))
+197: intersection:
+    match: ('switch', 10)
+    intersection:
+        match: ('switch', 10)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 9)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.1.0/24'))
+198: intersection:
+    match: ('switch', 10)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 10)
+            intersection:
+                match: ('switch', 10)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 10)
+                    intersection:
+                        match: ('switch', 10)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 9)
+199: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 10) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 10)
+            intersection:
+                match: ('switch', 10)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 9)
+200: intersection:
+    match: ('switch', 11)
+    intersection:
+        match: ('switch', 11)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 6)
+            match: ('outport', 7)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.1.0/24'))
+201: intersection:
+    match: ('switch', 11)
+    intersection:
+        match: ('switch', 11)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 6)
+            match: ('outport', 7)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.1.0/24'))
+202: intersection:
+    match: ('switch', 11)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 11)
+            intersection:
+                match: ('switch', 11)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 11)
+                    intersection:
+                        match: ('switch', 11)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+203: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 11) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 11)
+            intersection:
+                match: ('switch', 11)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+204: intersection:
+    match: ('switch', 12)
+    intersection:
+        match: ('switch', 12)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 7)
+            match: ('outport', 8)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.1.0/24'))
+205: intersection:
+    match: ('switch', 12)
+    intersection:
+        match: ('switch', 12)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 7)
+            match: ('outport', 8)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.1.0/24'))
+206: intersection:
+    match: ('switch', 12)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 12)
+            intersection:
+                match: ('switch', 12)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 12)
+                    intersection:
+                        match: ('switch', 12)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+207: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 12) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 12)
+            intersection:
+                match: ('switch', 12)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+208: intersection:
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+            match: ('outport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.1.0/24'))
+209: intersection:
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+            match: ('outport', 9)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.1.0/24'))
+210: intersection:
+    match: ('switch', 13)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 13)
+                    intersection:
+                        match: ('switch', 13)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+211: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 13) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+212: intersection:
+    match: ('switch', 14)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.1.0/24'))
+213: intersection:
+    match: ('switch', 14)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+                    match: ('outport', 5)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.1.0/24'))
+214: intersection:
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+            match: ('outport', 5)
+            match: ('outport', 8)
+            match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 14)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 14)
+                            intersection:
+                                match: ('switch', 14)
+                                union:
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+                                    match: ('outport', 5)
+                                    match: ('outport', 8)
+                                    match: ('outport', 9)
+215: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 14) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 14)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 14)
+                    intersection:
+                        match: ('switch', 14)
+                        union:
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+                            match: ('outport', 5)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+216: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    match: ('outport', 1)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 14)
+                    match: ('outport', 15)
+                    match: ('outport', 16)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 19)
+                    match: ('outport', 21)
+                    match: ('outport', 22)
+                    match: ('outport', 23)
+                    match: ('outport', 24)
+                    match: ('outport', 25)
+                    match: ('outport', 26)
+                    match: ('outport', 27)
+                    match: ('outport', 28)
+                    match: ('outport', 29)
+                    match: ('outport', 30)
+                    match: ('outport', 31)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.1.0/24'))
+217: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    match: ('outport', 1)
+                    match: ('outport', 5)
+                    match: ('outport', 6)
+                    match: ('outport', 7)
+                    match: ('outport', 8)
+                    match: ('outport', 9)
+                    match: ('outport', 10)
+                    match: ('outport', 11)
+                    match: ('outport', 12)
+                    match: ('outport', 13)
+                    match: ('outport', 14)
+                    match: ('outport', 15)
+                    match: ('outport', 16)
+                    match: ('outport', 17)
+                    match: ('outport', 18)
+                    match: ('outport', 19)
+                    match: ('outport', 21)
+                    match: ('outport', 22)
+                    match: ('outport', 23)
+                    match: ('outport', 24)
+                    match: ('outport', 25)
+                    match: ('outport', 26)
+                    match: ('outport', 27)
+                    match: ('outport', 28)
+                    match: ('outport', 29)
+                    match: ('outport', 30)
+                    match: ('outport', 31)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.1.0/24'))
+218: intersection:
+    match: ('switch', 15)
+    intersection:
+        match: ('switch', 15)
+        union:
+            match: ('outport', 1)
+            match: ('outport', 5)
+            match: ('outport', 6)
+            match: ('outport', 7)
+            match: ('outport', 8)
+            match: ('outport', 9)
+            match: ('outport', 10)
+            match: ('outport', 11)
+            match: ('outport', 12)
+            match: ('outport', 13)
+            match: ('outport', 14)
+            match: ('outport', 15)
+            match: ('outport', 16)
+            match: ('outport', 17)
+            match: ('outport', 18)
+            match: ('outport', 19)
+            match: ('outport', 21)
+            match: ('outport', 22)
+            match: ('outport', 23)
+            match: ('outport', 24)
+            match: ('outport', 25)
+            match: ('outport', 26)
+            match: ('outport', 27)
+            match: ('outport', 28)
+            match: ('outport', 29)
+            match: ('outport', 30)
+            match: ('outport', 31)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 15)
+                            intersection:
+                                match: ('switch', 15)
+                                union:
+                                    match: ('outport', 1)
+                                    match: ('outport', 5)
+                                    match: ('outport', 6)
+                                    match: ('outport', 7)
+                                    match: ('outport', 8)
+                                    match: ('outport', 9)
+                                    match: ('outport', 10)
+                                    match: ('outport', 11)
+                                    match: ('outport', 12)
+                                    match: ('outport', 13)
+                                    match: ('outport', 14)
+                                    match: ('outport', 15)
+                                    match: ('outport', 16)
+                                    match: ('outport', 17)
+                                    match: ('outport', 18)
+                                    match: ('outport', 19)
+                                    match: ('outport', 21)
+                                    match: ('outport', 22)
+                                    match: ('outport', 23)
+                                    match: ('outport', 24)
+                                    match: ('outport', 25)
+                                    match: ('outport', 26)
+                                    match: ('outport', 27)
+                                    match: ('outport', 28)
+                                    match: ('outport', 29)
+                                    match: ('outport', 30)
+                                    match: ('outport', 31)
+219: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 15) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 15)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    intersection:
+                        match: ('switch', 15)
+                        union:
+                            match: ('outport', 1)
+                            match: ('outport', 5)
+                            match: ('outport', 6)
+                            match: ('outport', 7)
+                            match: ('outport', 8)
+                            match: ('outport', 9)
+                            match: ('outport', 10)
+                            match: ('outport', 11)
+                            match: ('outport', 12)
+                            match: ('outport', 13)
+                            match: ('outport', 14)
+                            match: ('outport', 15)
+                            match: ('outport', 16)
+                            match: ('outport', 17)
+                            match: ('outport', 18)
+                            match: ('outport', 19)
+                            match: ('outport', 21)
+                            match: ('outport', 22)
+                            match: ('outport', 23)
+                            match: ('outport', 24)
+                            match: ('outport', 25)
+                            match: ('outport', 26)
+                            match: ('outport', 27)
+                            match: ('outport', 28)
+                            match: ('outport', 29)
+                            match: ('outport', 30)
+                            match: ('outport', 31)
+220: intersection:
+    match: ('switch', 16)
+    intersection:
+        match: ('switch', 16)
+        union:
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 7)
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.1.0/24'))
+221: intersection:
+    match: ('switch', 16)
+    intersection:
+        match: ('switch', 16)
+        union:
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 7)
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.1.0/24'))
+222: intersection:
+    match: ('switch', 16)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 16)
+            intersection:
+                match: ('switch', 16)
+                union:
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.1.0/24'))
+            negate:
+                intersection:
+                    match: ('switch', 16)
+                    intersection:
+                        match: ('switch', 16)
+                        union:
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 7)
+223: intersection:
+    match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 16) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        intersection:
+            match: ('switch', 16)
+            intersection:
+                match: ('switch', 16)
+                union:
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 7)

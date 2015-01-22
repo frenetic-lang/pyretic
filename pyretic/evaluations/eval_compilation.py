@@ -86,7 +86,7 @@ class eval_compilation:
                 self.out_capture_compile()
                 
                 self.path_in_table = self.path_in_tagging + self.path_in_capture
-                self.path_out_table = self.path_in_tagging + self.path_out_capture
+                self.path_out_table = self.path_out_tagging + self.path_out_capture
                 
                 self.in_table_compile()
                 self.out_table_compile()
@@ -178,7 +178,7 @@ class eval_compilation:
                 self.out_capture_compile()
                 
                 self.path_in_table = self.path_in_tagging + self.path_in_capture
-                self.path_out_table = self.path_in_tagging + self.path_out_capture
+                self.path_out_table = self.path_out_tagging + self.path_out_capture
                 
                 self.in_table_compile()
                 self.out_table_compile()
@@ -447,6 +447,7 @@ if __name__ == '__main__':
         for aq in args.added_query:
             #aparams = get_added_query_params(args)
             aparams = {'test': aq}
+            print aparams 
             t_s = time.time()
             eval_comp.add(False, **aparams)
             print time.time() - t_s

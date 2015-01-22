@@ -1549,7 +1549,7 @@ class pathcomp(object):
         out_cg = __out_re_tree_gen__
  
         default_link = default_enabled
-       
+        print default_link 
         du = common_dfa_utils
         
         in_tag_rules = 0
