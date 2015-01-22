@@ -96,10 +96,15 @@ class Runtime(object):
                 self.multitable_enabled = False
             else:
                 (self.disjoint_enabled, self.default_enabled, self.integrate_enabled, 
-                        self.multitable_enabled, self.ragel_enabled, self.match_enabled) = opt_flags
+                        self.multitable_enabled, self.ragel_enabled, self.partition_cnt) = opt_flags
             
+            if self.partition_cnt is None:
+                self.partition_enabled = False
+            else:
+                self.partition_enabled = True
+
             from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS)
+            pathcomp.init(NUM_PATH_TAGS, self.partition_cnt)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
 
@@ -128,13 +133,14 @@ class Runtime(object):
                     self.out_capture_compile()
                     
                     self.path_in_table = self.path_in_tagging + self.path_in_capture
-                    self.path_out_table = self.path_in_tagging + self.path_out_capture
+                    self.path_out_table = self.path_out_tagging + self.path_out_capture
                     
                     self.in_table_compile()
                     self.out_table_compile()
 
                     self.vf_tag_compile()
                     self.vf_untag_compile()
+                    
                     
                     self.policy = (
                     self.virtual_tag >> self.path_in_table >> 
@@ -144,6 +150,7 @@ class Runtime(object):
                     
                     self.whole_compile()
             else:
+                
                 
                 in_tag_policy = self.path_in_tagging >> self.policy
                 self.forwarding = (in_tag_policy >> self.path_out_tagging)
@@ -553,7 +560,7 @@ class Runtime(object):
         from pyretic.lib.path import pathcomp
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.match_enabled)
+                self.ragel_enabled, self.partition_enabled)
 
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments

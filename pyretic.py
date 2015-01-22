@@ -127,15 +127,15 @@ def parseArgs():
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
 
-    op.add_option('--enable_match', '-c', action="store_true",
-                    dest = 'match_enabled',
-                    help = 'enable match intersection optimization')
+    op.add_option('--enable_partition', '-c', type = int,
+                    dest = 'switch_cnt',
+                    help = 'enable partition optimization')
 
 
     
     op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False, 
                     disjoint_enabled=False, default_enabled = False, integrate_enabled = False, multitable_enabled = False,
-                    ragel_enabled = False, match_enabled = False)
+                    ragel_enabled = False, switch_cnt = None)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -222,7 +222,7 @@ def main():
     
     runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity, 
             (options.disjoint_enabled, options.default_enabled, options.integrate_enabled, 
-                options.multitable_enabled, options.ragel_enabled, options.match_enabled)
+                options.multitable_enabled, options.ragel_enabled, options.switch_cnt)
             )
     if not options.frontend_only:
         try:
