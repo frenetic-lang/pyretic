@@ -2366,8 +2366,6 @@ class ragel_dfa_utils(common_dfa_utils):
                 in_id = create_id_list(in_cache[identity].re_tree)
             if in_out:
                 out_id = create_id_list(out_cache[identity].re_tree)
-            print in_id
-            print out_id
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
                 for (src, dst), dfa_list in dfa_dict.items():
@@ -2375,9 +2373,6 @@ class ragel_dfa_utils(common_dfa_utils):
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
                         edge_syms.sort()
-                        if src == 40 and dst == 41:
-                            print edge_syms
-                            print check_ordinals(dfa_list)
                         if edge_syms == out_id:
                             assert edge_syms != in_id
                             if check_ordinals(dfa_list):

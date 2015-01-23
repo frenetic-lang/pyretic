@@ -70,12 +70,19 @@ class SliceStats:
             slice1 = match(srcip = pair[0], dstip = pair[0])
             slice2 = match(srcip = pair[1], dstip = pair[1])
             partial_pol = in_out_atom(slice1, slice2) | in_out_atom(slice2, slice1)
-
+            #partial_pol = in_out_atom(slice1, slice2)
+ 
             if pol is None:
                 pol = partial_pol
             else:
                 pol |= partial_pol
-            
+        
+        '''final_pol = pol
+        for i in range(3):
+            pol = in_atom(identity) ^ pol
+            final_pol += pol
+        return final_pol'''
+
         return +(in_atom(identity)) ^ pol
 
 

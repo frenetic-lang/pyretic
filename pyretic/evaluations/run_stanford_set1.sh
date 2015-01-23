@@ -1,10 +1,10 @@
-declare -a OPT_FLAGS_ARR=("-d -l -i -c 16" "-d -l -i" "-d -l" "-d" " ")
+#declare -a OPT_FLAGS_ARR=("-d -l -i -s 16 -c -g" "-d -l -i -s 16 -c" "-d -l -i -s 16" "-d -l -i" "-d -l" "-d" " ")
+declare -a OPT_FLAGS_ARR=("-d -l -i -s 16 -c -g")
 
 
-:<<COMMENT1
 TEST='traffic_matrix_stanford'
 
-i=6
+i=8
 DCR=1
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
 do
@@ -14,11 +14,10 @@ do
     i=$((i - DCR ))
     sleep 10
 done
-COMMENT1
 
 TEST='path_loss_stanford'
 
-i=6
+i=8
 DCR=1
 
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
@@ -34,7 +33,7 @@ done
 
 TEST='firewall_stanford'
 
-i=6
+i=8
 DCR=1
 
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
@@ -49,7 +48,7 @@ done
 
 TEST='ddos_stanford'
 
-i=6
+i=8
 DCR=1
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
 do
@@ -64,7 +63,7 @@ done
 
 TEST='slice_stanford'
 
-i=6
+i=8
 DCR=1
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
 do
@@ -78,7 +77,7 @@ done
 
 TEST='congested_stanford'
 
-i=6
+i=8
 DCR=1
 for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
 do

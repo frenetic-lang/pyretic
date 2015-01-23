@@ -166,7 +166,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
                     'tagging_compile', 'out_tagging_compile', 
                     'capture_compile', 'out_capture_compile', 
                     'in_table_compile', 'tab', 'out_table_compile', 'tab']
-            row.extend(['tab'] * 2 )
+            row.extend(['tab'] )
 
     else:
         row = [first_col, 'compile', 'forwarding_compile', 
