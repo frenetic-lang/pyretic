@@ -25,6 +25,7 @@ multitable_enabled = False
 ragel_enabled = False
 
 
+
 def start(results_folder=None, opt_flags = None):
     global path
     global monitoring
@@ -248,6 +249,7 @@ def elapsed_time(func):
     global stats
     global path
     global monitoring
+    global pred_part
 
     @wraps(func)
     def profiled_func(*args, **kwargs):
@@ -262,16 +264,17 @@ def elapsed_time(func):
             stats[fname][0] += 1
             stats[fname][1].append(elapsed)
 
-            f = open(os.path.join(path, '%s.profile' % fname), 'w')
-            f.write(('number of calls: %d' % stats[fname][0]) + '\n')
+            if fname != "pred_part":
+                f = open(os.path.join(path, '%s.profile' % fname), 'w')
+                f.write(('number of calls: %d' % stats[fname][0]) + '\n')
 
-            time_list = stats[fname][1]
-            f.write( ('total time: %f' % sum(time_list)) + '\n')
-            f.write( ('average time: %f' % ( sum(time_list) / len(time_list) )) + '\n')
-            f.write('---times----\n')
-            f.write(str(time_list) + '\n')
+                time_list = stats[fname][1]
+                f.write( ('total time: %f' % sum(time_list)) + '\n')
+                f.write( ('average time: %f' % ( sum(time_list) / len(time_list) )) + '\n')
+                f.write('---times----\n')
+                f.write(str(time_list) + '\n')
 
-            f.close()
+                f.close()
 
 
         return res
@@ -344,7 +347,9 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
     out_capture_edge = 0
     switch_cnt = 0
     rule_cnt = 0
-
+    
+    create_pol = 0
+    
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
         for line in g.readlines():
@@ -368,7 +373,10 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             
             elif 'dfa state count' in line:
                 dfa_state_cnt = int(line[line.index(':') + 2 : -1])
-
+            
+            elif 'create pol' in line:
+                create_pol =  float(line[line.index(':') + 2 : -1])
+ 
 
         g.close()
     except:
@@ -381,6 +389,11 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
 
     rule_avg = switch_cnt
     gen_list = [rule_avg, rule_cnt, dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
+   
+   
+    pred_part = stats['pred_part'][1][0]
+    if pred_part > 0 or create_pol > 0:
+        gen_list.extend([pred_part, create_pol])
 
     for gen in gen_list:
         f.write(str(gen) + "\t")
