@@ -320,9 +320,11 @@ class re_tree_gen(object):
     @classmethod
     def get_re_tree(cls, new_pred, at):
         if cls.simple:
-            return cls.get_re_tree_simple(new_pred, at)
+            res = cls.get_re_tree_simple(new_pred, at)
         else:
-            return cls.part_get_re_tree(new_pred, at)
+            res = cls.part_get_re_tree(new_pred, at)
+        
+        return res
 
     @classmethod
     def get_re_tree_simple(cls, new_pred, at):
@@ -670,6 +672,7 @@ class re_tree_gen(object):
                     res |= create_re_tree(sym, at)
                 return res
             else:
+                print type(eq_re_tree)
                 raise TypeError
         
         if cls.cache_enabled:
@@ -1501,7 +1504,7 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
-    def init(cls, numvals, switch_cnt = None, cache_enabled = False):
+    def init(cls, numvals, switch_cnt = None, cache_enabled = False, edge_contraction_enabled = False):
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
@@ -1509,6 +1512,8 @@ class pathcomp(object):
         re_tree_gen.init(switch_cnt, cache_enabled) 
         __in_re_tree_gen__.clear()
         __out_re_tree_gen__.clear()
+
+        ragel_dfa_utils.init(cache_enabled and edge_contraction_enabled)
 
 
     @classmethod
@@ -2242,6 +2247,10 @@ class dfa_utils(common_dfa_utils):
    
 class ragel_dfa_utils(common_dfa_utils):
     @classmethod
+    def init(cls, edge_contraction_enabled):
+        cls.edge_contraction_enabled = edge_contraction_enabled
+    
+    @classmethod
     def get_accepting_states(cls, data):
         acc_seen = False
         res = []
@@ -2528,7 +2537,11 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.output
         
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
-        (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
+        if cls.edge_contraction_enabled:
+            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
+        else:
+            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
+
        
         def print_list(l):
             for e in l:
