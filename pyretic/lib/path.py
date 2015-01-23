@@ -1549,6 +1549,13 @@ class pathcomp(object):
 
         ragel_dfa_utils.init(edge_contraction_enabled)
 
+    
+    @classmethod
+    @stat.elapsed_time
+    def pred_part(cls, path_pol):
+        ast_fold = path_policy_utils.path_policy_ast_fold
+        prep_trees = cls.__prep_re_trees__
+        ast_fold(path_pol, prep_trees, None)
 
     @classmethod
     @stat.elapsed_time
@@ -1575,14 +1582,13 @@ class pathcomp(object):
         out_cg.clear()
 
         ast_fold(path_pol, inv_trees, None)
-        ast_fold(path_pol, prep_trees, None)
+        cls.pred_part(path_pol)        
+
         
-        (cls.re_list, cls.pol_list) = ast_fold(path_pol, re_pols, ([], []))
+        (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
         #print '\n'.join([r.re_string_repr() for r in re_list])
         #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
         print time.time() - t_s
-        __in_re_tree_gen__.stats()
-        __out_re_tree_gen__.stats()
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
@@ -1599,7 +1605,6 @@ class pathcomp(object):
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
-        import time
         t_s = time.time()
 
         ast_fold(path_pol, inv_trees, None)
@@ -1660,6 +1665,7 @@ class pathcomp(object):
         if disjoint_enabled:
             
             if integrate_enabled:
+                t_s = time.time()
                 in_table_dic = {}
                 out_table_dic = {}
 
@@ -1712,7 +1718,9 @@ class pathcomp(object):
                 table_default = set([cls.__set_dead_state_tag__(du, dfa)])
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
                 out_table = QuerySwitch('path_tag', out_table_dic, table_default)
-                
+               
+                elap = time.time() - t_s
+                stat.gather_general_stats('create pol', elap, 0, False)
                 stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
                 stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
