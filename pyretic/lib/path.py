@@ -168,7 +168,7 @@ class re_tree_gen(object):
     pred_to_neg = {}
     dyn_preds      = []
     cache = {}
-
+    symbol_to_part = {}
     @classmethod
     def init(cls, switch_cnt = None, cache_enabled = False):
         if switch_cnt is None:
@@ -494,7 +494,7 @@ class re_tree_gen(object):
 
         cls.pred_to_atoms[partition][pred] = atoms
         cls.pred_to_neg[partition][pred] = pred_neg
-       
+        cls.symbol_to_part[symbol] = partition 
 
     @classmethod
     def __part_del_pred__(cls, pred, partition):
@@ -508,7 +508,7 @@ class re_tree_gen(object):
         del cls.pred_to_symbol[partition][pred]
         del cls.pred_to_atoms[partition][pred]
         del cls.pred_to_neg[partition][pred]
-
+        del cls.symbol_to_part[sym]
 
     @classmethod
     def __part_replace_pred__(cls, old_pred, new_preds, partition):
@@ -655,11 +655,9 @@ class re_tree_gen(object):
         assert isinstance(new_pred, Filter)
         
         def update_dicts(sym, at):
-            for i in range(1, cls.switch_cnt + 1):
-                if sym in cls.part_symbol_to_pred[i]:
-                    pred = cls.part_symbol_to_pred[i][sym]
-                    cls.pred_to_atoms[i][pred].append(at)
-                    break
+            i = cls.symbol_to_part[sym]
+            pred = cls.part_symbol_to_pred[i][sym]
+            cls.pred_to_atoms[i][pred].append(at)
 
         def create_re_tree(eq_re_tree, at):
             if isinstance(eq_re_tree, re_symbol):
@@ -710,7 +708,7 @@ class re_tree_gen(object):
         cls.dyn_preds = []
         cls.symbol_to_pred = {}
         cls.cache = {}
-
+        cls.symbol_to_part = {}
     @classmethod
     def get_predlist(cls):
         res = []
@@ -2292,6 +2290,7 @@ class ragel_dfa_utils(common_dfa_utils):
         edge_ordinals = {}
       
         dfa_dict = {}
+        edge_ordinals_dic = {}
         for line in output.splitlines():
             if not '->' in line or 'IN' in line or 'main' in line:
                 continue
@@ -2307,6 +2306,7 @@ class ragel_dfa_utils(common_dfa_utils):
             
             if not (src, dst) in dfa_dict:
                 dfa_dict[(src, dst)] = []
+                edge_ordinals_dic[(src, dst)] = {}
 
             parts = [s.strip() for s in label.split('/')]
             exp_list = []
@@ -2327,11 +2327,13 @@ class ragel_dfa_utils(common_dfa_utils):
                     for i in range(start, end + 1):
                         edge = (src, i, dst)
                         dfa_dict[(src,dst)].append( edge)
+                        edge_ordinals_dic[(src, dst)][edge] = exp_list
                         res.append(edge)
                         edge_ordinals[edge] = exp_list
                 else:
                     edge = (src, int(s), dst)
                     dfa_dict[(src, dst)].append(edge)
+                    edge_ordinals_dic[(src, dst)][edge] = exp_list
                     res.append(edge)
                     edge_ordinals[edge] = exp_list
 
@@ -2348,7 +2350,7 @@ class ragel_dfa_utils(common_dfa_utils):
             else:
                 raise TypeError
         def check_ordinals(edge_list):
-            edge_ords = [edge_ordinals[e] for e in dfa_list]
+            edge_ords = edge_list.values()
             for i in range(len(edge_ords) - 1):
                 if edge_ords[i] != edge_ords[i + 1]:
                     return False
@@ -2368,30 +2370,28 @@ class ragel_dfa_utils(common_dfa_utils):
                 out_id = create_id_list(out_cache[identity].re_tree)
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
+                edge_ordinals = {}
                 for (src, dst), dfa_list in dfa_dict.items():
+                    
+                    edge_ords = edge_ordinals_dic[(src, dst)]
                     if len(dfa_list) > 1:
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
                         edge_syms.sort()
                         if edge_syms == out_id:
                             assert edge_syms != in_id
-                            if check_ordinals(dfa_list):
+                            if check_ordinals(edge_ords):
                                 new_edge = (src, 'OUT_ID', dst)
-                                new_ord = edge_ordinals[dfa_list[0]]
-                                for edge in dfa_list:
-                                    del edge_ordinals[edge]
-
+                                new_ord = edge_ords.values()[0]
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
 
                                 continue
 
                         elif edge_syms == in_id:
-                            if check_ordinals(dfa_list):
+                            if check_ordinals(edge_ords):
                                 new_edge = (src, 'IN_ID', dst)
-                                new_ord = edge_ordinals[dfa_list[0]]
-                                for edge in dfa_list:
-                                    del edge_ordinals[edge]
+                                new_ord = edge_ords.values()[0]
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
@@ -2399,6 +2399,7 @@ class ragel_dfa_utils(common_dfa_utils):
                                 continue
                             
                     res.extend(dfa_list)
+                    edge_ordinals.update(edge_ords)
         
         return (res, edge_ordinals)
 
