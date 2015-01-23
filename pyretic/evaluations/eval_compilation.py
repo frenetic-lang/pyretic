@@ -41,6 +41,8 @@ class eval_compilation:
             self.partition_enabled = False
             self.switch_cnt = None
 
+        self.cache_enabled = args.cache_enabled
+
         if os.path.exists(self.results_folder):
             for fname in os.listdir(self.results_folder):
                 fpath = os.path.join(self.results_folder, fname)
@@ -146,7 +148,7 @@ class eval_compilation:
 
         stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        pathcomp.init(self.max_states, self.switch_cnt)
+        pathcomp.init(self.max_states, self.switch_cnt, self.cache_enabled)
          
         policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
@@ -382,10 +384,14 @@ def parse_args():
                     help = 'enable ragel optimization')
 
 
-    parser.add_argument('--enable_partition', '-c', type=int,
+    parser.add_argument('--enable_partition', '-s', type=int,
                     dest = 'switch_cnt',
                     help = 'enable partition optimization')
- 
+
+    parser.add_argument('--enable_cache', '-c', action="store_true",
+                    dest = 'cache_enabled',
+                    help = 'enable cache optimization')
+
     args = parser.parse_args()
 
     return args
@@ -418,7 +424,7 @@ def get_optimization_flags(args):
     params = []
     d = args.__dict__
     for arg in d:
-        if 'enabled' in arg and d[arg]:
+        if ('enabled' in arg or arg == 'switch_cnt') and d[arg]:
             params.append(arg)
 
     return params
