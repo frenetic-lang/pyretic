@@ -1,6 +1,7 @@
 declare -a OPT_FLAGS_ARR=("-d -l -i -c 16" "-d -l -i" "-d -l" "-d" " ")
 
 
+:<<COMMENT1
 TEST='traffic_matrix_stanford'
 
 i=6
@@ -13,7 +14,7 @@ do
     i=$((i - DCR ))
     sleep 10
 done
-
+COMMENT1
 
 TEST='path_loss_stanford'
 
