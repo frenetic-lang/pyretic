@@ -70,7 +70,6 @@ class TrafficMatrixStats:
         egress_pairs = itertools.product(switches, switches)
 
         pol = None
-        
         for pair in egress_pairs:
             partial_match_0 = drop
             for p in ports[pair[0]]:

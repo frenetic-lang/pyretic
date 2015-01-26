@@ -89,7 +89,7 @@ class FirewallStats:
                 else:
                     out_predicate |= match(switch = sw, outport = p)
 
-        pol = in_atom(in_predicate) ^ +(in_atom(~match(switch = sw))) ^ out_atom(out_predicate) 
+        pol = in_atom(in_predicate) ^ +(in_atom(~match(switch = fw))) ^ out_atom(out_predicate) 
 
 
         query_thread = threading.Thread(target = self.pull_buckets)

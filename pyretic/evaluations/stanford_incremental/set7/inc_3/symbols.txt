@@ -1,0 +1,1750 @@
+1: intersection:
+    match: ('switch', 1)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 8)
+        match: ('inport', 9)
+        match: ('inport', 10)
+        match: ('inport', 11)
+        match: ('inport', 13)
+        match: ('inport', 17)
+        match: ('inport', 18)
+        match: ('inport', 19)
+        match: ('inport', 20)
+        match: ('inport', 22)
+        match: ('inport', 23)
+        match: ('inport', 24)
+66: intersection:
+    match: ('switch', 3)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 9)
+        match: ('inport', 10)
+        match: ('inport', 11)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+67: intersection:
+    match: ('switch', 3)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 9)
+        match: ('inport', 10)
+        match: ('inport', 11)
+    match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+69: intersection:
+    match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+65: intersection:
+    match: ('switch', 16)
+    union:
+        match: ('inport', 1)
+        match: ('inport', 2)
+        match: ('inport', 7)
+73: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 13)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 20)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 7)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+                match: ('inport', 15)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 21)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+                match: ('inport', 25)
+                match: ('inport', 26)
+                match: ('inport', 27)
+                match: ('inport', 28)
+                match: ('inport', 29)
+                match: ('inport', 30)
+                match: ('inport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 2)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    union:
+                        match: ('inport', 2)
+                        match: ('inport', 3)
+                        match: ('inport', 4)
+                        match: ('inport', 6)
+                        match: ('inport', 7)
+                        match: ('inport', 9)
+                        match: ('inport', 10)
+                        match: ('inport', 11)
+    negate:
+        match: ('switch', 5)
+    match: ('switch', 1)
+74: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 13)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 20)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 7)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+                match: ('inport', 15)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 21)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+                match: ('inport', 25)
+                match: ('inport', 26)
+                match: ('inport', 27)
+                match: ('inport', 28)
+                match: ('inport', 29)
+                match: ('inport', 30)
+                match: ('inport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 2)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    union:
+                        match: ('inport', 2)
+                        match: ('inport', 3)
+                        match: ('inport', 4)
+                        match: ('inport', 6)
+                        match: ('inport', 7)
+                        match: ('inport', 9)
+                        match: ('inport', 10)
+                        match: ('inport', 11)
+    negate:
+        match: ('switch', 5)
+    negate:
+        match: ('switch', 1)
+    negate:
+        match: ('switch', 2)
+75: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 13)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 20)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 7)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+                match: ('inport', 15)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 21)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+                match: ('inport', 25)
+                match: ('inport', 26)
+                match: ('inport', 27)
+                match: ('inport', 28)
+                match: ('inport', 29)
+                match: ('inport', 30)
+                match: ('inport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 2)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    union:
+                        match: ('inport', 2)
+                        match: ('inport', 3)
+                        match: ('inport', 4)
+                        match: ('inport', 6)
+                        match: ('inport', 7)
+                        match: ('inport', 9)
+                        match: ('inport', 10)
+                        match: ('inport', 11)
+    negate:
+        match: ('switch', 5)
+    negate:
+        match: ('switch', 1)
+    match: ('switch', 2)
+71: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 13)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 20)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 10)
+                match: ('inport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 6)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 7)
+                match: ('inport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('inport', 2)
+                match: ('inport', 3)
+                match: ('inport', 4)
+                match: ('inport', 5)
+                match: ('inport', 8)
+                match: ('inport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 5)
+                match: ('inport', 6)
+                match: ('inport', 7)
+                match: ('inport', 8)
+                match: ('inport', 9)
+                match: ('inport', 10)
+                match: ('inport', 11)
+                match: ('inport', 12)
+                match: ('inport', 13)
+                match: ('inport', 14)
+                match: ('inport', 15)
+                match: ('inport', 16)
+                match: ('inport', 17)
+                match: ('inport', 18)
+                match: ('inport', 19)
+                match: ('inport', 21)
+                match: ('inport', 22)
+                match: ('inport', 23)
+                match: ('inport', 24)
+                match: ('inport', 25)
+                match: ('inport', 26)
+                match: ('inport', 27)
+                match: ('inport', 28)
+                match: ('inport', 29)
+                match: ('inport', 30)
+                match: ('inport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('inport', 1)
+                match: ('inport', 2)
+                match: ('inport', 7)
+    negate:
+        intersection:
+            match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 3) ('dstip', IPv4Network('10.0.0.2/32'))
+            negate:
+                intersection:
+                    match: ('switch', 3)
+                    union:
+                        match: ('inport', 2)
+                        match: ('inport', 3)
+                        match: ('inport', 4)
+                        match: ('inport', 6)
+                        match: ('inport', 7)
+                        match: ('inport', 9)
+                        match: ('inport', 10)
+                        match: ('inport', 11)
+    match: ('switch', 5)
+37: intersection:
+    match: ('switch', 2)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 8)
+        match: ('inport', 9)
+        match: ('inport', 10)
+        match: ('inport', 11)
+        match: ('inport', 12)
+        match: ('inport', 13)
+        match: ('inport', 16)
+        match: ('inport', 17)
+        match: ('inport', 18)
+        match: ('inport', 21)
+41: intersection:
+    match: ('switch', 4)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 10)
+        match: ('inport', 11)
+43: intersection:
+    match: ('switch', 5)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 8)
+45: intersection:
+    match: ('switch', 6)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 8)
+47: intersection:
+    match: ('switch', 7)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 8)
+        match: ('inport', 10)
+        match: ('inport', 11)
+        match: ('inport', 12)
+        match: ('inport', 13)
+        match: ('inport', 15)
+49: intersection:
+    match: ('switch', 8)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 8)
+        match: ('inport', 11)
+        match: ('inport', 12)
+        match: ('inport', 13)
+        match: ('inport', 14)
+51: intersection:
+    match: ('switch', 9)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 8)
+        match: ('inport', 9)
+53: intersection:
+    match: ('switch', 10)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 9)
+55: intersection:
+    match: ('switch', 11)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 6)
+        match: ('inport', 7)
+57: intersection:
+    match: ('switch', 12)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 7)
+        match: ('inport', 8)
+59: intersection:
+    match: ('switch', 13)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 8)
+        match: ('inport', 9)
+61: intersection:
+    match: ('switch', 14)
+    union:
+        match: ('inport', 2)
+        match: ('inport', 3)
+        match: ('inport', 4)
+        match: ('inport', 5)
+        match: ('inport', 8)
+        match: ('inport', 9)
+63: intersection:
+    match: ('switch', 15)
+    union:
+        match: ('inport', 1)
+        match: ('inport', 5)
+        match: ('inport', 6)
+        match: ('inport', 7)
+        match: ('inport', 8)
+        match: ('inport', 9)
+        match: ('inport', 10)
+        match: ('inport', 11)
+        match: ('inport', 12)
+        match: ('inport', 13)
+        match: ('inport', 14)
+        match: ('inport', 15)
+        match: ('inport', 16)
+        match: ('inport', 17)
+        match: ('inport', 18)
+        match: ('inport', 19)
+        match: ('inport', 21)
+        match: ('inport', 22)
+        match: ('inport', 23)
+        match: ('inport', 24)
+        match: ('inport', 25)
+        match: ('inport', 26)
+        match: ('inport', 27)
+        match: ('inport', 28)
+        match: ('inport', 29)
+        match: ('inport', 30)
+        match: ('inport', 31)
+5: intersection:
+    match: ('switch', 1)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 8)
+        match: ('outport', 9)
+        match: ('outport', 10)
+        match: ('outport', 11)
+        match: ('outport', 13)
+        match: ('outport', 17)
+        match: ('outport', 18)
+        match: ('outport', 19)
+        match: ('outport', 20)
+        match: ('outport', 22)
+        match: ('outport', 23)
+        match: ('outport', 24)
+7: intersection:
+    match: ('switch', 2)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 8)
+        match: ('outport', 9)
+        match: ('outport', 10)
+        match: ('outport', 11)
+        match: ('outport', 12)
+        match: ('outport', 13)
+        match: ('outport', 16)
+        match: ('outport', 17)
+        match: ('outport', 18)
+        match: ('outport', 21)
+9: intersection:
+    match: ('switch', 3)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 9)
+        match: ('outport', 10)
+        match: ('outport', 11)
+11: intersection:
+    match: ('switch', 4)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 10)
+        match: ('outport', 11)
+76: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 13)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 19)
+                match: ('outport', 20)
+                match: ('outport', 22)
+                match: ('outport', 23)
+                match: ('outport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 16)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 10)
+                match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 6)
+                match: ('outport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 7)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('outport', 1)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 14)
+                match: ('outport', 15)
+                match: ('outport', 16)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 19)
+                match: ('outport', 21)
+                match: ('outport', 22)
+                match: ('outport', 23)
+                match: ('outport', 24)
+                match: ('outport', 25)
+                match: ('outport', 26)
+                match: ('outport', 27)
+                match: ('outport', 28)
+                match: ('outport', 29)
+                match: ('outport', 30)
+                match: ('outport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('outport', 1)
+                match: ('outport', 2)
+                match: ('outport', 7)
+    negate:
+        match: ('switch', 1)
+13: intersection:
+    match: ('switch', 5)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 8)
+77: intersection:
+    identity
+    negate:
+        intersection:
+            match: ('switch', 1)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 13)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 19)
+                match: ('outport', 20)
+                match: ('outport', 22)
+                match: ('outport', 23)
+                match: ('outport', 24)
+    negate:
+        intersection:
+            match: ('switch', 2)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 16)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 21)
+    negate:
+        intersection:
+            match: ('switch', 3)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('switch', 4)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 10)
+                match: ('outport', 11)
+    negate:
+        intersection:
+            match: ('switch', 5)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 6)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 7)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 15)
+    negate:
+        intersection:
+            match: ('switch', 8)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 14)
+    negate:
+        intersection:
+            match: ('switch', 9)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 10)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 11)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 6)
+                match: ('outport', 7)
+    negate:
+        intersection:
+            match: ('switch', 12)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 7)
+                match: ('outport', 8)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            union:
+                match: ('outport', 2)
+                match: ('outport', 3)
+                match: ('outport', 4)
+                match: ('outport', 5)
+                match: ('outport', 8)
+                match: ('outport', 9)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            union:
+                match: ('outport', 1)
+                match: ('outport', 5)
+                match: ('outport', 6)
+                match: ('outport', 7)
+                match: ('outport', 8)
+                match: ('outport', 9)
+                match: ('outport', 10)
+                match: ('outport', 11)
+                match: ('outport', 12)
+                match: ('outport', 13)
+                match: ('outport', 14)
+                match: ('outport', 15)
+                match: ('outport', 16)
+                match: ('outport', 17)
+                match: ('outport', 18)
+                match: ('outport', 19)
+                match: ('outport', 21)
+                match: ('outport', 22)
+                match: ('outport', 23)
+                match: ('outport', 24)
+                match: ('outport', 25)
+                match: ('outport', 26)
+                match: ('outport', 27)
+                match: ('outport', 28)
+                match: ('outport', 29)
+                match: ('outport', 30)
+                match: ('outport', 31)
+    negate:
+        intersection:
+            match: ('switch', 16)
+            union:
+                match: ('outport', 1)
+                match: ('outport', 2)
+                match: ('outport', 7)
+    match: ('switch', 1)
+15: intersection:
+    match: ('switch', 6)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 8)
+17: intersection:
+    match: ('switch', 7)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 8)
+        match: ('outport', 10)
+        match: ('outport', 11)
+        match: ('outport', 12)
+        match: ('outport', 13)
+        match: ('outport', 15)
+19: intersection:
+    match: ('switch', 8)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 8)
+        match: ('outport', 11)
+        match: ('outport', 12)
+        match: ('outport', 13)
+        match: ('outport', 14)
+21: intersection:
+    match: ('switch', 9)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 8)
+        match: ('outport', 9)
+23: intersection:
+    match: ('switch', 10)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 9)
+25: intersection:
+    match: ('switch', 11)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 6)
+        match: ('outport', 7)
+27: intersection:
+    match: ('switch', 12)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 7)
+        match: ('outport', 8)
+29: intersection:
+    match: ('switch', 13)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 8)
+        match: ('outport', 9)
+31: intersection:
+    match: ('switch', 14)
+    union:
+        match: ('outport', 2)
+        match: ('outport', 3)
+        match: ('outport', 4)
+        match: ('outport', 5)
+        match: ('outport', 8)
+        match: ('outport', 9)
+33: intersection:
+    match: ('switch', 15)
+    union:
+        match: ('outport', 1)
+        match: ('outport', 5)
+        match: ('outport', 6)
+        match: ('outport', 7)
+        match: ('outport', 8)
+        match: ('outport', 9)
+        match: ('outport', 10)
+        match: ('outport', 11)
+        match: ('outport', 12)
+        match: ('outport', 13)
+        match: ('outport', 14)
+        match: ('outport', 15)
+        match: ('outport', 16)
+        match: ('outport', 17)
+        match: ('outport', 18)
+        match: ('outport', 19)
+        match: ('outport', 21)
+        match: ('outport', 22)
+        match: ('outport', 23)
+        match: ('outport', 24)
+        match: ('outport', 25)
+        match: ('outport', 26)
+        match: ('outport', 27)
+        match: ('outport', 28)
+        match: ('outport', 29)
+        match: ('outport', 30)
+        match: ('outport', 31)
+35: intersection:
+    match: ('switch', 16)
+    union:
+        match: ('outport', 1)
+        match: ('outport', 2)
+        match: ('outport', 7)

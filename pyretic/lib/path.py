@@ -1581,8 +1581,8 @@ class pathcomp(object):
         #print '\n'.join([r.re_string_repr() for r in re_list])
         #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
         print time.time() - t_s
-        __in_re_tree_gen__.stats()
-        __out_re_tree_gen__.stats()
+        #__in_re_tree_gen__.stats()
+        #__out_re_tree_gen__.stats()
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
@@ -2615,7 +2615,12 @@ class ragel_dfa_utils(common_dfa_utils):
         f.write(lex_input)
         f.close()
         try:
-            output = subprocess.check_output(['ragel', '-V', lex_input_file])
+            g = open('/tmp/graph.dot', 'w')
+            subprocess.call(['ragel', '-V', lex_input_file], stdout=g)
+            g.close()
+            g = open('/tmp/graph.dot')
+            output = g.read()
+            g.close()
         except subprocess.CalledProcessError as e:
             
             print "Error occured while running ragel"
@@ -2623,7 +2628,6 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.returncode
             print e.cmd
             print e.output
-        
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
             print 'using contraction'

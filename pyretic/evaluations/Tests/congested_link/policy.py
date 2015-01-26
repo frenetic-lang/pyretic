@@ -69,6 +69,11 @@ class LinkCongestionStats:
         return port_map
 
                     
+    def get_core_aggr(self, k, core_num, pod_num):
+        core_cnt = (k/2) ** 2
+        core_row = (core_num - 1)/ (k/ 2) + 1
+        return core_cnt + k * (pod_num - 1) + core_row
+
     def link_congestion_query(self, **kwargs):
         params = dict(**kwargs)
         self.k = int(params['k'])
@@ -78,6 +83,8 @@ class LinkCongestionStats:
         switches = ports.keys()
         egress_pairs = itertools.product(switches, switches)
 
+        s2 = 1
+        s1 = self.get_core_aggr(self.k, s2, 1)        
  
         pol = None
         

@@ -1,0 +1,1674 @@
+47: intersection:
+    match: ('switch', 1)
+    identity
+48: intersection:
+    match: ('switch', 2)
+    identity
+49: intersection:
+    match: ('switch', 3)
+    identity
+50: intersection:
+    match: ('switch', 4)
+    identity
+51: intersection:
+    match: ('switch', 5)
+    identity
+52: intersection:
+    match: ('switch', 6)
+    identity
+53: intersection:
+    match: ('switch', 7)
+    identity
+54: intersection:
+    match: ('switch', 8)
+    identity
+55: intersection:
+    match: ('switch', 9)
+    identity
+56: intersection:
+    match: ('switch', 10)
+    identity
+57: intersection:
+    match: ('switch', 11)
+    identity
+58: intersection:
+    match: ('switch', 12)
+    identity
+62: intersection:
+    match: ('switch', 16)
+    identity
+63: intersection:
+    match: ('switch', 17)
+    identity
+64: intersection:
+    match: ('switch', 18)
+    identity
+68: intersection:
+    match: ('switch', 22)
+    identity
+69: intersection:
+    match: ('switch', 23)
+    identity
+70: intersection:
+    match: ('switch', 24)
+    identity
+74: intersection:
+    match: ('switch', 28)
+    identity
+75: intersection:
+    match: ('switch', 29)
+    identity
+76: intersection:
+    match: ('switch', 30)
+    identity
+80: intersection:
+    match: ('switch', 34)
+    identity
+81: intersection:
+    match: ('switch', 35)
+    identity
+82: intersection:
+    match: ('switch', 36)
+    identity
+86: intersection:
+    match: ('switch', 40)
+    identity
+87: intersection:
+    match: ('switch', 41)
+    identity
+88: intersection:
+    match: ('switch', 42)
+    identity
+92: intersection:
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 32)
+            intersection:
+                match: ('switch', 32)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+93: intersection:
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+94: intersection:
+    match: ('switch', 32)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 32)
+            intersection:
+                match: ('switch', 32)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 32)
+            intersection:
+                match: ('switch', 32)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 32)
+                    intersection:
+                        match: ('switch', 32)
+                        union:
+                            drop
+                            match: ('inport', 1)
+                            match: ('inport', 2)
+95: intersection:
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 32)
+            intersection:
+                match: ('switch', 32)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+130: intersection:
+    match: ('switch', 33)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 33)
+            intersection:
+                match: ('switch', 33)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 33)
+            intersection:
+                match: ('switch', 33)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+131: intersection:
+    match: ('switch', 33)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 33)
+            intersection:
+                match: ('switch', 33)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    match: ('switch', 33)
+    intersection:
+        match: ('switch', 33)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+132: intersection:
+    match: ('switch', 33)
+    intersection:
+        match: ('switch', 33)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 33)
+            intersection:
+                match: ('switch', 33)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 33)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 33)
+                            intersection:
+                                match: ('switch', 33)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+133: intersection:
+    match: ('switch', 33)
+    intersection:
+        match: ('switch', 33)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 33)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 33)
+                    intersection:
+                        match: ('switch', 33)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+134: intersection:
+    match: ('switch', 45)
+    intersection:
+        match: ('switch', 45)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 45)
+            intersection:
+                match: ('switch', 45)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+135: intersection:
+    match: ('switch', 45)
+    intersection:
+        match: ('switch', 45)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 45)
+    intersection:
+        match: ('switch', 45)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+136: intersection:
+    match: ('switch', 45)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 45)
+            intersection:
+                match: ('switch', 45)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 45)
+            intersection:
+                match: ('switch', 45)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 45)
+                    intersection:
+                        match: ('switch', 45)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+137: intersection:
+    match: ('switch', 45)
+    intersection:
+        match: ('switch', 45)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 45)
+            intersection:
+                match: ('switch', 45)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+138: intersection:
+    match: ('switch', 37)
+    intersection:
+        match: ('switch', 37)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 37)
+            intersection:
+                match: ('switch', 37)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+139: intersection:
+    match: ('switch', 37)
+    intersection:
+        match: ('switch', 37)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 37)
+    intersection:
+        match: ('switch', 37)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+140: intersection:
+    match: ('switch', 37)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 37)
+            intersection:
+                match: ('switch', 37)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 37)
+            intersection:
+                match: ('switch', 37)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 37)
+                    intersection:
+                        match: ('switch', 37)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+141: intersection:
+    match: ('switch', 37)
+    intersection:
+        match: ('switch', 37)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 37)
+            intersection:
+                match: ('switch', 37)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+142: intersection:
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+143: intersection:
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+144: intersection:
+    match: ('switch', 38)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 38)
+                    intersection:
+                        match: ('switch', 38)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+145: intersection:
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+146: intersection:
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+147: intersection:
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+148: intersection:
+    match: ('switch', 39)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 39)
+                    intersection:
+                        match: ('switch', 39)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+149: intersection:
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+150: intersection:
+    match: ('switch', 43)
+    intersection:
+        match: ('switch', 43)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 43)
+            intersection:
+                match: ('switch', 43)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+151: intersection:
+    match: ('switch', 43)
+    intersection:
+        match: ('switch', 43)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 43)
+    intersection:
+        match: ('switch', 43)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+152: intersection:
+    match: ('switch', 43)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 43)
+            intersection:
+                match: ('switch', 43)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 43)
+            intersection:
+                match: ('switch', 43)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 43)
+                    intersection:
+                        match: ('switch', 43)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+153: intersection:
+    match: ('switch', 43)
+    intersection:
+        match: ('switch', 43)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 43)
+            intersection:
+                match: ('switch', 43)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+154: intersection:
+    match: ('switch', 44)
+    intersection:
+        match: ('switch', 44)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 44)
+            intersection:
+                match: ('switch', 44)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+155: intersection:
+    match: ('switch', 44)
+    intersection:
+        match: ('switch', 44)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 44)
+    intersection:
+        match: ('switch', 44)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+156: intersection:
+    match: ('switch', 44)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 44)
+            intersection:
+                match: ('switch', 44)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 44)
+            intersection:
+                match: ('switch', 44)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 44)
+                    intersection:
+                        match: ('switch', 44)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+157: intersection:
+    match: ('switch', 44)
+    intersection:
+        match: ('switch', 44)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 44)
+            intersection:
+                match: ('switch', 44)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+158: intersection:
+    match: ('switch', 13)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+159: intersection:
+    match: ('switch', 13)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+160: intersection:
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            intersection:
+                match: ('switch', 13)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 13)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 13)
+                            intersection:
+                                match: ('switch', 13)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+161: intersection:
+    match: ('switch', 13)
+    intersection:
+        match: ('switch', 13)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 13)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 13)
+                    intersection:
+                        match: ('switch', 13)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+162: intersection:
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+163: intersection:
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+164: intersection:
+    match: ('switch', 14)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 14)
+                    intersection:
+                        match: ('switch', 14)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+165: intersection:
+    match: ('switch', 14)
+    intersection:
+        match: ('switch', 14)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 14)
+            intersection:
+                match: ('switch', 14)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+166: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+167: intersection:
+    match: ('switch', 15)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    match: ('switch', 15)
+    intersection:
+        match: ('switch', 15)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+168: intersection:
+    match: ('switch', 15)
+    intersection:
+        match: ('switch', 15)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            intersection:
+                match: ('switch', 15)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 15)
+                            intersection:
+                                match: ('switch', 15)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+169: intersection:
+    match: ('switch', 15)
+    intersection:
+        match: ('switch', 15)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 15)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 15)
+                    intersection:
+                        match: ('switch', 15)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+170: intersection:
+    match: ('switch', 19)
+    intersection:
+        match: ('switch', 19)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 19)
+            intersection:
+                match: ('switch', 19)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+171: intersection:
+    match: ('switch', 19)
+    intersection:
+        match: ('switch', 19)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 19)
+    intersection:
+        match: ('switch', 19)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+172: intersection:
+    match: ('switch', 19)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 19)
+            intersection:
+                match: ('switch', 19)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 19)
+            intersection:
+                match: ('switch', 19)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 19)
+                    intersection:
+                        match: ('switch', 19)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+173: intersection:
+    match: ('switch', 19)
+    intersection:
+        match: ('switch', 19)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 19)
+            intersection:
+                match: ('switch', 19)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+174: intersection:
+    match: ('switch', 20)
+    intersection:
+        match: ('switch', 20)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 20)
+            intersection:
+                match: ('switch', 20)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+175: intersection:
+    match: ('switch', 20)
+    intersection:
+        match: ('switch', 20)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 20)
+    intersection:
+        match: ('switch', 20)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+176: intersection:
+    match: ('switch', 20)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 20)
+            intersection:
+                match: ('switch', 20)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 20)
+            intersection:
+                match: ('switch', 20)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 20)
+                    intersection:
+                        match: ('switch', 20)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+177: intersection:
+    match: ('switch', 20)
+    intersection:
+        match: ('switch', 20)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 20)
+            intersection:
+                match: ('switch', 20)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+178: intersection:
+    match: ('switch', 21)
+    intersection:
+        match: ('switch', 21)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 21)
+            intersection:
+                match: ('switch', 21)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+179: intersection:
+    match: ('switch', 21)
+    intersection:
+        match: ('switch', 21)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 21)
+    intersection:
+        match: ('switch', 21)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+180: intersection:
+    match: ('switch', 21)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 21)
+            intersection:
+                match: ('switch', 21)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 21)
+            intersection:
+                match: ('switch', 21)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 21)
+                    intersection:
+                        match: ('switch', 21)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+181: intersection:
+    match: ('switch', 21)
+    intersection:
+        match: ('switch', 21)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 21)
+            intersection:
+                match: ('switch', 21)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+182: intersection:
+    match: ('switch', 25)
+    intersection:
+        match: ('switch', 25)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 25)
+            intersection:
+                match: ('switch', 25)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+183: intersection:
+    match: ('switch', 25)
+    intersection:
+        match: ('switch', 25)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 25)
+    intersection:
+        match: ('switch', 25)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+184: intersection:
+    match: ('switch', 25)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 25)
+            intersection:
+                match: ('switch', 25)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 25)
+            intersection:
+                match: ('switch', 25)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 25)
+                    intersection:
+                        match: ('switch', 25)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+185: intersection:
+    match: ('switch', 25)
+    intersection:
+        match: ('switch', 25)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 25)
+            intersection:
+                match: ('switch', 25)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+186: intersection:
+    match: ('switch', 26)
+    intersection:
+        match: ('switch', 26)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 26)
+            intersection:
+                match: ('switch', 26)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+187: intersection:
+    match: ('switch', 26)
+    intersection:
+        match: ('switch', 26)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 26)
+    intersection:
+        match: ('switch', 26)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+188: intersection:
+    match: ('switch', 26)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 26)
+            intersection:
+                match: ('switch', 26)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 26)
+            intersection:
+                match: ('switch', 26)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 26)
+                    intersection:
+                        match: ('switch', 26)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+189: intersection:
+    match: ('switch', 26)
+    intersection:
+        match: ('switch', 26)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 26)
+            intersection:
+                match: ('switch', 26)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+190: intersection:
+    match: ('switch', 27)
+    intersection:
+        match: ('switch', 27)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 27)
+            intersection:
+                match: ('switch', 27)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+191: intersection:
+    match: ('switch', 27)
+    intersection:
+        match: ('switch', 27)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 27)
+    intersection:
+        match: ('switch', 27)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+192: intersection:
+    match: ('switch', 27)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 27)
+            intersection:
+                match: ('switch', 27)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 27)
+            intersection:
+                match: ('switch', 27)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 27)
+                    intersection:
+                        match: ('switch', 27)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+193: intersection:
+    match: ('switch', 27)
+    intersection:
+        match: ('switch', 27)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 27)
+            intersection:
+                match: ('switch', 27)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+194: intersection:
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+195: intersection:
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+196: intersection:
+    match: ('switch', 31)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+            negate:
+                intersection:
+                    match: ('switch', 31)
+                    intersection:
+                        match: ('switch', 31)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+197: intersection:
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+2: intersection:
+    match: ('switch', 1)
+    identity
+3: intersection:
+    match: ('switch', 2)
+    identity
+4: intersection:
+    match: ('switch', 3)
+    identity
+5: intersection:
+    match: ('switch', 4)
+    identity
+6: intersection:
+    match: ('switch', 5)
+    identity
+7: intersection:
+    match: ('switch', 6)
+    identity
+8: intersection:
+    match: ('switch', 7)
+    identity
+9: intersection:
+    match: ('switch', 8)
+    identity
+10: intersection:
+    match: ('switch', 9)
+    identity
+11: intersection:
+    match: ('switch', 10)
+    identity
+12: intersection:
+    match: ('switch', 11)
+    identity
+13: intersection:
+    match: ('switch', 12)
+    identity
+14: intersection:
+    match: ('switch', 13)
+    identity
+15: intersection:
+    match: ('switch', 14)
+    identity
+16: intersection:
+    match: ('switch', 15)
+    identity
+17: intersection:
+    match: ('switch', 16)
+    identity
+18: intersection:
+    match: ('switch', 17)
+    identity
+19: intersection:
+    match: ('switch', 18)
+    identity
+20: intersection:
+    match: ('switch', 19)
+    identity
+21: intersection:
+    match: ('switch', 20)
+    identity
+22: intersection:
+    match: ('switch', 21)
+    identity
+23: intersection:
+    match: ('switch', 22)
+    identity
+24: intersection:
+    match: ('switch', 23)
+    identity
+25: intersection:
+    match: ('switch', 24)
+    identity
+26: intersection:
+    match: ('switch', 25)
+    identity
+27: intersection:
+    match: ('switch', 26)
+    identity
+28: intersection:
+    match: ('switch', 27)
+    identity
+29: intersection:
+    match: ('switch', 28)
+    identity
+30: intersection:
+    match: ('switch', 29)
+    identity
+31: intersection:
+    match: ('switch', 30)
+    identity
+32: intersection:
+    match: ('switch', 31)
+    identity
+33: intersection:
+    match: ('switch', 32)
+    identity
+34: intersection:
+    match: ('switch', 33)
+    identity
+35: intersection:
+    match: ('switch', 34)
+    identity
+36: intersection:
+    match: ('switch', 35)
+    identity
+37: intersection:
+    match: ('switch', 36)
+    identity
+38: intersection:
+    match: ('switch', 37)
+    identity
+39: intersection:
+    match: ('switch', 38)
+    identity
+40: intersection:
+    match: ('switch', 39)
+    identity
+41: intersection:
+    match: ('switch', 40)
+    identity
+42: intersection:
+    match: ('switch', 41)
+    identity
+43: intersection:
+    match: ('switch', 42)
+    identity
+44: intersection:
+    match: ('switch', 43)
+    identity
+45: intersection:
+    match: ('switch', 44)
+    identity
+46: intersection:
+    match: ('switch', 45)
+    identity
