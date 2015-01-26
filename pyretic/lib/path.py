@@ -1590,8 +1590,11 @@ class pathcomp(object):
         #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
         print time.time() - t_s
 <<<<<<< HEAD
+<<<<<<< HEAD
         #__in_re_tree_gen__.stats()
         #__out_re_tree_gen__.stats()
+=======
+>>>>>>> 66a5a06fbe7efc5fb72265fd213839e71805b283
 =======
 >>>>>>> 66a5a06fbe7efc5fb72265fd213839e71805b283
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)

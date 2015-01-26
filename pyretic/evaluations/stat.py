@@ -393,16 +393,12 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
     '''
 
     rule_avg = switch_cnt
-<<<<<<< HEAD
     gen_list = [dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
-=======
-    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
    
    
     pred_part = stats['pred_part'][1][0]
     if pred_part > 0 or create_pol > 0:
         gen_list.extend([pred_part, create_pol])
->>>>>>> 66a5a06fbe7efc5fb72265fd213839e71805b283
 
     for gen in gen_list:
         f.write(str(gen) + "\t")
