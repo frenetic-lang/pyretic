@@ -1,7 +1,7 @@
 import sys
 import os
 
-def create_spreadsheet(fname, outname, limit = None):
+def create_spreadsheet(fname, outname, limit = None, report = 'excel'):
     f = open(outname, 'w')
     exp_paths = []
     for exp in os.listdir(fname):
@@ -26,7 +26,7 @@ def create_spreadsheet(fname, outname, limit = None):
             pass
 
         
-        exp_path = os.path.join(fname, os.path.join(exp, 'excel_report.txt'))
+        exp_path = os.path.join(fname, os.path.join(exp, '%s_report.txt'%report))
         if os.path.exists(exp_path):
             g = open(exp_path, 'r')
             f.write(g.readline())
@@ -37,6 +37,9 @@ def create_spreadsheet(fname, outname, limit = None):
 
 if __name__ == "__main__":
     limit = None
+    report = 'excel'
     if len(sys.argv) > 3:
         limit = int(sys.argv[3])
-    create_spreadsheet(sys.argv[1], sys.argv[2], limit)    
+    if len(sys.argv) > 4:
+        report = sys.argv[4]
+    create_spreadsheet(sys.argv[1], sys.argv[2], limit, report)    

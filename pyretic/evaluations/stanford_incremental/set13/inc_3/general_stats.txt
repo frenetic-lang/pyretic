@@ -1,0 +1,17 @@
+out capture edges: 4845
+dfa state count: 375
+out avg edge per state: 30.1325301205
+out max pred classifier size: 29
+in max edge per state: 34
+in max pred classifier size: 29
+in avg edge per state: 23.0384615385
+in table ast cnt: 84724
+in tagging edges: 4792
+out table ast cnt: 92356
+in capture edges: 0
+create pol: 0.527369022369
+dfa edges: 9794
+out avg pred classifier size: 10.696969697
+out max edge per state: 32
+out tagging edges: 5002
+in avg pred classifier size: 10.9428571429

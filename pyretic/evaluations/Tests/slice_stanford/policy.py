@@ -88,10 +88,10 @@ class SliceStats:
 
     def get_slices(self, s):
         assert s < 256
-        base = '10.0.0.%d'
+        base = '10.0.%d.0/24'
          
         res = []
-        for i in range(2, s + 2):
+        for i in range(s):
             res.append(base % i)
 
         return res
