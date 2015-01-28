@@ -1617,11 +1617,33 @@ class pathcomp(object):
         cls.path_policy += path_pol
         (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
         print time.time() - t_s
-        __in_re_tree_gen__.stats()
-        __out_re_tree_gen__.stats()
 
         return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
 
+    @classmethod
+    def ast_node_cnt(cls, pol):
+        if (pol == identity or
+                pol == drop or
+                isinstance(pol, match) or
+                isinstance(pol,modify) or
+                pol == Controller or
+                isinstance(pol, Query)):
+            return 1
+        elif isinstance(pol, CombinatorPolicy):
+            s = 1
+            for p in pol.policies:
+                s += cls.ast_node_cnt(p)
+            return s
+        elif isinstance(pol, QuerySwitch):
+            s = 1
+            for tag, p in pol.policy_dic.items():
+                s += cls.ast_node_cnt(p)
+            s += 1
+            for p in pol.default:
+                s += cls.ast_node_cnt(p)
+            return s
+        else:
+            raise TypeError
 
     @classmethod
     def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
@@ -1664,9 +1686,12 @@ class pathcomp(object):
         get_edge_attributes = du.get_edge_attributes
        
 
-        
+        stat.gather_general_stats('dfa edges', len(edges), 0, False) 
  
-        
+        in_edge_per_state = {}
+        out_edge_per_state = {}
+        in_pred_classifier = {}
+        out_pred_classifier = {}
         if disjoint_enabled:
             
             if integrate_enabled:
@@ -1676,6 +1701,15 @@ class pathcomp(object):
 
                 for edge in edges:
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
+                   
+                    if typ == __in__:
+                        if not pred in in_pred_classifier:
+                            in_pred_classifier[pred] = len(pred.compile().rules)
+                    else:
+                        if not pred in out_pred_classifier:
+                            out_pred_classifier[pred] = len(pred.compile().rules)
+
+
                     assert typ in [__in__, __out__]
                     
                     action_frag = None
@@ -1686,11 +1720,21 @@ class pathcomp(object):
                         if_pred = if_pred and not du.is_dead(dfa, dst)
 
                     if if_pred:
+                                                
                         action_frag = set_tag(dst_num)
 
                         if typ == __in__:
                             in_tag_rules += 1
+                            if not src in in_edge_per_state:
+                                in_edge_per_state[src] = 0
+                            in_edge_per_state[src] += 1
+
+
                         else:
+                            if not src in out_edge_per_state:
+                                out_edge_per_state[src] = 0
+                            out_edge_per_state[src] += 1
+
                             out_tag_rules += 1
                     
                     if du.is_accepting(dfa, dst):
@@ -1731,6 +1775,34 @@ class pathcomp(object):
 
                 stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
                 stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
+                
+                ### edge per state ###
+                edge_cnts = in_edge_per_state.values()
+                max_edge_per_state = max(edge_cnts)
+                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
+                stat.gather_general_stats("in max edge per state", max_edge_per_state, 0, False)
+                stat.gather_general_stats('in avg edge per state', avg_edge_per_state, 0, False)
+                
+                edge_cnts = out_edge_per_state.values()
+                max_edge_per_state = max(edge_cnts)
+                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
+                stat.gather_general_stats("out max edge per state", max_edge_per_state, 0, False)
+                stat.gather_general_stats('out avg edge per state', avg_edge_per_state, 0, False)
+
+                cls_sizes = in_pred_classifier.values()
+                max_cls_size = max(cls_sizes)
+                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
+                stat.gather_general_stats("in max pred classifier size", max_cls_size, 0, False)
+                stat.gather_general_stats("in avg pred classifier size", avg_cls_szie, 0, False)
+                
+                cls_sizes = out_pred_classifier.values()
+                max_cls_size = max(cls_sizes)
+                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
+                stat.gather_general_stats("out max pred classifier size", max_cls_size, 0, False)
+                stat.gather_general_stats("out avg pred classifier size", avg_cls_szie, 0, False)
+
+                stat.gather_general_stats("in table ast cnt", cls.ast_node_cnt(in_table), 0, False)
+                stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
 
                 return (in_table, out_table)
            
