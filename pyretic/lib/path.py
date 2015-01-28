@@ -1639,6 +1639,15 @@ class pathcomp(object):
             return s
         else:
             raise TypeError
+    
+    @classmethod
+    def create_dist(cls, vals):
+        dist = {}
+        for val in vals:
+            if not val in dist:
+                dist[val] = 0
+            dist[val] += 1
+        return dist
 
     @classmethod
     def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
@@ -1682,7 +1691,8 @@ class pathcomp(object):
        
 
         stat.gather_general_stats('dfa edges', len(edges), 0, False) 
- 
+        stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
+
         in_edge_per_state = {}
         out_edge_per_state = {}
         in_pred_classifier = {}
@@ -1777,24 +1787,28 @@ class pathcomp(object):
                 avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
                 stat.gather_general_stats("in max edge per state", max_edge_per_state, 0, False)
                 stat.gather_general_stats('in avg edge per state', avg_edge_per_state, 0, False)
+                stat.dump_dist(cls.create_dist(edge_cnts), "in_edge_dist_per_state")
                 
                 edge_cnts = out_edge_per_state.values()
                 max_edge_per_state = max(edge_cnts)
                 avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
                 stat.gather_general_stats("out max edge per state", max_edge_per_state, 0, False)
                 stat.gather_general_stats('out avg edge per state', avg_edge_per_state, 0, False)
+                stat.dump_dist(cls.create_dist(edge_cnts), "out_edge_dist_per_state")
 
                 cls_sizes = in_pred_classifier.values()
                 max_cls_size = max(cls_sizes)
                 avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
                 stat.gather_general_stats("in max pred classifier size", max_cls_size, 0, False)
                 stat.gather_general_stats("in avg pred classifier size", avg_cls_szie, 0, False)
+                stat.dump_dist(cls.create_dist(cls_sizes), "in_pred_classifier_dist.txt")
                 
                 cls_sizes = out_pred_classifier.values()
                 max_cls_size = max(cls_sizes)
                 avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
                 stat.gather_general_stats("out max pred classifier size", max_cls_size, 0, False)
                 stat.gather_general_stats("out avg pred classifier size", avg_cls_szie, 0, False)
+                stat.dump_dist(cls.create_dist(cls_sizes), "out_pred_classifier_dist.txt")
 
                 stat.gather_general_stats("in table ast cnt", cls.ast_node_cnt(in_table), 0, False)
                 stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
@@ -2422,6 +2436,7 @@ class ragel_dfa_utils(common_dfa_utils):
     @classmethod
     def init(cls, edge_contraction_enabled):
         cls.edge_contraction_enabled = edge_contraction_enabled
+        cls.dfa_dict = {}
     
     @classmethod
     def get_accepting_states(cls, data):
@@ -2463,8 +2478,7 @@ class ragel_dfa_utils(common_dfa_utils):
     def get_extended_edges_contracted(cls, output):
         res = []
         edge_ordinals = {}
-      
-        dfa_dict = {}
+        cls.dfa_dict = {}
         for line in output.splitlines():
             if not '->' in line or 'IN' in line or 'main' in line:
                 continue
@@ -2478,8 +2492,8 @@ class ragel_dfa_utils(common_dfa_utils):
             dst = cls.get_state(dst)
             src = cls.get_state(src)
             
-            if not (src, dst) in dfa_dict:
-                dfa_dict[(src, dst)] = []
+            if not (src, dst) in cls.dfa_dict:
+                cls.dfa_dict[(src, dst)] = []
 
             parts = [s.strip() for s in label.split('/')]
             exp_list = []
@@ -2499,12 +2513,12 @@ class ragel_dfa_utils(common_dfa_utils):
                     end = int(s[index + 2:])
                     for i in range(start, end + 1):
                         edge = (src, i, dst)
-                        dfa_dict[(src,dst)].append( edge)
+                        cls.dfa_dict[(src,dst)].append( edge)
                         res.append(edge)
                         edge_ordinals[edge] = exp_list
                 else:
                     edge = (src, int(s), dst)
-                    dfa_dict[(src, dst)].append(edge)
+                    cls.dfa_dict[(src, dst)].append(edge)
                     res.append(edge)
                     edge_ordinals[edge] = exp_list
 
@@ -2541,7 +2555,7 @@ class ragel_dfa_utils(common_dfa_utils):
                 out_id = create_id_list(out_cache[identity].re_tree)
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
-                for (src, dst), dfa_list in dfa_dict.items():
+                for (src, dst), dfa_list in cls.dfa_dict.items():
                     if len(dfa_list) > 1:
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
@@ -2556,7 +2570,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-
+                                cls.dfa_dict[(src, dst)] = [identity]
                                 continue
 
                         elif edge_syms == in_id:
@@ -2568,11 +2582,10 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-
+                                cls.dfa_dict[(src, dst)] = [identity]
                                 continue
                             
                     res.extend(dfa_list)
-        
         return (res, edge_ordinals)
 
     

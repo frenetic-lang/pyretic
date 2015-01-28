@@ -280,6 +280,15 @@ def elapsed_time(func):
         return res
 
     return profiled_func
+
+def dump_dist(dist, filename):
+    global path
+    
+    f = open(os.path.join(path, filename), 'w')
+    for k,v in dist.items():
+        f.write("%d %d\n" % (k, v))
+    f.close()
+
 '''
 import yappi
 
