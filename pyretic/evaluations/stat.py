@@ -349,7 +349,20 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
     rule_cnt = 0
     
     create_pol = 0
-    
+   
+    ######
+    in_table_edge_per_state_avg = 0
+    in_table_edge_per_state_max = 0
+    out_table_edge_per_state_avg = 0
+    out_table_edge_per_state_max = 0
+    in_pred_classifier_size_avg = 0
+    in_pred_classifier_size_max = 0
+    out_pred_classifier_size_avg = 0
+    out_pred_classifier_size_max = 0
+
+    in_table_ast_cnt = 0
+    out_table_ast_cnt = 0
+
     try:
         g = open(adjust_func('general_stats.txt'), 'r')
         for line in g.readlines():
@@ -376,7 +389,37 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             
             elif 'create pol' in line:
                 create_pol =  float(line[line.index(':') + 2 : -1])
- 
+             
+            ######
+            elif "in max edge per state" in line:
+                in_table_edge_per_state_max = int(line[line.index(':') + 2:-1])
+
+            elif "in avg edge per state" in line:
+                in_table_edge_per_state_avg = float(line[line.index(':') + 2:-1])
+
+            elif 'out max edge per state' in line:
+                out_table_edge_per_state_max = int(line[line.index(':') + 2 : -1])
+
+            elif 'out avg edge per state' in line:
+                out_table_edge_per_state_avg = float(line[line.index(':') + 2 : -1])
+
+            elif 'in max pred classifier size' in line:
+                in_pred_classifier_size_max = int(line[line.index(':') + 2 :-1])
+
+            elif 'in avg pred classifier size' in line:
+                in_pred_classifier_size_avg = float(line[line.index(':') + 2 : -1])
+            
+            elif 'out max pred classifier size' in line:
+                out_pred_classifier_size_max = int(line[line.index(':') + 2 :-1])
+
+            elif 'out avg pred classifier size' in line:
+                out_pred_classifier_size_avg = float(line[line.index(':') + 2 : -1])
+
+            elif 'in table ast cnt' in line:
+                in_table_ast_cnt = int(line[line.index(':') + 2 : -1])
+            
+            elif 'out table ast cnt' in line:
+                out_table_ast_cnt =  int(line[line.index(':') + 2 : -1])
 
         g.close()
     except:
@@ -400,6 +443,17 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
     f.write('\n')
 
     f.close()
+
+    f = open(adjust_func('stat_report.txt'), 'w')
+    stat_lost = [in_table_edge_per_state_avg, in_table_edge_per_state_max, out_table_edge_per_state_avg, out_table_edge_per_state_max,
+                in_table_ast_cnt, out_table_ast_cnt, in_pred_classifier_size_avg, in_pred_classifier_size_max,
+                out_pred_classifier_size_avg, out_pred_classifier_size_max]
+
+    for s in stat_lost:
+        f.write(str(s) + "\t")
+    f.write('\n')
+    f.close()
+
 
 
 def create_excel_report_inout_single_table(results_path, rule_cnt, dfa_path):
