@@ -1,0 +1,116 @@
+8: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I1
+socpyretic.core.language
+negate
+(((cpyretic.core.language
+match
+(dp0
+S'srcip'
+p1
+S'10.0.0.1'
+p2
+sS'switch'
+p3
+I1
+sS'dstip'
+p4
+S'10.0.0.2'
+p5
+soltÅltÅ.
+1: (cpyretic.core.language
+match
+(dp0
+S'srcip'
+p1
+S'10.0.0.1'
+p2
+sS'switch'
+p3
+I1
+sS'dstip'
+p4
+S'10.0.0.2'
+p5
+so.
+10: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I5
+so.
+9: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I4
+so.
+7: (cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I2
+so.
+2: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I1
+socpyretic.core.language
+identity
+ltÅ.
+3: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I2
+socpyretic.core.language
+identity
+ltÅ.
+4: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I3
+socpyretic.core.language
+identity
+ltÅ.
+5: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I4
+socpyretic.core.language
+identity
+ltÅ.
+6: cpyretic.core.language
+intersection
+(((cpyretic.core.language
+match
+(dp0
+S'switch'
+p1
+I5
+socpyretic.core.language
+identity
+ltÅ.

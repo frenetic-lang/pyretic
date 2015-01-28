@@ -144,6 +144,7 @@ class TrafficMatrixStats:
 def path_main(**kwargs):
     tms = TrafficMatrixStats(5, 10)
     path_policy = tms.traffic_matrix_query(**kwargs)
+    print 'hi'
     #print path_policy
     return path_policy
 

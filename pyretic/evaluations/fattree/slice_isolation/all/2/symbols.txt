@@ -1,0 +1,90 @@
+32: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+33: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+34: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+35: intersection:
+    match: ('switch', 3)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+36: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+37: intersection:
+    match: ('switch', 4)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+38: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+39: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+40: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+12: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+14: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+16: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+18: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+20: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+31: intersection:
+    match: ('switch', 1)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+22: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+24: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+26: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+28: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+30: match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+41: intersection:
+    match: ('switch', 1)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+42: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 1) ('dstip', IPv4Network('10.0.0.0/24'))
+43: intersection:
+    match: ('switch', 2)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+44: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 2) ('dstip', IPv4Network('10.0.0.0/24'))
+45: intersection:
+    match: ('switch', 3)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+46: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 3) ('dstip', IPv4Network('10.0.0.0/24'))
+47: intersection:
+    match: ('switch', 4)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+48: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 4) ('dstip', IPv4Network('10.0.0.0/24'))
+49: intersection:
+    match: ('switch', 5)
+    identity
+    negate:
+        match: ('srcip', IPv4Network('10.0.1.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.1.0/24'))
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))
+50: match: ('srcip', IPv4Network('10.0.0.0/24')) ('switch', 5) ('dstip', IPv4Network('10.0.0.0/24'))

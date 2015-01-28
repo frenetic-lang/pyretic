@@ -1,0 +1,593 @@
+1: match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+182: match: ('switch', 37)
+183: intersection:
+    match: ('switch', 1)
+    negate:
+        match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
+184: match: ('switch', 169)
+185: match: ('switch', 180)
+186: match: ('switch', 2)
+187: match: ('switch', 3)
+188: match: ('switch', 4)
+189: match: ('switch', 5)
+190: match: ('switch', 6)
+191: match: ('switch', 38)
+192: match: ('switch', 7)
+193: match: ('switch', 170)
+194: match: ('switch', 8)
+195: match: ('switch', 9)
+196: match: ('switch', 10)
+197: match: ('switch', 11)
+198: match: ('switch', 12)
+199: match: ('switch', 39)
+200: match: ('switch', 13)
+201: match: ('switch', 171)
+202: match: ('switch', 14)
+203: match: ('switch', 15)
+204: match: ('switch', 16)
+205: match: ('switch', 17)
+206: match: ('switch', 18)
+207: match: ('switch', 40)
+208: match: ('switch', 19)
+209: match: ('switch', 172)
+210: match: ('switch', 20)
+211: match: ('switch', 21)
+212: match: ('switch', 22)
+213: match: ('switch', 23)
+214: match: ('switch', 24)
+215: match: ('switch', 41)
+216: match: ('switch', 25)
+217: match: ('switch', 173)
+218: match: ('switch', 26)
+219: match: ('switch', 27)
+220: match: ('switch', 28)
+221: match: ('switch', 29)
+222: match: ('switch', 30)
+223: match: ('switch', 42)
+224: match: ('switch', 31)
+225: match: ('switch', 174)
+226: match: ('switch', 32)
+227: match: ('switch', 33)
+228: match: ('switch', 34)
+229: match: ('switch', 35)
+230: match: ('switch', 36)
+2: intersection:
+    match: ('switch', 1)
+    identity
+3: intersection:
+    match: ('switch', 2)
+    identity
+4: intersection:
+    match: ('switch', 3)
+    identity
+5: intersection:
+    match: ('switch', 4)
+    identity
+6: intersection:
+    match: ('switch', 5)
+    identity
+7: intersection:
+    match: ('switch', 6)
+    identity
+8: intersection:
+    match: ('switch', 7)
+    identity
+9: intersection:
+    match: ('switch', 8)
+    identity
+10: intersection:
+    match: ('switch', 9)
+    identity
+11: intersection:
+    match: ('switch', 10)
+    identity
+12: intersection:
+    match: ('switch', 11)
+    identity
+13: intersection:
+    match: ('switch', 12)
+    identity
+14: intersection:
+    match: ('switch', 13)
+    identity
+15: intersection:
+    match: ('switch', 14)
+    identity
+16: intersection:
+    match: ('switch', 15)
+    identity
+17: intersection:
+    match: ('switch', 16)
+    identity
+18: intersection:
+    match: ('switch', 17)
+    identity
+19: intersection:
+    match: ('switch', 18)
+    identity
+20: intersection:
+    match: ('switch', 19)
+    identity
+21: intersection:
+    match: ('switch', 20)
+    identity
+22: intersection:
+    match: ('switch', 21)
+    identity
+23: intersection:
+    match: ('switch', 22)
+    identity
+24: intersection:
+    match: ('switch', 23)
+    identity
+25: intersection:
+    match: ('switch', 24)
+    identity
+26: intersection:
+    match: ('switch', 25)
+    identity
+27: intersection:
+    match: ('switch', 26)
+    identity
+28: intersection:
+    match: ('switch', 27)
+    identity
+29: intersection:
+    match: ('switch', 28)
+    identity
+30: intersection:
+    match: ('switch', 29)
+    identity
+31: intersection:
+    match: ('switch', 30)
+    identity
+32: intersection:
+    match: ('switch', 31)
+    identity
+33: intersection:
+    match: ('switch', 32)
+    identity
+34: intersection:
+    match: ('switch', 33)
+    identity
+35: intersection:
+    match: ('switch', 34)
+    identity
+36: intersection:
+    match: ('switch', 35)
+    identity
+37: intersection:
+    match: ('switch', 36)
+    identity
+38: intersection:
+    match: ('switch', 37)
+    identity
+39: intersection:
+    match: ('switch', 38)
+    identity
+40: intersection:
+    match: ('switch', 39)
+    identity
+41: intersection:
+    match: ('switch', 40)
+    identity
+42: intersection:
+    match: ('switch', 41)
+    identity
+43: intersection:
+    match: ('switch', 42)
+    identity
+44: intersection:
+    match: ('switch', 43)
+    identity
+45: intersection:
+    match: ('switch', 44)
+    identity
+46: intersection:
+    match: ('switch', 45)
+    identity
+47: intersection:
+    match: ('switch', 46)
+    identity
+48: intersection:
+    match: ('switch', 47)
+    identity
+49: intersection:
+    match: ('switch', 48)
+    identity
+50: intersection:
+    match: ('switch', 49)
+    identity
+51: intersection:
+    match: ('switch', 50)
+    identity
+52: intersection:
+    match: ('switch', 51)
+    identity
+53: intersection:
+    match: ('switch', 52)
+    identity
+54: intersection:
+    match: ('switch', 53)
+    identity
+55: intersection:
+    match: ('switch', 54)
+    identity
+56: intersection:
+    match: ('switch', 55)
+    identity
+57: intersection:
+    match: ('switch', 56)
+    identity
+58: intersection:
+    match: ('switch', 57)
+    identity
+59: intersection:
+    match: ('switch', 58)
+    identity
+60: intersection:
+    match: ('switch', 59)
+    identity
+61: intersection:
+    match: ('switch', 60)
+    identity
+62: intersection:
+    match: ('switch', 61)
+    identity
+63: intersection:
+    match: ('switch', 62)
+    identity
+64: intersection:
+    match: ('switch', 63)
+    identity
+65: intersection:
+    match: ('switch', 64)
+    identity
+66: intersection:
+    match: ('switch', 65)
+    identity
+67: intersection:
+    match: ('switch', 66)
+    identity
+68: intersection:
+    match: ('switch', 67)
+    identity
+69: intersection:
+    match: ('switch', 68)
+    identity
+70: intersection:
+    match: ('switch', 69)
+    identity
+71: intersection:
+    match: ('switch', 70)
+    identity
+72: intersection:
+    match: ('switch', 71)
+    identity
+73: intersection:
+    match: ('switch', 72)
+    identity
+74: intersection:
+    match: ('switch', 73)
+    identity
+75: intersection:
+    match: ('switch', 74)
+    identity
+76: intersection:
+    match: ('switch', 75)
+    identity
+77: intersection:
+    match: ('switch', 76)
+    identity
+78: intersection:
+    match: ('switch', 77)
+    identity
+79: intersection:
+    match: ('switch', 78)
+    identity
+80: intersection:
+    match: ('switch', 79)
+    identity
+81: intersection:
+    match: ('switch', 80)
+    identity
+82: intersection:
+    match: ('switch', 81)
+    identity
+83: intersection:
+    match: ('switch', 82)
+    identity
+84: intersection:
+    match: ('switch', 83)
+    identity
+85: intersection:
+    match: ('switch', 84)
+    identity
+86: intersection:
+    match: ('switch', 85)
+    identity
+87: intersection:
+    match: ('switch', 86)
+    identity
+88: intersection:
+    match: ('switch', 87)
+    identity
+89: intersection:
+    match: ('switch', 88)
+    identity
+90: intersection:
+    match: ('switch', 89)
+    identity
+91: intersection:
+    match: ('switch', 90)
+    identity
+92: intersection:
+    match: ('switch', 91)
+    identity
+93: intersection:
+    match: ('switch', 92)
+    identity
+94: intersection:
+    match: ('switch', 93)
+    identity
+95: intersection:
+    match: ('switch', 94)
+    identity
+96: intersection:
+    match: ('switch', 95)
+    identity
+97: intersection:
+    match: ('switch', 96)
+    identity
+98: intersection:
+    match: ('switch', 97)
+    identity
+99: intersection:
+    match: ('switch', 98)
+    identity
+100: intersection:
+    match: ('switch', 99)
+    identity
+101: intersection:
+    match: ('switch', 100)
+    identity
+102: intersection:
+    match: ('switch', 101)
+    identity
+103: intersection:
+    match: ('switch', 102)
+    identity
+104: intersection:
+    match: ('switch', 103)
+    identity
+105: intersection:
+    match: ('switch', 104)
+    identity
+106: intersection:
+    match: ('switch', 105)
+    identity
+107: intersection:
+    match: ('switch', 106)
+    identity
+108: intersection:
+    match: ('switch', 107)
+    identity
+109: intersection:
+    match: ('switch', 108)
+    identity
+110: intersection:
+    match: ('switch', 109)
+    identity
+111: intersection:
+    match: ('switch', 110)
+    identity
+112: intersection:
+    match: ('switch', 111)
+    identity
+113: intersection:
+    match: ('switch', 112)
+    identity
+114: intersection:
+    match: ('switch', 113)
+    identity
+115: intersection:
+    match: ('switch', 114)
+    identity
+116: intersection:
+    match: ('switch', 115)
+    identity
+117: intersection:
+    match: ('switch', 116)
+    identity
+118: intersection:
+    match: ('switch', 117)
+    identity
+119: intersection:
+    match: ('switch', 118)
+    identity
+120: intersection:
+    match: ('switch', 119)
+    identity
+121: intersection:
+    match: ('switch', 120)
+    identity
+122: intersection:
+    match: ('switch', 121)
+    identity
+123: intersection:
+    match: ('switch', 122)
+    identity
+124: intersection:
+    match: ('switch', 123)
+    identity
+125: intersection:
+    match: ('switch', 124)
+    identity
+126: intersection:
+    match: ('switch', 125)
+    identity
+127: intersection:
+    match: ('switch', 126)
+    identity
+128: intersection:
+    match: ('switch', 127)
+    identity
+129: intersection:
+    match: ('switch', 128)
+    identity
+130: intersection:
+    match: ('switch', 129)
+    identity
+131: intersection:
+    match: ('switch', 130)
+    identity
+132: intersection:
+    match: ('switch', 131)
+    identity
+133: intersection:
+    match: ('switch', 132)
+    identity
+134: intersection:
+    match: ('switch', 133)
+    identity
+135: intersection:
+    match: ('switch', 134)
+    identity
+136: intersection:
+    match: ('switch', 135)
+    identity
+137: intersection:
+    match: ('switch', 136)
+    identity
+138: intersection:
+    match: ('switch', 137)
+    identity
+139: intersection:
+    match: ('switch', 138)
+    identity
+140: intersection:
+    match: ('switch', 139)
+    identity
+141: intersection:
+    match: ('switch', 140)
+    identity
+142: intersection:
+    match: ('switch', 141)
+    identity
+143: intersection:
+    match: ('switch', 142)
+    identity
+144: intersection:
+    match: ('switch', 143)
+    identity
+145: intersection:
+    match: ('switch', 144)
+    identity
+146: intersection:
+    match: ('switch', 145)
+    identity
+147: intersection:
+    match: ('switch', 146)
+    identity
+148: intersection:
+    match: ('switch', 147)
+    identity
+149: intersection:
+    match: ('switch', 148)
+    identity
+150: intersection:
+    match: ('switch', 149)
+    identity
+151: intersection:
+    match: ('switch', 150)
+    identity
+152: intersection:
+    match: ('switch', 151)
+    identity
+153: intersection:
+    match: ('switch', 152)
+    identity
+154: intersection:
+    match: ('switch', 153)
+    identity
+155: intersection:
+    match: ('switch', 154)
+    identity
+156: intersection:
+    match: ('switch', 155)
+    identity
+157: intersection:
+    match: ('switch', 156)
+    identity
+158: intersection:
+    match: ('switch', 157)
+    identity
+159: intersection:
+    match: ('switch', 158)
+    identity
+160: intersection:
+    match: ('switch', 159)
+    identity
+161: intersection:
+    match: ('switch', 160)
+    identity
+162: intersection:
+    match: ('switch', 161)
+    identity
+163: intersection:
+    match: ('switch', 162)
+    identity
+164: intersection:
+    match: ('switch', 163)
+    identity
+165: intersection:
+    match: ('switch', 164)
+    identity
+166: intersection:
+    match: ('switch', 165)
+    identity
+167: intersection:
+    match: ('switch', 166)
+    identity
+168: intersection:
+    match: ('switch', 167)
+    identity
+169: intersection:
+    match: ('switch', 168)
+    identity
+170: intersection:
+    match: ('switch', 169)
+    identity
+171: intersection:
+    match: ('switch', 170)
+    identity
+172: intersection:
+    match: ('switch', 171)
+    identity
+173: intersection:
+    match: ('switch', 172)
+    identity
+174: intersection:
+    match: ('switch', 173)
+    identity
+175: intersection:
+    match: ('switch', 174)
+    identity
+176: intersection:
+    match: ('switch', 175)
+    identity
+177: intersection:
+    match: ('switch', 176)
+    identity
+178: intersection:
+    match: ('switch', 177)
+    identity
+179: intersection:
+    match: ('switch', 178)
+    identity
+180: intersection:
+    match: ('switch', 179)
+    identity
+181: intersection:
+    match: ('switch', 180)
+    identity

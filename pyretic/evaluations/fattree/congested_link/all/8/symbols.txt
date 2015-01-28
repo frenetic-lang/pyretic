@@ -150,6 +150,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 21)
@@ -159,6 +161,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 163: intersection:
     match: ('switch', 21)
     intersection:
@@ -167,6 +171,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     match: ('switch', 21)
     intersection:
         match: ('switch', 21)
@@ -174,6 +180,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
 164: intersection:
     match: ('switch', 21)
     identity
@@ -186,6 +194,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 21)
@@ -195,6 +205,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
             negate:
                 intersection:
                     match: ('switch', 21)
@@ -204,6 +216,8 @@
                             drop
                             match: ('inport', 1)
                             match: ('inport', 2)
+                            match: ('inport', 3)
+                            match: ('inport', 4)
 165: intersection:
     match: ('switch', 21)
     intersection:
@@ -212,6 +226,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 21)
@@ -221,39 +237,9 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 228: intersection:
-    match: ('switch', 22)
-    intersection:
-        match: ('switch', 22)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 22)
-            intersection:
-                match: ('switch', 22)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-229: intersection:
-    match: ('switch', 22)
-    intersection:
-        match: ('switch', 22)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 22)
-    intersection:
-        match: ('switch', 22)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-230: intersection:
     match: ('switch', 22)
     identity
     negate:
@@ -265,6 +251,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 22)
@@ -274,6 +262,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+229: intersection:
+    match: ('switch', 22)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 22)
+            intersection:
+                match: ('switch', 22)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 22)
+    intersection:
+        match: ('switch', 22)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+230: intersection:
+    match: ('switch', 22)
+    intersection:
+        match: ('switch', 22)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 22)
+            intersection:
+                match: ('switch', 22)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 22)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 22)
+                            intersection:
+                                match: ('switch', 22)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+231: intersection:
+    match: ('switch', 22)
+    intersection:
+        match: ('switch', 22)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 22)
+            identity
             negate:
                 intersection:
                     match: ('switch', 22)
@@ -283,64 +346,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-231: intersection:
-    match: ('switch', 22)
-    intersection:
-        match: ('switch', 22)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 22)
-            intersection:
-                match: ('switch', 22)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 232: intersection:
-    match: ('switch', 23)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 23)
-            intersection:
-                match: ('switch', 23)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 23)
-            intersection:
-                match: ('switch', 23)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-233: intersection:
-    match: ('switch', 23)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 23)
-            intersection:
-                match: ('switch', 23)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    match: ('switch', 23)
-    intersection:
-        match: ('switch', 23)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-234: intersection:
     match: ('switch', 23)
     intersection:
         match: ('switch', 23)
@@ -348,6 +356,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 23)
@@ -357,20 +367,18 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 23)
-                    identity
-                    negate:
-                        intersection:
-                            match: ('switch', 23)
-                            intersection:
-                                match: ('switch', 23)
-                                union:
-                                    drop
-                                    match: ('outport', 1)
-                                    match: ('outport', 2)
-235: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+233: intersection:
+    match: ('switch', 23)
+    intersection:
+        match: ('switch', 23)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 23)
     intersection:
         match: ('switch', 23)
@@ -378,10 +386,33 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+234: intersection:
+    match: ('switch', 23)
+    identity
     negate:
         intersection:
             match: ('switch', 23)
-            identity
+            intersection:
+                match: ('switch', 23)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 23)
+            intersection:
+                match: ('switch', 23)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 23)
@@ -391,47 +422,30 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-236: intersection:
-    match: ('switch', 24)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 24)
-            intersection:
-                match: ('switch', 24)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 24)
-            intersection:
-                match: ('switch', 24)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-237: intersection:
-    match: ('switch', 24)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 24)
-            intersection:
-                match: ('switch', 24)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    match: ('switch', 24)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+235: intersection:
+    match: ('switch', 23)
     intersection:
-        match: ('switch', 24)
+        match: ('switch', 23)
         union:
             drop
             match: ('inport', 1)
             match: ('inport', 2)
-238: intersection:
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 23)
+            intersection:
+                match: ('switch', 23)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+236: intersection:
     match: ('switch', 24)
     intersection:
         match: ('switch', 24)
@@ -439,6 +453,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 24)
@@ -448,20 +464,18 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 24)
-                    identity
-                    negate:
-                        intersection:
-                            match: ('switch', 24)
-                            intersection:
-                                match: ('switch', 24)
-                                union:
-                                    drop
-                                    match: ('outport', 1)
-                                    match: ('outport', 2)
-239: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+237: intersection:
+    match: ('switch', 24)
+    intersection:
+        match: ('switch', 24)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 24)
     intersection:
         match: ('switch', 24)
@@ -469,10 +483,33 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+238: intersection:
+    match: ('switch', 24)
+    identity
     negate:
         intersection:
             match: ('switch', 24)
-            identity
+            intersection:
+                match: ('switch', 24)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 24)
+            intersection:
+                match: ('switch', 24)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 24)
@@ -482,39 +519,30 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-240: intersection:
-    match: ('switch', 29)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+239: intersection:
+    match: ('switch', 24)
     intersection:
-        match: ('switch', 29)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 29)
-            intersection:
-                match: ('switch', 29)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-241: intersection:
-    match: ('switch', 29)
-    intersection:
-        match: ('switch', 29)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 29)
-    intersection:
-        match: ('switch', 29)
+        match: ('switch', 24)
         union:
             drop
             match: ('inport', 1)
             match: ('inport', 2)
-242: intersection:
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 24)
+            intersection:
+                match: ('switch', 24)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+240: intersection:
     match: ('switch', 29)
     identity
     negate:
@@ -526,6 +554,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 29)
@@ -535,6 +565,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+241: intersection:
+    match: ('switch', 29)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 29)
+            intersection:
+                match: ('switch', 29)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 29)
+    intersection:
+        match: ('switch', 29)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+242: intersection:
+    match: ('switch', 29)
+    intersection:
+        match: ('switch', 29)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 29)
+            intersection:
+                match: ('switch', 29)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 29)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 29)
+                            intersection:
+                                match: ('switch', 29)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+243: intersection:
+    match: ('switch', 29)
+    intersection:
+        match: ('switch', 29)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 29)
+            identity
             negate:
                 intersection:
                     match: ('switch', 29)
@@ -544,56 +649,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-243: intersection:
-    match: ('switch', 29)
-    intersection:
-        match: ('switch', 29)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 29)
-            intersection:
-                match: ('switch', 29)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 244: intersection:
-    match: ('switch', 30)
-    intersection:
-        match: ('switch', 30)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 30)
-            intersection:
-                match: ('switch', 30)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-245: intersection:
-    match: ('switch', 30)
-    intersection:
-        match: ('switch', 30)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 30)
-    intersection:
-        match: ('switch', 30)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-246: intersection:
     match: ('switch', 30)
     identity
     negate:
@@ -605,6 +663,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 30)
@@ -614,6 +674,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+245: intersection:
+    match: ('switch', 30)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 30)
+            intersection:
+                match: ('switch', 30)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 30)
+    intersection:
+        match: ('switch', 30)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+246: intersection:
+    match: ('switch', 30)
+    intersection:
+        match: ('switch', 30)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 30)
+            intersection:
+                match: ('switch', 30)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 30)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 30)
+                            intersection:
+                                match: ('switch', 30)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+247: intersection:
+    match: ('switch', 30)
+    intersection:
+        match: ('switch', 30)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 30)
+            identity
             negate:
                 intersection:
                     match: ('switch', 30)
@@ -623,56 +758,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-247: intersection:
-    match: ('switch', 30)
-    intersection:
-        match: ('switch', 30)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 30)
-            intersection:
-                match: ('switch', 30)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 248: intersection:
-    match: ('switch', 31)
-    intersection:
-        match: ('switch', 31)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 31)
-            intersection:
-                match: ('switch', 31)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-249: intersection:
-    match: ('switch', 31)
-    intersection:
-        match: ('switch', 31)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 31)
-    intersection:
-        match: ('switch', 31)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-250: intersection:
     match: ('switch', 31)
     identity
     negate:
@@ -684,6 +772,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 31)
@@ -693,6 +783,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+249: intersection:
+    match: ('switch', 31)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+250: intersection:
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 31)
+            intersection:
+                match: ('switch', 31)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 31)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 31)
+                            intersection:
+                                match: ('switch', 31)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+251: intersection:
+    match: ('switch', 31)
+    intersection:
+        match: ('switch', 31)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 31)
+            identity
             negate:
                 intersection:
                     match: ('switch', 31)
@@ -702,56 +867,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-251: intersection:
-    match: ('switch', 31)
-    intersection:
-        match: ('switch', 31)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 31)
-            intersection:
-                match: ('switch', 31)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 252: intersection:
-    match: ('switch', 32)
-    intersection:
-        match: ('switch', 32)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 32)
-            intersection:
-                match: ('switch', 32)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-253: intersection:
-    match: ('switch', 32)
-    intersection:
-        match: ('switch', 32)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 32)
-    intersection:
-        match: ('switch', 32)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-254: intersection:
     match: ('switch', 32)
     identity
     negate:
@@ -763,6 +881,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 32)
@@ -772,23 +892,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 32)
-                    intersection:
-                        match: ('switch', 32)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-255: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+253: intersection:
     match: ('switch', 32)
-    intersection:
-        match: ('switch', 32)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 32)
@@ -798,6 +906,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+254: intersection:
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 32)
+            intersection:
+                match: ('switch', 32)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 32)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 32)
+                            intersection:
+                                match: ('switch', 32)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+255: intersection:
+    match: ('switch', 32)
+    intersection:
+        match: ('switch', 32)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 32)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 32)
+                    intersection:
+                        match: ('switch', 32)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 256: intersection:
     match: ('switch', 37)
     intersection:
@@ -806,6 +986,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 37)
@@ -815,6 +997,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 257: intersection:
     match: ('switch', 37)
     intersection:
@@ -823,6 +1007,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 37)
     intersection:
         match: ('switch', 37)
@@ -830,6 +1016,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 258: intersection:
     match: ('switch', 37)
     identity
@@ -842,6 +1030,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 37)
@@ -851,6 +1041,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 37)
@@ -860,6 +1052,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 259: intersection:
     match: ('switch', 37)
     intersection:
@@ -868,6 +1062,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 37)
@@ -877,39 +1073,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 260: intersection:
-    match: ('switch', 38)
-    intersection:
-        match: ('switch', 38)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 38)
-            intersection:
-                match: ('switch', 38)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-261: intersection:
-    match: ('switch', 38)
-    intersection:
-        match: ('switch', 38)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 38)
-    intersection:
-        match: ('switch', 38)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-262: intersection:
     match: ('switch', 38)
     identity
     negate:
@@ -921,6 +1087,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 38)
@@ -930,6 +1098,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+261: intersection:
+    match: ('switch', 38)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+262: intersection:
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 38)
+            intersection:
+                match: ('switch', 38)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 38)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 38)
+                            intersection:
+                                match: ('switch', 38)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+263: intersection:
+    match: ('switch', 38)
+    intersection:
+        match: ('switch', 38)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 38)
+            identity
             negate:
                 intersection:
                     match: ('switch', 38)
@@ -939,56 +1182,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-263: intersection:
-    match: ('switch', 38)
-    intersection:
-        match: ('switch', 38)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 38)
-            intersection:
-                match: ('switch', 38)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 264: intersection:
-    match: ('switch', 39)
-    intersection:
-        match: ('switch', 39)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 39)
-            intersection:
-                match: ('switch', 39)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-265: intersection:
-    match: ('switch', 39)
-    intersection:
-        match: ('switch', 39)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 39)
-    intersection:
-        match: ('switch', 39)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-266: intersection:
     match: ('switch', 39)
     identity
     negate:
@@ -1000,6 +1196,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 39)
@@ -1009,6 +1207,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+265: intersection:
+    match: ('switch', 39)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+266: intersection:
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 39)
+            intersection:
+                match: ('switch', 39)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 39)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 39)
+                            intersection:
+                                match: ('switch', 39)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+267: intersection:
+    match: ('switch', 39)
+    intersection:
+        match: ('switch', 39)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 39)
+            identity
             negate:
                 intersection:
                     match: ('switch', 39)
@@ -1018,64 +1291,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-267: intersection:
-    match: ('switch', 39)
-    intersection:
-        match: ('switch', 39)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 39)
-            intersection:
-                match: ('switch', 39)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 268: intersection:
-    match: ('switch', 40)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 40)
-            intersection:
-                match: ('switch', 40)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 40)
-            intersection:
-                match: ('switch', 40)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-269: intersection:
-    match: ('switch', 40)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 40)
-            intersection:
-                match: ('switch', 40)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    match: ('switch', 40)
-    intersection:
-        match: ('switch', 40)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-270: intersection:
     match: ('switch', 40)
     intersection:
         match: ('switch', 40)
@@ -1083,6 +1301,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 40)
@@ -1092,20 +1312,18 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 40)
-                    identity
-                    negate:
-                        intersection:
-                            match: ('switch', 40)
-                            intersection:
-                                match: ('switch', 40)
-                                union:
-                                    drop
-                                    match: ('outport', 1)
-                                    match: ('outport', 2)
-271: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+269: intersection:
+    match: ('switch', 40)
+    intersection:
+        match: ('switch', 40)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 40)
     intersection:
         match: ('switch', 40)
@@ -1113,10 +1331,33 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+270: intersection:
+    match: ('switch', 40)
+    identity
     negate:
         intersection:
             match: ('switch', 40)
-            identity
+            intersection:
+                match: ('switch', 40)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 40)
+            intersection:
+                match: ('switch', 40)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 40)
@@ -1126,6 +1367,29 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+271: intersection:
+    match: ('switch', 40)
+    intersection:
+        match: ('switch', 40)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 40)
+            intersection:
+                match: ('switch', 40)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 272: intersection:
     match: ('switch', 45)
     intersection:
@@ -1134,6 +1398,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 45)
@@ -1143,6 +1409,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 273: intersection:
     match: ('switch', 45)
     intersection:
@@ -1151,6 +1419,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 45)
     intersection:
         match: ('switch', 45)
@@ -1158,6 +1428,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 274: intersection:
     match: ('switch', 45)
     identity
@@ -1170,6 +1442,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 45)
@@ -1179,6 +1453,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 45)
@@ -1188,6 +1464,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 275: intersection:
     match: ('switch', 45)
     intersection:
@@ -1196,6 +1474,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 45)
@@ -1205,39 +1485,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 276: intersection:
-    match: ('switch', 46)
-    intersection:
-        match: ('switch', 46)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 46)
-            intersection:
-                match: ('switch', 46)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-277: intersection:
-    match: ('switch', 46)
-    intersection:
-        match: ('switch', 46)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 46)
-    intersection:
-        match: ('switch', 46)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-278: intersection:
     match: ('switch', 46)
     identity
     negate:
@@ -1249,6 +1499,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 46)
@@ -1258,6 +1510,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+277: intersection:
+    match: ('switch', 46)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 46)
+            intersection:
+                match: ('switch', 46)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 46)
+    intersection:
+        match: ('switch', 46)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+278: intersection:
+    match: ('switch', 46)
+    intersection:
+        match: ('switch', 46)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 46)
+            intersection:
+                match: ('switch', 46)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 46)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 46)
+                            intersection:
+                                match: ('switch', 46)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+279: intersection:
+    match: ('switch', 46)
+    intersection:
+        match: ('switch', 46)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 46)
+            identity
             negate:
                 intersection:
                     match: ('switch', 46)
@@ -1267,56 +1594,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-279: intersection:
-    match: ('switch', 46)
-    intersection:
-        match: ('switch', 46)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 46)
-            intersection:
-                match: ('switch', 46)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 280: intersection:
-    match: ('switch', 47)
-    intersection:
-        match: ('switch', 47)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 47)
-            intersection:
-                match: ('switch', 47)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-281: intersection:
-    match: ('switch', 47)
-    intersection:
-        match: ('switch', 47)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 47)
-    intersection:
-        match: ('switch', 47)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-282: intersection:
     match: ('switch', 47)
     identity
     negate:
@@ -1328,6 +1608,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 47)
@@ -1337,6 +1619,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+281: intersection:
+    match: ('switch', 47)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 47)
+            intersection:
+                match: ('switch', 47)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 47)
+    intersection:
+        match: ('switch', 47)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+282: intersection:
+    match: ('switch', 47)
+    intersection:
+        match: ('switch', 47)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 47)
+            intersection:
+                match: ('switch', 47)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 47)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 47)
+                            intersection:
+                                match: ('switch', 47)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+283: intersection:
+    match: ('switch', 47)
+    intersection:
+        match: ('switch', 47)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 47)
+            identity
             negate:
                 intersection:
                     match: ('switch', 47)
@@ -1346,64 +1703,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-283: intersection:
-    match: ('switch', 47)
-    intersection:
-        match: ('switch', 47)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 47)
-            intersection:
-                match: ('switch', 47)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 284: intersection:
-    match: ('switch', 48)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 48)
-            intersection:
-                match: ('switch', 48)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 48)
-            intersection:
-                match: ('switch', 48)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-285: intersection:
-    match: ('switch', 48)
-    identity
-    negate:
-        intersection:
-            match: ('switch', 48)
-            intersection:
-                match: ('switch', 48)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
-    match: ('switch', 48)
-    intersection:
-        match: ('switch', 48)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-286: intersection:
     match: ('switch', 48)
     intersection:
         match: ('switch', 48)
@@ -1411,6 +1713,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 48)
@@ -1420,20 +1724,18 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 48)
-                    identity
-                    negate:
-                        intersection:
-                            match: ('switch', 48)
-                            intersection:
-                                match: ('switch', 48)
-                                union:
-                                    drop
-                                    match: ('outport', 1)
-                                    match: ('outport', 2)
-287: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+285: intersection:
+    match: ('switch', 48)
+    intersection:
+        match: ('switch', 48)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 48)
     intersection:
         match: ('switch', 48)
@@ -1441,10 +1743,33 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+286: intersection:
+    match: ('switch', 48)
+    identity
     negate:
         intersection:
             match: ('switch', 48)
-            identity
+            intersection:
+                match: ('switch', 48)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 48)
+            intersection:
+                match: ('switch', 48)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 48)
@@ -1454,39 +1779,30 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-288: intersection:
-    match: ('switch', 53)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
+287: intersection:
+    match: ('switch', 48)
     intersection:
-        match: ('switch', 53)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 53)
-            intersection:
-                match: ('switch', 53)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-289: intersection:
-    match: ('switch', 53)
-    intersection:
-        match: ('switch', 53)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 53)
-    intersection:
-        match: ('switch', 53)
+        match: ('switch', 48)
         union:
             drop
             match: ('inport', 1)
             match: ('inport', 2)
-290: intersection:
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 48)
+            intersection:
+                match: ('switch', 48)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+288: intersection:
     match: ('switch', 53)
     identity
     negate:
@@ -1498,6 +1814,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 53)
@@ -1507,6 +1825,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+289: intersection:
+    match: ('switch', 53)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 53)
+            intersection:
+                match: ('switch', 53)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 53)
+    intersection:
+        match: ('switch', 53)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+290: intersection:
+    match: ('switch', 53)
+    intersection:
+        match: ('switch', 53)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 53)
+            intersection:
+                match: ('switch', 53)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 53)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 53)
+                            intersection:
+                                match: ('switch', 53)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+291: intersection:
+    match: ('switch', 53)
+    intersection:
+        match: ('switch', 53)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 53)
+            identity
             negate:
                 intersection:
                     match: ('switch', 53)
@@ -1516,56 +1909,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-291: intersection:
-    match: ('switch', 53)
-    intersection:
-        match: ('switch', 53)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 53)
-            intersection:
-                match: ('switch', 53)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 292: intersection:
-    match: ('switch', 54)
-    intersection:
-        match: ('switch', 54)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 54)
-            intersection:
-                match: ('switch', 54)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-293: intersection:
-    match: ('switch', 54)
-    intersection:
-        match: ('switch', 54)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 54)
-    intersection:
-        match: ('switch', 54)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-294: intersection:
     match: ('switch', 54)
     identity
     negate:
@@ -1577,6 +1923,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 54)
@@ -1586,23 +1934,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 54)
-                    intersection:
-                        match: ('switch', 54)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-295: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+293: intersection:
     match: ('switch', 54)
-    intersection:
-        match: ('switch', 54)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 54)
@@ -1612,6 +1948,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 54)
+    intersection:
+        match: ('switch', 54)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+294: intersection:
+    match: ('switch', 54)
+    intersection:
+        match: ('switch', 54)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 54)
+            intersection:
+                match: ('switch', 54)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 54)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 54)
+                            intersection:
+                                match: ('switch', 54)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+295: intersection:
+    match: ('switch', 54)
+    intersection:
+        match: ('switch', 54)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 54)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 54)
+                    intersection:
+                        match: ('switch', 54)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 296: intersection:
     match: ('switch', 55)
     intersection:
@@ -1620,6 +2028,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 55)
@@ -1629,6 +2039,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 297: intersection:
     match: ('switch', 55)
     intersection:
@@ -1637,6 +2049,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 55)
     intersection:
         match: ('switch', 55)
@@ -1644,6 +2058,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 298: intersection:
     match: ('switch', 55)
     identity
@@ -1656,6 +2072,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 55)
@@ -1665,6 +2083,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 55)
@@ -1674,6 +2094,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 299: intersection:
     match: ('switch', 55)
     intersection:
@@ -1682,6 +2104,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 55)
@@ -1691,39 +2115,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 300: intersection:
-    match: ('switch', 56)
-    intersection:
-        match: ('switch', 56)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 56)
-            intersection:
-                match: ('switch', 56)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-301: intersection:
-    match: ('switch', 56)
-    intersection:
-        match: ('switch', 56)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 56)
-    intersection:
-        match: ('switch', 56)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-302: intersection:
     match: ('switch', 56)
     identity
     negate:
@@ -1735,6 +2129,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 56)
@@ -1744,6 +2140,81 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+301: intersection:
+    match: ('switch', 56)
+    identity
+    negate:
+        intersection:
+            match: ('switch', 56)
+            intersection:
+                match: ('switch', 56)
+                union:
+                    drop
+                    match: ('outport', 1)
+                    match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 56)
+    intersection:
+        match: ('switch', 56)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+302: intersection:
+    match: ('switch', 56)
+    intersection:
+        match: ('switch', 56)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 56)
+            intersection:
+                match: ('switch', 56)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 56)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 56)
+                            intersection:
+                                match: ('switch', 56)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+303: intersection:
+    match: ('switch', 56)
+    intersection:
+        match: ('switch', 56)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 56)
+            identity
             negate:
                 intersection:
                     match: ('switch', 56)
@@ -1753,56 +2224,9 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
-303: intersection:
-    match: ('switch', 56)
-    intersection:
-        match: ('switch', 56)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-    negate:
-        intersection:
-            match: ('switch', 56)
-            intersection:
-                match: ('switch', 56)
-                union:
-                    drop
-                    match: ('outport', 1)
-                    match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 304: intersection:
-    match: ('switch', 61)
-    intersection:
-        match: ('switch', 61)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 61)
-            intersection:
-                match: ('switch', 61)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-305: intersection:
-    match: ('switch', 61)
-    intersection:
-        match: ('switch', 61)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 61)
-    intersection:
-        match: ('switch', 61)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-306: intersection:
     match: ('switch', 61)
     identity
     negate:
@@ -1814,6 +2238,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 61)
@@ -1823,23 +2249,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 61)
-                    intersection:
-                        match: ('switch', 61)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-307: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+305: intersection:
     match: ('switch', 61)
-    intersection:
-        match: ('switch', 61)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 61)
@@ -1849,6 +2263,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 61)
+    intersection:
+        match: ('switch', 61)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+306: intersection:
+    match: ('switch', 61)
+    intersection:
+        match: ('switch', 61)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 61)
+            intersection:
+                match: ('switch', 61)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 61)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 61)
+                            intersection:
+                                match: ('switch', 61)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+307: intersection:
+    match: ('switch', 61)
+    intersection:
+        match: ('switch', 61)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 61)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 61)
+                    intersection:
+                        match: ('switch', 61)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 308: intersection:
     match: ('switch', 62)
     intersection:
@@ -1857,6 +2343,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 62)
@@ -1866,6 +2354,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 309: intersection:
     match: ('switch', 62)
     intersection:
@@ -1874,6 +2364,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 62)
     intersection:
         match: ('switch', 62)
@@ -1881,6 +2373,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 310: intersection:
     match: ('switch', 62)
     identity
@@ -1893,6 +2387,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 62)
@@ -1902,6 +2398,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 62)
@@ -1911,6 +2409,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 311: intersection:
     match: ('switch', 62)
     intersection:
@@ -1919,6 +2419,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 62)
@@ -1928,6 +2430,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 312: intersection:
     match: ('switch', 63)
     intersection:
@@ -1936,6 +2440,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 63)
@@ -1945,6 +2451,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 313: intersection:
     match: ('switch', 63)
     intersection:
@@ -1953,6 +2461,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 63)
     intersection:
         match: ('switch', 63)
@@ -1960,6 +2470,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 314: intersection:
     match: ('switch', 63)
     identity
@@ -1972,6 +2484,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 63)
@@ -1981,6 +2495,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 63)
@@ -1990,6 +2506,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 315: intersection:
     match: ('switch', 63)
     intersection:
@@ -1998,6 +2516,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 63)
@@ -2007,6 +2527,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 316: intersection:
     match: ('switch', 64)
     intersection:
@@ -2015,6 +2537,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 64)
@@ -2024,6 +2548,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 317: intersection:
     match: ('switch', 64)
     intersection:
@@ -2032,6 +2558,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 64)
     intersection:
         match: ('switch', 64)
@@ -2039,6 +2567,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 318: intersection:
     match: ('switch', 64)
     identity
@@ -2051,6 +2581,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 64)
@@ -2060,6 +2592,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 64)
@@ -2069,6 +2603,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 319: intersection:
     match: ('switch', 64)
     intersection:
@@ -2077,6 +2613,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 64)
@@ -2086,39 +2624,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 320: intersection:
-    match: ('switch', 69)
-    intersection:
-        match: ('switch', 69)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 69)
-            intersection:
-                match: ('switch', 69)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-321: intersection:
-    match: ('switch', 69)
-    intersection:
-        match: ('switch', 69)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 69)
-    intersection:
-        match: ('switch', 69)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-322: intersection:
     match: ('switch', 69)
     identity
     negate:
@@ -2130,6 +2638,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 69)
@@ -2139,23 +2649,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 69)
-                    intersection:
-                        match: ('switch', 69)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-323: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+321: intersection:
     match: ('switch', 69)
-    intersection:
-        match: ('switch', 69)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 69)
@@ -2165,6 +2663,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 69)
+    intersection:
+        match: ('switch', 69)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+322: intersection:
+    match: ('switch', 69)
+    intersection:
+        match: ('switch', 69)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 69)
+            intersection:
+                match: ('switch', 69)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 69)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 69)
+                            intersection:
+                                match: ('switch', 69)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+323: intersection:
+    match: ('switch', 69)
+    intersection:
+        match: ('switch', 69)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 69)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 69)
+                    intersection:
+                        match: ('switch', 69)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 324: intersection:
     match: ('switch', 70)
     intersection:
@@ -2173,6 +2743,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 70)
@@ -2182,6 +2754,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 325: intersection:
     match: ('switch', 70)
     intersection:
@@ -2190,6 +2764,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 70)
     intersection:
         match: ('switch', 70)
@@ -2197,6 +2773,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 326: intersection:
     match: ('switch', 70)
     identity
@@ -2209,6 +2787,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 70)
@@ -2218,6 +2798,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 70)
@@ -2227,6 +2809,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 327: intersection:
     match: ('switch', 70)
     intersection:
@@ -2235,6 +2819,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 70)
@@ -2244,6 +2830,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 328: intersection:
     match: ('switch', 71)
     intersection:
@@ -2252,6 +2840,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 71)
@@ -2261,6 +2851,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 329: intersection:
     match: ('switch', 71)
     intersection:
@@ -2269,6 +2861,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 71)
     intersection:
         match: ('switch', 71)
@@ -2276,6 +2870,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 330: intersection:
     match: ('switch', 71)
     identity
@@ -2288,6 +2884,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 71)
@@ -2297,6 +2895,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 71)
@@ -2306,6 +2906,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 331: intersection:
     match: ('switch', 71)
     intersection:
@@ -2314,6 +2916,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 71)
@@ -2323,39 +2927,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 332: intersection:
-    match: ('switch', 72)
-    intersection:
-        match: ('switch', 72)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 72)
-            intersection:
-                match: ('switch', 72)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-333: intersection:
-    match: ('switch', 72)
-    intersection:
-        match: ('switch', 72)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 72)
-    intersection:
-        match: ('switch', 72)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-334: intersection:
     match: ('switch', 72)
     identity
     negate:
@@ -2367,6 +2941,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 72)
@@ -2376,23 +2952,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 72)
-                    intersection:
-                        match: ('switch', 72)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-335: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+333: intersection:
     match: ('switch', 72)
-    intersection:
-        match: ('switch', 72)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 72)
@@ -2402,6 +2966,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 72)
+    intersection:
+        match: ('switch', 72)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+334: intersection:
+    match: ('switch', 72)
+    intersection:
+        match: ('switch', 72)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 72)
+            intersection:
+                match: ('switch', 72)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 72)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 72)
+                            intersection:
+                                match: ('switch', 72)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+335: intersection:
+    match: ('switch', 72)
+    intersection:
+        match: ('switch', 72)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 72)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 72)
+                    intersection:
+                        match: ('switch', 72)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 336: intersection:
     match: ('switch', 77)
     identity
@@ -2414,6 +3050,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 77)
@@ -2423,6 +3061,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 337: intersection:
     match: ('switch', 77)
     identity
@@ -2435,6 +3075,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     match: ('switch', 77)
     intersection:
         match: ('switch', 77)
@@ -2442,6 +3084,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 338: intersection:
     match: ('switch', 77)
     intersection:
@@ -2450,6 +3094,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 77)
@@ -2459,6 +3105,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 77)
@@ -2472,6 +3120,8 @@
                                     drop
                                     match: ('outport', 1)
                                     match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
 339: intersection:
     match: ('switch', 77)
     intersection:
@@ -2480,6 +3130,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 77)
@@ -2493,6 +3145,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 340: intersection:
     match: ('switch', 78)
     intersection:
@@ -2501,6 +3155,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 78)
@@ -2510,6 +3166,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 341: intersection:
     match: ('switch', 78)
     intersection:
@@ -2518,6 +3176,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 78)
     intersection:
         match: ('switch', 78)
@@ -2525,6 +3185,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 342: intersection:
     match: ('switch', 78)
     identity
@@ -2537,6 +3199,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 78)
@@ -2546,6 +3210,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 78)
@@ -2555,6 +3221,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 343: intersection:
     match: ('switch', 78)
     intersection:
@@ -2563,6 +3231,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 78)
@@ -2572,6 +3242,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 344: intersection:
     match: ('switch', 79)
     intersection:
@@ -2580,6 +3252,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 79)
@@ -2589,6 +3263,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
 345: intersection:
     match: ('switch', 79)
     intersection:
@@ -2597,6 +3273,8 @@
             drop
             match: ('outport', 1)
             match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
     match: ('switch', 79)
     intersection:
         match: ('switch', 79)
@@ -2604,6 +3282,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
 346: intersection:
     match: ('switch', 79)
     identity
@@ -2616,6 +3296,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 79)
@@ -2625,6 +3307,8 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
             negate:
                 intersection:
                     match: ('switch', 79)
@@ -2634,6 +3318,8 @@
                             drop
                             match: ('outport', 1)
                             match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 347: intersection:
     match: ('switch', 79)
     intersection:
@@ -2642,6 +3328,8 @@
             drop
             match: ('inport', 1)
             match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
     negate:
         intersection:
             match: ('switch', 79)
@@ -2651,39 +3339,9 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
 348: intersection:
-    match: ('switch', 80)
-    intersection:
-        match: ('switch', 80)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    negate:
-        intersection:
-            match: ('switch', 80)
-            intersection:
-                match: ('switch', 80)
-                union:
-                    drop
-                    match: ('inport', 1)
-                    match: ('inport', 2)
-349: intersection:
-    match: ('switch', 80)
-    intersection:
-        match: ('switch', 80)
-        union:
-            drop
-            match: ('outport', 1)
-            match: ('outport', 2)
-    match: ('switch', 80)
-    intersection:
-        match: ('switch', 80)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
-350: intersection:
     match: ('switch', 80)
     identity
     negate:
@@ -2695,6 +3353,8 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
     negate:
         intersection:
             match: ('switch', 80)
@@ -2704,23 +3364,11 @@
                     drop
                     match: ('inport', 1)
                     match: ('inport', 2)
-            negate:
-                intersection:
-                    match: ('switch', 80)
-                    intersection:
-                        match: ('switch', 80)
-                        union:
-                            drop
-                            match: ('outport', 1)
-                            match: ('outport', 2)
-351: intersection:
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+349: intersection:
     match: ('switch', 80)
-    intersection:
-        match: ('switch', 80)
-        union:
-            drop
-            match: ('inport', 1)
-            match: ('inport', 2)
+    identity
     negate:
         intersection:
             match: ('switch', 80)
@@ -2730,6 +3378,78 @@
                     drop
                     match: ('outport', 1)
                     match: ('outport', 2)
+                    match: ('outport', 3)
+                    match: ('outport', 4)
+    match: ('switch', 80)
+    intersection:
+        match: ('switch', 80)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+350: intersection:
+    match: ('switch', 80)
+    intersection:
+        match: ('switch', 80)
+        union:
+            drop
+            match: ('outport', 1)
+            match: ('outport', 2)
+            match: ('outport', 3)
+            match: ('outport', 4)
+    negate:
+        intersection:
+            match: ('switch', 80)
+            intersection:
+                match: ('switch', 80)
+                union:
+                    drop
+                    match: ('inport', 1)
+                    match: ('inport', 2)
+                    match: ('inport', 3)
+                    match: ('inport', 4)
+            negate:
+                intersection:
+                    match: ('switch', 80)
+                    identity
+                    negate:
+                        intersection:
+                            match: ('switch', 80)
+                            intersection:
+                                match: ('switch', 80)
+                                union:
+                                    drop
+                                    match: ('outport', 1)
+                                    match: ('outport', 2)
+                                    match: ('outport', 3)
+                                    match: ('outport', 4)
+351: intersection:
+    match: ('switch', 80)
+    intersection:
+        match: ('switch', 80)
+        union:
+            drop
+            match: ('inport', 1)
+            match: ('inport', 2)
+            match: ('inport', 3)
+            match: ('inport', 4)
+    negate:
+        intersection:
+            match: ('switch', 80)
+            identity
+            negate:
+                intersection:
+                    match: ('switch', 80)
+                    intersection:
+                        match: ('switch', 80)
+                        union:
+                            drop
+                            match: ('outport', 1)
+                            match: ('outport', 2)
+                            match: ('outport', 3)
+                            match: ('outport', 4)
 2: intersection:
     match: ('switch', 1)
     identity

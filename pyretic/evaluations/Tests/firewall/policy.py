@@ -59,7 +59,7 @@ class FirewallStats:
         for i in range(0, self.k):
             start = core_cnt + 1 + (self.k * i) + (self.k / 2)
             for j in range(0, self.k / 2):
-                port_map[start + j] = [0, 1]
+                port_map[start + j] = range(1, self.fout + 1)
 
         return port_map
 
