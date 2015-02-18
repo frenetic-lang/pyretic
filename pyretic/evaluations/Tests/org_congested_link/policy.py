@@ -86,7 +86,7 @@ class LinkCongestionStats:
         pairs = [ (int(pair[0][1:]), int(pair[1][1:]) ) for pair in itertools.product(ingress, egress)]
         p = None
         for pair in pairs:
-            partial_query = atom(match(switch = pair[0])) ** atom(match(switch = s1)) ^ atom(match(switch = s2)) ** atom(match(switch = pair[1]))
+            partial_query = in_atom(match(switch = pair[0])) ** out_atom(match(switch = s1)) ^ in_atom(match(switch = s2)) ** out_atom(match(switch = pair[1]))
             partial_query.register_callback(query_callback(pair)) 
             cb = CountBucket()
             #partial_query.set_bucket(cb)
