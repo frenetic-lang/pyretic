@@ -150,8 +150,8 @@ class Policy(object):
             else:
                 pred_policy |= match(switch = i)
 
-        pol = pred_policy >> self
-        #pol = self
+        #pol = pred_policy >> self
+        pol = self
         import subprocess
 
         f = open('/tmp/in.json', 'w')
@@ -1815,7 +1815,10 @@ field_map = {'dlSrc' : 'srcmac', 'dlDst': 'dstmac', 'dlTyp': 'ethtype',
                 'tpSrc' : 'srcport', 'tpDst' : 'dstport', 'inPort' : 'inport'}
 
 def create_match(pattern, switch_id):
-    match_map = {'switch' : switch_id}
+    if switch_id > 0:
+        match_map = {'switch' : switch_id}
+    else:
+        match_map = {}
     for k,v in pattern.items():
         if v is not None and k != "dlTyp":
             match_map[field_map[k]] = v

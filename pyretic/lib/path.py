@@ -1388,6 +1388,45 @@ class QuerySwitch(Policy):
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
         return c
+    
+    def netkat_compile(self, switch_cnt):
+        from pyretic.core.classifier import Rule, Classifier
+        
+        def resolve_virtual_fields(act):
+            try:
+                if isinstance(act, modify):
+                    r = act.compile().rules[0]
+                    (mod_act,) =  r.actions
+                    return mod_act
+                if isinstance(act, match):
+                    return act.compile().rules[0].match
+                
+                return act
+            except:
+                return act
+            
+
+        
+        comp_defaults = set(map(resolve_virtual_fields, self.default))
+        final_rules = []
+        for tag_value in self.policy_dic:
+            p_rules = self.policy_dic[tag_value].netkat_compile(switch_cnt).rules
+            for r in p_rules:
+                new_match = r.match.intersect(match(**{self.tag : tag_value}))
+                new_match = new_match.compile().rules[0].match
+                if new_match == drop:
+                    raise TypeError
+                new_r = copy.copy(r)
+                new_r.match = new_match
+                if not new_r.actions:
+                    new_r.actions = comp_defaults
+                new_r.parents = [r]
+                new_r.op = "switch"
+                final_rules.append(new_r)
+
+        final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
+        c = Classifier(final_rules)
+        return c
 
     def __repr__(self):
         res = ''
