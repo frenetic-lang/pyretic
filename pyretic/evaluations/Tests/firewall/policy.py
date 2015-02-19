@@ -59,7 +59,7 @@ class FirewallStats:
         for i in range(0, self.k):
             start = core_cnt + 1 + (self.k * i) + (self.k / 2)
             for j in range(0, self.k / 2):
-                port_map[start + j] = [0, 1]
+                port_map[start + j] = range(1, self.fout + 1)
 
         return port_map
 
@@ -89,7 +89,7 @@ class FirewallStats:
                 else:
                     out_predicate |= match(switch = sw, outport = p)
 
-        pol = in_atom(in_predicate) ^ +(in_atom(~match(switch = sw))) ^ out_atom(out_predicate) 
+        pol = in_atom(in_predicate) ^ +(in_atom(~match(switch = fw))) ^ out_atom(out_predicate) 
 
 
         query_thread = threading.Thread(target = self.pull_buckets)

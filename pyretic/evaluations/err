@@ -1,0 +1,57 @@
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+/opt/pypy-2.4.0/site-packages/numpy/linalg/_umath_linalg.py:18: UserWarning: no cffi linalg functions and no _umath_linalg_capi module, expect problems.
+  warn('no cffi linalg functions and no _umath_linalg_capi module, expect problems.')
+Traceback (most recent call last):
+  File "app_main.py", line 75, in run_toplevel
+  File "eval_compilation.py", line 454, in <module>
+    eval_comp.compile()
+  File "eval_compilation.py", line 156, in compile
+    self.ragel_enabled, self.partition_enabled)
+  File "/home/mina/pyretic/pyretic/evaluations/stat.py", line 268, in profiled_func
+    res = func(*args, **kwargs)
+  File "/home/mina/pyretic/pyretic/lib/path.py", line 1594, in compile
+    res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
+  File "/home/mina/pyretic/pyretic/lib/path.py", line 1687, in compile_core
+    dfa = du.regexes_to_dfa(re_list)
+  File "/home/mina/pyretic/pyretic/evaluations/stat.py", line 268, in profiled_func
+    res = func(*args, **kwargs)
+  File "/home/mina/pyretic/pyretic/lib/path.py", line 2729, in regexes_to_dfa
+    (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
+  File "/home/mina/pyretic/pyretic/lib/path.py", line 2459, in get_accepting_states
+    state_num = max(res) + 1
+ValueError: arg is an empty sequence

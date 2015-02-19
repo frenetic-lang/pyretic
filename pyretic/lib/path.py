@@ -468,6 +468,7 @@ class re_tree_gen(object):
             output += (str(sym) + ': ' + repr(pred) + '\n')
         return output
 
+
     @classmethod
     def get_leaf_pickles(cls):
         output = ''
@@ -1647,7 +1648,10 @@ class pathcomp(object):
         t_s = time.time()
 
         ast_fold(path_pol, inv_trees, None)
-        ast_fold(path_pol, prep_trees, None)
+        #ast_fold(path_pol, prep_trees, None)
+        
+        cls.pred_part(path_pol)
+
         cls.path_policy += path_pol
         (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
         print time.time() - t_s
@@ -1730,7 +1734,7 @@ class pathcomp(object):
        
 
         stat.gather_general_stats('dfa edges', len(edges), 0, False) 
-        stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
+        #stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
 
         in_edge_per_state = {}
         out_edge_per_state = {}
@@ -1821,6 +1825,7 @@ class pathcomp(object):
                 stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
                 
                 ### edge per state ###
+                '''### edge per state ###
                 edge_cnts = in_edge_per_state.values()
                 max_edge_per_state = max(edge_cnts)
                 avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
@@ -1852,6 +1857,7 @@ class pathcomp(object):
                 stat.gather_general_stats("in table ast cnt", cls.ast_node_cnt(in_table), 0, False)
                 stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
 
+                '''
                 return (in_table, out_table)
            
             else:
@@ -1877,6 +1883,7 @@ class pathcomp(object):
                             else:
                                 in_tagging_dic[src_num] += tag_frag
                             in_tag_rules += 1
+
 
                         elif typ == __out__:
                             if not src in out_tagging_dic:
@@ -2747,7 +2754,12 @@ class ragel_dfa_utils(common_dfa_utils):
         f.write(lex_input)
         f.close()
         try:
-            output = subprocess.check_output(['ragel', '-V', lex_input_file])
+            g = open('/tmp/graph.dot', 'w')
+            subprocess.call(['ragel', '-V', lex_input_file], stdout=g)
+            g.close()
+            g = open('/tmp/graph.dot')
+            output = g.read()
+            g.close()
         except subprocess.CalledProcessError as e:
             
             print "Error occured while running ragel"

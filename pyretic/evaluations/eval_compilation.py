@@ -300,6 +300,10 @@ class eval_compilation:
     ############## composed methods #################
     
     ### single table ###
+    @stat.classifier_size
+    @stat.elapsed_time
+    def single_table_compile(self):
+        return (self.path_in_table >> self.policy >> self.path_out_table).compile()
 
     @stat.classifier_size
     @stat.elapsed_time
@@ -462,6 +466,7 @@ if __name__ == '__main__':
         for aq in args.added_query:
             #aparams = get_added_query_params(args)
             aparams = {'test': aq}
+            print aparams 
             t_s = time.time()
             eval_comp.add(False, **aparams)
             print time.time() - t_s

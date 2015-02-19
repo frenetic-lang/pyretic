@@ -7,8 +7,13 @@ classifier = {}
 general_stats = {}
 monitoring = False
 
+base_path = "/home/mininet/pyretic/pyretic/evaluations/"
 path = '/home/mininet/pyretic/pyretic/evaluations/results/'
 dfa_path = '/tmp/pyretic-regexes.txt.dot'
+#base_path =  '/home/mina/pyretic/pyretic/evaluations/'
+ 
+#path = '/home/mina/pyretic/pyretic/evaluations/results/'
+#dfa_path = '/tmp/pyretic-regexes.txt'
 symbol_path = '/tmp/symbols.txt'
 pickle_path = '/tmp/pickle_symbols.txt'
 rule_cnt_file = 'rule-count.txt'
@@ -38,8 +43,17 @@ def start(results_folder=None, opt_flags = None):
     global multitable_enabled
     global ragel_enabled
 
+    
+    global stats
+    global classifier
+    global general_states
+
+    stats = {}
+    classifier = {}
+    general_stats = {}
+    
     if results_folder:
-        path = results_folder
+        path = os.path.join(base_path, results_folder)
 
     if opt_flags:
         (disjoint_enabled, integrate_enabled, multitable_enabled, ragel_enabled) = opt_flags
@@ -80,6 +94,7 @@ def report_dfa(dfa_path, symbol_path, results_path, ragel_enabled):
                 shutil.copy(dfa_path, results_path)
             shutil.copy(symbol_path, results_path)
             shutil.copy(pickle_path, results_path)
+            print results_path
         except:
             print 'exception in dfa report'
 
@@ -148,7 +163,7 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
         if integrate_enabled:
             row =  [first_col, 'compile', 'forwarding_compile', 
                     'in_table_compile', 'out_table_compile']
-            row.extend(['tab'] * 13)
+            row.extend(['tab'] )
 
 
         else:
@@ -156,13 +171,13 @@ def create_excel_report(results_path, rule_cnt, dfa_path):
                     'tagging_compile', 'out_tagging_compile', 
                     'capture_compile', 'out_capture_compile', 
                     'in_table_compile', 'tab', 'out_table_compile', 'tab']
-            row.extend(['tab'] * 13)
+            row.extend(['tab'] )
 
     else:
         row = [first_col, 'compile', 'forwarding_compile', 
                 'tagging_compile', 'out_tagging_compile', 'tag_fwd_compile',
                 'capture_compile', 'out_capture_compile', 'full_out_capture_compile']            
-        row.extend(['tab'] * 13)
+        row.extend(['tab'] * 2)
    
     create_excel_report_general(results_path, rule_cnt, dfa_path, row)
 
@@ -387,12 +402,6 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
             elif 'out capture edges' in line:
                 out_capture_edge = int(line[line.index(':') + 2 : -1])
 
-            elif 'average switch rule count' in line:
-                switch_cnt = int(line[line.index(':') + 2 :-1])
-
-            elif 'max switch rule count' in line:
-                rule_cnt = int(line[line.index(':') + 2 : -1])
-            
             elif 'dfa state count' in line:
                 dfa_state_cnt = int(line[line.index(':') + 2 : -1])
             
@@ -440,7 +449,7 @@ def create_excel_report_general(results_path, rule_cnt, dfa_path, row):
     '''
 
     rule_avg = switch_cnt
-    gen_list = [rule_avg, rule_cnt, dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
+    gen_list = [dfa_state_cnt, in_tagging_edge, out_tagging_edge, in_capture_edge, out_capture_edge]
    
    
     pred_part = stats['pred_part'][1][0]
