@@ -150,8 +150,8 @@ class Policy(object):
             else:
                 pred_policy |= match(switch = i)
 
-        #pol = pred_policy >> self
-        pol = self
+        pol = pred_policy >> self
+        #pol = self
         import subprocess
 
         f = open('/tmp/in.json', 'w')
@@ -1852,8 +1852,8 @@ def create_action(action, inport):
                         mod_dict['outport'] = out_info['port']
                     elif out_info['type'] == 'controller':
                         res.add(Controller)
-                    elif out_info['type'] == 'inport' and inport is not None:
-                        mod_dict['outport'] = inport 
+                    #elif out_info['type'] == 'inport' and inport is not None:
+                        #mod_dict['outport'] = inport 
             
             if len(mod_dict) > 0:
                 res.add(modify(**mod_dict))

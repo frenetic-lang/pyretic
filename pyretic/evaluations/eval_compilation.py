@@ -76,9 +76,9 @@ class eval_compilation:
                 
         if self.multitable_enabled:
             if self.integrate_enabled:
-                self.forwarding_compile()
-                self.in_table_compile()
-                self.out_table_compile()
+                self.forwarding_compile(self.switch_cnt)
+                self.in_table_compile(self.switch_cnt)
+                self.out_table_compile(self.switch_cnt)
                 
             else:
                 
@@ -168,9 +168,9 @@ class eval_compilation:
                 
         if self.multitable_enabled:
             if self.integrate_enabled:
-                self.forwarding_compile()
-                self.in_table_compile()
-                self.out_table_compile()
+                self.forwarding_compile(self.switch_cnt)
+                self.in_table_compile(self.switch_cnt)
+                self.out_table_compile(self.switch_cnt)
                 
             else:
                 
@@ -250,8 +250,9 @@ class eval_compilation:
     
     @stat.classifier_size
     @stat.elapsed_time
-    def forwarding_compile(self):
+    def forwarding_compile(self, switch_cnt = None):
         return self.policy.compile()
+        #return self.policy.netkat_compile(switch_cnt)
      
     @stat.classifier_size
     @stat.elapsed_time
@@ -338,13 +339,15 @@ class eval_compilation:
     ### multi table ###
     @stat.classifier_size
     @stat.elapsed_time
-    def in_table_compile(self):
-        return self.path_in_table.compile()
+    def in_table_compile(self, switch_cnt = None):
+        #return self.path_in_table.compile()
+        return self.path_in_table.netkat_compile(switch_cnt)
 
     @stat.classifier_size
     @stat.elapsed_time
-    def out_table_compile(self):
-        return self.path_out_table.compile()
+    def out_table_compile(self, switch_cnt = None):
+        #return self.path_out_table.compile()
+        return self.path_out_table.netkat_compile(switch_cnt)
 
 
 
