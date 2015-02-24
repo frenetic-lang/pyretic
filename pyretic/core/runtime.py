@@ -158,6 +158,7 @@ class Runtime(object):
                 in_capture  = self.path_in_capture
                 self.out_capture = (in_tag_policy >> self.path_out_capture)
 
+                '''
                 ## gathering stats
                 # forwarding
                 self.forwarding_compile()
@@ -174,15 +175,20 @@ class Runtime(object):
                 # virtual tags
                 self.vf_tag_compile()
                 self.vf_untag_compile()
-            
+                '''
+                
+               
                 self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
                 self.vtag_in_capture = (self.virtual_tag >> in_capture)
                 self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
-
+               
+                #self.vtag_forwarding = (self.forwarding)
+                #self.vtag_out_capture = self.out_capture
+                '''
                 self.vtag_fw_compile()
                 self.vtag_in_capture_compile()
                 self.vtag_out_capture_compile()
-            
+                '''
                 
                 self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
             
@@ -459,6 +465,9 @@ class Runtime(object):
     @stat.elapsed_time
     def whole_policy_compile(self):
         p = self.policy.compile()
+
+        #p = self.policy.netkat_compile(3)
+        #print p
         return p
  
     def update_switch_classifiers(self):
