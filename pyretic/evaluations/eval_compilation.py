@@ -80,6 +80,7 @@ class eval_compilation:
                 self.in_table_compile()
                 self.out_table_compile()
                 
+                self.single_table_compile()    
             else:
                 
                 self.forwarding_compile()
@@ -171,7 +172,7 @@ class eval_compilation:
                 self.forwarding_compile()
                 self.in_table_compile()
                 self.out_table_compile()
-                
+                self.single_table_compile()                
             else:
                 
                 self.forwarding_compile()
@@ -299,6 +300,10 @@ class eval_compilation:
     ############## composed methods #################
     
     ### single table ###
+    @stat.classifier_size
+    @stat.elapsed_time
+    def single_table_compile(self):
+        return (self.path_in_table >> self.policy >> self.path_out_table).compile()
 
     @stat.classifier_size
     @stat.elapsed_time
