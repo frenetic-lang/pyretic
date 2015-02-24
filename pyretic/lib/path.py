@@ -1697,6 +1697,8 @@ class pathcomp(object):
 
         #stat.gather_general_stats('dfa edges', len(edges), 0, False) 
         #stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
+        stat.gather_general_stats('dfa edges', len(edges), 0, False) 
+        stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
 
         in_edge_per_state = {}
         out_edge_per_state = {}
