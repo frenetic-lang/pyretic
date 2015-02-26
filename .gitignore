@@ -8,3 +8,31 @@
 
 
 pyretic/evaluations/EvaluationResults/
+bfg-1.12.3.jar
+pyretic/core/.language.py.swo
+pyretic/core/.runtime.py.swl
+pyretic/core/.runtime.py.swm
+pyretic/core/.runtime.py.swo
+pyretic/evaluations/.DS_Store
+pyretic/evaluations/.eval_compilation.py.swn
+pyretic/evaluations/.eval_compilation.py.swo
+pyretic/evaluations/.eval_path.py.swn
+pyretic/evaluations/.eval_path.py.swo
+pyretic/evaluations/.mininet_setup.py.swl
+pyretic/evaluations/.mininet_setup.py.swm
+pyretic/evaluations/.mininet_setup.py.swn
+pyretic/evaluations/.mininet_setup.py.swo
+pyretic/evaluations/Tests/congested_link/.policy.py.swm
+pyretic/evaluations/Tests/congested_link/.policy.py.swn
+pyretic/evaluations/Tests/congested_link/.policy.py.swo
+pyretic/evaluations/Tests/loop_detection/.policy.py.swo
+pyretic/evaluations/Tests/org_congested_link/.policy.py.swm
+pyretic/evaluations/Tests/org_congested_link/.policy.py.swn
+pyretic/evaluations/Tests/org_congested_link/.policy.py.swo
+pyretic/evaluations/Tests/path_loss_stanford/.policy.py.swm
+pyretic/evaluations/Tests/path_loss_stanford/.policy.py.swo
+pyretic/evaluations/Tests/path_packet_loss/.policy.py.swm
+pyretic/evaluations/Tests/path_packet_loss/.policy.py.swo
+pyretic/examples/.path_query.py.swn
+pyretic/examples/.path_query.py.swo
+pyretic/lib/.path.py.swo
