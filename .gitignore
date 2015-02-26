@@ -1,10 +1,10 @@
 # Python compiled files #
 #########################
-*.pyc
+**/*.pyc
 
 # Temporary files #
 ###################
-*.swp
+**/*.swp
 
 
-pyretic/evaluations/results/
+pyretic/evaluations/EvaluationResults/
