@@ -1,0 +1,109 @@
+dfa state count : 31 
+--------------------
+rule count statistics: 
+switch count: 29
+total rule count: 6751
+average rule count: 232.793103448
+------details-------
+s9 -> 234
+s8 -> 238
+s3 -> 234
+s2 -> 238
+s1 -> 131
+s7 -> 234
+s6 -> 242
+s5 -> 234
+s4 -> 242
+s19 -> 238
+s18 -> 234
+s13 -> 234
+s12 -> 234
+s11 -> 238
+s10 -> 234
+s17 -> 234
+s16 -> 234
+s15 -> 234
+s14 -> 238
+s22 -> 234
+s23 -> 242
+s20 -> 234
+s21 -> 242
+s26 -> 238
+s27 -> 234
+s24 -> 234
+s25 -> 238
+s28 -> 234
+s29 -> 242
+--------end--------
+compile
+number of calls: 1
+total time: 16.984892
+average time: 16.984892
+---times----
+[16.98489212989807]
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.026413
+average time: 0.026413
+---times----
+[0.0264129638671875]
+classifier size: 30
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 76.771397
+average time: 76.771397
+---times----
+[76.77139687538147]
+classifier size: 2729
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 588.858432
+average time: 588.858432
+---times----
+[588.8584320545197]
+classifier size: 930
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 58.386344
+average time: 58.386344
+---times----
+[58.38634395599365]
+classifier size: 2674
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.001569
+average time: 0.001569
+---times----
+[0.0015690326690673828]
+classifier size: 5
+--------------------------------------
+vf_untag_compile
+number of calls: 2
+total time: 0.023375
+average time: 0.011688
+---times----
+[0.022488117218017578, 0.0008869171142578125]
+classifier size: 19
+classifier size: 22
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 14.823729
+average time: 14.823729
+---times----
+[14.823728799819946]
+--------------------------------------
+vf_tag_compile
+number of calls: 2
+total time: 0.044498
+average time: 0.022249
+---times----
+[0.02183818817138672, 0.022660017013549805]
+classifier size: 19
+classifier size: 22
+--------------------------------------

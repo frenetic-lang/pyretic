@@ -1,0 +1,84 @@
+dfa state count : 16 
+--------------------
+rule count statistics: 
+switch count: 7
+total rule count: 3568
+average rule count: 509.714285714
+------details-------
+s3 -> 484
+s2 -> 534
+s1 -> 534
+s7 -> 524
+s6 -> 524
+s5 -> 484
+s4 -> 484
+--------end--------
+compile
+number of calls: 1
+total time: 2.104994
+average time: 2.104994
+---times----
+[2.104994058609009]classifier size: 776
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.017363
+average time: 0.017363
+---times----
+[0.01736307144165039]classifier size: 31
+--------------------------------------
+first_whole_compile
+number of calls: 1
+total time: 4.138102
+average time: 4.138102
+---times----
+[4.138102054595947]classifier size: 776
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 7.160832
+average time: 7.160832
+---times----
+[7.160831928253174]classifier size: 806
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 1.819901
+average time: 1.819901
+---times----
+[1.8199009895324707]classifier size: 136
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 7.920148
+average time: 7.920148
+---times----
+[7.920148134231567]classifier size: 776
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.016333
+average time: 0.016333
+---times----
+[0.01633286476135254]classifier size: 21
+--------------------------------------
+vf_untag_compile
+number of calls: 1
+total time: 0.000111
+average time: 0.000111
+---times----
+[0.00011110305786132812]classifier size: 1
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 1.120708
+average time: 1.120708
+---times----
+[1.1207079887390137]--------------------------------------
+vf_tag_compile
+number of calls: 1
+total time: 0.000176
+average time: 0.000176
+---times----
+[0.00017595291137695312]classifier size: 1
+--------------------------------------

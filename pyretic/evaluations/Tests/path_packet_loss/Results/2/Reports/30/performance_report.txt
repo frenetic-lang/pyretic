@@ -1,0 +1,108 @@
+dfa state count : 32 
+--------------------
+rule count statistics: 
+switch count: 30
+total rule count: 7127
+average rule count: 237.566666667
+------details-------
+s9 -> 241
+s8 -> 241
+s3 -> 241
+s2 -> 241
+s1 -> 134
+s7 -> 241
+s6 -> 241
+s5 -> 241
+s4 -> 241
+s19 -> 241
+s18 -> 241
+s13 -> 241
+s12 -> 241
+s11 -> 241
+s10 -> 241
+s17 -> 241
+s16 -> 241
+s15 -> 241
+s14 -> 241
+s30 -> 245
+s22 -> 241
+s23 -> 241
+s20 -> 241
+s21 -> 241
+s26 -> 241
+s27 -> 241
+s24 -> 241
+s25 -> 241
+s28 -> 241
+s29 -> 241
+--------end--------
+compile
+number of calls: 1
+total time: 19.678607
+average time: 19.678607
+---times----
+[19.67860698699951]
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.027508
+average time: 0.027508
+---times----
+[0.027508020401000977]
+classifier size: 31
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 59.959719
+average time: 59.959719
+---times----
+[59.95971918106079]
+classifier size: 2863
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 713.951152
+average time: 713.951152
+---times----
+[713.9511520862579]
+classifier size: 992
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 65.321900
+average time: 65.321900
+---times----
+[65.32189989089966]
+classifier size: 2856
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.001370
+average time: 0.001370
+---times----
+[0.0013699531555175781]
+classifier size: 5
+--------------------------------------
+vf_untag_compile
+number of calls: 1
+total time: 0.000323
+average time: 0.000323
+---times----
+[0.0003230571746826172]
+classifier size: 3
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 17.602668
+average time: 17.602668
+---times----
+[17.602668046951294]
+--------------------------------------
+vf_tag_compile
+number of calls: 1
+total time: 0.000531
+average time: 0.000531
+---times----
+[0.0005309581756591797]
+classifier size: 3
+--------------------------------------

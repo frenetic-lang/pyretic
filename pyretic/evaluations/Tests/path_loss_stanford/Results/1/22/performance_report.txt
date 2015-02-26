@@ -1,0 +1,102 @@
+dfa state count : 24 
+--------------------
+rule count statistics: 
+switch count: 22
+total rule count: 4023
+average rule count: 182.863636364
+------details-------
+s9 -> 185
+s8 -> 185
+s3 -> 185
+s2 -> 189
+s1 -> 110
+s7 -> 185
+s6 -> 185
+s5 -> 185
+s4 -> 189
+s19 -> 189
+s18 -> 185
+s13 -> 189
+s12 -> 185
+s11 -> 189
+s10 -> 185
+s17 -> 185
+s16 -> 185
+s15 -> 185
+s14 -> 185
+s22 -> 189
+s20 -> 185
+s21 -> 189
+--------end--------
+compile
+number of calls: 1
+total time: 7.801959
+average time: 7.801959
+---times----
+[7.801959037780762]
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.012576
+average time: 0.012576
+---times----
+[0.012576103210449219]
+classifier size: 23
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 12.094804
+average time: 12.094804
+---times----
+[12.094804048538208]
+classifier size: 1593
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 117.343362
+average time: 117.343362
+---times----
+[117.3433620929718]
+classifier size: 552
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 19.730383
+average time: 19.730383
+---times----
+[19.730383157730103]
+classifier size: 1568
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.005204
+average time: 0.005204
+---times----
+[0.005203962326049805]
+classifier size: 5
+--------------------------------------
+vf_untag_compile
+number of calls: 2
+total time: 0.005305
+average time: 0.002653
+---times----
+[0.0048980712890625, 0.0004069805145263672]
+classifier size: 9
+classifier size: 12
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 6.870503
+average time: 6.870503
+---times----
+[6.870502948760986]
+--------------------------------------
+vf_tag_compile
+number of calls: 2
+total time: 0.005836
+average time: 0.002918
+---times----
+[0.005299091339111328, 0.0005371570587158203]
+classifier size: 9
+classifier size: 12
+--------------------------------------

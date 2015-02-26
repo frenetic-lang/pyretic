@@ -1,6 +1,0 @@
-out capture edges: 1056
-dfa state count: 129
-in tagging edges: 96
-in capture edges: 0
-create pol: 0.258960008621
-out tagging edges: 7168
