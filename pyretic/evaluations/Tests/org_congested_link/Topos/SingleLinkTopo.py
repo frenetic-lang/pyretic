@@ -1,4 +1,6 @@
-from pyretic.lib.corelib import *
+import sys
+sys.path.append('/home/mininet/pyretic/')
+from pyretic.core.language import *
 from pyretic.lib.std import *
 from mininet.topo import Topo
 from mininet.net import Mininet
@@ -67,9 +69,10 @@ class SingleLinkTopo(Topo):
 
 
 if __name__ == "__main__":
-    topo = TestTopo(2,3)
+    import sys
+    topo = SingleLinkTopo(int(sys.argv[1]), int(sys.argv[2]))
     net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
                   listenPort=6634)
     net.start()
-    print net.items()
+    CLI(net)
     net.stop()

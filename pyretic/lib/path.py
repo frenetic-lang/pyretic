@@ -1324,12 +1324,13 @@ class path_inters(path_combinator):
 
 class QuerySwitch(Policy):
 
-    def __init__(self, tag, policy_dic, default):
+    def __init__(self, tag, policy_dic, default, outport = False):
         #TODO (mina): add type checks
 
         self.tag = tag
         self.policy_dic = policy_dic
         self.default = default
+        self.outport_enabled = outport
 
     def eval(self, pkt):
         from pyretic.core.language import _match
@@ -1352,8 +1353,12 @@ class QuerySwitch(Policy):
         return eval_defaults(pkt)
     
     def compile(self):
+        '''
+        res = self.netkat_compile(3)
+        print 'rule count', len(res.rules)
+        return res
+        '''
         from pyretic.core.classifier import Rule, Classifier
-        
         def resolve_virtual_fields(act):
             try:
                 if isinstance(act, modify):
@@ -1390,9 +1395,11 @@ class QuerySwitch(Policy):
         c = Classifier(final_rules)
         return c
     
-    def netkat_compile(self, switch_cnt):
+    def netkat_compile(self, switch_cnt, outport = False):
         from pyretic.core.classifier import Rule, Classifier
-        
+        import time
+        tot_time = 0
+        t_s = time.time()
         def resolve_virtual_fields(act):
             try:
                 if isinstance(act, modify):
@@ -1411,7 +1418,11 @@ class QuerySwitch(Policy):
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         final_rules = []
         for tag_value in self.policy_dic:
-            p_rules = self.policy_dic[tag_value].netkat_compile(switch_cnt).rules
+            tot_time += time.time() - t_s
+            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, self.outport_enabled)
+            p_rules = p_class[0].rules
+            tot_time += p_class[1]
+            t_s = time.time()
             for r in p_rules:
                 new_match = r.match.intersect(match(**{self.tag : tag_value}))
                 new_match = new_match.compile().rules[0].match
@@ -1427,7 +1438,8 @@ class QuerySwitch(Policy):
 
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
-        return c
+        tot_time += time.time() - t_s
+        return (c, tot_time)
 
     def __repr__(self):
         res = ''
@@ -1797,7 +1809,6 @@ class pathcomp(object):
                                 in_cap_rules += 1
                             else:
                                 out_cap_rules += 1
-                    
                     if action_frag is not None:
                         table_frag = pred >> action_frag
                         if typ == __in__:
@@ -1807,14 +1818,14 @@ class pathcomp(object):
                                 in_table_dic[src_num] += table_frag
 
                         elif typ == __out__:
-                            if not src in out_table_dic:
+                            if not src_num in out_table_dic:
                                 out_table_dic[src_num] = table_frag
                             else:
                                 out_table_dic[src_num] += table_frag
-
+ 
                 table_default = set([cls.__set_dead_state_tag__(du, dfa)])
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
-                out_table = QuerySwitch('path_tag', out_table_dic, table_default)
+                out_table = QuerySwitch('path_tag', out_table_dic, table_default, True)
                
                 elap = time.time() - t_s
                 stat.gather_general_stats('create pol', elap, 0, False)
@@ -1886,7 +1897,7 @@ class pathcomp(object):
 
 
                         elif typ == __out__:
-                            if not src in out_tagging_dic:
+                            if not src_num in out_tagging_dic:
                                 out_tagging_dic[src_num] = tag_frag
                             else:
                                 out_tagging_dic[src_num] += tag_frag
@@ -1906,7 +1917,7 @@ class pathcomp(object):
                      
                 tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
                 in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
-                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
+                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default, True)
                 
                 stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
                 stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)

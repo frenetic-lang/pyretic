@@ -272,7 +272,11 @@ def elapsed_time(func):
         res = func(*args, **kwargs)
 
         if monitoring:
-            elapsed = time.time() - start_time
+            if isinstance(res, tuple) and isinstance(res[1], float):
+                elapsed = res[1]
+                res = res[0]
+            else:
+                elapsed = time.time() - start_time
             fname = func.__name__
             if fname not in stats:
                 stats[fname] = [0, []] #ncalls, times

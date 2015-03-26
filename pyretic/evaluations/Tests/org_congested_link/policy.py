@@ -92,7 +92,7 @@ class LinkCongestionStats:
             #partial_query.set_bucket(cb)
             self.buckets[pair] = cb
             self.stat[pair] = 0
-            partial_query.register_callback(self.bucket_callback(pair))
+            #partial_query.register_callback(self.bucket_callback(pair))
             if p is None:
                 p = partial_query
             else:

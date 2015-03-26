@@ -141,7 +141,7 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt):
+    def netkat_compile(self, switch_cnt, outport = False):
         #print 'called--------', self
         pred_policy = None
         for i in range(1, switch_cnt + 1):
@@ -159,15 +159,22 @@ class Policy(object):
         f.close()
 
         try:
-            output = subprocess.check_output(['curl', '-X', 'POST', 'localhost:9000/compile', '--data-binary', '@/tmp/in.json'])
+            output = subprocess.check_output(['curl', '-X', 'POST', 'localhost:9000/compile', '--data-binary', '@/tmp/in.json', '-D', '/tmp/header.txt'])
             f = open('/tmp/out.json', 'w')
             f.write(output)
             f.close()
         except subprocess.CalledProcessError:
             print "error in calling frenetic"
         
-        cls = json_to_classifier(output)
-        return cls
+        cls = json_to_classifier(output, outport)
+        f = open('/tmp/header.txt')
+        time = 0
+        for line in f.readlines():
+            if line.startswith('x-compile-time:'):
+                time = float(line[line.index(":") + 1:-1])
+                break
+
+        return (cls, time)
 
 class Filter(Policy):
     """
@@ -1784,7 +1791,7 @@ def to_pol(p):
   elif isinstance(p, ingress_network) or isinstance(p, egress_network) or isinstance(p, DynamicPolicy):
       return to_pol(p.policy)
   else:
-    raise TypeError("unknown policy %s" % p)
+    raise TypeError("unknown policy %s" % type(p))
 
 def mk_union(pols):
   return { "type": "union", "pols": pols }
@@ -1857,10 +1864,13 @@ def create_action(action, inport):
             
             if len(mod_dict) > 0:
                 res.add(modify(**mod_dict))
-            
+        if len(res) == 0:
+            res.add(identity)
     return res
         
-def json_to_classifier(fname):
+def json_to_classifier(fname, outport = False):
+    if outport:
+        field_map['inPort'] = 'outport'
     data = json.loads(fname)
     rules = []
     for sw_tbl in data:

@@ -465,8 +465,8 @@ def print_callback_2(pkt):
 # type: unit -> path list
 def path_main(**kwargs):
     #return path_test_waypoint_violation_general()
-    return path_test_3()
-    #return path_test_23()
+    #return path_test_3()
+    return path_test_23()
 def main(**kwargs):
 #    return mac_learner()
     #return static_fwding_single_switch

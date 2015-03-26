@@ -89,6 +89,7 @@ class Runtime(object):
         self.vf_tag_pol = None
         self.vf_untag_pol = None
 
+        self.forwarding_policy = self.policy            
         if path_main:
             if opt_flags is None:
                 self.disjoint_enabled = False
@@ -109,7 +110,6 @@ class Runtime(object):
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
 
-            
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
                     
@@ -461,13 +461,27 @@ class Runtime(object):
 
             self.in_network_update = False
 
+    
+    def netkat_classifier_compile(self):
+        cnt = self.partition_cnt;
+        c0 = self.virtual_tag.compile()
+        c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
+        #c1 = self.path_in_table.netkat_compile(cnt)[0]
+        
+        c2 = self.forwarding_policy.compile()
+        c3 = self.path_out_table.policy.netkat_compile(cnt, True)[0]
+        #c3 = self.path_out_table.netkat_compile(cnt, True)[0]
+
+        c4 = self.virtual_untag.compile()
+        res = c0 >> c1 >> c2 >> c3 >> c4
+        return res
+    
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
-        p = self.policy.compile()
-
-        #p = self.policy.netkat_compile(3)
-        #print p
+        #p = self.policy.compile()
+        p = self.netkat_classifier_compile()
+        print "rule count", len(p.rules)
         return p
  
     def update_switch_classifiers(self):

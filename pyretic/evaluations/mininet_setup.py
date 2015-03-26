@@ -301,7 +301,7 @@ def parse_args():
     parser.add_argument("-targs", "--topo_args", nargs='+', type=int)
 
     
-    parser.add_argument("-c", "--cli", action="store_true") 
+    parser.add_argument("-x", "--cli", action="store_true") 
     parser.add_argument("-profile", "--profile", action="store_true") 
     parser.add_argument("-polargs", "--policy_args", nargs='+')
     
@@ -322,6 +322,10 @@ def parse_args():
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
 
+
+    parser.add_argument('--enable_partition', '-s', type=int,
+                    dest = 'switch_cnt',
+                    help = 'enable partition optimization')
 
     
     #traffic arguments
