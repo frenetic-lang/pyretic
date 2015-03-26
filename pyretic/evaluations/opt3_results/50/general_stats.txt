@@ -1,5 +1,0 @@
-out capture edges: 50
-dfa state count: 102
-in tagging edges: 50
-out tagging edges: 50
-in capture edges: 0
