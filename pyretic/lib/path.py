@@ -93,14 +93,8 @@ class classifier_utils(object):
         """ Return true if policy p is effectively a drop. """
 
         p_class = cls.__get_classifier__(p)
-        res_1 = cls.__is_not_drop_classifier__(p_class)
-        '''res_2 = sat_utils.is_not_drop(p)
-        if res_1 != res_2:
-            print p
-            print res_1
-            print res_2
-            print '---------------------'''
-        return res_1
+        res = cls.__is_not_drop_classifier__(p_class)
+        return res
         
 
     @classmethod
@@ -379,7 +373,7 @@ class re_tree_gen(object):
             cls.__add_dyn_preds__(dyn_pols, at.policy)
         
         new_pred_neg = ~new_pred
-        new_pred_not_drop = None
+        #new_pred_not_drop = None
         for pred in pred_list:
             assert pred in cls.pred_to_atoms
             pred_atoms = cls.pred_to_atoms[pred]
@@ -402,7 +396,7 @@ class re_tree_gen(object):
                 return re_tree
             elif is_subset:
                 new_pred = new_pred & pred_neg
-                new_pred_not_drop = new_and_not_pred
+                #new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
@@ -418,15 +412,11 @@ class re_tree_gen(object):
                 added_sym = cls.pred_to_symbol[inter_p]
                 re_tree |= re_symbol(added_sym, metadata=at)
                 new_pred = new_pred & pred_neg
-                new_pred_not_drop = new_and_not_pred
+                #new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
             else:
                 pass
-        #if new_pred_not_drop is None:
-            #print 'here'
-            #new_pred_not_drop = is_not_drop(new_pred)
         if is_not_drop(new_pred):
-        #if new_pred_not_drop:
             """ The new predicate should be added if some part of it doesn't
             intersect any existing predicate, i.e., new_pred is not drop.
             """
@@ -624,7 +614,7 @@ class re_tree_gen(object):
             cls.__add_dyn_preds__(dyn_pols, at.policy)
         
         new_pred_neg = ~new_pred
-        new_pred_not_drop = None
+        #new_pred_not_drop = None
         for pred in pred_list:
             assert pred in cls.pred_to_atoms[partition]
             pred_atoms = cls.pred_to_atoms[partition][pred]
@@ -647,7 +637,7 @@ class re_tree_gen(object):
                 return re_tree
             elif is_subset:
                 new_pred = new_pred & pred_neg
-                new_pred_not_drop = new_and_not_pred
+                #new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
                 pred_atoms.append(at)
                 re_tree |= re_symbol(pred_symbol, metadata=at)
@@ -663,15 +653,16 @@ class re_tree_gen(object):
                 added_sym = cls.pred_to_symbol[partition][inter_p]
                 re_tree |= re_symbol(added_sym, metadata=at)
                 new_pred = new_pred & pred_neg
-                new_pred_not_drop = new_and_not_pred
+                #new_pred_not_drop = new_and_not_pred
                 new_pred_neg = ~new_pred
             else:
                 pass
         #if new_pred_not_drop is None:
             #print 'here'
             #new_pred_not_drop = is_not_drop(new_pred)
-        if is_not_drop(new_pred):
+        
         #if new_pred_not_drop:
+        if is_not_drop(new_pred):
             """ The new predicate should be added if some part of it doesn't
             intersect any existing predicate, i.e., new_pred is not drop.
             """
@@ -1353,11 +1344,6 @@ class QuerySwitch(Policy):
         return eval_defaults(pkt)
     
     def compile(self):
-        '''
-        res = self.netkat_compile(3)
-        print 'rule count', len(res.rules)
-        return res
-        '''
         from pyretic.core.classifier import Rule, Classifier
         def resolve_virtual_fields(act):
             try:
@@ -1462,22 +1448,6 @@ class QuerySwitch(Policy):
 
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
-    @classmethod
-    def __set_tag__(cls, d, q):
-        val = dfa_utils.get_state_index(d, q)
-        if int(val) == 0:
-            return modify(path_tag=None)
-        else:
-            return modify(path_tag=int(val))
-
-    @classmethod
-    def __match_tag__(cls, d, q):
-        val = dfa_utils.get_state_index(d, q)
-        if int(val) == 0:
-            return match(path_tag=None)
-        else:
-            return match(path_tag=int(val))
-
     @classmethod
     def __num_set_tag__(cls, num):
         if num == 0:
@@ -1628,8 +1598,6 @@ class pathcomp(object):
         prep_trees = cls.__prep_re_trees__
 
         
-        import time
-        t_s = time.time()
         in_cg.clear()
         out_cg.clear()
 
@@ -1638,9 +1606,6 @@ class pathcomp(object):
 
         
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
-        #print '\n'.join([r.re_string_repr() for r in re_list])
-        #print __in_re_tree_gen__.get_leaf_preds() + __out_re_tree_gen__.get_leaf_preds() 
-        print time.time() - t_s
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
@@ -1657,16 +1622,12 @@ class pathcomp(object):
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
-        t_s = time.time()
-
         ast_fold(path_pol, inv_trees, None)
-        #ast_fold(path_pol, prep_trees, None)
         
         cls.pred_part(path_pol)
 
         cls.path_policy += path_pol
         (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
-        print time.time() - t_s
 
         return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
 
@@ -1735,7 +1696,7 @@ class pathcomp(object):
             du = dfa_utils
       
         dfa = du.regexes_to_dfa(re_list)
-        print du.get_num_states(dfa)
+        print 'number of states: ', du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
         stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
@@ -1746,32 +1707,32 @@ class pathcomp(object):
        
 
         stat.gather_general_stats('dfa edges', len(edges), 0, False) 
-        #stat.dump_dist(cls.create_dist([len(v) for v in ragel_dfa_utils.dfa_dict.values()]), 'edge_dist_between_states.txt')
 
         in_edge_per_state = {}
         out_edge_per_state = {}
         in_pred_classifier = {}
         out_pred_classifier = {}
+
         if disjoint_enabled:
             
             if integrate_enabled:
-                t_s = time.time()
                 in_table_dic = {}
                 out_table_dic = {}
 
                 for edge in edges:
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                    
+                    assert typ in [__in__, __out__]
+                    
+                    ### statistics ###
                     if typ == __in__:
                         if not pred in in_pred_classifier:
                             in_pred_classifier[pred] = len(pred.compile().rules)
                     else:
                         if not pred in out_pred_classifier:
                             out_pred_classifier[pred] = len(pred.compile().rules)
-
-
-                    assert typ in [__in__, __out__]
-                    
+                    ################
+                        
                     action_frag = None
                    
                     
@@ -1783,12 +1744,12 @@ class pathcomp(object):
                                                 
                         action_frag = set_tag(dst_num)
 
+                        ### statistics ###
                         if typ == __in__:
                             in_tag_rules += 1
                             if not src in in_edge_per_state:
                                 in_edge_per_state[src] = 0
                             in_edge_per_state[src] += 1
-
 
                         else:
                             if not src in out_edge_per_state:
@@ -1796,7 +1757,8 @@ class pathcomp(object):
                             out_edge_per_state[src] += 1
 
                             out_tag_rules += 1
-                    
+                        ################
+
                     if du.is_accepting(dfa, dst):
                         ords = du.get_accepting_exps(dfa, edge, dst)
                         for i in ords:
@@ -1805,10 +1767,13 @@ class pathcomp(object):
                             else:
                                 action_frag += pol_list[i]
                            
+                            ### statisitcs ###
                             if typ == __in__:
                                 in_cap_rules += 1
                             else:
                                 out_cap_rules += 1
+                            ################
+                    
                     if action_frag is not None:
                         table_frag = pred >> action_frag
                         if typ == __in__:
@@ -1827,15 +1792,13 @@ class pathcomp(object):
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
                 out_table = QuerySwitch('path_tag', out_table_dic, table_default, True)
                
-                elap = time.time() - t_s
-                stat.gather_general_stats('create pol', elap, 0, False)
                 stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
                 stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
 
                 stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
                 stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
                 
-                ### edge per state ###
+                ### statistics  ###
                 '''### edge per state ###
                 edge_cnts = in_edge_per_state.values()
                 max_edge_per_state = max(edge_cnts)
@@ -1869,6 +1832,8 @@ class pathcomp(object):
                 stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
 
                 '''
+                ################
+
                 return (in_table, out_table)
            
             else:
@@ -2781,30 +2746,13 @@ class ragel_dfa_utils(common_dfa_utils):
         
         (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
-            print 'using contraction'
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
         else:
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
 
        
-        def print_list(l):
-            for e in l:
-                print e
-            print '----------'
 
-        def print_dict(d):
-            for e,v in d.items():
-                print e,v
-
-            print '----------'
-        #(edge2, ord2) = cls.get_extended_edges_2(output)
-        #print '----prev----'
-        #print_list(cls._edges)
-        #print_dict(cls._edge_ordinal)
-        #print '----next---'
-        #print_list(edge2)
-        #print_dict(ord2)'''
-
+        
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        
@@ -2818,410 +2766,6 @@ class ragel_dfa_utils(common_dfa_utils):
         return None
 
 
-#############################################################################
-###                       Match Intersection                              ###
-#############################################################################
-
-class intersection_utils(object):
-
-    @classmethod
-    def match_intersect(cls, m1, m2):
-        '''print 'in match'
-        print m1
-        print m2
-        print '-----------------'
-        '''
-        
-        m2_map = m2.map
-
-        for k,v1 in m1.map.items():
-            if k in m2_map:
-                v2 = m2_map[k]
-                if k == 'srcip' or k == 'dstip':
-                    if not v1 in v2 and not v2 in v1:
-                        return False
-
-                elif v1 != v2:
-                    return False
-
-        return True
-
-    @classmethod
-    def match_neg_intersect(cls, m1, m2):
-        '''print 'in match_neg'
-        print m1
-        print m2
-        print '-----------------'
-        '''
-        
-        m1_map = m1.map
-
-        for k, v2 in m2.policies[0].map.items():
-            if not k in m1_map:
-                return True
-            v1 = m1_map[k]
-            if k == 'srcip' or k == 'dstip':
-                if not v1 in v2:
-                    return True
-            elif v1 != v2:
-                return True
-        return False
-    
-    @classmethod
-    def match_neg_neg_intersect(cls, m1, m2):
-        '''
-        print 'in match_neg_neg'
-        print m1
-        print m2
-        print '-----------------'
-        '''
-        
-        m1_map = m1.map
-
-        for k, v2 in m2.map.items():
-            if not k in m1_map:
-                return True
-            v1 = m1_map[k]
-            if k == 'srcip' or k == 'dstip':
-                v1 = IPNetwork(util.network_to_string(v1))
-                v2 = IPNetwork(util.network_to_string(v2))
-                u = cidr_merge([v1, v2])
-                if len(u) > 1 or u.prefixlen > 0:
-                    return True
-            else:
-                return True
-        return False
-
-    @classmethod
-    def match_neg_tree_intersect(cls, m1, m2, neg):
-        '''
-        print 'in match_neg_tree'
-        print m1
-        print m2
-        print neg
-        print '-----------------'
-        '''
-        
-        inner_policy = m2.policies[0]
-        if isinstance(inner_policy, match):
-            if neg:
-                return cls.match_intersect(m1, inner_policy)
-            else:
-                return cls.match_neg_intersect(m1, m2)
-        elif inner_policy == drop:
-            if neg:
-                return False
-            else:
-                return classifier_utils.is_not_drop(m1)
-        elif inner_policy == identity:
-            if neg:
-                return classifier_utils.is_not_drop(m1)
-            else:
-                return False
-
-        elif isinstance(inner_policy, negate):
-            return cls.match_tree_intersect(m1, inner_policy.policies[0], neg)
-        elif isinstance(inner_policy, intersection):
-            return cls.match_intersect_tree_intersect(m1, inner_policy, not neg)
-        elif isinstance(inner_policy, union):
-            return cls.match_union_tree_intersect(m1, inner_policy, not neg)
-        raise TypeError
-
-    @classmethod
-    def match_intersect_tree_intersect(cls, m1, m2, neg):
-        '''
-        print 'in match_intersect_tree'
-        print m1
-        print m2
-        print neg
-        print '-----------------'
-        '''
-        
-        if neg:
-            for pol in m2.policies:
-                if cls.match_tree_intersect(m1, pol, neg):
-                    return True
-            return False
-        else:
-            for pol in m2.policies:
-                if not cls.match_tree_intersect(m1, pol, neg):
-                    return False
-            return True
-
-    @classmethod
-    def match_union_tree_intersect(cls, m1, m2, neg):
-        '''
-        print 'in match_union_tree'
-        print m1
-        print m2
-        print neg
-        print '-----------------'
-        '''
-
-        if neg:
-            for pol in m2.policies:
-                if not cls.match_tree_intersect(m1, pol, neg):
-                    return False
-            return True
-        else:
-            for pol in m2.policies:
-                if cls.match_tree_intersect(m1, pol, neg):
-                    return True
-            return False
-
-    @classmethod
-    def match_tree_intersect(cls, m1, m2, neg):
-        assert isinstance(m1, match)
-        '''
-        print 'in match_tree'
-        print m1
-        print m2
-        print neg
-        print '-----------------'
-        '''
-        if isinstance(m2, match):
-            if not neg:
-                return cls.match_intersect(m1, m2)
-            else:
-                return cls.match_neg_intersect(m1, ~m2)
-        elif m2 == drop:
-            if neg:
-                return classifier_utils.is_not_drop(m1)
-            else:
-                return False
-        elif m2 == identity:
-            if neg:
-                return False
-            else:
-                return classifier_utils.is_not_drop(m1)
-
-        elif isinstance(m2, negate):
-            return cls.match_neg_tree_intersect(m1, m2, neg)
-        elif isinstance(m2, intersection):
-            return cls.match_intersect_tree_intersect(m1, m2, neg)
-        elif isinstance(m2, union):
-            return cls.match_union_tree_intersect(m1, m2, neg)
-
-        raise TypeError
-   
-
-class sat_utils:
-    @classmethod
-    def dim_union_set(cls, s1, s2):
-        def_1 = s1[1]
-        def_2 = s2[1]
-
-        map_1 = s1[0]
-        map_2 = s2[0]
-        for k, v1 in map_1.items():
-            if v1:
-                if k in map_2:
-                    del map_2[k]
-            elif k in map_2:
-                map_1[k] = map_2[k]
-                del map_2[k]
-            else:
-                map_1[k] = def_2       
-        if def_1:
-            return (map_1, def_1)
-
-        for k, v2 in map_2.items():
-            map_1[k] = v2
-        
-        return (map_1, def_1 or def_2)
-
-    @classmethod
-    def dim_intersect_set(cls, s1, s2):
-        def_1 = s1[1]
-        def_2 = s2[1]
-
-        map_1 = s1[0]
-        map_2 = s2[0]
-        for k, v1 in map_1.items():
-            if not v1:
-                if k in map_2:
-                    del map_2[k]
-            elif k in map_2:
-                map_1[k] = map_2[k]
-                del map_2[k]
-            else:
-                map_1[k] = def_2  
-        
-        if not def_1:
-            return (map_1, def_1)
-        for k, v2 in map_2.items():
-            map_1[k] = v2
-
-        return (map_1, def_1 and def_2)
-   
-    @classmethod
-    def get_truth_value(cls, sp):
-        if len(sp) > 1 or not sp.items()[0][0] in ['identity', 'drop']:
-            return None
-        return sp.items()[0][1][1]
-
-    @classmethod
-    def union_set(cls, sp1, sp2):
-        res_sp = {}
-        
-        v1 = cls.get_truth_value(sp1)
-        v2 = cls.get_truth_value(sp2)
-
-        if not v1 is None and not v2 is None:
-            return {'identity' : ({}, v1 or v2)}
-        elif not v1 is None:
-            if v1:
-                return {'identity' : ({}, True)}
-            else:
-                return sp2
-        elif not v2 is None:
-            if v2:
-                return {'identity' : ({}, True)}
-            else:
-                return sp1
-
-        for field1, tbl1 in sp1.items():
-            if not field1 in sp2:
-                res_sp[field1] = tbl1
-            else:
-                res_sp[field1] = cls.dim_union_set(tbl1, sp2[field1])
-
-        for field2, tbl2 in sp2.items():
-            if not field2 in sp1:
-                res_sp[field2] = tbl2
-        return res_sp
-
-    @classmethod
-    def intersect_set(cls, sp1, sp2):
-        
-        res_sp = {}
-        
-        v1 = cls.get_truth_value(sp1)
-        v2 = cls.get_truth_value(sp2)
-
-        if not v1 is None and not v2 is None:
-            res_sp = {'identity' : ({}, v1 and v2)}
-        elif not v1 is None:
-            if not v1:
-                res_sp = {'identity' : ({}, False)}
-            else:
-                res_sp = sp2
-        elif not v2 is None:
-            if not v2:
-                res_sp = {'identity' : ({}, False)}
-            else:
-                res_sp = sp1
-        else:
-            for field1, tbl1 in sp1.items():
-                if not field1 in sp2:
-                    res_sp[field1] = tbl1
-                else:
-                    res_sp[field1] = cls.dim_intersect_set(tbl1, sp2[field1])
-
-            for field2, tbl2 in sp2.items():
-                if not field2 in sp1:
-                    res_sp[field2] = tbl2
-            
-        '''print 'in intersect'
-        print v1, sp1
-        print v2, sp2
-        print res_sp
-        print '-------------'
-        '''
-        
-        return res_sp
-
-    @classmethod
-    def is_not_drop_set(cls, p, neg):
-        if p == identity:
-            if neg:
-                return {'identity': ({}, False)}
-            else:
-                return  {'identity' : ({}, True)}
-        elif p == drop:
-            if neg:
-                return {'drop' : ({}, True)} 
-            else:
-                return {'drop' : ({}, False)}
-        else:
-            p_type = type(p) 
-            if p_type == match:
-                if neg:
-                    #FIXME: the map may be empty
-                    space = {}
-                    for field, value in p.map.items():
-                        space[field] = ({value:False}, True)
-                    return space
-                else:
-                    #FIXME: the map may be empty
-                    space = {}
-                    for field, value in p.map.items():
-                        space[field] = ({value:True}, False)
-                    return space
-
-            elif p_type == negate:
-                return cls.is_not_drop_set(p.policies[0], not neg)
-
-            elif (not neg and p_type == intersection) or (neg and p_type == union):
-                assert len(p.policies) >= 2
-                res = cls.intersect_set(cls.is_not_drop_set(p.policies[0], neg), cls.is_not_drop_set(p.policies[1], neg))
-                if len(p.policies) > 2:
-                    for pol in p.policies[2:]:
-                        res = cls.intersect_set(cls.is_not_drop_set(pol, neg), res)
-                return res
-            elif (not neg and p_type == union) or (neg and p_type == intersection):
-                assert len(p.policies) >= 2
-                res = cls.union_set(cls.is_not_drop_set(p.policies[0], neg), cls.is_not_drop_set(p.policies[1], neg))
-                if len(p.policies) > 2:
-                    for pol in p.policies[2:]:
-                        res = cls.union_set(cls.is_not_drop_set(pol, neg), res)
-                return res
-            raise TypeError
-
-    @classmethod
-    def is_not_drop(cls, p):
-        #print 'starting checking'
-        res = cls.is_not_drop_set(p, False)
-        for field, tbl in res.items():
-            if tbl[1]:
-                continue
-            else:
-                found = False
-                for v in tbl[0].values():
-                    if v:
-                        found = True
-                        break
-                if not found:
-                    return False
-        return True
-
-'''class z3_utils(object):
-    field_map = {'switch': z3.Int('s'), 'port' : z3.Int('p')}
-
-    @classmethod
-    def construct_pred(cls, p):
-        if p == identity:
-            return True
-        elif p == drop:
-            return False
-        else:
-            p_type = type(p)
-            if p_type == match:
-                pass
-
-    @classmethod
-    def is_not_drop(cls, p):
-        solver = z3.Solver()
-        pred = cls.construct_pred(p)
-        solver.add(pred)
-        res = solver.check()
-        if res == z3.sat:
-            return True
-        elif res == z3.unsat:
-            return False
-        else:
-            raise TypeError
-'''
 #############################################################################
 ###                              Pickling                                 ###
 #############################################################################

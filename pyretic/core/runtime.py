@@ -93,8 +93,13 @@ class Runtime(object):
         if path_main:
             if opt_flags is None:
                 self.disjoint_enabled = False
+                self.default_enabled = False
                 self.integrate_enabled = False
                 self.multitable_enabled = False
+                self.ragel_enabled = False
+                self.partition_cnt = None
+                self.cache_enabled = False
+                self.edge_contraction_enabled = False
             else:
                 (self.disjoint_enabled, self.default_enabled, self.integrate_enabled, 
                         self.multitable_enabled, self.ragel_enabled, self.partition_cnt,
@@ -158,7 +163,6 @@ class Runtime(object):
                 in_capture  = self.path_in_capture
                 self.out_capture = (in_tag_policy >> self.path_out_capture)
 
-                '''
                 ## gathering stats
                 # forwarding
                 self.forwarding_compile()
@@ -175,7 +179,6 @@ class Runtime(object):
                 # virtual tags
                 self.vf_tag_compile()
                 self.vf_untag_compile()
-                '''
                 
                
                 self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
@@ -184,11 +187,9 @@ class Runtime(object):
                
                 #self.vtag_forwarding = (self.forwarding)
                 #self.vtag_out_capture = self.out_capture
-                '''
                 self.vtag_fw_compile()
                 self.vtag_in_capture_compile()
                 self.vtag_out_capture_compile()
-                '''
                 
                 self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
             
@@ -240,7 +241,7 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def forwarding_compile(self):
-        return self.policy.compile()
+        return self.forwarding_policy.compile()
      
     @stat.classifier_size
     @stat.elapsed_time
@@ -479,9 +480,9 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
-        #p = self.policy.compile()
-        p = self.netkat_classifier_compile()
-        print "rule count", len(p.rules)
+        p = self.policy.compile()
+        #p = self.netkat_classifier_compile()
+        #print "rule count", len(p.rules)
         return p
  
     def update_switch_classifiers(self):

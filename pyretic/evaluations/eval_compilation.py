@@ -34,6 +34,7 @@ class eval_compilation:
         self.integrate_enabled = args.integrate_enabled
         self.multitable_enabled = args.multitable_enabled
         self.ragel_enabled = args.ragel_enabled
+
         if args.switch_cnt:
             self.partition_enabled = True
             self.switch_cnt = args.switch_cnt
@@ -471,66 +472,4 @@ if __name__ == '__main__':
             eval_comp.add(False, **aparams)
             print time.time() - t_s
     
-
-#######################################################
-###             Previous Tests                      ###
-#######################################################
-
-#### ml_ulex
-def get_input(re_list):
-    lex_input = ''
-    expr_num = 0 
-    for r in re_list:
-        lex_input += (r.ml_ulex_repr() + ' => ( T.expr_' + str(expr_num) + ' );')
-        lex_input += '\n'
-        expr_num += 1
-    return lex_input
-
-def ml_ulex(args):
-    import time
-    start = time.time()
-    p = eval_path.path_main(**get_testwise_params(args))
-    print 'hi'
-    re_list = pathcomp.compile(p)
-    print time.time() - start
-    lex_input = get_input(re_list) 
-    f = open('lex_input.txt', 'w')
-    f.write(lex_input)
-    f.close()
-    start = time.time()
-    output = subprocess.check_output(["ml-ulex", "--dot", 'lex_input.txt'])
-    print time.time() - start
-
-#### profiling
-def profile(args):
-    import cProfile as profile
-
-    p = profile.run('pathcomp.compile(p)', sort='tottime')
-
-
-#### ragel
-def get_ragel_input(re_list):
-    res = '%%{\n\tmachine pyretic;\n'
-    for i in range(len(re_list)):
-        res += '\taction _%d {}\n' % i
-    
-    re_list_str = '\tmain := '
-    for i,q in re_list:
-        re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
-    res += re_list_str[:-1] + ';}%%\n%% write data;'
-    return res
-
-def ragel(args):
-    p = eval_path.path_main(**get_testwise_params(args))
-    re_list = pathcomp.compile(p)
-    re_list = zip(range(len(re_list)), re_list)
-    lex_input = get_ragel_input(re_list) 
-    f = open('ragel_lex_input.txt', 'w')
-    f.write(lex_input)
-    f.close()
-    output = subprocess.check_output(["ragel", "-V", 'ragel_lex_input.txt'])
-    import pydot
-    g = pydot.graph_from_dot_data(output)
-    print g.get_node_list()
-
 

@@ -142,7 +142,6 @@ class Policy(object):
         return "%s : %d" % (self.name(),id(self))
 
     def netkat_compile(self, switch_cnt, outport = False):
-        #print 'called--------', self
         pred_policy = None
         for i in range(1, switch_cnt + 1):
             if pred_policy is None:
@@ -151,7 +150,6 @@ class Policy(object):
                 pred_policy |= match(switch = i)
 
         pol = pred_policy >> self
-        #pol = self
         import subprocess
 
         f = open('/tmp/in.json', 'w')
