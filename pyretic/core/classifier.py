@@ -232,8 +232,9 @@ class Classifier(object):
                 act = act.policy
             if act == identity:
                 return pkts
-            elif (act == Controller or isinstance(act, CountBucket) or
-                  isinstance(act, PathBucket)):
+            elif (act == Controller or isinstance(act, PathBucket)):
+                return identity
+            elif isinstance(act, CountBucket):
                 """ Warning: this could be a dangerous change. """
                 # return identity
                 return pkts
