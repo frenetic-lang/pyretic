@@ -1033,10 +1033,10 @@ class CountBucket(Query):
                                            entries_print_helper())
                         if me:
                             if extracted_pkts > 0:
-                                self.log.error('In bucket ' + self.bname +
+                                self.log.debug('In bucket ' + self.bname +
                                                ': found matching stats_reply:')
-                                self.log.error(str(me))
-                                self.log.error('packets: ' +
+                                self.log.debug(str(me))
+                                self.log.debug('packets: ' +
                                                str(extracted_pkts) + ' bytes: '
                                                + str(extracted_bytes))
                             if not self.matches[me].existing_rule:
@@ -1068,7 +1068,7 @@ class CountBucket(Query):
                     self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
             self.log.debug("No outstanding switches; calling callbacks")
-            self.log.error("*** Returning bucket %s counts.\n%s%s%s%s%s%s" % (
+            self.log.debug("*** Returning bucket %s counts.\n%s%s%s%s%s%s" % (
                     self.bname,
                     "table counts: %d\n" % self.packet_count_table,
                     "perst. apply: %d\n" % self.packet_count_persistent_apply,
