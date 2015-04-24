@@ -1632,13 +1632,24 @@ class Runtime(object):
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
-            self.path_based_forwarding = (self.virtual_tag >>
-                                          (self.path_in_tagging +
-                                           self.path_in_capture) >>
-                                          self.forwarding >>
-                                          (self.path_out_tagging +
-                                           self.path_out_capture) >>
-                                          self.virtual_untag)
+            # self.path_based_forwarding = (self.virtual_tag >>
+            #                               (self.path_in_tagging +
+            #                                self.path_in_capture) >>
+            #                               self.forwarding >>
+            #                               (self.path_out_tagging +
+            #                                self.path_out_capture) >>
+            #                               self.virtual_untag)
+            self.path_based_forwarding = ((self.virtual_tag >>
+                                           self.path_in_tagging >>
+                                           self.forwarding >>
+                                           self.path_out_tagging >>
+                                           self.virtual_untag) +
+                                          (self.virtual_tag >>
+                                           self.path_in_capture) +
+                                          (self.virtual_tag >>
+                                           self.path_in_tagging >>
+                                           self.forwarding >>
+                                           self.path_out_capture))
 
 ##########################
 # VIRTUAL HEADER SUPPORT 

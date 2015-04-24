@@ -235,9 +235,9 @@ class Classifier(object):
             elif (act == Controller or isinstance(act, PathBucket)):
                 return identity
             elif isinstance(act, CountBucket):
-                """ Warning: this could be a dangerous change. """
-                # return identity
-                return pkts
+                """ TODO(ngsrinivas): inspect which possibility is best """
+                return identity
+                # return pkts
             elif isinstance(act, modify):
                 new_match_dict = {}
                 if pkts == identity:

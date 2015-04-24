@@ -188,6 +188,9 @@ def path_callback(test_num):
         print '**************'
     return actual_callback
 
+def path_test_empty():
+    return path_empty()
+
 def path_test_0():
     p = atom(match(switch=2))
     p.register_callback(query_callback(0))
@@ -539,7 +542,7 @@ def path_test_tm():
                 p = (in_atom(ing() & match(switch=i)) ^
                      +in_atom(identity) ^
                      out_atom(eg() & match(switch=j)))
-                cb = CountBucket()
+                cb = CountBucket(bname=("%d ~> %d" % (i,j)))
                 cb.register_callback(query_callback("27.%d.%d" % (i, j)))
                 p.set_bucket(cb)
                 query_thread = threading.Thread(target=query_func, args=(cb,5.0))

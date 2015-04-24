@@ -701,7 +701,8 @@ class CountBucket(Query):
     Class for registering callbacks on counts of packets sent to
     the controller.
     """
-    def __init__(self):
+    def __init__(self, bname=None):
+        self.bname = str(bname) if bname else str(id(self))
         super(CountBucket, self).__init__()
         self.matches = {}
         self.runtime_stats_query_fun = None
@@ -728,7 +729,7 @@ class CountBucket(Query):
         self._classifier = self.generate_classifier()
 
     def __repr__(self):
-        return "CountBucket " + str(id(self))
+        return "CountBucket " + self.bname
 
     def is_new_bucket(self):
         return self.new_bucket
@@ -749,14 +750,14 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
-                self.log.info('In CountBucket ' + str(id(self)) + ' apply():'
+                self.log.info('In CountBucket ' + self.bname + ' apply():'
                                + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['payload_len']
                 self.packet_count_persistent_apply += 1
                 self.byte_count_persistent_apply += pkt['payload_len']
             self.bucket.clear()
-        self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
+        self.log.debug('In bucket ' +  self.bname + ' apply(): ' +
                        'persistent packet count is ' +
                        str(self.packet_count_persistent))
 
@@ -796,7 +797,7 @@ class CountBucket(Query):
         if self.new_bucket:
             self.pull_existing_stats()
             self.new_bucket = False
-        self.log.info("Updated bucket %d" % id(self))
+        self.log.info("Updated bucket %s" % self.bname)
        
 
     class match_entry(object):
@@ -865,10 +866,10 @@ class CountBucket(Query):
         packet_count = flow_stat['packet_count']
         byte_count   = flow_stat['byte_count']
         if packet_count > 0:
-            self.log.debug(("In bucket %d handle_flow_removed\n" +
+            self.log.debug(("In bucket %s handle_flow_removed\n" +
                             "got counts %d %d\n" +
                             "match %s") %
-                           (id(self), packet_count, byte_count,
+                           (self.bname, packet_count, byte_count,
                             str(match) + ' ' + str(priority) + ' ' +
                             str(version)) )
         with self.in_update_cv:
@@ -885,8 +886,8 @@ class CountBucket(Query):
                     # existed. We don't count it.
                     if packet_count > 0:
                         self.log.info(("Adding persistent pkt count %d"
-                                        + " to bucket %d") % (
-                                packet_count, id(self) ) )
+                                        + " to bucket %s") % (
+                                packet_count, self.bname ) )
                         self.log.debug(("persistent count is now %d" %
                                         (self.packet_count_persistent +
                                          packet_count) ) )
@@ -1032,19 +1033,21 @@ class CountBucket(Query):
                                            entries_print_helper())
                         if me:
                             if extracted_pkts > 0:
-                                self.log.debug('In bucket ' + str(id(self)) +
+                                self.log.error('In bucket ' + self.bname +
                                                ': found matching stats_reply:')
-                                self.log.debug(str(me))
-                                self.log.debug('packets: ' +
+                                self.log.error(str(me))
+                                self.log.error('packets: ' +
                                                str(extracted_pkts) + ' bytes: '
                                                + str(extracted_bytes))
                             if not self.matches[me].existing_rule:
                                 self.packet_count_table += extracted_pkts
                                 self.byte_count_table   += extracted_bytes
                             else: # pre-existing rule when bucket was created
-                                self.log.debug(('In bucket %d: removing' +
+                                self.log.debug(('In bucket %s: removing' +
                                                 'pre-existing rule counts %d' +
-                                                ' %d') % id(self))
+                                                ' %d') %
+                                               (self.bname, extracted_pkts,
+                                                extracted_bytes ))
                                 self.packet_count_persistent -= extracted_pkts
                                 self.byte_count_persistent -= extracted_bytes
                                 self.packet_count_persistent_existing += (
@@ -1058,15 +1061,15 @@ class CountBucket(Query):
                 self.log.debug("Current set of outstanding switches is:")
                 self.log.debug(str(self.outstanding_switches))
         # If have all necessary data, call user-land registered callbacks
-        self.log.info( ('*** Bucket %d flow_stats_reply\n' % id(self)) +
+        self.log.info( ('*** Bucket %s flow_stats_reply\n' % self.bname) +
                         ('table pktcount %d persistent pktcount %d total %d' % (
                     self.packet_count_table,
                     self.packet_count_persistent,
                     self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
             self.log.debug("No outstanding switches; calling callbacks")
-            self.log.debug("*** Returning bucket %d counts.\n%s%s%s%s%s%s" % (
-                    id(self),
+            self.log.error("*** Returning bucket %s counts.\n%s%s%s%s%s%s" % (
+                    self.bname,
                     "table counts: %d\n" % self.packet_count_table,
                     "perst. apply: %d\n" % self.packet_count_persistent_apply,
                     "perst. remov: %d\n" % self.packet_count_persistent_removed,
