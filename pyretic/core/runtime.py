@@ -531,6 +531,29 @@ class Runtime(object):
         if not self.use_nx:
             table_id = 0
 
+        class ListedRule(object):
+            """ Rule class used by half of the classifier processing pipeline
+            to keep track of various data plane installation parameters, outside
+            of the normal classifier.
+            """
+            def __init__(self, mat=drop, priority=0, actions=[],
+                         version=0, cookie=0,
+                         table_id=0, notify=False,
+                         parents=None, op="policy"):
+                self.mat = mat
+                self.priority = priority
+                self.actions = actions
+                self.version = version
+                self.cookie = cookie
+                self.table_id = table_id
+                self.parents = parents
+                self.op = op
+                self.notify = notify # flow removed notification
+
+            def to_tuple(self):
+                return (self.mat, self.priority, self.actions, self.cookie,
+                        self.notify, self.table_id)
+
         ### CLASSIFIER TRANSFORMS 
 
         # TODO (josh) logic for detecting action sets that can't be compiled
@@ -548,7 +571,10 @@ class Runtime(object):
             if not self.use_nx:
                 """ Remove identity policies if using single-stage table. """
                 return Classifier(Rule(rule.match,
-                                       filter(lambda a: a != identity,rule.actions))
+                                       filter(lambda a: a !=
+                                              identity,rule.actions),
+                                       parents=rule.parents,
+                                       op=rule.op)
                                   for rule in classifier.rules)
             else:
                 """ Don't remove identity actions from multi-stage policies. """
@@ -576,7 +602,9 @@ class Runtime(object):
                         new_acts.append(Controller)
                     else:
                         new_acts.append(act)
-                new_rules.append(Rule(rule.match, new_acts))
+                new_rules.append(Rule(rule.match, new_acts,
+                                      parents=rule.parents,
+                                      op=rule.op))
             return Classifier(new_rules)
 
         def controllerify(classifier):
@@ -597,7 +625,9 @@ class Runtime(object):
                     # DISCUSS (cole): should other actions be taken at the switch
                     # before sending to the controller?  i.e. a policy like:
                     # modify(srcip=1) >> ToController.
-                    return Rule(rule.match,[Controller])
+                    return Rule(rule.match,[Controller],
+                                parents=rule.parents,
+                                op=rule.op)
                 else:
                     return rule
             return Classifier(controllerify_rule(rule) 
@@ -620,7 +650,9 @@ class Runtime(object):
                        not 'vlan_id' in rule.match.map ) or
                      rule.match == identity ):
                     specialized_rules.append(Rule(rule.match.intersect(default_vlan_match),
-                                                  rule.actions))
+                                                  rule.actions,
+                                                  parents=rule.parents,
+                                                  op=rule.op))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -642,7 +674,11 @@ class Runtime(object):
                      ( 'srcip' in rule.match.map or 
                        'dstip' in rule.match.map ) and 
                      not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
+                    specialized_rules.append(Rule(rule.match &
+                                                  match(ethtype=IP_TYPE),
+                                                  rule.actions,
+                                                  parents=rule.parents,
+                                                  op=rule.op))
 
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
@@ -655,9 +691,17 @@ class Runtime(object):
                             arp_bug = True
                             break
                     if arp_bug:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[Controller]))
+                        specialized_rules.append(Rule(rule.match &
+                                                      match(ethtype=ARP_TYPE),
+                                                      [Controller],
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     else:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
+                        specialized_rules.append(Rule(rule.match &
+                                                      match(ethtype=ARP_TYPE),
+                                                      rule.actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -680,7 +724,7 @@ class Runtime(object):
                 """
                 bucket_list = {}
                 for rule in rules:
-                    (_,_,actions,_,_) = rule
+                    actions = rule.actions
                     for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
@@ -688,7 +732,11 @@ class Runtime(object):
                 return bucket_list
 
             def update_rules_for_buckets(rule, op):
-                (match, priority, actions, version, table_id) = rule
+                match = rule.mat
+                priority = rule.priority
+                actions = rule.actions
+                version = rule.version
+                table_id = rule.table_id
                 hashable_match = util.frozendict(match)
                 rule_key = (hashable_match, priority, version)
                 for act in actions:
@@ -748,13 +796,19 @@ class Runtime(object):
             for lst in diff_lists:
                 new_lst = []
                 for rule in lst:
-                    (match,priority,acts,version,table_id) = rule
+                    acts = rule.actions
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
-                    if len(new_acts) < len(acts):
-                        new_rule = (match, priority, new_acts, version, True, table_id)
-                    else:
-                        new_rule = (match, priority, new_acts, version, False, table_id)
+                    notify_flag = True if len(new_acts) < len(acts) else False
+                    new_rule = ListedRule(mat=rule.mat,
+                                          priority=rule.priority,
+                                          actions=new_acts,
+                                          version=rule.version,
+                                          cookie=rule.cookie,
+                                          notify=notify_flag,
+                                          table_id=rule.table_id,
+                                          parents=rule.parents,
+                                          op=rule.op)
                     new_lst.append(new_rule)
                 new_diff_lists.append(new_lst)
             return new_diff_lists
@@ -781,8 +835,10 @@ class Runtime(object):
                 else:
                     for s in switches:
                         new_rules.append(Rule(
-                                rule.match.intersect(match(switch=s)),
-                                rule.actions))
+                            rule.match.intersect(match(switch=s)),
+                            rule.actions,
+                            parents=rule.parents,
+                            op=rule.op))
             return Classifier(new_rules)
 
         def concretize(classifier):
@@ -824,7 +880,7 @@ class Runtime(object):
                 if m is None:
                     return None
                 else:
-                    return Rule(m,acts)
+                    return Rule(m,acts,parents=rule.parents,op=rule.op)
             crs = [concretize_rule_actions(r) for r in classifier.rules]
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
@@ -840,7 +896,9 @@ class Runtime(object):
                         act['outport'] = CUSTOM_NEXT_TABLE_PORT
                     new_acts.append(act)
                 return new_acts
-            return Classifier([Rule(r.match, set_next_table_outport(r.actions))
+            return Classifier([Rule(r.match,
+                                    set_next_table_outport(r.actions),
+                                    parents=r.parents, op=r.op)
                                for r in classifier.rules])
 
         def check_OF_rules(classifier):
@@ -914,14 +972,18 @@ class Runtime(object):
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
                         new_actions = specialize_actions(rule.actions,outport)
-                        specialized_rules.append(Rule(new_match,new_actions))
+                        specialized_rules.append(Rule(new_match,new_actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     # And a default rule for any inport outside the set of outports_used
                     specialized_rules.append(rule)
                 else:
                     if rule.match['inport'] in outports_used:
                         # Modify the set of actions
                         new_actions = specialize_actions(rule.actions,rule.match['inport'])
-                        specialized_rules.append(Rule(rule.match,new_actions))
+                        specialized_rules.append(Rule(rule.match,new_actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     else:
                         # Leave as before
                         specialized_rules.append(rule)
@@ -945,7 +1007,12 @@ class Runtime(object):
                     priority[s] -= 1
                 except KeyError:
                     priority[s] = TABLE_START_PRIORITY
-                tuple_rules.append((rule.match,priority[s],rule.actions))
+                r = ListedRule(mat=rule.match,
+                               priority=priority[s],
+                               actions=rule.actions,
+                               parents=rule.parents,
+                               op=rule.op)
+                tuple_rules.append(r)
             return tuple_rules
 
         ### UPDATE LOGIC
@@ -988,15 +1055,35 @@ class Runtime(object):
             if rule_list is None:
                 return None
             for rule in rule_list:
-                if target[0] == rule[0] and target[1] == rule[1]:
+                if target.mat == rule.mat and target.priority == rule.priority:
                     return rule
             return None
 
         def get_new_rules(classifier, curr_classifier_no, table_id):
-            def add_field(rules, field):
+            def add_cookie(rules, cookie_val):
                 new_rules = []
                 for r in rules:
-                    new_rules.append(r + (field,))
+                    new_rules.append(ListedRule(mat=r.mat,
+                                                priority=r.priority,
+                                                actions=r.actions,
+                                                version=r.version,
+                                                cookie=cookie_val,
+                                                table_id=r.table_id,
+                                                parents=r.parents,
+                                                op=r.op))
+                return new_rules
+
+            def add_table_id(rules, table_id_val):
+                new_rules = []
+                for r in rules:
+                    new_rules.append(ListedRule(mat=r.mat,
+                                                priority=r.priority,
+                                                actions=r.actions,
+                                                version=r.version,
+                                                cookie=r.cookie,
+                                                table_id=table_id_val,
+                                                parents=r.parents,
+                                                op=r.op))
                 return new_rules
 
             switches = self.network.switch_list()
@@ -1009,8 +1096,8 @@ class Runtime(object):
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
             cookie = self.get_cookie(curr_classifier_no, table_id)
-            new_rules = add_field(new_rules, cookie)
-            new_rules = add_field(new_rules, table_id)
+            new_rules = add_cookie(new_rules, cookie)
+            new_rules = add_table_id(new_rules, table_id)
             return new_rules
 
         def get_nuclear_diff(new_rules):
@@ -1029,6 +1116,9 @@ class Runtime(object):
         def get_incremental_diff(new_rules):
             """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
             (versioned) classifier."""
+            """ TODO: this function needs to be updated with multiple
+            tables. There must now be one old_rules structure corresponding
+            to each table_id. """
             def different_actions(old_acts, new_acts):
                 def buckets_removed(acts):
                     return filter(lambda a: not isinstance(a, CountBucket),
@@ -1048,11 +1138,20 @@ class Runtime(object):
                     if new is None:
                         to_delete.append(old)
                     else:
-                        (new_match,new_priority,new_actions,_) = new
-                        (_,_,old_actions,old_version) = old
+                        new_match = new.mat
+                        new_priority = new.priority
+                        new_actions = new.actions
+                        old_actions = old.actions
+                        old_version = old.version
                         if different_actions(old_actions, new_actions):
-                            modified_rule = (new_match, new_priority,
-                                             new_actions, old_version)
+                            modified_rule = ListedRule(mat=new_match,
+                                                       priority=new_priority,
+                                                       actions=new_actions,
+                                                       version=old_version,
+                                                       cookie=new.cookie,
+                                                       table_id=new.table_id,
+                                                       parents=new.parents,
+                                                       op=new.op)
                             to_modify.append(modified_rule)
                             to_modify_old.append(old)
                             # We also add the new and old rules to the to_add
@@ -1088,6 +1187,15 @@ class Runtime(object):
                 return get_nuclear_diff(new_rules)
             elif self.mode == 'proactive1':
                 return get_incremental_diff(new_rules)
+
+        def convert_to_tuple(diff_lists):
+            new_diff_lists = []
+            for lst in diff_lists:
+                new_lst = []
+                for lr in lst:
+                    new_lst.append(lr.to_tuple())
+                new_diff_lists.append(new_lst)
+            return new_diff_lists
 
         def install_diff_lists(diff_lists, classifier_version_no, table_id):
             """Install the difference between the input classifier and the
@@ -1177,6 +1285,12 @@ class Runtime(object):
         for rule in new_rules:
             self.log.debug(str(rule))
         self.log.debug('================================')
+
+        # This is the point to do any diagnostics on classifier rules, since the
+        # ListedRule structure contains parents and operation pointers.
+        # These are removed before being passed on to the data plane rule
+        # installation routine below.
+        diff_lists = convert_to_tuple(diff_lists)
 
         p = Process(target=f, args=(diff_lists,curr_version_no,table_id))
         p.daemon = True
