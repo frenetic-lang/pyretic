@@ -87,6 +87,24 @@ def get_rule_derivation_tree(r, pre_spaces='', only_leaves=False):
         raise TypeError
     return output
 
+def get_rule_derivation_leaves(r):
+    """ Get just the leaf policies from the derivation tree of a rule, in a
+    list. """
+    assert isinstance(r, Rule)
+    op = r.op
+    assert op in ["policy", "parallel", "empty_parallel",
+                  "sequential", "negate"]
+    leaf_list = []
+    if op == "parallel" or op == "negate" or op == "sequential":
+        for rp in r.parents:
+            leaf_list += get_rule_derivation_leaves(rp)
+    elif op == "policy":
+        leaf_list += [r.parents[0]]
+    elif op == "empty_parallel":
+        pass
+    else:
+        raise TypeError
+    return leaf_list
 
 # Classifier -> match -> rule
 def get_rule_exact_match(classifier, mat):

@@ -35,6 +35,7 @@ from pyretic.core.network import *
 from pyretic.core.packet import *
 from pyretic.core.classifier import get_rule_exact_match
 from pyretic.core.classifier import get_rule_derivation_tree
+from pyretic.core.classifier import get_rule_derivation_leaves
 
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
@@ -554,6 +555,13 @@ class Runtime(object):
                 return (self.mat, self.priority, self.actions, self.cookie,
                         self.notify, self.table_id)
 
+            def to_rule(self):
+                return Rule(self.mat, self.actions,
+                            parents=self.parents, op=self.op)
+
+            def __repr__(self):
+                return str((self.table_id, self.priority, self.cookie, self.mat, self.actions))
+
         ### CLASSIFIER TRANSFORMS 
 
         # TODO (josh) logic for detecting action sets that can't be compiled
@@ -841,7 +849,7 @@ class Runtime(object):
                             op=rule.op))
             return Classifier(new_rules)
 
-        def concretize(classifier):
+        def concretize(classifier, table_id):
             """
             Convert policies into dictionaries.
             
@@ -1089,7 +1097,7 @@ class Runtime(object):
             switches = self.network.switch_list()
 
             classifier = switchify(classifier,switches)
-            classifier = concretize(classifier)
+            classifier = concretize(classifier, table_id)
             if self.use_nx:
                 classifier = set_next_table_port(classifier)
             classifier = check_OF_rules(classifier)

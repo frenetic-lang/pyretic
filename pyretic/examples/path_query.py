@@ -234,7 +234,7 @@ def path_test_4_5():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=2))
     p = a1 ^ a2
-    cb = CountBucket()
+    cb = CountBucket(bname='1 ~> 2')
     p.set_bucket(cb)
     p.register_callback(query_callback("4.5"))
     query_thread = threading.Thread(target=query_func, args=(cb,5.0))
