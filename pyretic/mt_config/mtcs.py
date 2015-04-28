@@ -52,8 +52,8 @@ def path_query_pipeline():
     ((out_tagging + out_capture) >>
      virtual_untagging)
     """
-    pqc = pipeline_config(3)
-    for i in range(0, 2):
+    pqc = pipeline_config(4)
+    for i in range(0, 3):
         pqc.add_edge(i, i+1)
     return pqc
 

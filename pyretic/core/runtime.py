@@ -1693,7 +1693,8 @@ class Runtime(object):
                 self.path_out_tagging, self.path_out_capture)
             self.policy = (self.policy_map[0] >>
                            self.policy_map[1] >>
-                           self.policy_map[2])
+                           self.policy_map[2] >>
+                           self.policy_map[3])
         elif use_nx:
             raise RuntimeError("No table to policy map configuration defined for"
                                " this pipeline! %s" % pipeline)
@@ -1731,7 +1732,8 @@ class Runtime(object):
                                    out_tagging, out_capture):
         return {0: virtual_tag >> (in_tagging + in_capture),
                 1: forwarding,
-                2: (out_tagging + out_capture) >> virtual_untag}
+                2: out_tagging + out_capture,
+                3: virtual_untag}
 
 
 ###############################
