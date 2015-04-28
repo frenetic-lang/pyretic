@@ -1074,7 +1074,7 @@ class Runtime(object):
                     new_rules.append(ListedRule(mat=r.mat,
                                                 priority=r.priority,
                                                 actions=r.actions,
-                                                version=r.version,
+                                                version=cookie_val,
                                                 cookie=cookie_val,
                                                 table_id=r.table_id,
                                                 parents=r.parents,
