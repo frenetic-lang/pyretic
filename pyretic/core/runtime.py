@@ -740,7 +740,20 @@ class Runtime(object):
                 return bucket_list
 
             def update_rules_for_buckets(rule, op):
-                match = rule.mat
+                match = copy.copy(rule.mat)
+                """When running multi-stage table with nicira extensions, we remove
+                matches on outports. The flow stats reply matches don't come
+                with the outport (or the metadata register) match
+                information. Since the priority and version, and rest of the
+                match without the outport will match anyhow, we can safely
+                remove the outport field from the stored match!
+
+                Such matches still get sent out to the backend with the outport
+                field match intact, and data plane forwarding behavior is
+                unaffected.
+                """
+                if self.use_nx:
+                    match.pop('outport', None)
                 priority = rule.priority
                 actions = rule.actions
                 version = rule.version
@@ -1348,6 +1361,11 @@ class Runtime(object):
             queried. """
             if already_queried:
                 with self.last_queried_time_lock:
+                    if not s in self.last_queried_time:
+                        self.log.error("Did not find the switch in last queried table!!")
+                        self.log.error("Switch %s" % s)
+                        self.log.error("last queried time list: %s" %
+                                       str(self.last_queried_time))
                     assert s in self.last_queried_time
                     need_to_query = ((time.time() - self.last_queried_time[s])
                                        > STATS_REQUERY_THRESHOLD_SEC)
