@@ -188,7 +188,6 @@ def _sequence_actions(a1, as2):
 # containing a single rule, or None
 def _cross_act(r1,act,r2):
     from pyretic.core.language import drop
-    m2 = _commute_test(act, r2.match)
     m = r1.match.intersect(_commute_test(act, r2.match))
     actions = _sequence_actions(act,r2.actions)
     if m == drop:
