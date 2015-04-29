@@ -251,6 +251,7 @@ def test_bucket_single_test():
     close_fds([c_out, c_err], "controller")
     close_fds([t_out, t_err], "tshark")
     net.stop()
+    time.sleep(tshark_slack_sec)
 
     """ Verify results """
     print "Verifying correctness..."
@@ -297,6 +298,7 @@ def parse_args():
     parser.add_argument("--success_file", help="File to write test pass/fail",
                         default="pass-fail.txt")
     parser.add_argument("--interface_map", default="map_any",
+                        choices=['map_any','map_chain_3_3'],
                         help="Map that defines interfaces to run packet capture")
     parser.add_argument("--capture_dir", default="inbound",
                         choices=['inbound', 'outbound'],
@@ -376,8 +378,8 @@ def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
         for q in tshark_counts.keys():
             tc = tshark_counts[q]
             bc = buckets_counts[q]
-            (tc_total_pkts, tc_total_bytes) = tc['total']
-            (bc_total_pkts, bc_total_bytes) = bc['total']
+            (tc_total_pkts, tc_total_bytes) = tc.get('total', 0)
+            (bc_total_pkts, bc_total_bytes) = bc.get('total', 0)
             if tc_total_pkts != bc_total_pkts:
                 output_str += 'FAIL\n'
                 output_str += 'Query: %s\n' % q
