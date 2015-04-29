@@ -33,10 +33,11 @@ num_failed = 0
 failed_tests = []
 fails_counts = []
 
-def single_test(fwding, query, filt_funs, topo_name, topo_args,
-                results, pass_fail, test_nums):
+def single_bucket_test(fwding, query, filt_funs, topo_name, topo_args,
+                       results, pass_fail, test_nums):
     global fails_counts
     cmd = ("sudo python pyretic/tests/test_bucket.py " +
+           "--ctlr=bucket " +
            "--fwding=" + fwding + ' ' +
            "--query=" + query + ' ' +
            "--topo_name=" + topo_name + ' ' +
@@ -84,9 +85,9 @@ def generic_topo_tests(topo_name, topo_args, fwding_pols):
 
     for fwding in fwding_pols:
         for i in range(0, len(query_pols)):
-            res = single_test(fwding, query_pols[i], filt_funs[i],
-                              topo_name, topo_args, results, pass_fail,
-                              test_nums[i])
+            res = single_bucket_test(fwding, query_pols[i], filt_funs[i],
+                                     topo_name, topo_args, results, pass_fail,
+                                     test_nums[i])
             test_name = "%s %s on %s" % (query_pols[i], fwding, topo_name)
             if res:
                 print "===== TEST %s PASSED =====" % test_name
