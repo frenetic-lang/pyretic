@@ -396,7 +396,7 @@ def path_test_waypoint_violation_general():
     eg  = egress_network()
     p = ((in_atom(ing & ~fw) ^ +in_atom(~fw) ^ out_atom(eg & ~fw)) |
          (in_out_atom(ing, eg & ~fw)))
-    p.register_callback(query_callback("generalized waypoint violation"))
+    p.register_callback(query_callback("generalized_waypoint_violation"))
     return p
 
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):

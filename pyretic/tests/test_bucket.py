@@ -40,7 +40,8 @@ from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
 from pyretic.evaluations.mininet_setup import mn_cleanup, wait_switch_rules_installed, get_abort_handler, get_adjust_path
 
-def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err, pythonpath):
+def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err,
+                       pythonpath, pyopts):
     c_outfile = open(c_out, 'w')
     c_errfile = open(c_err, 'w')
     # Hackety hack. I don't know of any other way to supply the PYTHONPATH
@@ -49,7 +50,8 @@ def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err, pythonpath):
     if not "PYTHONPATH" in py_env:
         py_env["PYTHONPATH"] = pythonpath
 
-    cmd = ("pyretic.py -m p0 pyretic.examples." + ctlr_name + ' ' +
+    cmd = ("pyretic.py -m p0 " + pyopts + ' ' +
+           "pyretic.examples." + ctlr_name + ' ' +
            reduce(lambda r, k: r + ("--" + k + "=" + ctlr_params[k] + " "),
                   ctlr_params.keys(), " "))
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
@@ -222,12 +224,13 @@ def test_bucket_single_test():
     print "Setting up controller..."
     c_params = {'query': args.query, 'fwding': args.fwding,
                 'only_count_results': 'true'}
+    pyopts = args.pyopts
     c_name   = args.ctlr
     c_outfile = adjust_path("pyretic-stdout.txt")
     c_errfile = adjust_path("pyretic-stderr.txt")
     pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
     (ctlr, c_out, c_err) = pyretic_controller(c_name, c_params, c_outfile,
-                                              c_errfile, pypath)
+                                              c_errfile, pypath, pyopts)
 
     """ Network """
     print "Setting up mininet..."
@@ -277,6 +280,8 @@ def parse_args():
     parser.add_argument("-c", "--ctlr", default="bucket",
                         choices=['bucket', 'path_query'],
                         help="Controller to test")
+    parser.add_argument("--pyopts", default='',
+                        help="Options to pyretic.py")
     parser.add_argument("-q", "--query", default="test0",
                         help="Query policy to run")
     parser.add_argument("-f", "--fwding", default="mac_learner",
@@ -306,7 +311,7 @@ def parse_args():
     parser.add_argument("--success_file", help="File to write test pass/fail",
                         default="pass-fail.txt")
     parser.add_argument("--interface_map", default="map_any",
-                        choices=['map_any','map_chain_3_3'],
+                        choices=['map_any','map_chain_3_3', 'map_cycle_4_4'],
                         help="Map that defines interfaces to run packet capture")
     parser.add_argument("--capture_dir", default="inbound",
                         choices=['inbound', 'outbound'],
@@ -494,6 +499,7 @@ def pkt_interface(int_name, l):
 ip1 = '10.0.0.1'
 ip2 = '10.0.0.2'
 ip3 = '10.0.0.3'
+ip4 = '10.0.0.4'
 
 ## Bucket test cases.
 def filt_test0(l):
@@ -557,6 +563,40 @@ def filt_path_test_1(l):
 def filt_path_test_2(l):
     return pkt_srcip(ip1, l) and pkt_interface('s3-eth1', l)
 
+def filt_path_test_gwpv_st1(l):
+    """filter function for generalized waypoint violation. This filter function only
+    works with the static forwarding policy corresponding to spanning tree 1 (in
+    path_query.py examples file).
+
+    The simple filter
+
+    not (pkt_srcip(ip4,l) or pkt_dstip(ip4, l))
+
+    will multiple-count packets at switch interfaces even when the packets don't
+    egress at that switch, e.g., h1 -> h3 packets at s2-eth1. Instead, we'll
+    also add a conjunction to denote the possible ingress interfaces of packets
+    wherever they would egress the network at that switch:
+    """
+    return ((not (pkt_srcip(ip4,l) or pkt_dstip(ip4,l))) and
+            (((pkt_interface('s1-eth1',l) or pkt_interface('s1-eth2',l)) and
+              pkt_dstip(ip1,l)) or
+             ((pkt_interface('s2-eth1',l) or pkt_interface('s2-eth2',l)) and
+              pkt_dstip(ip2,l)) or
+             ((pkt_interface('s3-eth1',l) or pkt_interface('s3-eth2',l)) and
+              pkt_dstip(ip3,l))))
+
+def filt_path_test_gwpv_st2(l):
+    """filter function for generalized waypoint violation when the forwarding
+    policy uses spanning_tree_2 (see path_query.py example file). Only traffic
+    from h2 <-> h3 can escape the firewall S4 with this forwarding policy, so
+    it's enough to catch that traffic at the switch where it egresses the
+    network.
+    """
+    return ((pkt_srcip(ip2,l) and pkt_dstip(ip3,l) and
+             pkt_interface('s3-eth1',l)) or
+            (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
+             pkt_interface('s2-eth2',l)))
+
 ### Interfaces map for packet capture ###
 def map_any():
     global ints_map, rev_ints_map
@@ -568,6 +608,16 @@ def map_chain_3_3():
     global ints_map, rev_ints_map
     ints_list = ["s1-eth1", "s1-eth2", "s2-eth1", "s2-eth2",
                  "s2-eth3", "s3-eth1", "s3-eth2"]
+    ints_map  = {i: ints_list.index(i) for i in ints_list}
+    rev_ints_map = {j: ints_list[j] for j in range(0, len(ints_list))}
+    return ints_list
+
+def map_cycle_4_4():
+    global ints_map, rev_ints_map
+    ints_list = ["s1-eth1", "s1-eth2", "s1-eth3",
+                 "s2-eth1", "s2-eth2", "s2-eth3",
+                 "s3-eth1", "s3-eth2", "s3-eth3",
+                 "s4-eth1", "s4-eth2", "s4-eth3"]
     ints_map  = {i: ints_list.index(i) for i in ints_list}
     rev_ints_map = {j: ints_list[j] for j in range(0, len(ints_list))}
     return ints_list
