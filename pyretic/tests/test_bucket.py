@@ -551,6 +551,12 @@ def filt_path_test_0_5(l):
     multiple hops, i.e., either S2 and S3 or S2 and S1, respectively.
     """
 
+def filt_path_test_1(l):
+    return pkt_srcip(ip1, l) and pkt_dstip(ip3, l) and pkt_interface('s3-eth1', l)
+
+def filt_path_test_2(l):
+    return pkt_srcip(ip1, l) and pkt_interface('s3-eth1', l)
+
 ### Interfaces map for packet capture ###
 def map_any():
     global ints_map, rev_ints_map
