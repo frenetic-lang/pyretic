@@ -533,6 +533,13 @@ def filt_path_test_0_5(l):
     return (pkt_srcip(ip2, l) or
             (pkt_srcip(ip1, l) and not pkt_interface('s1-eth2', l)) or
             (pkt_srcip(ip3, l) and not pkt_interface('s3-eth2', l)))
+    """ Note that
+           (pkt_interface('s2-eth1', l) or
+            pkt_interface('s2-eth2', l) or
+            pkt_interface('s2-eth3', l))
+    won't work, because it won't capture packets that are double-counted from
+    multiple hops, i.e., either S2 and S3 or S2 and S1, respectively.
+    """
 
 ### Interfaces map for packet capture ###
 def map_any():
