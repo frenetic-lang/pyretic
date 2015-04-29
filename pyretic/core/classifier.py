@@ -114,6 +114,108 @@ def get_rule_exact_match(classifier, mat):
             return r
     return None
 
+#### Compilation helper functions, exposed for easier testing. ####
+# given a test b and an action p, return a test
+# b' such that p >> b == b' >> p.
+def _commute_test(act, pkts):
+    from pyretic.core.language import (match, modify, drop, identity,
+                                       Controller, CountBucket,
+                                       DerivedPolicy, PathBucket)
+    while isinstance(act, DerivedPolicy):
+        act = act.policy
+    if act == identity:
+        return pkts
+    elif (act == Controller or isinstance(act, PathBucket)):
+        return identity
+    elif isinstance(act, CountBucket):
+        """ TODO(ngsrinivas): inspect which possibility is best """
+        return identity
+        # return pkts
+    elif isinstance(act, modify):
+        new_match_dict = {}
+        if pkts == identity:
+            return identity
+        elif pkts == drop:
+            return drop
+        for f, v in pkts.map.iteritems():
+            if f in act.map and act.map[f] == v:
+                continue
+            elif f in act.map and act.map[f] != v:
+                return drop
+            else:
+                new_match_dict[f] = v
+        if len(new_match_dict) == 0:
+            return identity
+        return match(**new_match_dict)
+    else:
+        raise TypeError
+
+# sequentially compose actions.  a1 must be a
+# single action.  Returns a list of actions.
+def _sequence_actions(a1, as2):
+    from pyretic.core.language import (match, modify, drop, identity,
+                                       Controller, CountBucket,
+                                       DerivedPolicy, PathBucket)
+    while isinstance(a1, DerivedPolicy):
+        a1 = a1.policy
+    # TODO: be uniform about returning copied or modified objects.
+    if (a1 == Controller or isinstance(a1, CountBucket) or 
+        isinstance(a1, PathBucket)):
+        return {a1}
+    elif a1 == identity:
+        return copy.copy(as2)
+    elif isinstance(a1, modify):
+        new_actions = set()
+        for a2 in as2:
+            while isinstance(a2, DerivedPolicy):
+                a2 = a2.policy
+            if (a2 == Controller or isinstance(a2, CountBucket) or
+                isinstance(a2, PathBucket)):
+                new_actions.add(a2)
+            elif a2 == identity:
+                new_actions.add(a1)
+            elif isinstance(a2, modify):
+                new_a1 = modify(**a1.map.copy())
+                new_a1.map.update(a2.map)
+                new_actions.add(new_a1)
+            else:
+                raise TypeError
+        return new_actions
+    else:
+        raise TypeError
+
+# generates a (potentially) non-total classifier 
+# containing a single rule, or None
+def _cross_act(r1,act,r2):
+    from pyretic.core.language import drop
+    m2 = _commute_test(act, r2.match)
+    m = r1.match.intersect(_commute_test(act, r2.match))
+    actions = _sequence_actions(act,r2.actions)
+    if m == drop:
+        return None
+    else:
+        return Classifier([Rule(m,actions,[r1,r2],"sequential")])
+
+# returns a potentially non-total classifier
+# suitable for concatenating w/ other potentially non-total classifiers
+def _cross_rules(r1,r2):
+    c = None
+    for act in r1.actions:
+        cross = _cross_act(r1,act,r2) 
+        if c is None:
+            c = cross
+        elif not cross is None:
+            # parallel compose to get c_tmp
+            c_tmp = c + cross
+            # but since both c and cross were potentially non-total
+            # we need to append both c and cross to c_tmp
+            c_tmp.append(c)
+            c_tmp.append(cross)
+            # set c to c_tmp and optimize
+            c = c_tmp
+            c = c.optimize()
+    return c
+#### End of exposed classifier helper functions ####
 
 class Classifier(object):
     """
@@ -243,101 +345,6 @@ class Classifier(object):
         from pyretic.core.language import (match, modify, drop, identity,
                                            Controller, CountBucket,
                                            DerivedPolicy, PathBucket)
-        # given a test b and an action p, return a test
-        # b' such that p >> b == b' >> p.
-        def _commute_test(act, pkts):
-            while isinstance(act, DerivedPolicy):
-                act = act.policy
-            if act == identity:
-                return pkts
-            elif (act == Controller or isinstance(act, PathBucket)):
-                return identity
-            elif isinstance(act, CountBucket):
-                """ TODO(ngsrinivas): inspect which possibility is best """
-                return identity
-                # return pkts
-            elif isinstance(act, modify):
-                new_match_dict = {}
-                if pkts == identity:
-                    return identity
-                elif pkts == drop:
-                    return drop
-                for f, v in pkts.map.iteritems():
-                    if f in act.map and act.map[f] == v:
-                        continue
-                    elif f in act.map and act.map[f] != v:
-                        return drop
-                    else:
-                        new_match_dict[f] = v
-                if len(new_match_dict) == 0:
-                    return identity
-                return match(**new_match_dict)
-            else:
-                raise TypeError
-
-        # sequentially compose actions.  a1 must be a
-        # single action.  Returns a list of actions.
-        def _sequence_actions(a1, as2):
-            while isinstance(a1, DerivedPolicy):
-                a1 = a1.policy
-            # TODO: be uniform about returning copied or modified objects.
-            if (a1 == Controller or isinstance(a1, CountBucket) or 
-                isinstance(a1, PathBucket)):
-                return {a1}
-            elif a1 == identity:
-                return copy.copy(as2)
-            elif isinstance(a1, modify):
-                new_actions = set()
-                for a2 in as2:
-                    while isinstance(a2, DerivedPolicy):
-                        a2 = a2.policy
-                    if (a2 == Controller or isinstance(a2, CountBucket) or
-                        isinstance(a2, PathBucket)):
-                        new_actions.add(a2)
-                    elif a2 == identity:
-                        new_actions.add(a1)
-                    elif isinstance(a2, modify):
-                        new_a1 = modify(**a1.map.copy())
-                        new_a1.map.update(a2.map)
-                        new_actions.add(new_a1)
-                    else:
-                        raise TypeError
-                return new_actions
-            else:
-                raise TypeError
-
-        # generates a (potentially) non-total classifier 
-        # containing a single rule, or None
-        def _cross_act(r1,act,r2):
-            m = r1.match.intersect(_commute_test(act, r2.match))
-            actions = _sequence_actions(act,r2.actions)
-            if m == drop:
-                return None
-            else:
-                return Classifier([Rule(m,actions,[r1,r2],"sequential")])
-
-        # returns a potentially non-total classifier
-        # suitable for concatenating w/ other potentially non-total classifiers
-        def _cross(r1,r2):
-            c = None
-            for act in r1.actions:
-                cross = _cross_act(r1,act,r2) 
-                if c is None:
-                    c = cross
-                elif not cross is None:
-                    # parallel compose to get c_tmp
-                    c_tmp = c + cross
-                    # but since both c and cross were potentially non-total
-                    # we need to append both c and cross to c_tmp
-                    c_tmp.append(c)
-                    c_tmp.append(cross)
-                    # set c to c_tmp and optimize
-                    c = c_tmp
-                    c = c.optimize()
-            return c
-
-        # core __rshift__ logic begins here.
-
         # start with an empty set of rules for the output classifier
         # then for each rule in the first classifier (self)
         c3 = Classifier()
@@ -346,7 +353,7 @@ class Classifier(object):
                 c3.append(r1)
             else:
                 for r2 in c2.rules:
-                    c_tmp = _cross(r1,r2)
+                    c_tmp = _cross_rules(r1,r2)
                     if not c_tmp is None:
                         c3.append(c_tmp)
         # when all rules in c1 and c2 have been crossed
