@@ -140,6 +140,14 @@ def get_key_str(line):
         ethtype, srcip_fun(line), dstip_fun(line))
     return pred
 
+def print_counts_dict(counts_dict, count_type):
+    """ Helper to print tshark_counts and buckets_counts """
+    print "Counts from", count_type
+    for q in counts_dict.keys():
+        print "*** Query", q
+        for pred in counts_dict[q].keys():
+            print pred, "counts:", counts_dict[q][pred]
+
 def path_query_tshark_filter_count(t_outfile, filter_fun):
     global ints_map
     t_out = open(t_outfile, 'r')
@@ -367,6 +375,8 @@ def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
     """
     passfail = open(success_file, 'w')
     output_str = ''
+    # print_counts_dict(tshark_counts, "TShark")
+    # print_counts_dict(buckets_counts, "buckets")
     if set(tshark_counts.keys()) != set(buckets_counts.keys()):
         """ Test numbers mismatch. """
         output_str += 'FAIL\n'
