@@ -291,10 +291,10 @@ def parse_args():
                         help="Folder to put the raw results data into")
     parser.add_argument("--test_duration_sec", type=int,
                         help="Duration before workload finishes execution",
-                        default=15)
+                        default=20)
     parser.add_argument("--tshark_slack_sec", type=int,
                         help="Duration to wait for tshark capture to start",
-                        default=5)
+                        default=10)
     parser.add_argument("--success_file", help="File to write test pass/fail",
                         default="pass-fail.txt")
     parser.add_argument("--interface_map", default="map_any",
