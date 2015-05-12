@@ -149,6 +149,8 @@ class Policy(object):
             else:
                 pred_policy |= match(switch = i)
 
+        if pred_policy is None:
+            pred_policy = identity
         pol = pred_policy >> self
         import subprocess
 

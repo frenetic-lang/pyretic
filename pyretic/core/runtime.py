@@ -464,7 +464,7 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
-        cnt = self.partition_cnt;
+        cnt = self.partition_cnt if self.partition_cnt else 0
         c0 = self.virtual_tag.compile()
         c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
         #c1 = self.path_in_table.netkat_compile(cnt)[0]
@@ -480,8 +480,8 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
-        p = self.policy.compile()
-        #p = self.netkat_classifier_compile()
+        #p = self.policy.compile()
+        p = self.netkat_classifier_compile()
         #print "rule count", len(p.rules)
         return p
  
