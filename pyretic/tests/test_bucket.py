@@ -597,6 +597,16 @@ def filt_path_test_gwpv_st2(l):
             (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
              pkt_interface('s2-eth2',l)))
 
+def filt_path_test_23_p1_static(l):
+    """ This filter only works for static fwding policy. """
+    return (pkt_interface('s2-eth1', l) and
+            pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
+
+def filt_path_test_23_p2_static(l):
+    """ This filter only works for static fwding policy. """
+    return (pkt_interface('s2-eth1', l) and
+            pkt_srcip(ip1, l))
+
 ### Interfaces map for packet capture ###
 def map_any():
     global ints_map, rev_ints_map

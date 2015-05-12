@@ -27,6 +27,7 @@
 ################################################################################
 
 import subprocess, shlex, os
+import sys
 
 num_passed = 0
 num_failed = 0
@@ -162,6 +163,30 @@ def all_path_tests():
         results_folder=results_folder, success_file=success_file,
         test_nums='generalized_waypoint_violation',
         interface_map="map_cycle_4_4", tshark_slack_sec=20)
+    update_test_stats(query, fwding, pyopts, res)
+
+    """ Path test 23 single-stage, static policy """
+    query = "path_test_23"
+    fwding = "static_fwding_chain_3_3"
+    pyopts = ''
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        topo_name="ChainTopo", topo_args="3,3",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
+    update_test_stats(query, fwding, pyopts, res)
+
+    """ Path test 23 multi-stage, static policy """
+    query = "path_test_23"
+    fwding = "static_fwding_chain_3_3"
+    pyopts = '--nx --pipeline=path_query_pipeline'
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        topo_name="ChainTopo", topo_args="3,3",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
     update_test_stats(query, fwding, pyopts, res)
 
 def update_test_stats(query, fwding, pyopts, res):
