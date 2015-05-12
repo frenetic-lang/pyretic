@@ -217,7 +217,7 @@ def pyretic_controller(test, testwise_params, c_out, c_err, pythonpath):
                          env=py_env)
     return ([c], [c_outfile, c_errfile])
 
-def wait_switch_rules_installed(switches):
+def wait_switch_rules_installed(switches, wait_timeout=0):
     """This function waits for switch rule installation to stabilize on all
     switches before running tests.
     """
@@ -226,8 +226,10 @@ def wait_switch_rules_installed(switches):
     num_rules = {}
     num_iterations = 0
     per_iter_timeout = 3
-    while not_fully_installed:
+    time_waited = 0
+    while not_fully_installed and wait_timeout and time_waited < wait_timeout:
         num_iterations += 1
+        time_waited = per_iter_timeout * num_iterations
         not_fully_installed = False
         for s in switches:
             if not s in num_rules:
@@ -241,8 +243,10 @@ def wait_switch_rules_installed(switches):
             num_rules[s] = rules
         time.sleep(per_iter_timeout)
     print
-    time_waited = per_iter_timeout * num_iterations
-    print "Rules fully installed after waiting", time_waited, "seconds"
+    if time_waited > wait_timeout:
+        print "!!! Rules *not* fully installed within the timeout!"
+    else:
+        print "Rules fully installed after waiting", time_waited, "seconds"
 
 def run_iperf_test(net, hosts_src, hosts_dst, test_duration_sec,
                    per_transfer_bandwidth, client_prefix, server_prefix):

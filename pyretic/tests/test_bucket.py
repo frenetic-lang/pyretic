@@ -239,7 +239,7 @@ def test_bucket_single_test():
 
     """ Wait for switches to be prepped """
     print "Waiting to install switch rules..."
-    wait_switch_rules_installed(switches)
+    wait_switch_rules_installed(switches, args.install_timeout_sec)
 
     """ Capture """
     print "Starting tshark capture..."
@@ -302,6 +302,8 @@ def parse_args():
     parser.add_argument("-r", "--results_folder",
                         default="./pyretic/evaluations/results/",
                         help="Folder to put the raw results data into")
+    parser.add_argument("--install_timeout_sec", default=30, type=int,
+                        help="Time to wait for switch rules to be installed")
     parser.add_argument("--test_duration_sec", type=int,
                         help="Duration before workload finishes execution",
                         default=20)
