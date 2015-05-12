@@ -595,6 +595,8 @@ class Runtime(object):
             self.path_in_capture.policy  = in_cap
             self.path_out_tagging.policy = out_tag
             self.path_out_capture.policy = out_cap
+            self.path_in_table.policy = in_tag + in_cap
+            self.path_out_table.policy = out_tag + out_cap
 
 
 #######################
