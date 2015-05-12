@@ -1827,7 +1827,8 @@ def create_match(pattern, switch_id):
     else:
         match_map = {}
     for k,v in pattern.items():
-        if v is not None and k != "dlTyp":
+        # HACKETY HACK: remove nwProto from netkat generated classifier
+        if v is not None and k != "dlTyp" and k != "nwProto":
             match_map[field_map[k]] = v
 
     return match(**match_map)
