@@ -43,6 +43,7 @@ from multiprocessing import Queue, Process
 import pyretic.core.util as util
 import yappi
 from pyretic.evaluations import stat
+import shlex
 
 of_client = None
 enable_profile = False
@@ -95,6 +96,11 @@ def parseArgs():
     op.add_option( '--mode', '-m', type='choice',
                      choices=['interpreted','i','reactive0','r0','proactive0','p0','proactive1','p1'], 
                      help = '|'.join( ['interpreted/i','reactive0/r0','proactiveN/pN for N={0,1}'] )  )
+    op.add_option( '--nx', action="store_true",
+                   dest="nx", help="use nicira extensions in pox" )
+    op.add_option( '--pipeline', dest="pipeline",
+                   help="pipeline configuration (if --nx enabled)",
+                   default="default_pipeline")
     op.add_option( '--verbosity', '-v', type='choice',
                    choices=['low','normal','high','please-make-it-stop'],
                    default = 'low',
@@ -103,46 +109,39 @@ def parseArgs():
                    dest="enable_profile",
                    help = 'enable yappi multithreaded profiler' )
 
-    op.add_option('--eval_profile_enabled', '-e', action='store', 
-                    type='string', dest='eval_result_path', 
-                   )
-
+    op.add_option('--eval_result_path', '-e', action='store', 
+                    type='string', dest='eval_result_path')
     op.add_option( '--enable_disjoint', '-d', action="store_true",
                     dest="disjoint_enabled",
                     help = 'enable disjoint optimization')
-
     op.add_option('--enable_default_link', '-l', action="store_true",
                     dest='default_enabled',
                     help = 'enable adding default link optimization, only woks with disjoint on')
-
     op.add_option('--enable_integration', '-i', action="store_true",
                     dest='integrate_enabled',
                     help = 'enable integration of tag and capture optimization, only works with multitable on')
-
     op.add_option('--enable_multitable', '-u', action="store_true",
                     dest = 'multitable_enabled',
                     help = 'enable multitable optimization')
-
     op.add_option('--enable_ragel', '-r', action="store_true",
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
-
     op.add_option('--enable_partition', '-s', type = int,
                     dest = 'switch_cnt',
                     help = 'enable partition optimization')
-
     op.add_option('--enable_cache', '-c', action = "store_true",
                     dest = 'cache_enabled',
                     help = 'enable cache optimization')
-
-    op.add_option('--enable_edge_contraction_enabled', '-g', action = "store_true",
+    op.add_option('--enable_edge_contraction', '-g', action = "store_true",
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contraction optimization, only works with cache enabled')
+    op.set_defaults(frontend_only=False, mode='reactive0', enable_profile=False,
+                    disjoint_enabled=False, default_enabled=False,
+                    integrate_enabled=False, multitable_enabled=False,
+                    ragel_enabled=False, switch_cnt=None,
+                    cache_enabled=False, edge_contraction_enabled=False,
+                    nx=False)
 
-    
-    op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False, 
-                    disjoint_enabled=False, default_enabled = False, integrate_enabled = False, multitable_enabled = False,
-                    ragel_enabled = False, switch_cnt = None, cache_enabled = False, edge_contraction_enabled = False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
@@ -226,12 +225,18 @@ def main():
         global eval_profile_enabled
         eval_profile_enabled = True
         stat.start(options.eval_result_path)
-    
-    runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity, 
-            (options.disjoint_enabled, options.default_enabled, options.integrate_enabled, 
-                options.multitable_enabled, options.ragel_enabled, options.switch_cnt, 
-                options.cache_enabled, options.edge_contraction_enabled)
-            )
+
+    """ Start the runtime. """
+    opt_flags_arg = (options.disjoint_enabled, options.default_enabled,
+                     options.integrate_enabled, options.multitable_enabled,
+                     options.ragel_enabled, options.switch_cnt,
+                     options.cache_enabled, options.edge_contraction_enabled)
+    runtime = Runtime(Backend(),main,path_main,kwargs,
+                      mode=options.mode, verbosity=options.verbosity,
+                      opt_flags=opt_flags_arg, use_nx=options.nx,
+                      pipeline=options.pipeline)
+
+    """ Start pox backend. """
     if not options.frontend_only:
         try:
             output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
@@ -250,12 +255,16 @@ def main():
         python=sys.executable
         # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
         # other log file descriptor if necessary
-        of_client = subprocess.Popen([python, 
-                                      pox_exec,
-                                      'of_client.pox_client' ],
+        pox_cmd = "python %s %s of_client.pox_client %s %s" % (
+            pox_exec,
+            'openflow.nicira --convert-packet-in' if options.nx else '',
+            '--use_nx' if options.nx else '',
+            "--pipeline=%s" % options.pipeline if options.nx else '')
+        of_client = subprocess.Popen(shlex.split(pox_cmd),
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
 
+    """ Profiling. """
     if options.enable_profile:
         enable_profile = True
         yappi.start()

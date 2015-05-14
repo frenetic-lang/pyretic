@@ -40,8 +40,17 @@ from pox.lib.packet.lldp          import lldp, chassis_id, port_id, end_tlv
 from pox.lib.packet.lldp          import ttl, system_description
 
 from pyretic.backend.comm import *
+from pyretic.mt_config.mtcs import *
 
 import time
+
+IP_TYPE = 0x800
+ARP_TYPE = 0x806
+
+# TODO: This "next table" port number is custom; not OF compliant.
+# Since it also appears in the pyretic frontend (network.py), it will require
+# updating in both places eventually.
+CUSTOM_NEXT_TABLE_PORT = 0xfff4
 
 def inport_value_hack(outport):
     if outport > 1:
@@ -121,10 +130,11 @@ class BackendChannel(asynchat.async_chat):
             actions = map(self.dict2OF,msg[3])
             cookie = int(msg[4])
             notify = bool(msg[5])
+            table_id = int(msg[6])
             if msg[0] == 'install':
-                self.of_client.install_flow(pred,priority,actions,cookie,notify)
+                self.of_client.install_flow(pred,priority,actions,cookie,notify,table_id)
             else:
-                self.of_client.modify_flow(pred,priority,actions,cookie,notify)
+                self.of_client.modify_flow(pred,priority,actions,cookie,notify,table_id)
             self.interval = time.time() - self.start_time
         elif msg[0] == 'delete':
             pred = self.dict2OF(msg[1])
@@ -132,7 +142,8 @@ class BackendChannel(asynchat.async_chat):
             self.of_client.delete_flow(pred,priority)
         elif msg[0] == 'clear':
             switch = int(msg[1])
-            self.of_client.clear(switch)
+            table_id = int(msg[2])
+            self.of_client.clear(switch, table_id)
         elif msg[0] == 'barrier':
             switch = msg[1]
             self.of_client.barrier(switch)
@@ -145,10 +156,16 @@ class BackendChannel(asynchat.async_chat):
 
 class POXClient(revent.EventMixin):
     # NOT **kwargs
-    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT):
+    def __init__(self,show_traces=False,debug_packet_in=False,ip='127.0.0.1',port=BACKEND_PORT,use_nx=False,pipeline=None):
         self.switches = {}
         self.show_traces = show_traces
         self.debug_packet_in = debug_packet_in
+        self.use_nx = use_nx
+        if pipeline:
+            pipe_config_fun = globals()[str(pipeline)]
+            self.pipeline = globals()[str(pipeline)]()
+        else:
+            self.pipeline = default_pipeline()
         self.packetno = 0
         self.channel_lock = threading.Lock()
         self.send_time = 0.0
@@ -336,6 +353,61 @@ class POXClient(revent.EventMixin):
             match.tp_dst = pred['dstport']
         return match
 
+    def build_nx_match(self,switch,inport,outport,pred):
+        ### BUILD NX MATCH
+        match = nx.nx_match()
+        if inport:
+            match.of_in_port = inport
+        if outport:
+            """ NXM_NX_REG2 is the per-packet metadata register where we store
+            the outport from previous tables' port-forwarding actions. """
+            match.reg2 = outport
+
+        if 'srcmac' in pred:
+            match.of_eth_src = packetaddr.EthAddr(pred['srcmac'])
+        if 'dstmac' in pred:
+            match.of_eth_dst = packetaddr.EthAddr(pred['dstmac'])
+        if 'vlan_id' in pred:
+            assert 'vlan_pcp' in pred
+            # Setting the 16-bit TCI: (from highest to least significant bits):
+            # 3 bits vlan_pcp
+            # 1 bit CFI forced to 1
+            # 12 bits vlan_id
+            # Ref: manpages.ubuntu.com/manpages/trusty/man8/ovs-ofctl.8.html
+            vlan_16bit = ((int(pred['vlan_pcp']) << 13) |
+                          0x1000 |
+                          (int(pred['vlan_id'])))
+            match.of_vlan_tci = vlan_16bit
+        if 'ethtype' in pred:
+            match.of_eth_type = pred['ethtype']
+        if 'srcip' in pred:
+            assert 'ethtype' in pred
+            if pred['ethtype'] == IP_TYPE:
+                match.of_ip_src = packetaddr.IPAddr(pred['srcip'])
+            elif pred['ethtype'] == ARP_TYPE:
+                match.arp_spa = packetaddr.IPAddr(pred['srcip'])
+            else:
+                raise RuntimeError("Unknown ethtype for srcip match!")
+        if 'dstip' in pred:
+            assert 'ethtype' in pred
+            if pred['ethtype'] == IP_TYPE:
+                match.of_ip_dst = packetaddr.IPAddr(pred['dstip'])
+            elif pred['ethtype'] == ARP_TYPE:
+                match.arp_tpa = packetaddr.IPAddr(pred['dstip'])
+            else:
+                raise RuntimeError("Unknown ethtype for dstip match!")
+        if 'tos' in pred:
+            match.of_ip_tos = pred['tos']
+        if 'protocol' in pred:
+            match.of_ip_proto = pred['protocol']
+        if 'srcport' in pred:
+            assert 'protocol' in pred
+            match.append(nx.NXM_OF_TCP_SRC(pred['srcport']))
+        if 'dstport' in pred:
+            assert 'protocol' in pred
+            match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
+        return match
+
     def build_of_actions(self,inport,action_list):
         ### BUILD OF ACTIONS
         of_actions = []
@@ -372,14 +444,173 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def flow_mod_action(self,pred,priority,action_list,cookie,command,notify):
+    def build_nx_actions(self,inport,action_list,table_id,pipeline):
+        ### BUILD NX ACTIONS
+        of_actions = []
+        ctlr_outport = False # there is a controller outport action
+        phys_outports = list() # list of physical outports to forward out of
+        possibly_resubmit_next_table = False # should packet be passed on to next table?
+
+        for actions in action_list:
+            if 'srcmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
+            if 'dstmac' in actions:
+                of_actions.append(of.ofp_action_dl_addr.set_dst(actions['dstmac']))
+            if 'srcip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_src(actions['srcip']))
+            if 'dstip' in actions:
+                of_actions.append(of.ofp_action_nw_addr.set_dst(actions['dstip']))
+            if 'srcport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_src(actions['srcport']))
+            if 'dstport' in actions:
+                of_actions.append(of.ofp_action_tp_port.set_dst(actions['dstport']))
+            if 'vlan_id' in actions:
+                if actions['vlan_id'] is None:
+                    of_actions.append(of.ofp_action_strip_vlan())
+                else:
+                    of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
+            if 'vlan_pcp' in actions:
+                if actions['vlan_pcp'] is None:
+                    if not actions['vlan_id'] is None:
+                        raise RuntimeError("vlan_id and vlan_pcp must be set together!")
+                    pass
+                else:
+                    of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
+
+            assert 'outport' in actions
+            outport = actions['outport']
+            if outport == of.OFPP_CONTROLLER:
+                ctlr_outport = True
+            else:
+                """ There is either a physical output action (i.e., on a
+                non-controller port), or a "send to next table" action."""
+                possibly_resubmit_next_table = True
+                if (not inport is None) and outport == inport:
+                    phys_outports.append(of.OFPP_IN_PORT)
+                elif outport != CUSTOM_NEXT_TABLE_PORT:
+                    phys_outports.append(outport)
+                else:
+                    """ No physical outports here; just a possibility of
+                    resubmitting to the next table. """
+                    assert outport == CUSTOM_NEXT_TABLE_PORT
+                    pass
+
+        """ First determine if there is a "next" table from here, or this is the
+        last one. This allows us to append actions appropriately since packet
+        modifications may need to wait until the final table, before sending
+        them out an outport. So, here's the basic approach:
+
+        (1) determine if a table is the last table along this chain of tables,
+        or there is a "next" table.
+
+        (2) If there are more tables that still need to process the packet,
+        write the outport into a dedicated per-packet register, and resubmit the
+        packet to that table for processing.
+
+        (3) If this is the last table, output the packet on any output port that
+        may be specified in actions in the last table, and if there are no such
+        ports by the outport recorded in the per-packet dedicated register.
+        """
+        exists_next_table = table_id in pipeline.edges
+        next_table = pipeline.edges[table_id] if exists_next_table else None
+
+        if ctlr_outport:
+            """ If rule sends packet to controller, this is the sole action. """
+            of_actions = []
+            of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
+
+        elif possibly_resubmit_next_table and exists_next_table:
+            """ This isn't the last table, and either there is an explicit 'next
+            table' action in the rule or a physical outport that demands
+            forwarding in the last table along the pipeline.
+            """
+            if len(phys_outports) > 0:
+                """ Semantics: create a new copy of the packet for each value of
+                the physical outport specified in the action, and resubmit to
+                the next table as a brand new packet. The 'outport' is carried
+                along in a dedicated per-packet register, namely REG2.
+
+                This also means that earlier outport fields get overwritten by
+                fresh output actions in this table. This is consistent with the
+                sequential composition semantics, i.e.,
+
+                (port <- x) >> ((port <- y) + (port <- z))
+
+                results in two packets, which satisfy (respectively) the tests
+
+                port = y,
+
+                and
+
+                port = z,
+
+                but neither satisfy the test
+
+                port = x.
+                """
+                for p in phys_outports:
+                    of_actions.append(nx.nx_reg_load(dst=nx.NXM_NX_REG2,
+                                                     value=p, nbits=16))
+                    of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                            table=next_table))
+            else:
+                """ Semantics: No physical outports on this table; but older
+                output actions may still be left to complete. Just resubmit to
+                next table. """
+                of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                        table=next_table))
+
+        elif (not exists_next_table) and possibly_resubmit_next_table:
+            """ This case happens when this is the last table. There may or may
+            not be physical output actions on this table. If there are physical
+            output actions, use those to forward the packet. If not, use stored
+            outport information (in the per-packet register) to forward the
+            packet.
+            """
+            if len(phys_outports) > 0:
+                """ By semantics of sequential composition of tables, the latest
+                physical outports take priority over stored outport for
+                forwarding. """
+                for p in phys_outports:
+                    of_actions.append(of.ofp_action_output(port=p))
+            else:
+                """ Forward using outport stored in the dedicated register. """
+                of_actions.append(nx.nx_output_reg(reg=nx.NXM_NX_REG2,
+                                                   nbits=16))
+
+        elif (not possibly_resubmit_next_table):
+            """ This case happens if there aren't any actions in the action list
+            of this rule. By the semantics of sequential composition, this
+            packet should be dropped. Do nothing."""
+            pass
+
+        else:
+            raise RuntimeError("Unexpected condition on table flow!")
+
+        return of_actions
+
+    def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
         switch = pred['switch']
-        if 'inport' in pred:        
+        """ Set inport from matching predicate """
+        if 'inport' in pred:
             inport = pred['inport']
         else:
             inport = None
-        match = self.build_of_match(switch,inport,pred)
-        of_actions = self.build_of_actions(inport,action_list)
+        """ Set outport from matching predicate """
+        if 'outport' in pred:
+            outport = pred['outport']
+        else:
+            outport = None
+        if self.use_nx:
+            match = self.build_nx_match(switch,inport,outport,pred)
+        else:
+            match = self.build_of_match(switch,inport,pred)
+        if self.use_nx:
+            of_actions = self.build_nx_actions(inport, action_list, table_id,
+                                               self.pipeline)
+        else:
+            of_actions = self.build_of_actions(inport, action_list)
+
         flags = 0
         if notify:
             flags = of.OFPFF_SEND_FLOW_REM
@@ -393,6 +624,18 @@ class POXClient(revent.EventMixin):
                                  flags=flags,
                                  cookie=cookie,
                                  actions=of_actions)
+
+        elif self.use_nx:
+            msg = nx.nx_flow_mod(command=command,
+                                 priority=priority,
+                                 idle_timeout=of.OFP_FLOW_PERMANENT,
+                                 hard_timeout=of.OFP_FLOW_PERMANENT,
+                                 match=match,
+                                 flags=flags,
+                                 cookie=cookie,
+                                 actions=of_actions,
+                                 table_id=table_id)
+
         else:
             msg = of.ofp_flow_mod(command=command,
                                   priority=priority,
@@ -409,11 +652,11 @@ class POXClient(revent.EventMixin):
         except KeyError, e:
             print "WARNING:install_flow: No connection to switch %d available" % switch
 
-    def install_flow(self,pred,priority,action_list,cookie,notify):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD,notify)
+    def install_flow(self,pred,priority,action_list,cookie,notify,table_id):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_ADD,notify,table_id)
 
-    def modify_flow(self,pred,priority,action_list,cookie,notify):
-        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT,notify)
+    def modify_flow(self,pred,priority,action_list,cookie,notify,table_id):
+        self.flow_mod_action(pred,priority,action_list,cookie,of.OFPFC_MODIFY_STRICT,notify,table_id)
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
@@ -449,13 +692,37 @@ class POXClient(revent.EventMixin):
             print ( ("ERROR:flow_stats_request: No connection to switch %d" +
                      " available") % switch )
     
-    def clear(self,switch=None):
+    def clear(self,switch=None,table_id=0):
         if switch is None:
             for switch in self.switches.keys():
                 self.clear(switch)
         else:
-            d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
+            if self.use_nx:
+                d = nx.nx_flow_mod(command = of.OFPFC_DELETE, table_id=table_id)
+            else:
+                d = of.ofp_flow_mod(command = of.OFPFC_DELETE)
             self.switches[switch]['connection'].send(d) 
+
+    def __nx_switch_pipeline_init(self, dpid, p):
+        """ Initialize switch `dpid` according to the input pipeline
+        configuration `p`. """
+        """ Clear all tables; install default actions. """
+        for t in range(0, p.num_tables):
+            msg = nx.nx_flow_mod(command=of.OFPFC_DELETE, table_id=t)
+            self.switches[dpid]['connection'].send(msg)
+            msg = nx.nx_flow_mod()
+            msg.table_id = t
+            msg.priority = 1
+            msg.match = nx.nx_match()
+            if (t+1) < p.num_tables and t in p.edges:
+                """ If not last table in the pipeline, fallthrough to next. """
+                dst_t = p.edges[t]
+                msg.actions.append(nx.nx_action_resubmit.resubmit_table(table=dst_t))
+            else:
+                """ If last table in pipeline, or no further edges, send to
+                controller. """
+                msg.actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
+            self.switches[dpid]['connection'].send(msg)
 
     def _handle_ConnectionUp(self, event):
         assert event.dpid not in self.switches
@@ -464,9 +731,18 @@ class POXClient(revent.EventMixin):
         self.switches[event.dpid]['connection'] = event.connection
         self.switches[event.dpid]['ports'] = {}
 
-        msg = of.ofp_flow_mod(match = of.ofp_match())
-        msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
-        self.switches[event.dpid]['connection'].send(msg) 
+        if self.use_nx:
+            """ Enable nicira packet-ins (e.g., to get rule cookies) """
+            msg = nx.nx_packet_in_format()
+            self.switches[event.dpid]['connection'].send(msg)
+            """ Enable multi-stage table with nicira extensions """
+            msg = nx.nx_flow_mod_table_id()
+            self.switches[event.dpid]['connection'].send(msg)
+            self.__nx_switch_pipeline_init(event.dpid, self.pipeline)
+        else:
+            msg = of.ofp_flow_mod(match = of.ofp_match())
+            msg.actions.append(of.ofp_action_output(port = of.OFPP_CONTROLLER))
+            self.switches[event.dpid]['connection'].send(msg)
 
         self.send_to_pyretic(['switch','join',event.dpid,'BEGIN'])
 
@@ -476,7 +752,8 @@ class POXClient(revent.EventMixin):
                 self.switches[event.dpid]['ports'][port.port_no] = port.hw_addr
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])                        
+                PORT_TYPE = self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
    
         self.send_to_pyretic(['switch','join',event.dpid,'END'])
 
@@ -577,7 +854,8 @@ class POXClient(revent.EventMixin):
                 #self.runtime.network.port_joins.signal((event.dpid, event.port))
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP])
+                PORT_TYPE =  self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
             elif event.deleted:
                 try:
                     del self.switches[event.dpid]['ports'][event.port] 
@@ -587,7 +865,8 @@ class POXClient(revent.EventMixin):
             elif event.modified:
                 CONF_UP = not 'OFPPC_PORT_DOWN' in self.active_ofp_port_config(port.config)
                 STAT_UP = not 'OFPPS_LINK_DOWN' in self.active_ofp_port_state(port.state)
-                self.send_to_pyretic(['port','mod',event.dpid, event.port, CONF_UP, STAT_UP])
+                PORT_TYPE = self.active_ofp_port_features(port.curr)
+                self.send_to_pyretic(['port','join',event.dpid, port.port_no, CONF_UP, STAT_UP, PORT_TYPE])                        
             else:
                 raise RuntimeException("Unknown port status event")
 
@@ -725,17 +1004,29 @@ class POXClient(revent.EventMixin):
             print "dpid\t%s" % event.dpid
             print
 
-        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data)
-        self.send_to_pyretic(['packet',received])
+        if self.use_nx:
+            assert isinstance(event.ofp, nx.nxt_packet_in)
+            cookie = event.ofp.cookie
+            reg2_entry = event.ofp.match.find(nx.NXM_NX_REG2)
+            if reg2_entry:
+                outport = reg2_entry.value
+            else:
+                outport = None
+        else:
+            cookie = 0
+            outport = None
+
+        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data, outport=outport)
+        self.send_to_pyretic(['packet',received,cookie])
         
        
-def launch():
+def launch(use_nx=False, pipeline=None):
 
     class asyncore_loop(threading.Thread):
         def run(self):
             asyncore.loop()
 
-    POXClient()
+    POXClient(use_nx=use_nx,pipeline=pipeline)
     al = asyncore_loop()
     al.start()
 

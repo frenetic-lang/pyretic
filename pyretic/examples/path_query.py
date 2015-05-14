@@ -39,6 +39,8 @@ from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
 from pyretic.lib.query import counts
+from pyretic.core import util
+import copy
 import threading
 
 import time
@@ -49,38 +51,38 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 ip4 = IPAddr('10.0.0.4')
 
-static_fwding_single_switch = (
-    (match(dstip = ip1) >> fwd(1)) + 
-    (match(dstip = ip2) >> fwd(2))
-    )
+only_count_results = False
 
-static_fwding_chain_2_2 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2))))
-    )
+def static_fwding_chain_2_2():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2))))
+        )
 
-static_fwding_chain_3_3_only_h1_h3 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2))))
-    )
+def static_fwding_chain_3_3_only_h1_h3():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2))))
+        )
 
-static_fwding_chain_3_3 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2))))
-    )
+def static_fwding_chain_3_3():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2))))
+        )
 
 def query_func(bucket, interval):
     while True:
@@ -92,11 +94,79 @@ def query_func(bucket, interval):
         time.sleep(interval)
 
 def query_callback(test_num):
+    global only_count_results
+
     def actual_callback(pkt):
+        ac = actual_callback
+
+        def touch_vars():
+            """ Initialize function-specific counters, if uninitialized. """
+            try:
+                val = ac.pkt_count
+                val = ac.byte_count
+                val = ac.predwise_pkt_count
+                val = ac.predwise_byte_count
+            except AttributeError:
+                ac.pkt_count = 0
+                ac.byte_count = 0
+                ac.predwise_pkt_count = {}
+                ac.predwise_byte_count = {}
+
+        def get_count_key(pkt):
+            predwise_count_key = ['ethtype', 'srcip', 'dstip', 'switch', 'inport']
+            return util.frozendict({k: pkt[k] for k in predwise_count_key})
+
+        def update_predwise_counts(pkt):
+            curr_key = get_count_key(pkt)
+            curr_pkt_count = ac.predwise_pkt_count.get(curr_key, 0)
+            ac.predwise_pkt_count[curr_key] = curr_pkt_count + 1
+            curr_byte_count = ac.predwise_byte_count.get(curr_key, 0)
+            ac.predwise_byte_count[curr_key] = (curr_byte_count +
+                                                pkt['payload_len'])
+
+        def get_key_str(pred):
+            try:
+                out = "int:%s,ethtype:%s,srcip:%s,dstip:%s" % (
+                    "s%d-eth%d" % (pred['switch'], pred['inport']),
+                    "ip" if pred['ethtype']==2048 else "arp",
+                    str(pred['srcip']), str(pred['dstip']))
+            except KeyError:
+                raise RuntimeError("Missing keys from count predicate!")
+            return out
+
+        def print_predwise_entries():
+            pkt_counts  = ac.predwise_pkt_count
+            byte_counts = ac.predwise_byte_count
+            for pred in pkt_counts.keys():
+                assert pred in byte_counts.keys()
+                print "Bucket %s %s counts: [%d, %d]" % (
+                    str(test_num),
+                    get_key_str(pred),
+                    pkt_counts[pred],
+                    byte_counts[pred])
+
+        def print_total_entries():
+            print "Bucket %s total counts: [%d, %d]" % (
+                str(test_num),
+                ac.pkt_count,
+                ac.byte_count)
+
         print '**************'
         print datetime.now()
         print 'Test', test_num, ' -- got a callback from installed path query!'
-        print pkt
+        if only_count_results:
+            if isinstance(pkt, pyretic.core.packet.Packet):
+                touch_vars()
+                ac.pkt_count  += 1
+                ac.byte_count += pkt['payload_len']
+                update_predwise_counts(pkt)
+                print_predwise_entries()
+                print_total_entries()
+            else:
+                print "Bucket %s (packet, byte) counts: %s" % (
+                    str(test_num), pkt)
+        else:
+            print pkt
         print '**************'
     return actual_callback
 
@@ -118,9 +188,17 @@ def path_callback(test_num):
         print '**************'
     return actual_callback
 
+def path_test_empty():
+    return path_empty()
+
 def path_test_0():
     p = atom(match(switch=2))
     p.register_callback(query_callback(0))
+    return p
+
+def path_test_0_5():
+    p = +atom(identity) ^ atom(match(switch=2)) ^ +atom(identity)
+    p.register_callback(query_callback(0.5))
     return p
 
 def path_test_1():
@@ -156,9 +234,9 @@ def path_test_4_5():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=2))
     p = a1 ^ a2
-    cb = CountBucket()
+    cb = CountBucket(bname='1 ~> 2')
     p.set_bucket(cb)
-    p.register_callback(query_callback(4))
+    p.register_callback(query_callback("4.5"))
     query_thread = threading.Thread(target=query_func, args=(cb,5.0))
     query_thread.daemon = True
     query_thread.start()
@@ -241,43 +319,45 @@ def path_test_18():
     p.register_callback(query_callback(18))
     return p
 
-static_fwding_cycle_4_4_spanning_tree_1 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
-                          (match(switch=2) >> fwd(1)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(3)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip4) >> ((match(switch=1) >> fwd(1)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(3))))
-    )
+def static_fwding_cycle_4_4_spanning_tree_1():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(3)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip4) >> ((match(switch=1) >> fwd(1)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(3))))
+        )
 
-static_fwding_cycle_4_4_spanning_tree_2 = (
-    (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(2)))) +
-    (match(dstip=ip2) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(3)) +
-                          (match(switch=3) >> fwd(1)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip3) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(3)) +
-                          (match(switch=4) >> fwd(1)))) +
-    (match(dstip=ip4) >> ((match(switch=1) >> fwd(2)) +
-                          (match(switch=2) >> fwd(2)) +
-                          (match(switch=3) >> fwd(2)) +
-                          (match(switch=4) >> fwd(3))))
-    )
+def static_fwding_cycle_4_4_spanning_tree_2():
+    return (
+        (match(dstip=ip1) >> ((match(switch=1) >> fwd(3)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(2)))) +
+        (match(dstip=ip2) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(3)) +
+                              (match(switch=3) >> fwd(1)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip3) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(3)) +
+                              (match(switch=4) >> fwd(1)))) +
+        (match(dstip=ip4) >> ((match(switch=1) >> fwd(2)) +
+                              (match(switch=2) >> fwd(2)) +
+                              (match(switch=3) >> fwd(2)) +
+                              (match(switch=4) >> fwd(3))))
+        )
 
 def path_test_waypoint_violation():
     """ This examples relies on the cycle,4,4 topology. Use one of the spanning
@@ -316,7 +396,7 @@ def path_test_waypoint_violation_general():
     eg  = egress_network()
     p = ((in_atom(ing & ~fw) ^ +in_atom(~fw) ^ out_atom(eg & ~fw)) |
          (in_out_atom(ing, eg & ~fw)))
-    p.register_callback(query_callback("generalized waypoint violation"))
+    p.register_callback(query_callback("generalized_waypoint_violation"))
     return p
 
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
@@ -443,32 +523,65 @@ def path_test_25():
     p.register_callback(query_callback(25))
     return p
 
-count = 0
-def print_callback(pkt):
-    global count
-    count += 1
-    print 'count is ' + str(count)
-    print 'calll baaack'
-    print pkt
-    print '-----------'
+def path_test_26():
+    p1 = (in_atom(match(srcip=ip1, switch=1)) ^
+          out_atom(match(switch=2, dstip=ip2)))
+    p2 = (in_atom(match(switch=1)) ^ in_out_atom(identity, match(switch=2)))
+    p1.register_callback(query_callback("26.p1"))
+    p2.register_callback(query_callback("26.p2"))
+    return p1 + p2
 
+def path_test_tm():
+    num_switches = 4
+    pset = path_empty()
+    ing = ingress_network
+    eg  = egress_network
+    for i in range(1, num_switches + 1):
+        for j in range(1, num_switches + 1):
+            if (i != j):
+                p = (in_atom(ing() & match(switch=i)) ^
+                     +in_atom(identity) ^
+                     out_atom(eg() & match(switch=j)))
+                cb = CountBucket(bname=("%d ~> %d" % (i,j)))
+                cb.register_callback(query_callback("27.%d.%d" % (i, j)))
+                p.set_bucket(cb)
+                query_thread = threading.Thread(target=query_func, args=(cb,5.0))
+                query_thread.daemon = True
+                query_thread.start()
+                pset += p
+    return pset
 
-def print_callback_2(pkt):
-    global count
-    count += 1
-    print 'count is ' + str(count)
-    print 'calll baaack 2'
-    print pkt
-    print '-----------'
+def get_query(kwargs, default):
+    params = dict(kwargs)
+    if 'query' in params:
+        path_query = globals()[str(params['query'])]
+    else:
+        path_query = default
+    return path_query
 
+def get_fwding(kwargs, default):
+    params = dict(kwargs)
+    if 'fwding' in params:
+        fwding_policy = globals()[str(params['fwding'])]
+    else:
+        fwding_policy = default
+    return fwding_policy
+
+def check_only_count(kwargs):
+    global only_count_results
+    params = dict(kwargs)
+    if (('only_count_results' in params) and
+        (params['only_count_results'] == 'true')):
+        only_count_results = True
 
 # type: unit -> path list
 def path_main(**kwargs):
-    #return path_test_waypoint_violation_general()
-    #return path_test_3()
-    return path_test_23()
+    check_only_count(kwargs)
+    default = path_test_waypoint_violation_general
+    return get_query(kwargs, default)()
+
 def main(**kwargs):
 #    return mac_learner()
-    #return static_fwding_single_switch
-    return static_fwding_chain_3_3
-#    return static_fwding_cycle_4_4_spanning_tree_2
+#    return static_fwding_chain_3_3
+    default = static_fwding_cycle_4_4_spanning_tree_1
+    return get_fwding(kwargs, default)()

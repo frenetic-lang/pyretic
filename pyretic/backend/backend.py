@@ -94,9 +94,9 @@ class BackendChannel(asynchat.async_chat):
                 print "ERROR: Bad switch event"
         elif msg[0] == 'port':
             if msg[1] == 'join':
-                self.backend.runtime.handle_port_join(msg[2],msg[3],msg[4],msg[5])
+                self.backend.runtime.handle_port_join(msg[2],msg[3],msg[4],msg[5],msg[6])
             elif msg[1] == 'mod':
-                self.backend.runtime.handle_port_mod(msg[2],msg[3],msg[4],msg[5])
+                self.backend.runtime.handle_port_mod(msg[2],msg[3],msg[4],msg[5],msg[6])
             elif msg[1] == 'part':
                 self.backend.runtime.handle_port_part(msg[2],msg[3])
             else:
@@ -105,7 +105,8 @@ class BackendChannel(asynchat.async_chat):
             self.backend.runtime.handle_link_update(msg[1],msg[2],msg[3],msg[4])
         elif msg[0] == 'packet':
             packet = msg[1]
-            self.backend.runtime.handle_packet_in(packet)
+            cookie = msg[2]
+            self.backend.runtime.handle_packet_in(packet, cookie)
         elif msg[0] == 'flow_stats_reply':
             self.backend.runtime.handle_flow_stats_reply(msg[1],msg[2])
         elif msg[0] == 'flow_removed':
@@ -139,17 +140,17 @@ class Backend(object):
     def send_packet(self,packet):
         self.send_to_OF_client(['packet',packet])
 
-    def send_install(self,pred,priority,action_list,cookie,notify=False):
-        self.send_to_OF_client(['install',pred,priority,action_list,cookie,notify])
+    def send_install(self,pred,priority,action_list,cookie,notify=False,table_id=0):
+        self.send_to_OF_client(['install',pred,priority,action_list,cookie,notify,table_id])
 
-    def send_modify(self,pred,priority,action_list,cookie,notify=False):
-        self.send_to_OF_client(['modify',pred,priority,action_list,cookie,notify])
+    def send_modify(self,pred,priority,action_list,cookie,notify=False,table_id=0):
+        self.send_to_OF_client(['modify',pred,priority,action_list,cookie,notify,table_id])
 
     def send_delete(self,pred,priority):
         self.send_to_OF_client(['delete',pred,priority])
         
-    def send_clear(self,switch):
-        self.send_to_OF_client(['clear',switch])
+    def send_clear(self,switch,table_id):
+        self.send_to_OF_client(['clear',switch,table_id])
 
     def send_flow_stats_request(self,switch):
         self.send_to_OF_client(['flow_stats_request',switch])

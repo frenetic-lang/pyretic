@@ -35,6 +35,7 @@ from pyretic.core.network import *
 from pyretic.core.packet import *
 from pyretic.core.classifier import get_rule_exact_match
 from pyretic.core.classifier import get_rule_derivation_tree
+from pyretic.core.classifier import get_rule_derivation_leaves
 
 from multiprocessing import Process, Manager, RLock, Lock, Value, Queue, Condition
 import logging, sys, time
@@ -44,8 +45,8 @@ import copy
 TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
 STATS_REQUERY_THRESHOLD_SEC = 10
-#NUM_PATH_TAGS=1022
 NUM_PATH_TAGS = 65000
+DEFAULT_NX_TABLE_ID=1
 
 from pyretic.evaluations import stat
 
@@ -64,140 +65,46 @@ class Runtime(object):
     :type mode: string
     :param verbosity: one of low, normal, high, please-make-it-stop
     :type verbosity: string
+    :param use_nx: use nicira extensions for multi-table rule installation
+    :type use_nx: boolean
+    :param pipeline: for multi-stage switches, a pipeline configuration
+    :type pipeline: pipeline_config
     """
     
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
-                 verbosity='normal', opt_flags = None):
+                 verbosity='normal',use_nx=False, pipeline="default_pipeline",
+                 opt_flags=None):
         self.verbosity = self.verbosity_numeric(verbosity)
+        self.use_nx = use_nx
+        self.pipeline = pipeline
         self.log = logging.getLogger('%s.Runtime' % __name__)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
-        self.policy = main(**kwargs)
+        self.forwarding = main(**kwargs)
+        self.get_subpol_stats = True # TODO: make cmdline option to pyretic.py
+        self.use_netkat_compiler = True # TODO: make cmdline option to pyretic.py
 
+        """ Set runtime flags for specific optimizations. """
+        self.set_optimization_opts(path_main, opt_flags)
 
-        self.path_policy = None
-        self.path_in_tagging  = DynamicPolicy(identity)
-        self.path_in_capture  = DynamicPolicy(drop)
-        self.path_out_tagging = DynamicPolicy(identity)
-        self.path_out_capture = DynamicPolicy(drop)
-        self.dynamic_sub_path_pols = set()
-        self.dynamic_path_preds    = set()
+        """ If there are path-policies, initialize path query components. """
+        self.init_path_query(path_main, kwargs, self.partition_cnt,
+                             self.cache_enabled, self.edge_contraction_enabled)
 
-        self.path_in_table = DynamicPolicy(identity)
-        self.path_out_table = DynamicPolicy(identity)
-        self.vf_tag_pol = None
-        self.vf_untag_pol = None
+        """ Initialize a `policy map', which determines how the network policy
+        is mapped onto the tables on switches. By default (i.e., a single stage
+        table), the entire policy goes into the first table on each switch.
 
-        self.forwarding_policy = self.policy            
-        if path_main:
-            if opt_flags is None:
-                self.disjoint_enabled = False
-                self.default_enabled = False
-                self.integrate_enabled = False
-                self.multitable_enabled = False
-                self.ragel_enabled = False
-                self.partition_cnt = None
-                self.cache_enabled = False
-                self.edge_contraction_enabled = False
-            else:
-                (self.disjoint_enabled, self.default_enabled, self.integrate_enabled, 
-                        self.multitable_enabled, self.ragel_enabled, self.partition_cnt,
-                        self.cache_enabled, self.edge_contraction_enabled) = opt_flags
-            
-            if self.partition_cnt is None:
-                self.partition_enabled = False
-            else:
-                self.partition_enabled = True
+        Based on the policy map, the member variable `self.policy' is also
+        initialized, which denotes the final network policy that is installed on
+        devices.
+        """
+        self.set_policy_map(path_main)
 
-            from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS, self.partition_cnt, self.cache_enabled, self.edge_contraction_enabled)
-            self.path_policy = path_main(**kwargs)
-            self.handle_path_change()
-
-            self.virtual_tag = virtual_field_tagging()
-            self.virtual_untag = virtual_field_untagging()
-                    
-            if self.multitable_enabled:
-                if self.integrate_enabled:
-                    self.in_table_compile()
-                    self.out_table_compile()
-                    
-                    self.vf_tag_compile()
-                    self.vf_untag_compile()
-
-                    self.policy = (self.virtual_tag >> self.path_in_table >> self.policy
-                                    >> self.path_out_table >> self.virtual_untag)
-
-                    self.whole_compile()
-                else:
-                    
-                    self.forwarding_compile()
-                    self.tagging_compile()
-                    self.out_tagging_compile()
-                    self.capture_compile()
-                    self.out_capture_compile()
-                    
-                    self.path_in_table = self.path_in_tagging + self.path_in_capture
-                    self.path_out_table = self.path_out_tagging + self.path_out_capture
-                    
-                    self.in_table_compile()
-                    self.out_table_compile()
-
-                    self.vf_tag_compile()
-                    self.vf_untag_compile()
-                    
-                    
-                    self.policy = (
-                    self.virtual_tag >> self.path_in_table >> 
-                    self.policy >> self.path_out_table >>
-                    self.virtual_untag
-                    )
-                    
-                    self.whole_compile()
-            else:
-                
-                
-                in_tag_policy = self.path_in_tagging >> self.policy
-                self.forwarding = (in_tag_policy >> self.path_out_tagging)
-                in_capture  = self.path_in_capture
-                self.out_capture = (in_tag_policy >> self.path_out_capture)
-
-                ## gathering stats
-                # forwarding
-                self.forwarding_compile()
-                self.tagging_compile()
-                self.out_tagging_compile()
-                self.tag_fwd_compile()
-
-            
-                #capture
-                self.capture_compile()
-                self.out_capture_compile()
-                self.full_out_capture_compile()
-
-                # virtual tags
-                self.vf_tag_compile()
-                self.vf_untag_compile()
-                
-               
-                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
-                self.vtag_in_capture = (self.virtual_tag >> in_capture)
-                self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
-               
-                #self.vtag_forwarding = (self.forwarding)
-                #self.vtag_out_capture = self.out_capture
-                self.vtag_fw_compile()
-                self.vtag_in_capture_compile()
-                self.vtag_out_capture_compile()
-                
-                self.policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture 
-            
-                self.whole_compile()
-
-                #self.policy = ((virtual_tag >> forwarding >> virtual_untag) +
-                #              (virtual_tag >> in_capture) +
-                #             (virtual_tag >> out_capture))
+        """ If subpolicy stats are required, compute them. """
+        if self.get_subpol_stats:
+            self.get_subpolicy_compile_stats(path_main)
 
         self.mode = mode
         self.backend = backend
@@ -231,6 +138,7 @@ class Runtime(object):
         self.packet_in_time = 0
         self.num_packet_ins = 0
         self.update_dynamic_sub_pols()
+        self.total_packets_removed = 0 # pkt count from flow removed messages
 
 ######################
 # Stat Methods 
@@ -241,7 +149,7 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def forwarding_compile(self):
-        return self.forwarding_policy.compile()
+        return self.forwarding.compile()
      
     @stat.classifier_size
     @stat.elapsed_time
@@ -336,9 +244,98 @@ class Runtime(object):
     def out_table_compile(self):
         return self.path_out_table.compile()
 
+    ###### Runtime initialization routines to extract stats ######
+    def set_optimization_opts(self, path_main, opt_flags):
+        """ Set runtime flags for various optimization settings from the command
+        line. """
+        if path_main:
+            if opt_flags is None:
+                self.disjoint_enabled = False
+                self.default_enabled = False
+                self.integrate_enabled = False
+                self.multitable_enabled = False
+                self.ragel_enabled = False
+                self.partition_cnt = None
+                self.cache_enabled = False
+                self.edge_contraction_enabled = False
+            else:
+                (self.disjoint_enabled, self.default_enabled,
+                 self.integrate_enabled, self.multitable_enabled,
+                 self.ragel_enabled, self.partition_cnt,
+                 self.cache_enabled,
+                 self.edge_contraction_enabled) = opt_flags
+            
+            if self.partition_cnt is None:
+                self.partition_enabled = False
+            else:
+                self.partition_enabled = True
 
+    def get_subpolicy_compile_stats(self, path_main):
+        """ In the "offline" case, get compile time and classifier size stats
+        for sub-policies. This function only compiles the sub-parts of the
+        policy. It neither compiles the entire policy, nor touches the
+        self.policy in the runtime. This is done in update_switch_classifiers()
+        and set_policy_map(), respectively.
+        """
+        if path_main:
+            if self.multitable_enabled:
+                if self.integrate_enabled:
+                    self.in_table_compile()
+                    self.out_table_compile()
+                    
+                    self.vf_tag_compile()
+                    self.vf_untag_compile()
 
-   
+                else:                    
+                    self.forwarding_compile()
+                    self.tagging_compile()
+                    self.out_tagging_compile()
+                    self.capture_compile()
+                    self.out_capture_compile()
+                    
+                    self.path_in_table = self.path_in_tagging + self.path_in_capture
+                    self.path_out_table = self.path_out_tagging + self.path_out_capture
+                    
+                    self.in_table_compile()
+                    self.out_table_compile()
+
+                    self.vf_tag_compile()
+                    self.vf_untag_compile()
+
+            else:
+                in_tag_policy = self.path_in_tagging >> self.policy
+                self.forwarding = (in_tag_policy >> self.path_out_tagging)
+                in_capture  = self.path_in_capture
+                self.out_capture = (in_tag_policy >> self.path_out_capture)
+
+                ## gathering stats
+                # forwarding
+                self.forwarding_compile()
+                self.tagging_compile()
+                self.out_tagging_compile()
+                self.tag_fwd_compile()
+
+            
+                #capture
+                self.capture_compile()
+                self.out_capture_compile()
+                self.full_out_capture_compile()
+
+                # virtual tags
+                self.vf_tag_compile()
+                self.vf_untag_compile()
+                
+               
+                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+                self.vtag_in_capture = (self.virtual_tag >> in_capture)
+                self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
+               
+                #self.vtag_forwarding = (self.forwarding)
+                #self.vtag_out_capture = self.out_capture
+                self.vtag_fw_compile()
+                self.vtag_in_capture_compile()
+                self.vtag_out_capture_compile()
+                
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,
@@ -351,7 +348,7 @@ class Runtime(object):
 # PACKET INTERPRETER 
 ######################
 
-    def handle_packet_in(self, concrete_pkt):
+    def handle_packet_in(self, concrete_pkt, cookie):
         """
         The packet interpreter.
         
@@ -362,12 +359,19 @@ class Runtime(object):
         self.num_packet_ins += 1
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
-            
-            
+
+            # Set policy to be used for evaluation, depending on whether
+            # multiple tables are enabled, and the table packet is coming from.
+            eff_policy = self.policy
+            if self.use_nx:
+                (version, table) = self.get_version_table_from_cookie(cookie)
+                eff_policy = self.get_effective_policy_from_table(table)
+
             # find the queries, if any in the policy, that will be evaluated
-            queries,pkts = queries_in_eval((set(),{pyretic_pkt}),self.policy)
+            queries,pkts = queries_in_eval((set(),{pyretic_pkt}),eff_policy)
+
             # evaluate the policy
-            output = self.policy.eval(pyretic_pkt)
+            output = eff_policy.eval(pyretic_pkt)
 
             # apply the queries whose buckets have received new packets
             self.in_bucket_apply = True
@@ -437,7 +441,7 @@ class Runtime(object):
         with self.network_lock:
 
             # if the topology hasn't changed, ignore
-            if self.network.topology == self.prev_network.topology:
+            if self.network == self.prev_network:
                 return
 
             # otherwise copy the network object
@@ -448,8 +452,17 @@ class Runtime(object):
             with self.policy_lock:
                 for policy in self.dynamic_sub_pols:
                     policy.set_network(self.network)
-                for (sub_pol, full_pol) in self.dynamic_path_preds:
-                    sub_pol.set_network(self.network)
+
+                """ Update network objects for dynamic predicates in path
+                queries as well. If any of them changed its policy, path queries
+                must be recompiled.
+                """
+                self.dyn_path_pred_changed = False
+                for dyn_pred_obj in self.dynamic_path_preds:
+                    dyn_pred_obj.pred.set_network(self.network)
+                if self.dyn_path_pred_changed:
+                    self.handle_path_change()
+                    self.dyn_path_pred_changed = False
 
                 # FIXME(joshreich) :-)
                 # This is a temporary fix. We need to specialize the check below
@@ -471,7 +484,7 @@ class Runtime(object):
         c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
         #c1 = self.path_in_table.netkat_compile(cnt)[0]
         
-        c2 = self.forwarding_policy.compile()
+        c2 = self.forwarding.compile()
         c3 = self.path_out_table.policy.netkat_compile(cnt, True)[0]
         #c3 = self.path_out_table.netkat_compile(cnt, True)[0]
 
@@ -482,11 +495,26 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
-        #p = self.policy.compile()
-        p = self.netkat_classifier_compile()
+        if self.use_netkat_compiler:
+            p = self.netkat_classifier_compile()
+        else:
+            p = self.policy.compile()
         #print "rule count", len(p.rules)
         return p
- 
+
+    def mt_specific_policy_compile(self, pol):
+        """ Multi-table specific policy compilation. Pol is the policy argument
+        which is then compiled by netkat and returned.
+        """
+        switch_cnt_runtime = len(self.network.topology.nodes())
+        cnt = (self.partition_cnt if self.partition_cnt
+               else switch_cnt_runtime)
+        if self.use_netkat_compiler:
+            c = pol.netkat_compile(cnt)[0]
+        else:
+            c = pol.compile()
+        return c
+
     def update_switch_classifiers(self):
         """
         Updates switch classifiers
@@ -494,21 +522,39 @@ class Runtime(object):
         classifier = None
         
         if self.mode == 'reactive0':
-            self.clear_all() 
+            self.clear_all()
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
-
-            if self.vf_tag_pol and self.vf_untag_pol: 
-                self.vf_tag_compile()
-                self.vf_untag_compile()
-            classifier = self.whole_policy_compile()
-            self.log.debug(
-                '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
-                                              "generate classifier",
-                                              "policy=\n"+repr(self.policy),
-                                              "classifier=\n"+repr(classifier)))
-            self.install_classifier(classifier)
-
+            if not self.use_nx:
+                classifier = self.whole_policy.compile()
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  "generate classifier",
+                                                  "policy=\n"+repr(self.policy),
+                                                  "classifier=\n"+repr(classifier)))
+                self.install_classifier(classifier)
+            else:
+                classifier_map = {}
+                table_list = []
+                classifier_string = ''
+                classifier_lens = ''
+                for (table, pol) in self.policy_map.iteritems():
+                    if ((not pol.has_active_classifier()) or
+                        self.in_network_update):
+                        table_list.append(table)
+                        classifier_map[table] = self.mt_specific_policy_compile(pol)
+                        classifier_string += "%s\n%s\n" % (
+                            "Table %d classifier:" % table,
+                            repr(classifier_map[table]))
+                        classifier_lens += "Table %d: %d rules\n" % (
+                            table, len(classifier_map[table].rules))
+                self.log.debug(
+                    '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
+                                                  "generate classifier",
+                                                  "policy=\n"+repr(self.policy),
+                                                  classifier_string))
+                for table in table_list:
+                    self.install_classifier(classifier_map[table], table)
 
     def update_dynamic_sub_pols(self):
         """
@@ -550,10 +596,17 @@ class Runtime(object):
         self.recompile_paths()
         self.update_dynamic_sub_path_pols(self.path_policy)
 
-    def handle_path_change_dyn_pred(self, sub_pol, full_pol):
-        recompile_list = on_recompile_path_list(id(sub_pol), full_pol)
-        map(lambda p: p.invalidate_classifier(), recompile_list)
-        self.handle_path_change()
+    def handle_path_change_dyn_pred(self, sub_pol):
+        dyn_preds = self.dynamic_path_preds
+        for policy_tuple in dyn_preds:
+            if id(policy_tuple.pred) == id(sub_pol):
+                full_pol = policy_tuple.pol
+                recomp_list = on_recompile_path_list(id(sub_pol), full_pol)
+                map(lambda p: p.invalidate_classifier(), recomp_list)
+        if not self.in_network_update:
+            self.handle_path_change()
+        else:
+            self.dyn_path_pred_changed = True
 
     def update_dynamic_sub_path_pols(self, path_pol):
         """ Update runtime internal structures which keep track of dynamic
@@ -572,14 +625,14 @@ class Runtime(object):
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
             pp.path_attach(self.handle_path_change)
         old_dynamic_path_preds = copy.copy(self.dynamic_path_preds)
+        dyn_preds_tuples = in_cg.get_dyn_preds() + out_cg.get_dyn_preds()
         self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
                                       out_cg.get_dyn_preds())
-        for (sp, fp) in (old_dynamic_path_preds - self.dynamic_path_preds):
-            sp.path_detach()
-        for (sp, fp) in (self.dynamic_path_preds - old_dynamic_path_preds):
-            sp.set_network(self.network)
-            f = lambda x: self.handle_path_change_dyn_pred(x, fp)
-            sp.path_attach(f)
+        for olds in (old_dynamic_path_preds - self.dynamic_path_preds):
+            olds.pred.path_detach()
+        for news in (self.dynamic_path_preds - old_dynamic_path_preds):
+            news.pred.set_network(self.network)
+            news.pred.path_attach(self.handle_path_change_dyn_pred)
 
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
@@ -653,10 +706,11 @@ class Runtime(object):
         concrete_pkt_in = self.pyretic2concrete(pkt_in)
         concrete_pred = self.match_on_all_fields(concrete_pkt_in)
         action_list = []
+        default_table = 0
         
         ### IF NO PKTS OUT THEN INSTALL DROP (EMPTY ACTION LIST)
         if len(pkts_out) == 0:
-            return (concrete_pred,0,action_list,self.default_cookie,False)
+            return (concrete_pred,0,action_list,self.default_cookie,False,default_table)
 
         for pkt_out in pkts_out:
             concrete_pkt_out = self.pyretic2concrete(pkt_out)
@@ -683,34 +737,49 @@ class Runtime(object):
                 if len(action_set) > 1:
                     return None
 
-        return (concrete_pred,0,action_list,self.default_cookie,False)
+        return (concrete_pred,0,action_list,self.default_cookie,False,default_table)
 
 #########################
 # PROACTIVE COMPILATION 
 #########################
 
-    def install_defaults(self, s):
+    def get_cookie(self, version, table_id):
+        """ Set a cookie which contains information both about the
+        classifier version of the rule as well as the table it's going
+        into. """
+        return (((table_id & 0b11) << 14) | (version & 0x3fff))
+
+    def get_version_table_from_cookie(self, cookie):
+        """ Return a classifier version number and table_id from a cookie. """
+        table_id = (cookie >> 14) & 0b11
+        version  = cookie & 0x3fff
+        return (version, table_id)
+
+    def install_defaults(self, s, table_id):
         """ Install backup rules on switch s by default. """
         # Fallback "send to controller" rule under table miss
         self.install_rule(({'switch' : s},
                            TABLE_MISS_PRIORITY,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie,
-                           False))
+                           self.get_cookie(self.default_cookie, table_id),
+                           False,
+                           table_id))
         # Send all LLDP packets to controller for topology maintenance
         self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
                            TABLE_START_PRIORITY + 2,
                            [{'outport' : OFPP_CONTROLLER}],
-                           self.default_cookie,
-                           False))
+                           self.get_cookie(self.default_cookie, table_id),
+                           False,
+                           table_id))
         # Drop all IPv6 packets by default.
-        #self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
-         #                  TABLE_START_PRIORITY + 1,
-          #                 [],
-           #                self.default_cookie,
-            #               False))
+        self.install_rule(({'switch':s, 'ethtype':IPV6_TYPE},
+                           TABLE_START_PRIORITY + 1,
+                           [],
+                           self.get_cookie(self.default_cookie, table_id),
+                           False,
+                           table_id))
 
-    def install_classifier(self, classifier):
+    def install_classifier(self, classifier, table_id=DEFAULT_NX_TABLE_ID):
         """
         Proactively installs switch table entries based on the input classifier
 
@@ -719,6 +788,38 @@ class Runtime(object):
         """
         if classifier is None:
             return
+        if not self.use_nx:
+            table_id = 0
+
+        class ListedRule(object):
+            """ Rule class used by half of the classifier processing pipeline
+            to keep track of various data plane installation parameters, outside
+            of the normal classifier.
+            """
+            def __init__(self, mat=drop, priority=0, actions=[],
+                         version=0, cookie=0,
+                         table_id=0, notify=False,
+                         parents=None, op="policy"):
+                self.mat = mat
+                self.priority = priority
+                self.actions = actions
+                self.version = version
+                self.cookie = cookie
+                self.table_id = table_id
+                self.parents = parents
+                self.op = op
+                self.notify = notify # flow removed notification
+
+            def to_tuple(self):
+                return (self.mat, self.priority, self.actions, self.cookie,
+                        self.notify, self.table_id)
+
+            def to_rule(self):
+                return Rule(self.mat, self.actions,
+                            parents=self.parents, op=self.op)
+
+            def __repr__(self):
+                return str((self.table_id, self.priority, self.cookie, self.mat, self.actions))
 
         ### CLASSIFIER TRANSFORMS 
 
@@ -734,9 +835,17 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            return Classifier(Rule(rule.match,
-                                   filter(lambda a: a != identity,rule.actions))
-                              for rule in classifier.rules)
+            if not self.use_nx:
+                """ Remove identity policies if using single-stage table. """
+                return Classifier(Rule(rule.match,
+                                       filter(lambda a: a !=
+                                              identity,rule.actions),
+                                       parents=rule.parents,
+                                       op=rule.op)
+                                  for rule in classifier.rules)
+            else:
+                """ Don't remove identity actions from multi-stage policies. """
+                return classifier
 
         def remove_path_buckets(classifier):
             """
@@ -760,7 +869,9 @@ class Runtime(object):
                         new_acts.append(Controller)
                     else:
                         new_acts.append(act)
-                new_rules.append(Rule(rule.match, new_acts))
+                new_rules.append(Rule(rule.match, new_acts,
+                                      parents=rule.parents,
+                                      op=rule.op))
             return Classifier(new_rules)
 
         def controllerify(classifier):
@@ -781,7 +892,9 @@ class Runtime(object):
                     # DISCUSS (cole): should other actions be taken at the switch
                     # before sending to the controller?  i.e. a policy like:
                     # modify(srcip=1) >> ToController.
-                    return Rule(rule.match,[Controller])
+                    return Rule(rule.match,[Controller],
+                                parents=rule.parents,
+                                op=rule.op)
                 else:
                     return rule
             return Classifier(controllerify_rule(rule) 
@@ -804,7 +917,9 @@ class Runtime(object):
                        not 'vlan_id' in rule.match.map ) or
                      rule.match == identity ):
                     specialized_rules.append(Rule(rule.match.intersect(default_vlan_match),
-                                                  rule.actions))
+                                                  rule.actions,
+                                                  parents=rule.parents,
+                                                  op=rule.op))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -826,20 +941,34 @@ class Runtime(object):
                      ( 'srcip' in rule.match.map or 
                        'dstip' in rule.match.map ) and 
                      not 'ethtype' in rule.match.map ):
-                    specialized_rules.append(Rule(rule.match & match(ethtype=IP_TYPE),rule.actions))
+                    specialized_rules.append(Rule(rule.match &
+                                                  match(ethtype=IP_TYPE),
+                                                  rule.actions,
+                                                  parents=rule.parents,
+                                                  op=rule.op))
 
                     # DEAL W/ BUG IN OVS ACCEPTING ARP RULES THAT AREN'T ACTUALLY EXECUTED
                     arp_bug = False
                     for action in rule.actions:
-                        if action == Controller or isinstance(action, CountBucket):
+                        if ((action == Controller) or
+                            isinstance(action, CountBucket) or
+                            (self.use_nx and action == identity)):
                             pass
                         elif len(action.map) > 1:
                             arp_bug = True
                             break
                     if arp_bug:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),[Controller]))
+                        specialized_rules.append(Rule(rule.match &
+                                                      match(ethtype=ARP_TYPE),
+                                                      [Controller],
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     else:
-                        specialized_rules.append(Rule(rule.match & match(ethtype=ARP_TYPE),rule.actions))
+                        specialized_rules.append(Rule(rule.match &
+                                                      match(ethtype=ARP_TYPE),
+                                                      rule.actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                 else:
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
@@ -862,7 +991,7 @@ class Runtime(object):
                 """
                 bucket_list = {}
                 for rule in rules:
-                    (_,_,actions,_) = rule
+                    actions = rule.actions
                     for act in actions:
                         if isinstance(act, CountBucket):
                             if not id(act) in bucket_list:
@@ -870,7 +999,24 @@ class Runtime(object):
                 return bucket_list
 
             def update_rules_for_buckets(rule, op):
-                (match, priority, actions, version) = rule
+                match = copy.copy(rule.mat)
+                """When running multi-stage table with nicira extensions, we remove
+                matches on outports. The flow stats reply matches don't come
+                with the outport (or the metadata register) match
+                information. Since the priority and version, and rest of the
+                match without the outport will match anyhow, we can safely
+                remove the outport field from the stored match!
+
+                Such matches still get sent out to the backend with the outport
+                field match intact, and data plane forwarding behavior is
+                unaffected.
+                """
+                if self.use_nx:
+                    match.pop('outport', None)
+                priority = rule.priority
+                actions = rule.actions
+                version = rule.version
+                table_id = rule.table_id
                 hashable_match = util.frozendict(match)
                 rule_key = (hashable_match, priority, version)
                 for act in actions:
@@ -930,13 +1076,19 @@ class Runtime(object):
             for lst in diff_lists:
                 new_lst = []
                 for rule in lst:
-                    (match,priority,acts,version) = rule
+                    acts = rule.actions
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
-                    if len(new_acts) < len(acts):
-                        new_rule = (match, priority, new_acts, version, True)
-                    else:
-                        new_rule = (match, priority, new_acts, version, False)
+                    notify_flag = True if len(new_acts) < len(acts) else False
+                    new_rule = ListedRule(mat=rule.mat,
+                                          priority=rule.priority,
+                                          actions=new_acts,
+                                          version=rule.version,
+                                          cookie=rule.cookie,
+                                          notify=notify_flag,
+                                          table_id=rule.table_id,
+                                          parents=rule.parents,
+                                          op=rule.op)
                     new_lst.append(new_rule)
                 new_diff_lists.append(new_lst)
             return new_diff_lists
@@ -963,11 +1115,13 @@ class Runtime(object):
                 else:
                     for s in switches:
                         new_rules.append(Rule(
-                                rule.match.intersect(match(switch=s)),
-                                rule.actions))
+                            rule.match.intersect(match(switch=s)),
+                            rule.actions,
+                            parents=rule.parents,
+                            op=rule.op))
             return Classifier(new_rules)
 
-        def concretize(classifier):
+        def concretize(classifier, table_id):
             """
             Convert policies into dictionaries.
             
@@ -997,6 +1151,8 @@ class Runtime(object):
                         return {'outport' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
                         return { k:v for (k,v) in a.map.iteritems() }
+                    elif self.use_nx and a == identity:
+                        return {'outport' : CUSTOM_NEXT_TABLE_PORT }
                     else: # default
                         return a
                 m = concretize_match(rule.match)
@@ -1004,10 +1160,26 @@ class Runtime(object):
                 if m is None:
                     return None
                 else:
-                    return Rule(m,acts)
+                    return Rule(m,acts,parents=rule.parents,op=rule.op)
             crs = [concretize_rule_actions(r) for r in classifier.rules]
             crs = filter(lambda cr: not cr is None,crs)
             return Classifier(crs)
+
+        def set_next_table_port(classifier):
+            def set_next_table_outport(acts):
+                """ If an action in acts does not contain an outport, add the
+                "next table" outport to it. Applicable only in multi-stage table
+                mode."""
+                new_acts = []
+                for act in acts:
+                    if not isinstance(act, Query) and not 'outport' in act:
+                        act['outport'] = CUSTOM_NEXT_TABLE_PORT
+                    new_acts.append(act)
+                return new_acts
+            return Classifier([Rule(r.match,
+                                    set_next_table_outport(r.actions),
+                                    parents=r.parents, op=r.op)
+                               for r in classifier.rules])
 
         def check_OF_rules(classifier):
             def check_OF_rule_has_outport(r):
@@ -1066,9 +1238,11 @@ class Runtime(object):
 
             specialized_rules = []
             for rule in classifier.rules:
-                phys_actions = filter(lambda a: (not isinstance(a, CountBucket)
-                                                 and a['outport'] != OFPP_CONTROLLER
-                                                 and a['outport'] != OFPP_IN_PORT),
+                phys_actions = filter(lambda a: (
+                        not isinstance(a, CountBucket)
+                        and a['outport'] != OFPP_CONTROLLER
+                        and a['outport'] != OFPP_IN_PORT
+                        and a['outport'] != CUSTOM_NEXT_TABLE_PORT),
                                       rule.actions)
                 outports_used = map(lambda a: a['outport'], phys_actions)
                 if not 'inport' in rule.match:
@@ -1078,14 +1252,18 @@ class Runtime(object):
                         new_match = copy.deepcopy(rule.match)
                         new_match['inport'] = outport
                         new_actions = specialize_actions(rule.actions,outport)
-                        specialized_rules.append(Rule(new_match,new_actions))
+                        specialized_rules.append(Rule(new_match,new_actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     # And a default rule for any inport outside the set of outports_used
                     specialized_rules.append(rule)
                 else:
                     if rule.match['inport'] in outports_used:
                         # Modify the set of actions
                         new_actions = specialize_actions(rule.actions,rule.match['inport'])
-                        specialized_rules.append(Rule(rule.match,new_actions))
+                        specialized_rules.append(Rule(rule.match,new_actions,
+                                                      parents=rule.parents,
+                                                      op=rule.op))
                     else:
                         # Leave as before
                         specialized_rules.append(rule)
@@ -1109,12 +1287,17 @@ class Runtime(object):
                     priority[s] -= 1
                 except KeyError:
                     priority[s] = TABLE_START_PRIORITY
-                tuple_rules.append((rule.match,priority[s],rule.actions))
+                r = ListedRule(mat=rule.match,
+                               priority=priority[s],
+                               actions=rule.actions,
+                               parents=rule.parents,
+                               op=rule.op)
+                tuple_rules.append(r)
             return tuple_rules
 
         ### UPDATE LOGIC
 
-        def nuclear_install(new_rules, curr_classifier_no):
+        def nuclear_install(new_rules, curr_classifier_no, table_id):
             """Delete all rules currently installed on switches and then install
             input classifier from scratch. This function installs the new
             classifier through send_clear's first followed by install_rule's,
@@ -1130,15 +1313,13 @@ class Runtime(object):
             :param classifier: the input classifer
             :type classifier: Classifier
             """
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switch_list()
 
             for s in switches:
                 self.send_barrier(s)
-                self.send_clear(s)
+                self.send_clear(s, table_id)
                 self.send_barrier(s)
-                self.install_defaults(s)
+                self.install_defaults(s, table_id)
 
             for rule in new_rules:
                 self.install_rule(rule)
@@ -1154,27 +1335,49 @@ class Runtime(object):
             if rule_list is None:
                 return None
             for rule in rule_list:
-                if target[0] == rule[0] and target[1] == rule[1]:
+                if target.mat == rule.mat and target.priority == rule.priority:
                     return rule
             return None
 
-        def get_new_rules(classifier, curr_classifier_no):
-            def add_version(rules, version):
+        def get_new_rules(classifier, curr_classifier_no, table_id):
+            def add_cookie(rules, cookie_val):
                 new_rules = []
                 for r in rules:
-                    new_rules.append(r + (version,))
+                    new_rules.append(ListedRule(mat=r.mat,
+                                                priority=r.priority,
+                                                actions=r.actions,
+                                                version=cookie_val,
+                                                cookie=cookie_val,
+                                                table_id=r.table_id,
+                                                parents=r.parents,
+                                                op=r.op))
                 return new_rules
 
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            def add_table_id(rules, table_id_val):
+                new_rules = []
+                for r in rules:
+                    new_rules.append(ListedRule(mat=r.mat,
+                                                priority=r.priority,
+                                                actions=r.actions,
+                                                version=r.version,
+                                                cookie=r.cookie,
+                                                table_id=table_id_val,
+                                                parents=r.parents,
+                                                op=r.op))
+                return new_rules
+
+            switches = self.network.switch_list()
 
             classifier = switchify(classifier,switches)
-            classifier = concretize(classifier)
+            classifier = concretize(classifier, table_id)
+            if self.use_nx:
+                classifier = set_next_table_port(classifier)
             classifier = check_OF_rules(classifier)
             classifier = OF_inportize(classifier)
             new_rules = prioritize(classifier)
-            new_rules = add_version(new_rules, curr_classifier_no)
+            cookie = self.get_cookie(curr_classifier_no, table_id)
+            new_rules = add_cookie(new_rules, cookie)
+            new_rules = add_table_id(new_rules, table_id)
             return new_rules
 
         def get_nuclear_diff(new_rules):
@@ -1193,6 +1396,9 @@ class Runtime(object):
         def get_incremental_diff(new_rules):
             """Compute diff lists, i.e., (+), (-) and (0) rules from the earlier
             (versioned) classifier."""
+            """ TODO: this function needs to be updated with multiple
+            tables. There must now be one old_rules structure corresponding
+            to each table_id. """
             def different_actions(old_acts, new_acts):
                 def buckets_removed(acts):
                     return filter(lambda a: not isinstance(a, CountBucket),
@@ -1212,11 +1418,20 @@ class Runtime(object):
                     if new is None:
                         to_delete.append(old)
                     else:
-                        (new_match,new_priority,new_actions,_) = new
-                        (_,_,old_actions,old_version) = old
+                        new_match = new.mat
+                        new_priority = new.priority
+                        new_actions = new.actions
+                        old_actions = old.actions
+                        old_version = old.version
                         if different_actions(old_actions, new_actions):
-                            modified_rule = (new_match, new_priority,
-                                             new_actions, old_version)
+                            modified_rule = ListedRule(mat=new_match,
+                                                       priority=new_priority,
+                                                       actions=new_actions,
+                                                       version=old_version,
+                                                       cookie=new.cookie,
+                                                       table_id=new.table_id,
+                                                       parents=new.parents,
+                                                       op=new.op)
                             to_modify.append(modified_rule)
                             to_modify_old.append(old)
                             # We also add the new and old rules to the to_add
@@ -1253,7 +1468,16 @@ class Runtime(object):
             elif self.mode == 'proactive1':
                 return get_incremental_diff(new_rules)
 
-        def install_diff_lists(diff_lists, classifier_version_no):
+        def convert_to_tuple(diff_lists):
+            new_diff_lists = []
+            for lst in diff_lists:
+                new_lst = []
+                for lr in lst:
+                    new_lst.append(lr.to_tuple())
+                new_diff_lists.append(new_lst)
+            return new_diff_lists
+
+        def install_diff_lists(diff_lists, classifier_version_no, table_id):
             """Install the difference between the input classifier and the
             current switch tables. The function takes the set of rules (added,
             deleted, modified, untouched), and does necessary flow
@@ -1266,17 +1490,15 @@ class Runtime(object):
             :type classifier_version_no: int
             """
             (to_add, to_delete, to_modify, to_stay) = diff_lists
-            switch_attrs_tuples = self.network.topology.nodes(data=True)
-            switch_to_attrs = { k : v for (k,v) in switch_attrs_tuples }
-            switches = switch_to_attrs.keys()
+            switches = self.network.switch_list()
 
             # If the controller just came up, clear out the switches.
             if classifier_version_no == 1 or self.mode == 'proactive0':
                 for s in switches:
                     self.send_barrier(s)
-                    self.send_clear(s)
+                    self.send_clear(s, table_id)
                     self.send_barrier(s)
-                    self.install_defaults(s)
+                    self.install_defaults(s, table_id)
 
             # There's no need to delete rules if nuclear install:
             if self.mode == 'proactive0':
@@ -1302,10 +1524,10 @@ class Runtime(object):
 
         ### PROCESS THAT DOES INSTALL
 
-        def f(diff_lists,curr_version_no):
+        def f(diff_lists,curr_version_no,table_id):
             self.send_reset_install_time()
             with self.switch_lock:
-                install_diff_lists(diff_lists,curr_version_no)
+                install_diff_lists(diff_lists,curr_version_no,table_id)
 
         curr_version_no = None
         with self.classifier_version_lock:
@@ -1332,8 +1554,14 @@ class Runtime(object):
         # bookkeeping and removing of bucket actions happens at the end of the
         # whole pipeline, because buckets need very precise mappings to the
         # rules installed by the runtime.
-        new_rules = get_new_rules(classifier, curr_version_no)
+        new_rules = get_new_rules(classifier, curr_version_no, table_id)
         self.log.debug("Number of rules in classifier: %d" % len(new_rules))
+
+        # Get statistics
+        stat_switch_cnt = len(self.network.topology.nodes())
+        stat.gather_general_stats('switch count', stat_switch_cnt, 0, False)
+        stat.gather_general_stats('rule count', len(new_rules), 0, False)
+
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)
         diff_lists = remove_buckets(diff_lists)
@@ -1344,13 +1572,13 @@ class Runtime(object):
             self.log.debug(str(rule))
         self.log.debug('================================')
 
+        # This is the point to do any diagnostics on classifier rules, since the
+        # ListedRule structure contains parents and operation pointers.
+        # These are removed before being passed on to the data plane rule
+        # installation routine below.
+        diff_lists = convert_to_tuple(diff_lists)
 
-        stat_switch_attrs_tuples = self.network.topology.nodes(data=True)
-        stat_switch_cnt = len({ k : v for (k,v) in stat_switch_attrs_tuples }.keys())
-        stat.gather_general_stats('switch count', stat_switch_cnt, 0, False)
-        stat.gather_general_stats('rule count', len(new_rules), 0, False)
-
-        p = Process(target=f, args=(diff_lists,curr_version_no))
+        p = Process(target=f, args=(diff_lists,curr_version_no,table_id))
         p.daemon = True
         p.start()
 
@@ -1374,10 +1602,10 @@ class Runtime(object):
             if 'switch' in concrete_pred:
                 switch_id = concrete_pred['switch']
                 if ((not switch_id in switch_list) and
-                    (switch_id in self.network.topology.nodes())):
+                    (switch_id in self.network.switch_list())):
                     switch_list.append(switch_id)
             else:
-                switch_list = self.network.topology.nodes()
+                switch_list = self.network.switch_list()
                 break
         self.log.info('Pulling stats from switches '
                       + str(switch_list) + ' for bucket ' +
@@ -1398,6 +1626,11 @@ class Runtime(object):
             queried. """
             if already_queried:
                 with self.last_queried_time_lock:
+                    if not s in self.last_queried_time:
+                        self.log.error("Did not find the switch in last queried table!!")
+                        self.log.error("Switch %s" % s)
+                        self.log.error("last queried time list: %s" %
+                                       str(self.last_queried_time))
                     assert s in self.last_queried_time
                     need_to_query = ((time.time() - self.last_queried_time[s])
                                        > STATS_REQUERY_THRESHOLD_SEC)
@@ -1465,6 +1698,7 @@ class Runtime(object):
         packet['raw'] = raw_pkt['raw']
         packet['switch'] = raw_pkt['switch']
         packet['inport'] = raw_pkt['inport']
+        packet['outport'] = raw_pkt['outport']
 
         def convert(h,val):
             if h in ['srcmac','dstmac']:
@@ -1516,16 +1750,16 @@ class Runtime(object):
     def send_packet(self,concrete_packet):
         self.backend.send_packet(concrete_packet)
 
-    def install_rule(self,(concrete_pred,priority,action_list,cookie,notify)):
+    def install_rule(self,(concrete_pred,priority,action_list,cookie,notify,table_id)):
         self.log.debug(
             '|%s|\n\t%s\n\t%s\n' % (str(datetime.now()),
                 "sending openflow rule:",
                 (str(priority) + " " + repr(concrete_pred) + " "+
                  repr(action_list) + " " + repr(cookie))))
-        self.backend.send_install(concrete_pred,priority,action_list,cookie,notify)
+        self.backend.send_install(concrete_pred,priority,action_list,cookie,notify,table_id)
 
-    def modify_rule(self, (concrete_pred,priority,action_list,cookie,notify)):
-        self.backend.send_modify(concrete_pred,priority,action_list,cookie,notify)
+    def modify_rule(self, (concrete_pred,priority,action_list,cookie,notify,table_id)):
+        self.backend.send_modify(concrete_pred,priority,action_list,cookie,notify,table_id)
 
     def delete_rule(self,(concrete_pred,priority)):
         self.backend.send_delete(concrete_pred,priority)
@@ -1533,17 +1767,17 @@ class Runtime(object):
     def send_barrier(self,switch):
         self.backend.send_barrier(switch)
 
-    def send_clear(self,switch):
-        self.backend.send_clear(switch)
+    def send_clear(self,switch,table_id):
+        self.backend.send_clear(switch,table_id)
 
-    def clear_all(self):
+    def clear_all(self, table_id=0):
         def f():
-            switches = self.network.topology.nodes()
+            switches = self.network.switch_list()
             for s in switches:
                 self.send_barrier(s)
-                self.send_clear(s)
+                self.send_clear(s, table_id)
                 self.send_barrier(s)
-                self.install_defaults(s)
+                self.install_defaults(s, table_id)
         p = Process(target=f)
         p.daemon = True
         p.start()
@@ -1565,11 +1799,11 @@ class Runtime(object):
     def handle_switch_part(self,switch_id):
         self.network.handle_switch_part(switch_id)
 
-    def handle_port_join(self,switch_id,port_id,conf_up,stat_up):
-        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up)
+    def handle_port_join(self,switch_id,port_id,conf_up,stat_up,port_type):
+        self.network.handle_port_join(switch_id,port_id,conf_up,stat_up,port_type)
 
-    def handle_port_mod(self, switch, port_no, config, status):
-        self.network.handle_port_mod(switch, port_no, config, status)
+    def handle_port_mod(self,switch_id,port_id,conf_up,stat_up,port_type):
+        self.network.handle_port_mod(switch_id,port_id,conf_up,stat_up,port_type)
 
     def handle_port_part(self, switch, port_no):
         self.network.handle_port_part(switch, port_no)
@@ -1662,6 +1896,10 @@ class Runtime(object):
                 self.log.debug("Got removed flow\n%s with counts %d %d" %
                                (str(match_entry), f['packet_count'],
                                 f['byte_count']) )
+                if version > 0:
+                    self.total_packets_removed += f['packet_count']
+                    self.log.debug("Total packets removed: %d" %
+                                   self.total_packets_removed)
                 self.log.debug('Printing global structure for deleted rules:')
                 for k,v in self.global_outstanding_deletes.iteritems():
                     self.log.debug(str(k) + " : " + str(v))
@@ -1708,6 +1946,128 @@ class Runtime(object):
 
     def get_fwding_policy(self):
         return self.policy
+
+################################################################################
+# MULTI-STAGE TABLE CONFIGURATION
+################################################################################
+
+    def set_policy_map(self, path_main):
+        """ Set up the mapping between specific policies and tables in a
+        multi-stage pipeline. This loosely corresponds to the ``configuration''
+        phase of a reprogrammable switch, such as RMT.
+        """
+        def get_effective_forwarding_policy(path_main):
+            if path_main:
+                return self.path_based_forwarding
+            else:
+                return self.forwarding
+        use_nx = self.use_nx
+        pipeline = self.pipeline
+        assert pipeline in ['default_pipeline', 'path_query_pipeline']
+        if use_nx and pipeline == 'default_pipeline':
+            self.policy_map = self.default_pipeline_policy_map(
+                get_effective_forwarding_policy(path_main))
+            self.policy = self.policy_map[1]
+        elif use_nx and pipeline == 'path_query_pipeline' and path_main:
+            self.policy_map = self.path_query_pipeline_policy_map(
+                self.virtual_tag, self.virtual_untag,
+                self.path_in_tagging, self.path_in_capture,
+                self.forwarding,
+                self.path_out_tagging, self.path_out_capture)
+            self.policy = (self.policy_map[0] >>
+                           self.policy_map[1] >>
+                           self.policy_map[2] >>
+                           self.policy_map[3])
+        elif use_nx:
+            raise RuntimeError("No table to policy map configuration defined for"
+                               " this pipeline! %s" % pipeline)
+        else:
+            self.policy_map = self.single_stage_policy_map(
+                get_effective_forwarding_policy(path_main))
+            self.policy = self.policy_map[0]
+
+    def get_effective_policy_from_table(self, table_id):
+        """ Return the effective policy to evaluate a policy, if a packet is
+        sent to controller from table `table_id`.
+        """
+        num_tables = len(self.policy_map.keys())
+        """ Assume a sequential pipeline of policies. """
+        seq_list = [self.policy_map[k] for k in range(table_id, num_tables)]
+        return sequential(seq_list)
+
+    def single_stage_policy_map(self, pol):
+        """ A dummy policy map for single-stage tables. Useful for
+        uniformity. """
+        return {0: pol}
+
+    def default_pipeline_policy_map(self, pol):
+        """ The default pipeline for multi-stage tables with pyretic. Simple
+        configuration:
+
+        table with a single fallthrough rule ->
+        actual rule with _full_ policy
+        """
+        return {0: identity,
+                1: pol}
+
+    def path_query_pipeline_policy_map(self, virtual_tag, virtual_untag,
+                                   in_tagging, in_capture, forwarding,
+                                   out_tagging, out_capture):
+        return {0: virtual_tag >> (in_tagging + in_capture),
+                1: forwarding,
+                2: out_tagging + out_capture,
+                3: virtual_untag}
+
+
+###############################
+# PATH QUERY INITIALIZATION
+###############################
+
+    def init_path_query(self, path_main, kwargs, partition_cnt, cache_enabled,
+                        edge_contraction_enabled):
+        """
+        Initialization of path query library with optimization parameters.
+        * partition_cnt: how many partitions for predicate overlap detection?
+        * cache_enabled: is caching of predicates enabled?
+        * edge_contraction_enabled: is contraction of DFA edges enabled?
+        """
+        self.path_policy = None
+        self.path_in_tagging  = DynamicPolicy(identity)
+        self.path_in_capture  = DynamicPolicy(drop)
+        self.path_out_tagging = DynamicPolicy(identity)
+        self.path_out_capture = DynamicPolicy(drop)
+        self.path_in_table = DynamicPolicy(identity)
+        self.path_out_table = DynamicPolicy(identity)
+        self.dynamic_sub_path_pols = set()
+        self.dynamic_path_preds    = set()
+        self.vf_tag_pol = None
+        self.vf_untag_pol = None
+
+        if path_main:
+            from pyretic.lib.path import pathcomp
+            pathcomp.init(NUM_PATH_TAGS)
+            self.path_policy = path_main(**kwargs)
+            self.handle_path_change()
+            self.virtual_tag = virtual_field_tagging()
+            self.virtual_untag = virtual_field_untagging()
+            # self.path_based_forwarding = (self.virtual_tag >>
+            #                               (self.path_in_tagging +
+            #                                self.path_in_capture) >>
+            #                               self.forwarding >>
+            #                               (self.path_out_tagging +
+            #                                self.path_out_capture) >>
+            #                               self.virtual_untag)
+            self.path_based_forwarding = ((self.virtual_tag >>
+                                           self.path_in_tagging >>
+                                           self.forwarding >>
+                                           self.path_out_tagging >>
+                                           self.virtual_untag) +
+                                          (self.virtual_tag >>
+                                           self.path_in_capture) +
+                                          (self.virtual_tag >>
+                                           self.path_in_tagging >>
+                                           self.forwarding >>
+                                           self.path_out_capture))
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
@@ -1821,10 +2181,10 @@ class ConcreteNetwork(Network):
         self.debug_log.debug(str(self.next_topo))
         self.queue_update(self.get_update_no())
         
-    def handle_port_join(self, switch, port_no, config, status):
+    def handle_port_join(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         this_update_no = self.get_update_no()
-        self.next_topo.add_port(switch,port_no,config,status)
+        self.next_topo.add_port(switch,port_no,config,status,port_type)
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.next_topo))
@@ -1840,12 +2200,13 @@ class ConcreteNetwork(Network):
         except KeyError:
             pass  # THE SWITCH HAS ALREADY BEEN REMOVED BY handle_switch_parts
         
-    def handle_port_mod(self, switch, port_no, config, status):
+    def handle_port_mod(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_mods %s:%s:%s:%s" % (switch, port_no, config, status))
         # GET PREV VALUES
         try:
             prev_config = self.next_topo.node[switch]["ports"][port_no].config
             prev_status = self.next_topo.node[switch]["ports"][port_no].status
+            prev_port_type = self.next_topo.node[switch]["ports"][port_no].port_type
         except KeyError:
             self.log.warning("KeyError CASE!!!!!!!!")
             self.port_down(switch, port_no)
@@ -1854,6 +2215,8 @@ class ConcreteNetwork(Network):
         # UPDATE VALUES
         self.next_topo.node[switch]["ports"][port_no].config = config
         self.next_topo.node[switch]["ports"][port_no].status = status
+        self.next_topo.node[switch]["ports"][port_no].port_type = port_type
+        
 
         # DETERMINE IF/WHAT CHANGED
         if (prev_config and not config):
@@ -1917,7 +2280,13 @@ class ConcreteNetwork(Network):
         if p1.possibly_up() and p2.possibly_up():
             self.next_topo.node[s1]["ports"][p_no1].linked_to = Location(s2,p_no2)
             self.next_topo.node[s2]["ports"][p_no2].linked_to = Location(s1,p_no1)   
-            self.next_topo.add_edge(s1, s2, {s1: p_no1, s2: p_no2})
+            pt1 = self.next_topo.node[s1]["ports"][p_no1].port_type 
+            pt2 = self.next_topo.node[s2]["ports"][p_no2].port_type 
+            if pt1 != pt2:
+                print "MISMATCH ",
+                print pt1
+                print pt2
+            self.next_topo.add_edge(s1, s2, {s1: p_no1, s2: p_no2, 'type' : pt1})
             
         # IF REACHED, WE'VE REMOVED AN EDGE, OR ADDED ONE, OR BOTH
         self.debug_log.debug(self.next_topo)

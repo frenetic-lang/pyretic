@@ -83,6 +83,9 @@ class Policy(object):
     def invalidate_classifier(self):
         self._classifier = None
 
+    def has_active_classifier(self):
+        return True if self._classifier else False
+
     def compile(self):
         """
         Produce a Classifier for this policy
@@ -761,7 +764,8 @@ class CountBucket(Query):
     Class for registering callbacks on counts of packets sent to
     the controller.
     """
-    def __init__(self):
+    def __init__(self, bname=None):
+        self.bname = str(bname) if bname else str(id(self))
         super(CountBucket, self).__init__()
         self.matches = {}
         self.runtime_stats_query_fun = None
@@ -772,6 +776,12 @@ class CountBucket(Query):
         self.byte_count_table = 0
         self.packet_count_persistent = 0
         self.byte_count_persistent = 0
+        self.packet_count_persistent_apply = 0
+        self.packet_count_persistent_removed = 0
+        self.packet_count_persistent_existing = 0
+        self.byte_count_persistent_apply = 0
+        self.byte_count_persistent_removed = 0
+        self.byte_count_persistent_existing = 0
         self.in_update_cv = Condition()
         self.in_update = False
         self.new_bucket = True
@@ -782,7 +792,7 @@ class CountBucket(Query):
         self._classifier = self.generate_classifier()
 
     def __repr__(self):
-        return "CountBucket " + str(id(self))
+        return "CountBucket " + self.bname
 
     def is_new_bucket(self):
         return self.new_bucket
@@ -803,12 +813,14 @@ class CountBucket(Query):
     def apply(self):
         with self.bucket_lock:
             for pkt in self.bucket:
-                self.log.info('In CountBucket ' + str(id(self)) + ' apply():'
+                self.log.info('In CountBucket ' + self.bname + ' apply():'
                                + ' Packet is:\n' + repr(pkt))
                 self.packet_count_persistent += 1
                 self.byte_count_persistent += pkt['payload_len']
+                self.packet_count_persistent_apply += 1
+                self.byte_count_persistent_apply += pkt['payload_len']
             self.bucket.clear()
-        self.log.debug('In bucket ' +  str(id(self)) + ' apply(): ' +
+        self.log.debug('In bucket ' +  self.bname + ' apply(): ' +
                        'persistent packet count is ' +
                        str(self.packet_count_persistent))
 
@@ -848,7 +860,7 @@ class CountBucket(Query):
         if self.new_bucket:
             self.pull_existing_stats()
             self.new_bucket = False
-        self.log.info("Updated bucket %d" % id(self))
+        self.log.info("Updated bucket %s" % self.bname)
        
 
     class match_entry(object):
@@ -917,10 +929,10 @@ class CountBucket(Query):
         packet_count = flow_stat['packet_count']
         byte_count   = flow_stat['byte_count']
         if packet_count > 0:
-            self.log.debug(("In bucket %d handle_flow_removed\n" +
+            self.log.debug(("In bucket %s handle_flow_removed\n" +
                             "got counts %d %d\n" +
                             "match %s") %
-                           (id(self), packet_count, byte_count,
+                           (self.bname, packet_count, byte_count,
                             str(match) + ' ' + str(priority) + ' ' +
                             str(version)) )
         with self.in_update_cv:
@@ -937,13 +949,15 @@ class CountBucket(Query):
                     # existed. We don't count it.
                     if packet_count > 0:
                         self.log.info(("Adding persistent pkt count %d"
-                                        + " to bucket %d") % (
-                                packet_count, id(self) ) )
+                                        + " to bucket %s") % (
+                                packet_count, self.bname ) )
                         self.log.debug(("persistent count is now %d" %
                                         (self.packet_count_persistent +
                                          packet_count) ) )
                     self.packet_count_persistent += packet_count
                     self.byte_count_persistent += byte_count
+                    self.packet_count_persistent_removed += packet_count
+                    self.byte_count_persistent_removed += byte_count
                 # Note that there is no else action. We just forget
                 # that this rule was ever associated with the bucket
                 # if we get a "flow removed" message before we got
@@ -1082,7 +1096,7 @@ class CountBucket(Query):
                                            entries_print_helper())
                         if me:
                             if extracted_pkts > 0:
-                                self.log.debug('In bucket ' + str(id(self)) +
+                                self.log.debug('In bucket ' + self.bname +
                                                ': found matching stats_reply:')
                                 self.log.debug(str(me))
                                 self.log.debug('packets: ' +
@@ -1092,11 +1106,17 @@ class CountBucket(Query):
                                 self.packet_count_table += extracted_pkts
                                 self.byte_count_table   += extracted_bytes
                             else: # pre-existing rule when bucket was created
-                                self.log.debug(('In bucket %d: removing' +
+                                self.log.debug(('In bucket %s: removing' +
                                                 'pre-existing rule counts %d' +
-                                                ' %d') % id(self))
+                                                ' %d') %
+                                               (self.bname, extracted_pkts,
+                                                extracted_bytes ))
                                 self.packet_count_persistent -= extracted_pkts
                                 self.byte_count_persistent -= extracted_bytes
+                                self.packet_count_persistent_existing += (
+                                    extracted_pkts)
+                                self.byte_count_persistent_existing += (
+                                    extracted_bytes)
                                 self.clear_existing_rule_flag(me)
                     else:
                         raise RuntimeError("weird flow entry")
@@ -1104,13 +1124,22 @@ class CountBucket(Query):
                 self.log.debug("Current set of outstanding switches is:")
                 self.log.debug(str(self.outstanding_switches))
         # If have all necessary data, call user-land registered callbacks
-        self.log.info( ('*** Bucket %d flow_stats_reply\n' % id(self)) +
+        self.log.info( ('*** Bucket %s flow_stats_reply\n' % self.bname) +
                         ('table pktcount %d persistent pktcount %d total %d' % (
                     self.packet_count_table,
                     self.packet_count_persistent,
                     self.packet_count_table + self.packet_count_persistent ) ) )
         if not self.outstanding_switches:
             self.log.debug("No outstanding switches; calling callbacks")
+            self.log.debug("*** Returning bucket %s counts.\n%s%s%s%s%s%s" % (
+                    self.bname,
+                    "table counts: %d\n" % self.packet_count_table,
+                    "perst. apply: %d\n" % self.packet_count_persistent_apply,
+                    "perst. remov: %d\n" % self.packet_count_persistent_removed,
+                    "perst. exist: %d\n" % self.packet_count_persistent_existing,
+                    "perst. total: %d\n" % self.packet_count_persistent,
+                    "bucket total: %d\n" % (self.packet_count_table +
+                                            self.packet_count_persistent)))
             self.call_callbacks([(self.packet_count_table +
                                   self.packet_count_persistent),
                                  (self.byte_count_table   +
@@ -1541,17 +1570,17 @@ class DynamicFilter(DynamicPolicy,Filter):
     """
     def __init__(self, policy=drop):
         super(DynamicFilter, self).__init__(policy)
-        self.path_notify = None
+        self.path_notify = []
 
     def path_attach(self, path_notify):
-        self.path_notify = path_notify
+        self.path_notify.append(path_notify)
 
     def path_detach(self):
-        self.path_notify = None
+        self.path_notify = []
 
     def changed(self):
-        if self.path_notify:
-            self.path_notify(self)
+        for f in self.path_notify:
+            f(self)
         if self.notify:
             self.notify(self)
 
@@ -1583,10 +1612,11 @@ class flood(DynamicPolicy):
         if changed:
             self.log.debug("Printing updated MST:\n %s" % str(updated_mst))
             self.policy = parallel([
-                    match(switch=switch) >>
-                        parallel(map(xfwd,attrs['ports'].keys()))
-                    for switch,attrs in self.mst.nodes(data=True)])
-
+                match(switch=switch) >>
+                parallel(map(xfwd,ports))
+                for switch,ports 
+                in self.mst.switch_with_port_ids_list()])
+                
     def __repr__(self):
         try:
             return "flood on:\n%s" % self.mst

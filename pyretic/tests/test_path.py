@@ -527,6 +527,8 @@ def test_in_out_compile_1():
     assert out_cap._classifier == ref_out_cap._classifier
 
 def test_in_out_compile_2():
+    in_cg.clear()
+    out_cg.clear()
     a1 = in_atom(match(srcip=ip1))
     a2 = out_atom(match(dstip=ip2))
     fb = FwdBucket()
@@ -545,28 +547,28 @@ def test_in_out_compile_2():
 
     ref_in_tag = ((~(pred_b | pred_a) >> ~mtag[2] >> atag[2]) +
                   (mtag[2]) +
-                  ((mtag[1] & pred_a) >> atag[2]) +
-                  ((mtag[1] & pred_b) >> atag[2]) +
                   ((mtag[5] & pred_a) >> atag[2]) +
                   ((mtag[5] & pred_b) >> atag[2]) +
-                  ((mtag[0] & pred_a) >> atag[1]) +
-                  ((mtag[0] & pred_b) >> atag[2]) +
                   ((mtag[3] & pred_a) >> atag[4]) +
                   ((mtag[3] & pred_b) >> atag[4]) +
+                  ((mtag[1] & pred_a) >> atag[2]) +
+                  ((mtag[1] & pred_b) >> atag[2]) +
+                  ((mtag[0] & pred_a) >> atag[1]) +
+                  ((mtag[0] & pred_b) >> atag[2]) +
                   ((mtag[4] & pred_a) >> atag[2]) +
                   ((mtag[4] & pred_b) >> atag[2]))
     ref_out_tag = ((~(pred_c | pred_d) >> ~mtag[2] >> atag[2]) +
                    (mtag[2]) +
-                   ((mtag[1] & pred_d) >> atag[3]) +
-                   ((mtag[1] & pred_c) >> atag[3]) +
-                   ((mtag[5] & pred_d) >> atag[2]) +
                    ((mtag[5] & pred_c) >> atag[2]) +
-                   ((mtag[0] & pred_d) >> atag[2]) +
-                   ((mtag[0] & pred_c) >> atag[2]) +
-                   ((mtag[3] & pred_d) >> atag[2]) +
+                   ((mtag[5] & pred_d) >> atag[2]) +
                    ((mtag[3] & pred_c) >> atag[2]) +
-                   ((mtag[4] & pred_d) >> atag[2]) +
-                   ((mtag[4] & pred_c) >> atag[5]))
+                   ((mtag[3] & pred_d) >> atag[2]) +
+                   ((mtag[1] & pred_c) >> atag[3]) +
+                   ((mtag[1] & pred_d) >> atag[3]) +
+                   ((mtag[0] & pred_c) >> atag[2]) +
+                   ((mtag[0] & pred_d) >> atag[2]) +
+                   ((mtag[4] & pred_c) >> atag[5]) +
+                   ((mtag[4] & pred_d) >> atag[2]))
     ref_in_cap = drop
     ref_out_cap = ((drop) +
                    ((mtag[4] & pred_c) >> fb))

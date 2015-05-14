@@ -49,15 +49,32 @@ ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
-fwding = ( (match(dstip=ip1) >> fwd(1)) +
-           (match(dstip=ip2) >> fwd(2)) +
-           (match(dstip=ip3) >> fwd(3)) )
+def static_fwding_single_2():
+    return ( (match(dstip=ip1) >> fwd(1)) +
+             (match(dstip=ip2) >> fwd(2)) )
+
+def static_fwding_single_3():
+    return ( (match(dstip=ip1) >> fwd(1)) +
+             (match(dstip=ip2) >> fwd(2)) +
+             (match(dstip=ip3) >> fwd(3)) )
+
+def static_fwding_cycle_3_3():
+    return ( (match(dstip=ip1) >> match(switch=1) >> fwd(3)) +
+             (match(dstip=ip1) >> match(switch=2) >> fwd(1)) +
+             (match(dstip=ip1) >> match(switch=3) >> fwd(2)) +
+             (match(dstip=ip2) >> match(switch=1) >> fwd(1)) +
+             (match(dstip=ip2) >> match(switch=2) >> fwd(3)) +
+             (match(dstip=ip2) >> match(switch=3) >> fwd(2)) +
+             (match(dstip=ip3) >> match(switch=1) >> fwd(2)) +
+             (match(dstip=ip3) >> match(switch=2) >> fwd(1)) +
+             (match(dstip=ip3) >> match(switch=3) >> fwd(3)) )
 
 class QueryTest(CountBucket):
     
-    def __init__(self):
+    def __init__(self, test_num=None):
         super(QueryTest, self).__init__()
         self.register_callback(self.query_callback)
+        self.test_num = test_num if test_num else id(self)
         import threading
         self.query_thread = threading.Thread(target=self.query_thread)
         self.query_thread.daemon = True
@@ -72,14 +89,14 @@ class QueryTest(CountBucket):
             output += self.get_matches()
             # print output
             self.pull_stats()
-            print ">>>", str(datetime.now()), ('issued query %d, sleeping for %f' %
-                                               (id(self), interval))
+            print ">>>", str(datetime.now()), ('issued query %s, sleeping for %f' %
+                                               (str(self.test_num), interval))
             time.sleep(interval)
 
     def query_callback(self, counts):
         print "***", str(datetime.now()), "| In user callback for bucket",
-        print id(self)
-        print "(packet, byte) counts:", counts
+        print self.test_num
+        print "Bucket", self.test_num, "(packet, byte) counts:", counts
         print "-----------------------------------"
 
 def test0():
@@ -100,7 +117,7 @@ def test0():
     number of packets/bytes displayed by wireshark or tshark with these
     filters. They are designed to work under topology and policy updates.
     """
-    test_bucket = QueryTest()
+    test_bucket = QueryTest('0')
     return test_bucket
 
 def test1():
@@ -115,7 +132,7 @@ def test1():
     arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and ( ip.src ==
     10.0.0.1 || (arp && arp.src.proto_ipv4 == 10.0.0.1) )
     """
-    test_bucket = QueryTest()
+    test_bucket = QueryTest(1)
     return (match(srcip=ip1) >> test_bucket)
 
 def test2():
@@ -141,7 +158,7 @@ def test2():
     """
     b = [] # counting buckets
     for i in range(0,2):
-        b.append(QueryTest())
+        b.append(QueryTest('2.b%d' % i))
         time.sleep(0.2)
 
     pol1 = (match(ethtype=IP_TYPE) & match(srcip=ip1)) >> b[0]
@@ -174,7 +191,7 @@ def test3():
     """
     b = [] # counting buckets
     for i in range(0,2):
-        b.append(QueryTest())
+        b.append(QueryTest('3.b%d' % i))
         time.sleep(0.2)
 
     pol1 = match(srcip=ip1) >> b[0]
@@ -209,7 +226,7 @@ def test4():
     """
     b = [] # counting buckets
     for i in range(0,3):
-        b.append(QueryTest())
+        b.append(QueryTest('4.b%d' % i))
         time.sleep(0.2)
 
     query1 = match(srcip=ip1) >> match(dstip=ip2) >> b[0]
@@ -233,7 +250,7 @@ def test5():
     (arp.dst.proto_ipv4 == 10.0.0.1 || arp.dst.proto_ipv4 == 10.0.0.2 ||
     arp.dst.proto_ipv4 == 10.0.0.3) ) )
     """
-    test_bucket = QueryTest()
+    test_bucket = QueryTest(5)
     matched_traffic = ( (~match(srcip=ip1) & match(dstip=ip2)) +
                         (~match(srcip=ip1) & match(dstip=ip3)) +
                         (~match(srcip=ip1) & match(dstip=ip1)) )
@@ -252,7 +269,7 @@ def test6():
     ( (ip && ip.src == 10.0.0.1 ) or (arp && arp.src.proto_ipv4 == 10.0.0.1) or
     ipv6))
     """
-    test_bucket = QueryTest()
+    test_bucket = QueryTest(6)
     matched_traffic = ~match(srcip=ip1)
     return (matched_traffic >> test_bucket)
 
@@ -268,13 +285,19 @@ def test7():
     arp.dst.proto_ipv4 == 10.0.2.0/24) ) or ipv6 ) ) and (ip.dst == 10.0.0.1 ||
     (arp && (arp.dst.proto_ipv4 == 10.0.0.1 ) ) )
     """
-    return ( (match(dstip=ip1) >> QueryTest()) +
+    return ( (match(dstip=ip1) >> QueryTest(7)) +
              (match(dstip=ip1) >> Controller) )
 
-def main():
-    # examples:
-#     return test0() + fwding
-#    return test0() + flood()
-    return test0() + mac_learner()
-    # return test2() + mac_learner()
+def parse_args(kwargs, defaults):
+    params = dict(kwargs)
+    (query_policy, fwding_policy) = defaults
+    if 'query' in params:
+        query_policy = globals()[str(params['query'])]
+    if 'fwding' in params:
+        fwding_policy = globals()[str(params['fwding'])]
+    return (query_policy, fwding_policy)
 
+def main(**kwargs):
+    defaults = (test0, mac_learner)
+    (query, fwding) = parse_args(kwargs, defaults)
+    return fwding() + query()
