@@ -526,7 +526,7 @@ class Runtime(object):
 
         elif self.mode == 'proactive0' or self.mode == 'proactive1':
             if not self.use_nx:
-                classifier = self.whole_policy.compile()
+                classifier = self.whole_policy_compile()
                 self.log.debug(
                     '|%s|\n\t%s\n\t%s\n\t%s\n' % (str(datetime.now()),
                                                   "generate classifier",
