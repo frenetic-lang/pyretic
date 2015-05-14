@@ -464,7 +464,9 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
-        cnt = self.partition_cnt if self.partition_cnt else 0
+        switch_cnt_runtime = len(self.network.topology.nodes())
+        cnt = (self.partition_cnt if self.partition_cnt
+               else switch_cnt_runtime)
         c0 = self.virtual_tag.compile()
         c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
         #c1 = self.path_in_table.netkat_compile(cnt)[0]
