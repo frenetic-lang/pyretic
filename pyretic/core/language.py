@@ -144,7 +144,7 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, outport = False):
+    def netkat_compile(self, switch_cnt, outport = False, print_json=False):
         pred_policy = None
         for i in range(1, switch_cnt + 1):
             if pred_policy is None:
@@ -158,6 +158,9 @@ class Policy(object):
         import subprocess
 
         f = open('/tmp/in.json', 'w')
+        if print_json:
+            self.log.error("The policy being compiled to netkat is:")
+            self.log.error(str(pol))
         f.write(compile_to_netkat(pol))
         f.close()
 
@@ -170,6 +173,9 @@ class Policy(object):
             print "error in calling frenetic"
         
         cls = json_to_classifier(output, outport)
+        if print_json:
+            self.log.error("This is the json output:")
+            self.log.error(str(output))
         f = open('/tmp/header.txt')
         time = 0
         for line in f.readlines():
@@ -388,7 +394,7 @@ class match(Filter):
 
     def generate_classifier(self):
         c = _match(**self.map).generate_classifier()
-        
+        self.internal_match = _match(**self.map)
         return c
 
     def __eq__(self, other):
@@ -481,7 +487,7 @@ class match(Filter):
         return True
 
     def __repr__(self):
-        return "match: %s" % ' '.join(map(str,self.map.items()))
+        return "match: %s" % ' '.join(map(str,self.internal_match.map.items()))
 
 class _match(match):
     def __init__(self, *args, **kwargs):
@@ -527,6 +533,10 @@ class _match(match):
 
         return util.frozendict(**_map)
 
+    def __repr__(self):
+        return "match: %s" % ' '.join(map(str,self.map.items()))
+
+
 class modify(Policy):
     """
     Modify on all specified fields to specified values.
@@ -560,11 +570,12 @@ class modify(Policy):
 
     def generate_classifier(self):
         c = _modify(**self.map).generate_classifier()
+        self.internal_modify = _modify(**self.map)
         return c
 
 
     def __repr__(self):
-        return "modify: %s" % ' '.join(map(str,self.map.items()))
+        return "modify: %s" % ' '.join(map(str,self.internal_modify.map.items()))
 
     def __eq__(self, other):
         return ( isinstance(other, modify)
@@ -599,6 +610,10 @@ class _modify(modify):
             virtual_field.compress(_vf)))
 
         return _map
+
+    def __repr__(self):
+        return "modify: %s" % ' '.join(map(str,self.map.items()))
+
 
 # FIXME: Srinivas =).
 class Query(Filter):
@@ -1682,6 +1697,10 @@ def virtual_field_untagging():
         vf_matches[name] = None
     
     return ((
+        # The value of the VLAN used to be None, to strip, but NetKat does not
+        # work with None. Since hosts still respond to packets with VLAN 0, we
+        # retain this. (TODO: currently this is a brittle fix; need to fix
+        # NetKat for a permanent solution.)
         egress_network() >> _modify(vlan_id=0, vlan_pcp=0))+
         (~egress_network()))
 
@@ -1861,6 +1880,9 @@ def create_match(pattern, switch_id):
         if v is not None and k != "dlTyp" and k != "nwProto":
             match_map[field_map[k]] = v
 
+    # HACK! NetKat doesn't return vlan_pcp with vlan_id sometimes.
+    if 'vlan_id' in match_map and not 'vlan_pcp' in match_map:
+        match_map['vlan_pcp'] = 0
     return match(**match_map)
 
 def create_action(action, inport):
@@ -1913,7 +1935,7 @@ def json_to_classifier(fname, outport = False):
             if 'inport' in m.map:
                 inport = m.map['inport']
             action = create_action(rule['action'], inport)
-            rules.append( (prio, Rule(m, action)))
+            rules.append( (prio, Rule(m, action, [None], "netkat")))
     #rules.sort()
     rules = [v for (k,v) in rules]
     return Classifier(rules)

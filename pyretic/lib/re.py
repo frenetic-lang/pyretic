@@ -166,7 +166,7 @@ class re_empty(re_base):
         return KEY_EMPTY
 
     def re_string_repr(self):
-        return "phi"
+        return "^any"
 
 class re_symbol(re_base):
     """ A symbol of the character set used by the regular language. """

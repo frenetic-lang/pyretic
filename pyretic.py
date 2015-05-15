@@ -135,12 +135,15 @@ def parseArgs():
     op.add_option('--enable_edge_contraction', '-g', action = "store_true",
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contraction optimization, only works with cache enabled')
+    op.add_option('--use_pyretic', action="store_true",
+                  dest = 'use_pyretic',
+                  help = "Use the pyretic compiler (uses netkat by default)")
     op.set_defaults(frontend_only=False, mode='reactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
                     ragel_enabled=False, switch_cnt=None,
                     cache_enabled=False, edge_contraction_enabled=False,
-                    nx=False)
+                    nx=False, use_pyretic=False)
 
     options, args = op.parse_args()
 
@@ -234,7 +237,8 @@ def main():
     runtime = Runtime(Backend(),main,path_main,kwargs,
                       mode=options.mode, verbosity=options.verbosity,
                       opt_flags=opt_flags_arg, use_nx=options.nx,
-                      pipeline=options.pipeline)
+                      pipeline=options.pipeline,
+                      use_pyretic=options.use_pyretic)
 
     """ Start pox backend. """
     if not options.frontend_only:

@@ -1196,7 +1196,7 @@ class in_out_atom(path):
                 self.out_pred == other.out_pred)
 
     def __repr__(self):
-        return "in: %s\n\tout: %s\n\texpr:%s" % (repr(self.in_pred),
+        return "\tin:\n\t%s\n\tout:\n\t%s\n\texpr:%s" % (repr(self.in_pred),
                                              repr(self.out_pred),
                                              self.expr)
 
@@ -1684,7 +1684,7 @@ class pathcomp(object):
         ast_fold(path_pol, inv_trees, None)
         cls.pred_part(path_pol)        
 
-        
+
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
@@ -1774,9 +1774,9 @@ class pathcomp(object):
             du = ragel_dfa_utils
         else:
             du = dfa_utils
-      
+
         dfa = du.regexes_to_dfa(re_list)
-        print 'number of states: ', du.get_num_states(dfa)
+        # print 'number of states: ', du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
         stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
@@ -2553,8 +2553,12 @@ class ragel_dfa_utils(common_dfa_utils):
                     break
                 else:
                     res.append(cls.get_state(line.strip()[:-1]))
-        
-        state_num = max(res) + 1
+
+        if res:
+            """ If the input RE is not dead """
+            state_num = max(res) + 1
+        else:
+            state_num = 1
         return (res, state_num)
     
     @classmethod
@@ -2799,7 +2803,51 @@ class ragel_dfa_utils(common_dfa_utils):
             re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
         res += re_list_str[:-1] + ';}%%\n%% write data;'
         return res
-       
+
+    @classmethod
+    def add_dead_edges(cls):
+        """ Ragel doesn't add edges to dead states by default. Add those
+        here. """
+        state_edges = {}
+        state_type = {}
+        # get list of all predicates
+        in_pred_symbols = __in_re_tree_gen__.symbol_to_pred.keys()
+        out_pred_symbols = __out_re_tree_gen__.symbol_to_pred.keys()
+        """ Determine edges currently in DFA, i.e., "non-dead" """
+        for edge in cls._edges:
+            (s, p, d) = edge
+            if s in state_edges:
+                state_edges[s].append(p)
+            else:
+                state_edges[s] = [p]
+            if p in in_pred_symbols:
+                assert s not in state_type or state_type[s] == "in"
+                state_type[s] = "in"
+            elif p in out_pred_symbols:
+                assert s not in state_type or state_type[s] == "out"
+                state_type[s] = "out"
+            else:
+                raise RuntimeError("Outgoing pred must be at least of one\
+                                    (in/out) type!")
+        dead = cls._state_num
+        """ Add dead edges. """
+        for s in state_edges.keys():
+            if state_type[s] == "in":
+                all_symbols = set(copy.copy(in_pred_symbols))
+            else:
+                all_symbols = set(copy.copy(out_pred_symbols))
+            state_symbols = set(state_edges[s])
+            remaining_symbols = all_symbols - state_symbols
+            for sym in remaining_symbols:
+                cls._edges.append((s, sym, dead))
+        """ Add dead edges for accepting states (without outgoing transitions)
+        too!! """
+        dfa_states = set(state_edges.keys())
+        all_states = set(range(1, cls._state_num))
+        for s in all_states - dfa_states:
+            for sym in in_pred_symbols + out_pred_symbols:
+                cls._edges.append((s, sym, dead))
+
     @classmethod
     @stat.elapsed_time
     def regexes_to_dfa(cls, re_list):
@@ -2830,7 +2878,8 @@ class ragel_dfa_utils(common_dfa_utils):
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
         else:
             (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
-
+        # Add missing edges going to dead states, if needed.
+        cls.add_dead_edges()
        
 
         
@@ -2839,10 +2888,11 @@ class ragel_dfa_utils(common_dfa_utils):
        
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
-        leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
-                      __out_re_tree_gen__.get_leaf_pickles())
+        # TODO(Mina): avoid pickling as of now; fix later
+        # leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
+        #               __out_re_tree_gen__.get_leaf_pickles())
         
-        dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
+        # dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
         
         return None
 
@@ -2897,6 +2947,13 @@ def pickle_dump(policy):
             res += pol_dump
         res += LIST_END + TUPLE_END + NEWOBJ + END
         return res
+
+    while instance(policy, DynamicPolicy):
+        policy = policy.policy
+        # TODO(Mina)
+        # ... add more stuff here.
+        # ... need unpickling as well.
+
 
     print type(policy)
     raise NotImplementedError

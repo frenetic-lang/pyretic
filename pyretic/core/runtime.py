@@ -74,7 +74,7 @@ class Runtime(object):
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal',use_nx=False, pipeline="default_pipeline",
-                 opt_flags=None):
+                 opt_flags=None, use_pyretic=False):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
         self.pipeline = pipeline
@@ -83,7 +83,7 @@ class Runtime(object):
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
         self.get_subpol_stats = True # TODO: make cmdline option to pyretic.py
-        self.use_netkat_compiler = True # TODO: make cmdline option to pyretic.py
+        self.use_pyretic_compiler = use_pyretic
 
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
@@ -304,7 +304,7 @@ class Runtime(object):
 
             else:
                 in_tag_policy = self.path_in_tagging >> self.policy
-                self.forwarding = (in_tag_policy >> self.path_out_tagging)
+                self.forwarding_test = (in_tag_policy >> self.path_out_tagging)
                 in_capture  = self.path_in_capture
                 self.out_capture = (in_tag_policy >> self.path_out_capture)
 
@@ -326,11 +326,11 @@ class Runtime(object):
                 self.vf_untag_compile()
                 
                
-                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
+                self.vtag_forwarding = (self.virtual_tag >> self.forwarding_test >> self.virtual_untag)
                 self.vtag_in_capture = (self.virtual_tag >> in_capture)
                 self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
                
-                #self.vtag_forwarding = (self.forwarding)
+                #self.vtag_forwarding = (self.forwarding_test)
                 #self.vtag_out_capture = self.out_capture
                 self.vtag_fw_compile()
                 self.vtag_in_capture_compile()
@@ -482,12 +482,8 @@ class Runtime(object):
                else switch_cnt_runtime)
         c0 = self.virtual_tag.compile()
         c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
-        #c1 = self.path_in_table.netkat_compile(cnt)[0]
-        
         c2 = self.forwarding.compile()
         c3 = self.path_out_table.policy.netkat_compile(cnt, True)[0]
-        #c3 = self.path_out_table.netkat_compile(cnt, True)[0]
-
         c4 = self.virtual_untag.compile()
         res = c0 >> c1 >> c2 >> c3 >> c4
         return res
@@ -495,24 +491,36 @@ class Runtime(object):
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
-        if self.use_netkat_compiler:
-            p = self.netkat_classifier_compile()
-        else:
+        if self.use_pyretic_compiler:
             p = self.policy.compile()
+        else:
+            p = self.netkat_classifier_compile()
         #print "rule count", len(p.rules)
         return p
 
-    def mt_specific_policy_compile(self, pol):
+    def mt_specific_policy_compile(self, pol, table):
         """ Multi-table specific policy compilation. Pol is the policy argument
         which is then compiled by netkat and returned.
         """
         switch_cnt_runtime = len(self.network.topology.nodes())
         cnt = (self.partition_cnt if self.partition_cnt
                else switch_cnt_runtime)
-        if self.use_netkat_compiler:
-            c = pol.netkat_compile(cnt)[0]
-        else:
+        """ TODO(ngsrinivas): This is a hack! The forwarding table must be
+        compiled by pyretic for the path query pipeline. Must be fixd when
+        netkat can distinguish between inport and outports. """
+        if table == 2:
             c = pol.compile()
+        else:
+            """Hack to determine, for the path query pipeline, whether port is inport or
+            outport.  TODO(ngsrinivas): revert once netkat provides distinct
+            inport/outport in the classifier.
+            """
+            use_outport = table > 2
+            if self.use_pyretic_compiler:
+                c = pol.compile()
+            else:
+                c = pol.netkat_compile(cnt, use_outport)[0]
+                c_py = pol.compile()
         return c
 
     def update_switch_classifiers(self):
@@ -542,7 +550,8 @@ class Runtime(object):
                     if ((not pol.has_active_classifier()) or
                         self.in_network_update):
                         table_list.append(table)
-                        classifier_map[table] = self.mt_specific_policy_compile(pol)
+                        classifier_map[table] = self.mt_specific_policy_compile(pol,
+                                                                                table)
                         classifier_string += "%s\n%s\n" % (
                             "Table %d classifier:" % table,
                             repr(classifier_map[table]))
@@ -747,12 +756,12 @@ class Runtime(object):
         """ Set a cookie which contains information both about the
         classifier version of the rule as well as the table it's going
         into. """
-        return (((table_id & 0b11) << 14) | (version & 0x3fff))
+        return (((table_id & 0b111) << 13) | (version & 0x1fff))
 
     def get_version_table_from_cookie(self, cookie):
         """ Return a classifier version number and table_id from a cookie. """
-        table_id = (cookie >> 14) & 0b11
-        version  = cookie & 0x3fff
+        table_id = (cookie >> 13) & 0b111
+        version  = cookie & 0x1fff
         return (version, table_id)
 
     def install_defaults(self, s, table_id):
@@ -819,7 +828,12 @@ class Runtime(object):
                             parents=self.parents, op=self.op)
 
             def __repr__(self):
-                return str((self.table_id, self.priority, self.cookie, self.mat, self.actions))
+                out = '\nRule\n  table: %d\n' % self.table_id
+                out += '  priority: %d\n' % self.priority
+                out += '  cookie: %d\n' % self.cookie
+                out += '  match: %s\n' % str(self.mat)
+                out += '  actions: %s\n' % str(self.actions)
+                return out
 
         ### CLASSIFIER TRANSFORMS 
 
@@ -955,7 +969,12 @@ class Runtime(object):
                             (self.use_nx and action == identity)):
                             pass
                         elif len(action.map) > 1:
-                            arp_bug = True
+                            """TODO(ngsrinivas): test ARP packet modification
+                            behavior and permanently remove arp_bug checks. But
+                            for now, commented out.
+                            """
+                            arp_bug = False
+                            # arp_bug = True
                             break
                     if arp_bug:
                         specialized_rules.append(Rule(rule.match &
@@ -1977,7 +1996,8 @@ class Runtime(object):
             self.policy = (self.policy_map[0] >>
                            self.policy_map[1] >>
                            self.policy_map[2] >>
-                           self.policy_map[3])
+                           self.policy_map[3] >>
+                           self.policy_map[4])
         elif use_nx:
             raise RuntimeError("No table to policy map configuration defined for"
                                " this pipeline! %s" % pipeline)
@@ -2013,10 +2033,11 @@ class Runtime(object):
     def path_query_pipeline_policy_map(self, virtual_tag, virtual_untag,
                                    in_tagging, in_capture, forwarding,
                                    out_tagging, out_capture):
-        return {0: virtual_tag >> (in_tagging + in_capture),
-                1: forwarding,
-                2: out_tagging + out_capture,
-                3: virtual_untag}
+        return {0: virtual_tag,
+                1: in_tagging + in_capture,
+                2: forwarding,
+                3: out_tagging + out_capture,
+                4: virtual_untag}
 
 
 ###############################

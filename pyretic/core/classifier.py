@@ -66,7 +66,7 @@ def get_rule_derivation_tree(r, pre_spaces='', only_leaves=False):
     assert isinstance(r, Rule)
     op = r.op
     assert op in ["policy", "parallel", "empty_parallel",
-                  "sequential", "negate"]
+                  "sequential", "negate", "netkat"]
     extra_ind = '    '
     output = ''
     if op == "parallel" or op == "negate" or op == "sequential":
@@ -78,10 +78,18 @@ def get_rule_derivation_tree(r, pre_spaces='', only_leaves=False):
             output += get_rule_derivation_tree(rp, pre_spaces+extra_ind,
                                                only_leaves)
     elif op == "policy":
-        if r.parents[0]:
-            output = pre_spaces + str(r.parents[0]) + '\n'
+        try:
+            if r.parents[0]:
+                output = pre_spaces + str(r.parents[0]) + '\n'
+        except IndexError:
+            print "I got an index error! The rule is", r
+            print "Parents of this rule are:", r.parents
+            import sys
+            sys.exit(0)
     elif op == "empty_parallel":
         output = pre_spaces + "empty classifier\n"
+    elif op == "netkat":
+        output = pre_spaces + str(r) + '\n'
     else:
         raise TypeError
     return output
@@ -92,15 +100,18 @@ def get_rule_derivation_leaves(r):
     assert isinstance(r, Rule)
     op = r.op
     assert op in ["policy", "parallel", "empty_parallel",
-                  "sequential", "negate"]
+                  "sequential", "negate", "netkat"]
     leaf_list = []
     if op == "parallel" or op == "negate" or op == "sequential":
         for rp in r.parents:
             leaf_list += get_rule_derivation_leaves(rp)
     elif op == "policy":
-        leaf_list += [r.parents[0]]
+        if r.parents[0]:
+            leaf_list += [r.parents[0]]
     elif op == "empty_parallel":
         pass
+    elif op == "netkat":
+        leaf_list += [r]
     else:
         raise TypeError
     return leaf_list
