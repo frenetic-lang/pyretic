@@ -217,7 +217,7 @@ def test_bucket_single_test():
     args = parse_args()
     test_duration_sec = args.test_duration_sec
     tshark_slack_sec  = args.tshark_slack_sec
-    adjust_path = get_adjust_path(args)
+    adjust_path = get_adjust_path(args.results_folder)
     mn_cleanup()
 
     """ Controller """
