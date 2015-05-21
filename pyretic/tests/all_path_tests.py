@@ -75,14 +75,14 @@ def single_path_test(fwding="static_fwding_chain_3_3",
         fails_counts.append(success_info)
     return success_info == 'PASS'
 
-def all_path_tests():
+def bunched_path_tests(default_pyopts=''):
     results_folder = './pyretic/evaluations/results'
     success_file = 'pass-fail.txt'
 
     """ Path test 0 with static policy, single-stage """
     query = "path_test_0"
     fwding = "static_fwding_chain_3_3"
-    pyopts = ''
+    pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_0',
@@ -94,7 +94,7 @@ def all_path_tests():
     """ Path test 0.5 with static policy, single-stage """
     query = "path_test_0_5"
     fwding = "static_fwding_chain_3_3"
-    pyopts = ''
+    pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_0_5',
@@ -106,7 +106,7 @@ def all_path_tests():
     """ Path test 2 with mac learner, single-stage """
     query = "path_test_2"
     fwding = "mac_learner"
-    pyopts = ''
+    pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_2',
@@ -118,7 +118,7 @@ def all_path_tests():
     """ Path test 3 with static policy, single-stage """
     query = "path_test_3"
     fwding = "static_fwding_chain_3_3"
-    pyopts = ''
+    pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_1,filt_path_test_2',
@@ -130,7 +130,7 @@ def all_path_tests():
     """ Path test 3 with mac learner, multistage """
     query = "path_test_3"
     fwding = "mac_learner"
-    pyopts = "--nx --pipeline=path_query_pipeline"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_1,filt_path_test_2',
@@ -142,7 +142,7 @@ def all_path_tests():
     """ Waypoint violation with spanning tree 1, multistage """
     query = "path_test_waypoint_violation_general"
     fwding = "static_fwding_cycle_4_4_spanning_tree_1"
-    pyopts = "--nx --pipeline=path_query_pipeline"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_gwpv_st1',
@@ -155,7 +155,7 @@ def all_path_tests():
     """ Waypoint violation with spanning tree 2, multistage """
     query = "path_test_waypoint_violation_general"
     fwding = "static_fwding_cycle_4_4_spanning_tree_2"
-    pyopts = "--nx --pipeline=path_query_pipeline"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_gwpv_st2',
@@ -168,7 +168,7 @@ def all_path_tests():
     """ Path test 23 single-stage, static policy """
     query = "path_test_23"
     fwding = "static_fwding_chain_3_3"
-    pyopts = ''
+    pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
@@ -180,7 +180,7 @@ def all_path_tests():
     """ Path test 23 multi-stage, static policy """
     query = "path_test_23"
     fwding = "static_fwding_chain_3_3"
-    pyopts = '--nx --pipeline=path_query_pipeline'
+    pyopts = '%s --nx --pipeline=path_query_pipeline' % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
         tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
@@ -208,7 +208,10 @@ def print_failed_tests():
         print fails_counts[t]
 
 if __name__ == "__main__":
-    all_path_tests()
+    bunched_path_tests(default_pyopts='')
+    bunched_path_tests(default_pyopts='-r -l')
+    bunched_path_tests(default_pyopts='-r -l --use_pyretic')
+    bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="
     print "%d tests passed, %d failed" % (num_passed, num_failed)
