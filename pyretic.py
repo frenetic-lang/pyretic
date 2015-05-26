@@ -95,12 +95,22 @@ def parseArgs():
     op.add_option( '--enable_profile', '-p', action="store_true",
                    dest="enable_profile",
                    help = 'enable yappi multithreaded profiler' )
+    backends = ['pox', 'ryu']
+    op.add_option( '--backend', '-b', type='choice',
+                   choices=backends,
+                   default = 'pox',
+                   help = '|'.join(backends) )
 
     op.set_defaults(frontend_only=False,mode='reactive0',enable_profile=False)
     options, args = op.parse_args()
 
     return (op, options, args, kwargs_to_pass)
 
+def which(file):
+    for path in os.environ["PATH"].split(":"):
+        if os.path.exists(path + "/" + file):
+            return path + "/" + file
+    return None
 
 def main():
     global of_client, enable_profile
@@ -175,29 +185,41 @@ def main():
     handler = util.QueueStreamHandler(logging_queue)
     logger.addHandler(handler)
     logger.setLevel(log_level)
-    
+
     runtime = Runtime(Backend(),main,path_main,kwargs,options.mode,options.verbosity)
     if not options.frontend_only:
-        try:
-            output = subprocess.check_output('echo $PYTHONPATH',shell=True).strip()
-        except:
-            print 'Error: Unable to obtain PYTHONPATH'
+        if options.backend == 'pox':
+            backend_client = 'of_client.pox_client'
+            backend_path = None
+            for p in sys.path:
+                 if re.match('.*pox/?$',p):
+                     backend_path = os.path.abspath(p)
+                     break
+            if backend_path is None:
+                print 'Error: {} not found in PYTHONPATH'.format(backend_client)
+                sys.exit(1)
+            # Pox is still py2-only
+            if sys.version_info[0] == 2:
+                python = sys.executable
+            else:
+                python = which("python2")
+                if not python:
+                    print "Error: Could not find 'python2' in path."
+                    sys.exit(1)
+            backend_exec = [python, os.path.join(backend_path, 'pox.py'), backend_client]
+        elif options.backend == 'ryu':
+            backend_client = 'of_client.ryu_shim'
+            ryu_exec = which('ryu-manager')
+            if not ryu_exec:
+                print "Error: Could not find 'ryu-manager' in path. Is ryu installed?"
+            backend_exec = [ryu_exec, backend_client]
+        else:
+            print "Error: Invalid backend '{}' specified".format(options.backend)
             sys.exit(1)
-        poxpath = None
-        for p in output.split(':'):
-             if re.match('.*pox/?$',p):
-                 poxpath = os.path.abspath(p)
-                 break
-        if poxpath is None:
-            print 'Error: pox not found in PYTHONPATH'
-            sys.exit(1)
-        pox_exec = os.path.join(poxpath,'pox.py')
-        python=sys.executable
-        # TODO(josh): pipe pox_client stdout to subprocess.PIPE or
+
+        # TODO(josh): pipe backend stdout to subprocess.PIPE or
         # other log file descriptor if necessary
-        of_client = subprocess.Popen([python, 
-                                      pox_exec,
-                                      'of_client.pox_client' ],
+        of_client = subprocess.Popen(backend_exec,
                                      stdout=sys.stdout,
                                      stderr=subprocess.STDOUT)
 
