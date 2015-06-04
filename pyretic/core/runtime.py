@@ -248,27 +248,26 @@ class Runtime(object):
     def set_optimization_opts(self, path_main, opt_flags):
         """ Set runtime flags for various optimization settings from the command
         line. """
-        if path_main:
-            if opt_flags is None:
-                self.disjoint_enabled = False
-                self.default_enabled = False
-                self.integrate_enabled = False
-                self.multitable_enabled = False
-                self.ragel_enabled = False
-                self.partition_cnt = None
-                self.cache_enabled = False
-                self.edge_contraction_enabled = False
-            else:
-                (self.disjoint_enabled, self.default_enabled,
-                 self.integrate_enabled, self.multitable_enabled,
-                 self.ragel_enabled, self.partition_cnt,
-                 self.cache_enabled,
-                 self.edge_contraction_enabled) = opt_flags
-            
-            if self.partition_cnt is None:
-                self.partition_enabled = False
-            else:
-                self.partition_enabled = True
+        if not path_main or opt_flags is None:
+            self.disjoint_enabled = False
+            self.default_enabled = False
+            self.integrate_enabled = False
+            self.multitable_enabled = False
+            self.ragel_enabled = False
+            self.partition_cnt = None
+            self.cache_enabled = False
+            self.edge_contraction_enabled = False
+        else:
+            (self.disjoint_enabled, self.default_enabled,
+             self.integrate_enabled, self.multitable_enabled,
+             self.ragel_enabled, self.partition_cnt,
+             self.cache_enabled,
+             self.edge_contraction_enabled) = opt_flags
+
+        if self.partition_cnt is None:
+            self.partition_enabled = False
+        else:
+            self.partition_enabled = True
 
     def get_subpolicy_compile_stats(self, path_main):
         """ In the "offline" case, get compile time and classifier size stats
@@ -2063,6 +2062,8 @@ class Runtime(object):
         self.dynamic_path_preds    = set()
         self.vf_tag_pol = None
         self.vf_untag_pol = None
+        self.virtual_tag = identity
+        self.virtual_untag = identity
 
         if path_main:
             from pyretic.lib.path import pathcomp

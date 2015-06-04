@@ -297,6 +297,9 @@ def parse_args(kwargs, defaults):
         fwding_policy = globals()[str(params['fwding'])]
     return (query_policy, fwding_policy)
 
+def no_query():
+    return drop
+
 def main(**kwargs):
     defaults = (test0, mac_learner)
     (query, fwding) = parse_args(kwargs, defaults)
