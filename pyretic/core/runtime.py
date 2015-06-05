@@ -268,6 +268,9 @@ class Runtime(object):
             self.partition_enabled = False
         else:
             self.partition_enabled = True
+        self.sw_cnt = (self.partition_cnt if self.partition_cnt
+                       else len(self.network.topology.nodes()))
+
 
     def get_subpolicy_compile_stats(self, path_main):
         """ In the "offline" case, get compile time and classifier size stats
@@ -476,13 +479,10 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
-        switch_cnt_runtime = len(self.network.topology.nodes())
-        cnt = (self.partition_cnt if self.partition_cnt
-               else switch_cnt_runtime)
         c0 = self.virtual_tag.compile()
-        c1 = self.path_in_table.policy.netkat_compile(cnt)[0]
+        c1 = self.path_in_table.policy.netkat_compile(self.sw_cnt)[0]
         c2 = self.forwarding.compile()
-        c3 = self.path_out_table.policy.netkat_compile(cnt, True)[0]
+        c3 = self.path_out_table.policy.netkat_compile(self.sw_cnt, True)[0]
         c4 = self.virtual_untag.compile()
         res = c0 >> c1 >> c2 >> c3 >> c4
         return res
@@ -492,8 +492,10 @@ class Runtime(object):
     def whole_policy_compile(self):
         if self.use_pyretic_compiler:
             p = self.policy.compile()
-        else:
+        elif self.path_policy:
             p = self.netkat_classifier_compile()
+        else:
+            p = self.policy.netkat_compile(self.sw_cnt)[0] # directly compile with netkat
         #print "rule count", len(p.rules)
         return p
 
@@ -501,25 +503,21 @@ class Runtime(object):
         """ Multi-table specific policy compilation. Pol is the policy argument
         which is then compiled by netkat and returned.
         """
-        switch_cnt_runtime = len(self.network.topology.nodes())
-        cnt = (self.partition_cnt if self.partition_cnt
-               else switch_cnt_runtime)
-        """ TODO(ngsrinivas): This is a hack! The forwarding table must be
-        compiled by pyretic for the path query pipeline. Must be fixd when
-        netkat can distinguish between inport and outports. """
-        if table == 2:
-            c = pol.compile()
-        else:
-            """Hack to determine, for the path query pipeline, whether port is inport or
-            outport.  TODO(ngsrinivas): revert once netkat provides distinct
-            inport/outport in the classifier.
-            """
-            use_outport = table > 2
+        assert self.pipeline in ["default_pipeline", "path_query_pipeline"]
+        if self.pipeline == 'default_pipeline':
+            if table > 0 and not self.use_pyretic_compiler:
+                c = pol.netkat_compile(self.sw_cnt)[0]
+            else:
+                c = pol.compile()
+        elif self.pipeline == 'path_query_pipeline':
+            use_outport = table > 2 # condition for "egress" stage in the pipeline
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                c = pol.netkat_compile(cnt, use_outport)[0]
-                c_py = pol.compile()
+                c = pol.netkat_compile(self.sw_cnt, use_outport)[0]
+        else:
+            raise RuntimeError("Unknown pipeline type for multitable specific "
+                                + "policy compilation")
         return c
 
     def update_switch_classifiers(self):
@@ -1998,8 +1996,10 @@ class Runtime(object):
                            self.policy_map[3] >>
                            self.policy_map[4])
         elif use_nx:
+            path_exists = 'not' if path_main is None else ''
             raise RuntimeError("No table to policy map configuration defined for"
-                               " this pipeline! %s" % pipeline)
+                               " pipeline %s (path_main %s provided)" % (
+                                   pipeline, path_exists))
         else:
             self.policy_map = self.single_stage_policy_map(
                 get_effective_forwarding_policy(path_main))
@@ -2064,6 +2064,7 @@ class Runtime(object):
         self.vf_untag_pol = None
         self.virtual_tag = identity
         self.virtual_untag = identity
+        self.path_policy = None
 
         if path_main:
             from pyretic.lib.path import pathcomp
