@@ -1839,6 +1839,8 @@ def to_pol(p):
       return {"type" : "mod", "header" : "location", "value": {"type" : "pipe", "name" : str(id(p))}}
   elif isinstance(p, ingress_network) or isinstance(p, egress_network) or isinstance(p, DynamicPolicy):
       return to_pol(p.policy)
+  elif isinstance(p, DerivedPolicy):
+      return to_pol(p.policy)
   else:
     raise TypeError("unknown policy %s" % type(p))
 

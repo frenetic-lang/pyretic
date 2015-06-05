@@ -268,9 +268,11 @@ class Runtime(object):
             self.partition_enabled = False
         else:
             self.partition_enabled = True
-        self.sw_cnt = (self.partition_cnt if self.partition_cnt
-                       else len(self.network.topology.nodes()))
 
+    def sw_cnt(self):
+        """ Switch count for netkat compilation """
+        return (self.partition_cnt if self.partition_cnt
+                else len(self.network.topology.nodes()))
 
     def get_subpolicy_compile_stats(self, path_main):
         """ In the "offline" case, get compile time and classifier size stats
@@ -480,9 +482,9 @@ class Runtime(object):
     
     def netkat_classifier_compile(self):
         c0 = self.virtual_tag.compile()
-        c1 = self.path_in_table.policy.netkat_compile(self.sw_cnt)[0]
+        c1 = self.path_in_table.policy.netkat_compile(self.sw_cnt())[0]
         c2 = self.forwarding.compile()
-        c3 = self.path_out_table.policy.netkat_compile(self.sw_cnt, True)[0]
+        c3 = self.path_out_table.policy.netkat_compile(self.sw_cnt(), True)[0]
         c4 = self.virtual_untag.compile()
         res = c0 >> c1 >> c2 >> c3 >> c4
         return res
@@ -495,7 +497,7 @@ class Runtime(object):
         elif self.path_policy:
             p = self.netkat_classifier_compile()
         else:
-            p = self.policy.netkat_compile(self.sw_cnt)[0] # directly compile with netkat
+            p = self.policy.netkat_compile(self.sw_cnt())[0] # directly compile with netkat
         #print "rule count", len(p.rules)
         return p
 
@@ -506,7 +508,7 @@ class Runtime(object):
         assert self.pipeline in ["default_pipeline", "path_query_pipeline"]
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
-                c = pol.netkat_compile(self.sw_cnt)[0]
+                c = pol.netkat_compile(self.sw_cnt())[0]
             else:
                 c = pol.compile()
         elif self.pipeline == 'path_query_pipeline':
@@ -514,7 +516,7 @@ class Runtime(object):
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                c = pol.netkat_compile(self.sw_cnt, use_outport)[0]
+                c = pol.netkat_compile(self.sw_cnt(), use_outport)[0]
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")
