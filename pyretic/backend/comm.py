@@ -76,6 +76,8 @@ def dict_to_ascii(d):
         if (isinstance(v,str) or
             isinstance(v,int)):
             return v
+        elif isinstance(v, unicode):
+            return str(v)
         else:
             return repr(v)
     return { h : convert(h,v) for (h,v) in d.items() }
