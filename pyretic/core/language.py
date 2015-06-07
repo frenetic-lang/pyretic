@@ -49,6 +49,7 @@ import copy
 from pyretic.evaluations import stat
 
 NO_CACHE=False
+NETKAT_CLASSIFIER_CACHE=True
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
@@ -82,6 +83,7 @@ class Policy(object):
 
     def invalidate_classifier(self):
         self._classifier = None
+        self.comp_time = 0
 
     def has_active_classifier(self):
         return True if self._classifier else False
@@ -144,7 +146,15 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, outport = False, print_json=False):
+    def netkat_compile(self, switch_cnt, outport=False, print_json=False):
+        comp_t = 0
+        if not NETKAT_CLASSIFIER_CACHE or not self._classifier:
+            (self._classifier, comp_t) = self.netkat_generate_classifier(switch_cnt,
+                                                                    outport,
+                                                                    print_json)
+        return (self._classifier, comp_t)
+
+    def netkat_generate_classifier(self, switch_cnt, outport = False, print_json=False):
         pred_policy = None
         for i in range(1, switch_cnt + 1):
             if pred_policy is None:
@@ -1873,6 +1883,8 @@ field_map = {'dlSrc' : 'srcmac', 'dlDst': 'dstmac', 'dlTyp': 'ethtype',
                 'tpSrc' : 'srcport', 'tpDst' : 'dstport', 'inPort' : 'inport'}
 
 def create_match(pattern, switch_id):
+    def __reverse_mac__(m):
+        return ':'.join(m.split(':')[::-1])
     if switch_id > 0:
         match_map = {'switch' : switch_id}
     else:
@@ -1880,7 +1892,11 @@ def create_match(pattern, switch_id):
     for k,v in pattern.items():
         # HACKETY HACK: remove nwProto from netkat generated classifier
         if v is not None and k != "dlTyp" and k != "nwProto":
-            match_map[field_map[k]] = v
+            if k == 'dlSrc' or k == 'dlDst':
+                """ TODO: NetKat returns MAC addresses reversed. """
+                match_map[field_map[k]] = __reverse_mac__(v)
+            else:
+                match_map[field_map[k]] = v
 
     # HACK! NetKat doesn't return vlan_pcp with vlan_id sometimes.
     if 'vlan_id' in match_map and not 'vlan_pcp' in match_map:

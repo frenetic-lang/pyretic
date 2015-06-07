@@ -506,9 +506,10 @@ class Runtime(object):
         which is then compiled by netkat and returned.
         """
         assert self.pipeline in ["default_pipeline", "path_query_pipeline"]
+        t = 0
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
-                c = pol.netkat_compile(self.sw_cnt())[0]
+                (c, t) = pol.netkat_compile(self.sw_cnt())
             else:
                 c = pol.compile()
         elif self.pipeline == 'path_query_pipeline':
@@ -516,7 +517,7 @@ class Runtime(object):
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                c = pol.netkat_compile(self.sw_cnt(), use_outport)[0]
+                (c, t) = pol.netkat_compile(self.sw_cnt(), use_outport)
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")
