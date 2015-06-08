@@ -42,48 +42,59 @@ class netkat_backend(object):
     @classmethod
     def generate_classifier(cls, pol, switch_cnt, outport = False,
                             print_json=False):
-        from pyretic.core.language import match
-        pred_policy = None
-        for i in range(1, switch_cnt + 1):
+        def use_explicit_switches(pol):
+            """ Ensure every switch in the network gets reflected in the policy
+            sent to netkat. This is because netkat generates a separate copy of
+            the policy per switch, and it is necessary for it to know that a switch
+            appears in the policy through the policy itself."""
+            from pyretic.core.language import match
+            pred_policy = None
+            for i in range(1, switch_cnt + 1):
+                if pred_policy is None:
+                    pred_policy = match(switch = i)
+                else:
+                    pred_policy |= match(switch = i)
+
             if pred_policy is None:
-                pred_policy = match(switch = i)
-            else:
-                pred_policy |= match(switch = i)
+                pred_policy = identity
+            return pred_policy >> pol
 
-        if pred_policy is None:
-            pred_policy = identity
-        pol = pred_policy >> pol
-        import subprocess
+        def curl_channel_compilation(pol):
+            """ Communicate with the netKAT compile server through curl. """
+            import subprocess
 
-        f = open('/tmp/in.json', 'w')
-        if print_json:
-            self.log.error("The policy being compiled to netkat is:")
-            self.log.error(str(pol))
-        f.write(compile_to_netkat(pol))
-        f.close()
-
-        try:
-            output = subprocess.check_output(['curl', '-X', 'POST', 'localhost:9000/compile', '--data-binary', '@/tmp/in.json', '-D', '/tmp/header.txt'])
-            f = open('/tmp/out.json', 'w')
-            f.write(output)
+            f = open('/tmp/in.json', 'w')
+            if print_json:
+                self.log.error("The policy being compiled to netkat is:")
+                self.log.error(str(pol))
+            f.write(compile_to_netkat(pol))
             f.close()
-        except subprocess.CalledProcessError:
-            print "error in calling frenetic"
-        
-        cls = json_to_classifier(output, outport)
-        if print_json:
-            self.log.error("This is the json output:")
-            self.log.error(str(output))
-        f = open('/tmp/header.txt')
-        time = 0
-        for line in f.readlines():
-            if line.startswith('x-compile-time:'):
-                time = float(line[line.index(":") + 1:-1])
-                break
 
-        return (cls, time)
+            try:
+                output = subprocess.check_output(['curl', '-X', 'POST', 'localhost:9000/compile', '--data-binary', '@/tmp/in.json', '-D', '/tmp/header.txt'])
+                f = open('/tmp/out.json', 'w')
+                f.write(output)
+                f.close()
+            except subprocess.CalledProcessError:
+                print "error in calling frenetic"
 
+            cls = json_to_classifier(output, outport)
+            if print_json:
+                self.log.error("This is the json output:")
+                self.log.error(str(output))
+            f = open('/tmp/header.txt')
+            time = 0
+            for line in f.readlines():
+                if line.startswith('x-compile-time:'):
+                    time = float(line[line.index(":") + 1:-1])
+                    break
 
+            return (cls, time)
+
+        pol = use_explicit_switches(pol)
+        return curl_channel_compilation(pol)
+
+##################### Helper functions #################
 
 import json
 def mk_filter(pred):
