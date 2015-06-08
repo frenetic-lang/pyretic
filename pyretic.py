@@ -138,7 +138,7 @@ def parseArgs():
     op.add_option('--use_pyretic', action="store_true",
                   dest = 'use_pyretic',
                   help = "Use the pyretic compiler (uses netkat by default)")
-    op.set_defaults(frontend_only=False, mode='reactive0', enable_profile=False,
+    op.set_defaults(frontend_only=False, mode='proactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
                     ragel_enabled=False, switch_cnt=None,
