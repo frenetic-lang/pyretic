@@ -506,7 +506,7 @@ class Runtime(object):
         which is then compiled by netkat and returned.
         """
         assert self.pipeline in ["default_pipeline", "path_query_pipeline"]
-        t = 0
+        t = '0'
         self.log.debug("Attempting to compile table %d with netkat" % table)
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
@@ -522,7 +522,7 @@ class Runtime(object):
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")
-        self.log.debug("Recompiled table %d in %d secs" % (table, t))
+        self.log.debug("Recompiled table %d in %s secs" % (table, t))
         return c
 
     def update_switch_classifiers(self):

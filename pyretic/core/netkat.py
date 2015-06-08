@@ -241,7 +241,7 @@ def to_pol(p):
                                      parallel, intersection, ingress_network,
                                      egress_network, sequential, fwd, if_,
                                      FwdBucket, DynamicPolicy, DerivedPolicy,
-                                     Controller)
+                                     Controller, _modify)
   if isinstance(p, match):
     return mk_filter(to_pred(p))
   elif p == identity:
