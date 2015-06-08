@@ -28,8 +28,17 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+import sys
 import logging
+import httplib
 from ipaddr import IPv4Network
+
+NETKAT_PORT = 9000
+NETKAT_DOM  = "/compile"
+NETKAT_TIME_HDR = "x-compile-time"
+TEMP_INPUT = "/tmp/temp.in.json"
+TEMP_HEADERS = "/tmp/temp.headers.txt"
+TEMP_OUTPUT = "/tmp/temp.out.json"
 
 class netkat_backend(object):
     """
@@ -47,7 +56,7 @@ class netkat_backend(object):
             sent to netkat. This is because netkat generates a separate copy of
             the policy per switch, and it is necessary for it to know that a switch
             appears in the policy through the policy itself."""
-            from pyretic.core.language import match
+            from pyretic.core.language import match, identity
             pred_policy = None
             for i in range(1, switch_cnt + 1):
                 if pred_policy is None:
@@ -91,12 +100,40 @@ class netkat_backend(object):
 
             return (cls, time)
 
+        def httplib_channel_compilation(pol):
+            json_input = compile_to_netkat(pol)
+            write_to_file(json_input, TEMP_INPUT)
+            headers = {"Content-Type": "application/x-www-form-urlencoded",
+                       "Accept": "*/*"}
+            ctime = 0
+            try:
+                conn = httplib.HTTPConnection("localhost", NETKAT_PORT)
+                conn.request("POST", NETKAT_DOM, json_input, headers)
+                resp = conn.getresponse()
+                ctime = resp.getheader(NETKAT_TIME_HDR, "-1")
+                netkat_out = resp.read()
+                write_to_file(ctime, TEMP_HEADERS)
+                write_to_file(netkat_out, TEMP_OUTPUT)
+            except Exception as e:
+                print "Failed!!"
+                print e
+                sys.exit(0)
+            cls = json_to_classifier(netkat_out, outport)
+            return (cls, ctime)
+
         pol = use_explicit_switches(pol)
-        return curl_channel_compilation(pol)
+        # return curl_channel_compilation(pol)
+        return httplib_channel_compilation(pol)
 
 ##################### Helper functions #################
 
 import json
+
+def write_to_file(val, fname):
+    f = open(fname, 'w')
+    f.write(val)
+    f.close()
+
 def mk_filter(pred):
   return { "type": "filter", "pred": pred }
 
@@ -109,7 +146,6 @@ def mk_mod(hv):
 
 def mk_header(h, v):
   return { "header": h, "value": v }
-
 
 def to_int(bytes):
   n = 0
