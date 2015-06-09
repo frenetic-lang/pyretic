@@ -49,6 +49,14 @@ class netkat_backend(object):
     pyretic/core/classifier.py.)
     """
     @classmethod
+    def log(cls):
+        try:
+            return cls.log_writer
+        except AttributeError:
+            cls.log_writer = logging.getLogger('%s.netkat' % __name__)
+            return cls.log_writer
+
+    @classmethod
     def generate_classifier(cls, pol, switch_cnt, outport = False,
                             print_json=False):
         def use_explicit_switches(pol):
@@ -74,8 +82,8 @@ class netkat_backend(object):
 
             f = open('/tmp/in.json', 'w')
             if print_json:
-                self.log.error("The policy being compiled to netkat is:")
-                self.log.error(str(pol))
+                cls.log().error("The policy being compiled to netkat is:")
+                cls.log().error(str(pol))
             f.write(compile_to_netkat(pol))
             f.close()
 
@@ -89,8 +97,8 @@ class netkat_backend(object):
 
             cls = json_to_classifier(output, outport)
             if print_json:
-                self.log.error("This is the json output:")
-                self.log.error(str(output))
+                cls.log().error("This is the json output:")
+                cls.log().error(str(output))
             f = open('/tmp/header.txt')
             time = 0
             for line in f.readlines():
@@ -115,11 +123,11 @@ class netkat_backend(object):
                 write_to_file(ctime, TEMP_HEADERS)
                 write_to_file(netkat_out, TEMP_OUTPUT)
             except Exception as e:
-                print "Failed!!"
-                print e
+                cls.log().error(("Compiling with the netkat compilation" +
+                                 " server failed. (%s)") % str(e))
                 sys.exit(0)
-            cls = json_to_classifier(netkat_out, outport)
-            return (cls, ctime)
+            classifier = json_to_classifier(netkat_out, outport)
+            return (classifier, ctime)
 
         pol = use_explicit_switches(pol)
         # return curl_channel_compilation(pol)

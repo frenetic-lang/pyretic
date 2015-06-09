@@ -565,6 +565,7 @@ class Runtime(object):
                                                   "policy=\n"+repr(self.policy),
                                                   classifier_string))
                 for table in table_list:
+                    self.log.debug("Installing table %d" % table)
                     self.install_classifier(classifier_map[table], table)
 
     def update_dynamic_sub_pols(self):
