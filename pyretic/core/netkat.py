@@ -32,6 +32,7 @@ import sys
 import logging
 import httplib
 from ipaddr import IPv4Network
+from pyretic.core.network import MAC
 
 NETKAT_PORT = 9000
 NETKAT_DOM  = "/compile"
@@ -326,7 +327,7 @@ def create_match(pattern, switch_id):
         if v is not None and k != "dlTyp" and k != "nwProto":
             if k == 'dlSrc' or k == 'dlDst':
                 """ TODO: NetKat returns MAC addresses reversed. """
-                match_map[field_map[k]] = __reverse_mac__(v)
+                match_map[field_map[k]] = MAC(__reverse_mac__(v))
             else:
                 match_map[field_map[k]] = v
 
