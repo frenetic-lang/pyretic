@@ -361,6 +361,7 @@ class Runtime(object):
         """
         start_time = time.time()
         self.num_packet_ins += 1
+        self.log.debug("Packet-in # %d" % self.num_packet_ins)
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
@@ -394,6 +395,8 @@ class Runtime(object):
                     
         # send output of evaluation into the network
         concrete_output = map(self.pyretic2concrete,output)
+        self.log.debug("Corresponding packetouts: %d" %
+                       len(concrete_output))
         map(self.send_packet,concrete_output)
 
         self.packet_in_time += (time.time() - start_time)
