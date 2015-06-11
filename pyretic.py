@@ -229,6 +229,17 @@ def main():
         eval_profile_enabled = True
         stat.start(options.eval_result_path)
 
+    """ Start the frenetic compiler-server """
+    if not options.use_pyretic:
+        netkat_cmd = "bash start-frenetic.sh"
+        try:
+            output = subprocess.Popen(netkat_cmd, shell=True,
+                                      stderr=subprocess.STDOUT)
+        except Exception as e:
+            print "Could not start frenetic server successfully."
+            print e
+            sys.exit(1)
+
     """ Start the runtime. """
     opt_flags_arg = (options.disjoint_enabled, options.default_enabled,
                      options.integrate_enabled, options.multitable_enabled,
