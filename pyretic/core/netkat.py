@@ -378,6 +378,8 @@ def json_to_classifier(fname, outport = False):
     from pyretic.core.classifier import Rule, Classifier
     if outport:
         field_map['inPort'] = 'outport'
+    else:
+        field_map['inPort'] = 'inport'
     data = json.loads(fname)
     rules = []
     for sw_tbl in data:
