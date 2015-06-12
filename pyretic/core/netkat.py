@@ -116,6 +116,7 @@ class netkat_backend(object):
                        "Accept": "*/*"}
             ctime = 0
             try:
+                # TODO: make the connection persist across compilations
                 conn = httplib.HTTPConnection("localhost", NETKAT_PORT)
                 conn.request("POST", NETKAT_DOM, json_input, headers)
                 resp = conn.getresponse()
