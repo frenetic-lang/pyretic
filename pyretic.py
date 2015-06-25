@@ -230,7 +230,7 @@ def main():
         stat.start(options.eval_result_path)
 
     """ Start the frenetic compiler-server """
-    if not options.use_pyretic:
+    if not options.use_pyretic and options.mode == 'proactive0':
         netkat_cmd = "bash start-frenetic.sh"
         try:
             output = subprocess.Popen(netkat_cmd, shell=True,
