@@ -28,7 +28,7 @@
 # Basic classes for derivative-based construction of deterministic automata    #
 # for regular expressions.                                                     #
 ################################################################################
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 import string
 try:
     import pyretic.vendor
@@ -1339,7 +1339,7 @@ def explore_vector(states, tt, q, alphabet_list):
     for symbol in alphabet_list:
         goto_vector(q, symbol, tt, states, alphabet_list)
 
-@stat.elapsed_time
+@Stat.elapsed_time
 def makeDFA_vector(re_list, alphabet_list):
     """ Make a DFA from a list of regular expressions `re_list`. """
     assert list_isinstance(re_list, re_deriv)

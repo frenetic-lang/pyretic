@@ -42,7 +42,7 @@ import logging
 from multiprocessing import Queue, Process
 import pyretic.core.util as util
 import yappi
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 import shlex
 
 of_client = None
@@ -69,7 +69,7 @@ def signal_handler(signal, frame):
     
     global eval_profile_enabled
     if eval_profile_enabled:
-        stat.stop()
+        Stat.stop()
 
     sys.exit(0)
 
@@ -227,7 +227,7 @@ def main():
     if options.eval_result_path:
         global eval_profile_enabled
         eval_profile_enabled = True
-        stat.start(options.eval_result_path)
+        Stat.start(options.eval_result_path)
 
     """ Start the frenetic compiler-server """
     if not options.use_pyretic and options.mode == 'proactive0':

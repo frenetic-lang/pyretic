@@ -46,7 +46,7 @@ from pyretic.core.language import Controller, fwd, CombinatorPolicy
 from pyretic.core.language import negate, union, intersection
 from pyretic.core import util
 import pickle
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 
@@ -1515,7 +1515,7 @@ class pathcomp(object):
 
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, default_enabled = False, 
             integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
@@ -1552,7 +1552,7 @@ class pathcomp(object):
         return res
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, default_enabled = False, 
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
         
@@ -1611,7 +1611,6 @@ class pathcomp(object):
         print du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
-        stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
         
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
         edges = du.get_edges(dfa)
@@ -1672,12 +1671,6 @@ class pathcomp(object):
             in_table = QuerySwitch('path_tag', in_table_dic, table_default)
             out_table = QuerySwitch('path_tag', out_table_dic, table_default)
             
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
             return (in_table, out_table)
 
  
@@ -1729,12 +1722,6 @@ class pathcomp(object):
             in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
             out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
             
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
             return (in_tagging, in_capture, out_tagging, out_capture)
 
         else:
@@ -1776,12 +1763,6 @@ class pathcomp(object):
                             out_capture += cap_frag
                             out_cap_rules += 1
             
-            stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-            stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-            stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-            stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-           
             return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
@@ -2220,7 +2201,7 @@ class dfa_utils(common_dfa_utils):
         return (src, src_num, dst, dst_num, pred, typ)
     
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
@@ -2513,7 +2494,7 @@ class ragel_dfa_utils(common_dfa_utils):
         return res
        
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_list):
         re_list = zip(range(len(re_list)), re_list)
         lex_input = cls.regex_to_ragel_format(re_list)

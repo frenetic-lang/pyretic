@@ -46,7 +46,7 @@ from pyretic.core.language import Controller, fwd, CombinatorPolicy
 from pyretic.core.language import negate, union, intersection
 from pyretic.core import util
 import pickle
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 
@@ -1653,14 +1653,14 @@ class pathcomp(object):
 
     
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def pred_part(cls, path_pol):
         ast_fold = path_policy_utils.path_policy_ast_fold
         prep_trees = cls.__prep_re_trees__
         ast_fold(path_pol, prep_trees, None)
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, default_enabled = False, 
             integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
@@ -1691,7 +1691,7 @@ class pathcomp(object):
         return res
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, default_enabled = False, 
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
         
@@ -1779,14 +1779,9 @@ class pathcomp(object):
         # print 'number of states: ', du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
-        stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
-        
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
         edges = du.get_edges(dfa)
         get_edge_attributes = du.get_edge_attributes
-       
-
-        stat.gather_general_stats('dfa edges', len(edges), 0, False) 
 
         in_edge_per_state = {}
         out_edge_per_state = {}
@@ -1872,48 +1867,6 @@ class pathcomp(object):
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
                 out_table = QuerySwitch('path_tag', out_table_dic, table_default, True)
                
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-                
-                ### statistics  ###
-                '''### edge per state ###
-                edge_cnts = in_edge_per_state.values()
-                max_edge_per_state = max(edge_cnts)
-                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
-                stat.gather_general_stats("in max edge per state", max_edge_per_state, 0, False)
-                stat.gather_general_stats('in avg edge per state', avg_edge_per_state, 0, False)
-                stat.dump_dist(cls.create_dist(edge_cnts), "in_edge_dist_per_state")
-                
-                edge_cnts = out_edge_per_state.values()
-                max_edge_per_state = max(edge_cnts)
-                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
-                stat.gather_general_stats("out max edge per state", max_edge_per_state, 0, False)
-                stat.gather_general_stats('out avg edge per state', avg_edge_per_state, 0, False)
-                stat.dump_dist(cls.create_dist(edge_cnts), "out_edge_dist_per_state")
-
-                cls_sizes = in_pred_classifier.values()
-                max_cls_size = max(cls_sizes)
-                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
-                stat.gather_general_stats("in max pred classifier size", max_cls_size, 0, False)
-                stat.gather_general_stats("in avg pred classifier size", avg_cls_szie, 0, False)
-                stat.dump_dist(cls.create_dist(cls_sizes), "in_pred_classifier_dist.txt")
-                
-                cls_sizes = out_pred_classifier.values()
-                max_cls_size = max(cls_sizes)
-                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
-                stat.gather_general_stats("out max pred classifier size", max_cls_size, 0, False)
-                stat.gather_general_stats("out avg pred classifier size", avg_cls_szie, 0, False)
-                stat.dump_dist(cls.create_dist(cls_sizes), "out_pred_classifier_dist.txt")
-
-                stat.gather_general_stats("in table ast cnt", cls.ast_node_cnt(in_table), 0, False)
-                stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
-
-                '''
-                ################
-
                 return (in_table, out_table)
            
             else:
@@ -1964,12 +1917,6 @@ class pathcomp(object):
                 in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
                 out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default, True)
                 
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
                 return (in_tagging, in_capture, out_tagging, out_capture)
 
         else:
@@ -2020,12 +1967,6 @@ class pathcomp(object):
                         elif typ == __out__:
                             out_table += tag_frag
                 
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
                 return (in_table, out_table)
 
             else:
@@ -2067,12 +2008,6 @@ class pathcomp(object):
                                 out_capture += cap_frag
                                 out_cap_rules += 1
                 
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-               
                 return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
@@ -2512,7 +2447,7 @@ class dfa_utils(common_dfa_utils):
         return (src, src_num, dst, dst_num, pred, typ)
     
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
@@ -2745,7 +2680,7 @@ class ragel_dfa_utils(common_dfa_utils):
         return cls._edges
 
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         assert len(edge) == 3
         src = edge[0]
         try:
@@ -2758,9 +2693,12 @@ class ragel_dfa_utils(common_dfa_utils):
             dst_num = int(dst)
         except:
             dst_num = None
-       
-        in_list = __in_re_tree_gen__.symbol_to_pred
-        out_list = __out_re_tree_gen__.symbol_to_pred
+
+        if not in_list:
+            in_list = __in_re_tree_gen__.symbol_to_pred
+        if not out_list:
+            out_list = __out_re_tree_gen__.symbol_to_pred
+
         sym = edge[1]
         if sym == 'IN_ID':
             typ = __in__
@@ -2782,6 +2720,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
+        #TODO(mina): fix
         return False
 
     @classmethod
@@ -2849,7 +2788,7 @@ class ragel_dfa_utils(common_dfa_utils):
                 cls._edges.append((s, sym, dead))
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_list):
         re_list = zip(range(len(re_list)), re_list)
         lex_input = cls.regex_to_ragel_format(re_list)

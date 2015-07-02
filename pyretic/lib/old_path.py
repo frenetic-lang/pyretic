@@ -45,7 +45,7 @@ import copy
 from pyretic.core.language import Controller, fwd, CombinatorPolicy
 from pyretic.core import util
 import pickle
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 
 TOKEN_START_VALUE = 48 # start with printable ASCII for visual inspection ;)
 # token type definitions
@@ -1171,7 +1171,7 @@ class pathcomp(object):
 
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def compile(cls, path_pol, max_states=1022):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
@@ -1304,12 +1304,6 @@ class pathcomp(object):
                             out_capture += cap_frag
                             out_cap_rules += 1
             
-        stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-        stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-        stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-        stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-       
         return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
@@ -1670,7 +1664,7 @@ class dfa_utils(object):
 
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),

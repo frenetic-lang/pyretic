@@ -48,7 +48,7 @@ STATS_REQUERY_THRESHOLD_SEC = 10
 NUM_PATH_TAGS = 65000
 DEFAULT_NX_TABLE_ID=1
 
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 
 class Runtime(object):
     """
@@ -146,49 +146,49 @@ class Runtime(object):
 
     ##### general methods ######
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def forwarding_compile(self):
         return self.forwarding.compile()
      
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def whole_compile(self):
         return self.policy.compile()
 
     
     ##### tagging methods ######
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def tagging_compile(self):
         return self.path_in_tagging.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_tagging_compile(self):
         return self.path_out_tagging.compile()
 
     ##### capture methods ######
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def capture_compile(self):
         return self.path_in_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_capture_compile(self):
         return self.path_out_capture.compile()
 
     
     ##### virtual tags methods ######
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vf_tag_compile(self):
         return self.virtual_tag.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vf_untag_compile(self):
         return self.virtual_untag.compile()
 
@@ -198,49 +198,49 @@ class Runtime(object):
     
     ### single table ###
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def tag_fwd_compile(self):
 
         ## this is in_tag >> forwarding >> out_tag 
         return self.forwarding.compile()
 
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def full_out_capture_compile(self):
         ## this is in_tag_fwd >> path_out_capture
         ## tag_fwd is in_tag >> forwarding which is already compiled
         return self.out_capture.compile()
 
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_fw_compile(self):
         ## this is vtag >> tag_fwd >> vuntag
         return self.vtag_forwarding.compile()
 
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_in_capture_compile(self):
         ## this is vtag >> in_capture
         return self.vtag_in_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_out_capture_compile(self):
         ## this is vtag >> out_captre
         return self.vtag_out_capture.compile()
 
     ### multi table ###
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def in_table_compile(self):
         return self.path_in_table.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_table_compile(self):
         return self.path_out_table.compile()
 
@@ -492,8 +492,8 @@ class Runtime(object):
         res = c0 >> c1 >> c2 >> c3 >> c4
         return res
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def whole_policy_compile(self):
         if self.use_pyretic_compiler:
             p = self.policy.compile()
@@ -794,6 +794,7 @@ class Runtime(object):
                            False,
                            table_id))
 
+    @Stat.collects(['switch count', 'rule count'])
     def install_classifier(self, classifier, table_id=DEFAULT_NX_TABLE_ID):
         """
         Proactively installs switch table entries based on the input classifier
@@ -1584,8 +1585,8 @@ class Runtime(object):
 
         # Get statistics
         stat_switch_cnt = len(self.network.topology.nodes())
-        stat.gather_general_stats('switch count', stat_switch_cnt, 0, False)
-        stat.gather_general_stats('rule count', len(new_rules), 0, False)
+        Stat.collect_stat('switch count', stat_switch_cnt)
+        Stat.collect_stat('rule count', len(new_rules))
 
         diff_lists = get_diff_lists(new_rules)
         bookkeep_buckets(diff_lists)

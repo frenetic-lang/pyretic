@@ -8,7 +8,7 @@ from pyretic.core.language import *
 from pyretic.lib.corelib import *
 from pyretic.lib.path import *
 
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 from pyretic.evaluations import eval_path
 
 import argparse
@@ -249,50 +249,50 @@ class eval_compilation:
 
     ##### general methods ######
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def forwarding_compile(self, switch_cnt = None):
         return self.policy.compile()
         #return self.policy.netkat_compile(switch_cnt)
      
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def whole_policy_compile(self):
         return self.overall_policy.compile()
 
     
     ##### tagging methods ######
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def tagging_compile(self):
         return self.path_in_tagging.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_tagging_compile(self):
         return self.path_out_tagging.compile()
 
     ##### capture methods ######
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def capture_compile(self):
         return self.path_in_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_capture_compile(self):
         return self.path_out_capture.compile()
 
     
     ##### virtual tags methods ######
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vf_tag_compile(self):
         return self.virtual_tag.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vf_untag_compile(self):
         return self.virtual_untag.compile()
 
@@ -301,55 +301,55 @@ class eval_compilation:
     ############## composed methods #################
     
     ### single table ###
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def single_table_compile(self):
         return (self.path_in_table >> self.policy >> self.path_out_table).compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def tag_fwd_compile(self):
 
         ## this is in_tag >> forwarding >> out_tag 
         return self.forwarding.compile()
 
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def full_out_capture_compile(self):
         ## this is in_tag_fwd >> path_out_capture
         ## tag_fwd is in_tag >> forwarding which is already compiled
         return self.out_capture.compile()
 
     
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_fw_compile(self):
         ## this is vtag >> tag_fwd >> vuntag
         return self.vtag_forwarding.compile()
 
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_in_capture_compile(self):
         ## this is vtag >> in_capture
         return self.vtag_in_capture.compile()
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def vtag_out_capture_compile(self):
         ## this is vtag >> out_captre
         return self.vtag_out_capture.compile()
 
     ### multi table ###
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def in_table_compile(self, switch_cnt = None):
         #return self.path_in_table.compile()
         return self.path_in_table.netkat_compile(switch_cnt)
 
-    @stat.classifier_size
-    @stat.elapsed_time
+    @Stat.classifier_stat
+    @Stat.elapsed_time
     def out_table_compile(self, switch_cnt = None):
         #return self.path_out_table.compile()
         return self.path_out_table.netkat_compile(switch_cnt)
