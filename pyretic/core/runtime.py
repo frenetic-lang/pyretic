@@ -144,105 +144,6 @@ class Runtime(object):
 # Stat Methods 
 ######################
 
-    ##### general methods ######
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def forwarding_compile(self):
-        return self.forwarding.compile()
-     
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def whole_compile(self):
-        return self.policy.compile()
-
-    
-    ##### tagging methods ######
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def tagging_compile(self):
-        return self.path_in_tagging.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_tagging_compile(self):
-        return self.path_out_tagging.compile()
-
-    ##### capture methods ######
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def capture_compile(self):
-        return self.path_in_capture.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_capture_compile(self):
-        return self.path_out_capture.compile()
-
-    
-    ##### virtual tags methods ######
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vf_tag_compile(self):
-        return self.virtual_tag.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vf_untag_compile(self):
-        return self.virtual_untag.compile()
-
-
-    
-    ############## composed methods #################
-    
-    ### single table ###
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def tag_fwd_compile(self):
-
-        ## this is in_tag >> forwarding >> out_tag 
-        return self.forwarding.compile()
-
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def full_out_capture_compile(self):
-        ## this is in_tag_fwd >> path_out_capture
-        ## tag_fwd is in_tag >> forwarding which is already compiled
-        return self.out_capture.compile()
-
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_fw_compile(self):
-        ## this is vtag >> tag_fwd >> vuntag
-        return self.vtag_forwarding.compile()
-
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_in_capture_compile(self):
-        ## this is vtag >> in_capture
-        return self.vtag_in_capture.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_out_capture_compile(self):
-        ## this is vtag >> out_captre
-        return self.vtag_out_capture.compile()
-
-    ### multi table ###
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def in_table_compile(self):
-        return self.path_in_table.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_table_compile(self):
-        return self.path_out_table.compile()
 
     ###### Runtime initialization routines to extract stats ######
     def set_optimization_opts(self, path_main, opt_flags):
@@ -282,64 +183,54 @@ class Runtime(object):
         and set_policy_map(), respectively.
         """
         if path_main:
-            if self.multitable_enabled:
-                if self.integrate_enabled:
-                    self.in_table_compile()
-                    self.out_table_compile()
-                    
-                    self.vf_tag_compile()
-                    self.vf_untag_compile()
+            from pyretic.lib.path import LeafSketch
 
-                else:                    
-                    self.forwarding_compile()
-                    self.tagging_compile()
-                    self.out_tagging_compile()
-                    self.capture_compile()
-                    self.out_capture_compile()
-                    
-                    self.path_in_table = self.path_in_tagging + self.path_in_capture
-                    self.path_out_table = self.path_out_tagging + self.path_out_capture
-                    
-                    self.in_table_compile()
-                    self.out_table_compile()
+            sketch = None
 
-                    self.vf_tag_compile()
-                    self.vf_untag_compile()
-
-            else:
-                in_tag_policy = self.path_in_tagging >> self.policy
-                self.forwarding_test = (in_tag_policy >> self.path_out_tagging)
-                in_capture  = self.path_in_capture
-                self.out_capture = (in_tag_policy >> self.path_out_capture)
-
-                ## gathering stats
-                # forwarding
-                self.forwarding_compile()
-                self.tagging_compile()
-                self.out_tagging_compile()
-                self.tag_fwd_compile()
-
+            forwarding = LeafSketch('forwarding', self.forwarding)
+            vf_tag = LeafSketch('vf_tag', self.virtual_tag)
+            vf_untag = LeafSketch('vf_untag', self.virtual_untag)
             
-                #capture
-                self.capture_compile()
-                self.out_capture_compile()
-                self.full_out_capture_compile()
+            if self.multitable_enabled:
+                
 
-                # virtual tags
-                self.vf_tag_compile()
-                self.vf_untag_compile()
+                if self.integrate_enabled:
+
+                    in_table = LeafSketch('in_table', self.path_in_table)
+                    out_table = LeafSketch('out_table', self.path_out_table)
+                    
+                    sketch = [in_table, out_table, vf_tag, vf_untag]
+
+                else:
+                    
+                    in_tag = LeafSketch('in_tag', self.path_in_tagging)
+                    out_tag = LeafSketch('out_tag', self.path_out_tagging)
+                    in_capture = LeafSketch('in_capture', self.path_in_capture)
+                    out_capture = LeafSketch('out_capture', self.path_out_capture)
+
+                    sketch = [in_tag ** in_capture, out_tag ** out_capture, vf_tag, vf_untag]
+                    
+            else:
+                in_tag = LeafSketch('in_tag', self.path_in_tagging)
+                out_tag = LeafSketch('out_tag', self.path_out_tagging)
+                in_capture = LeafSketch('in_capture', self.path_in_capture)
+                out_capture = LeafSketch('out_capture', self.path_out_capture)
                 
-               
-                self.vtag_forwarding = (self.virtual_tag >> self.forwarding_test >> self.virtual_untag)
-                self.vtag_in_capture = (self.virtual_tag >> in_capture)
-                self.vtag_out_capture = (self.virtual_tag >> self.out_capture)
-               
-                #self.vtag_forwarding = (self.forwarding_test)
-                #self.vtag_out_capture = self.out_capture
-                self.vtag_fw_compile()
-                self.vtag_in_capture_compile()
-                self.vtag_out_capture_compile()
+                in_tag_policy = in_tag ** forwarding
+                in_fwd_out = (in_tag_policy ** out_tag)
+                full_out_cap = (in_tag_policy ** out_capture)
+
+                vtag_forwarding = vf_tag ** in_fwd_out ** vf_untag
+                vtag_in_cap = vf_tag ** in_capture
+                vtag_out_cap = vf_tag ** full_out_cap
+
+                final_pol = vtag_forwarding // vtag_in_cap // vtag_out_cap
+                sketch = [final_pol]
                 
+        if sketch:
+            for s in sketch:
+                s.compile()
+
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
                         'normal': 2,

@@ -50,6 +50,8 @@ from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 
+from enum import Enum
+
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
 TOKEN_END_VALUE = 0xFFFFFFFF 
 # token type definitions
@@ -2897,4 +2899,95 @@ def pickle_dump(policy):
     print type(policy)
     raise NotImplementedError
 
+#############################################################################
+###                    Compilation Sketch                                 ###
+#############################################################################
 
+class Sketch(object):
+    
+    def __init__(self, need_stat):
+        self.need_stat = need_stat
+        self.compiled = False
+
+    def compile(self):
+        raise NotImplementedError
+
+    def __mul__(self, sketch):
+        return SequentalSketch(self, sketch, False)
+
+    def __pow__(self, sketch):
+        return SequentalSketch(self, sketch, True)
+
+    def __div__(self, sketch):
+        return ParallelSketch(self, sketch, False)
+
+    def __floordiv__(self, sketch):
+        return ParallelSketch(self, sketch, True)
+
+
+
+class SketchCombinator(Sketch):
+
+    def __init__(self, s1, s2, need_stat):
+        self.s1 = s1
+        self.s2 = s2
+        self.pol1 = s1.pol
+        self.pol2 = s2.pol
+        super(SketchCombinator, self).__init__(need_stat)
+
+    def compile(self, pol, func_str):
+        res = None
+        if self.compiled or not self.need_stat:
+            res = pol.compile()
+        else:
+            c1 = self.s1.compile()
+            c2 = self.s2.compile()
+            exec(func_str)
+            func = locals()[self.name]
+            res = func(c1, c2)
+            pol._classifier = res
+        self.compiled = True
+        return res
+
+
+class SequentalSketch(SketchCombinator):
+    
+    def __init__(self, s1, s2, need_stat):
+        super(SequentalSketch, self).__init__(s1, s2, need_stat)
+        self.name = s1.name + "__seq__" + s2.name
+        self.pol = self.pol1 >> self.pol2
+
+    def compile(self):
+        func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 >> c2' % self.name
+        return super(SequentalSketch, self).compile(self.pol, func_str)
+        
+class ParallelSketch(SketchCombinator):
+    
+    def __init__(self, s1, s2, need_stat):
+        super(ParallelSketch, self).__init__(s1, s2, need_stat)
+        self.name = s1.name + "__par__" + s2.name
+        self.pol = self.pol1 + self.pol2
+
+    def compile(self):
+        func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 + c2' % self.name
+        return super(ParallelSketch, self).compile(self.pol, func_str)
+
+class LeafSketch(Sketch):
+
+    def __init__(self, name, pol):
+        super(LeafSketch, self).__init__(True)
+        self.name = name
+        self.pol = pol
+
+    def compile(self):
+        res = None
+        if self.compiled or not self.need_stat:
+            res =  self.pol.compile()
+        else:
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol):\n\treturn pol.compile()' % self.name
+            exec(func_str)
+            func = locals()[self.name]
+            res = func(self.pol) 
+
+        self.compiled = True
+        return res
