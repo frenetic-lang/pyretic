@@ -126,9 +126,12 @@ def parseArgs():
     op.add_option('--enable_ragel', '-r', action="store_true",
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
-    op.add_option('--enable_partition', '-s', type = int,
-                    dest = 'switch_cnt',
+    op.add_option('--enable_partition', '-a', action = "store_true",
+                    dest = 'partition_enabled',
                     help = 'enable partition optimization')
+    op.add_option('--switch_count', '-s', type = int,
+                    dest = 'switch_cnt',
+                    help = 'The expected number of switches, used for offline analysis')
     op.add_option('--enable_cache', '-c', action = "store_true",
                     dest = 'cache_enabled',
                     help = 'enable cache optimization')
@@ -141,8 +144,9 @@ def parseArgs():
     op.set_defaults(frontend_only=False, mode='proactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
-                    ragel_enabled=False, switch_cnt=None,
-                    cache_enabled=False, edge_contraction_enabled=False,
+                    ragel_enabled=False, partition_enabled=False, 
+                    switch_cnt=None, cache_enabled=False, 
+                    edge_contraction_enabled=False,
                     nx=False, use_pyretic=False)
 
     options, args = op.parse_args()
@@ -243,8 +247,9 @@ def main():
     """ Start the runtime. """
     opt_flags_arg = (options.disjoint_enabled, options.default_enabled,
                      options.integrate_enabled, options.multitable_enabled,
-                     options.ragel_enabled, options.switch_cnt,
-                     options.cache_enabled, options.edge_contraction_enabled)
+                     options.ragel_enabled, options.partition_enabled,
+                     options.switch_cnt, options.cache_enabled, 
+                     options.edge_contraction_enabled)
     runtime = Runtime(Backend(),main,path_main,kwargs,
                       mode=options.mode, verbosity=options.verbosity,
                       opt_flags=opt_flags_arg, use_nx=options.nx,

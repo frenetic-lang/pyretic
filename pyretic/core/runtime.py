@@ -159,17 +159,15 @@ class Runtime(object):
             self.partition_cnt = None
             self.cache_enabled = False
             self.edge_contraction_enabled = False
+            self.partition_enabled = False
         else:
             (self.disjoint_enabled, self.default_enabled,
              self.integrate_enabled, self.multitable_enabled,
-             self.ragel_enabled, self.partition_cnt,
-             self.cache_enabled,
+             self.ragel_enabled, self.partition_enabled,
+             self.partition_cnt, self.cache_enabled,
              self.edge_contraction_enabled) = opt_flags
-
-        if self.partition_cnt is None:
-            self.partition_enabled = False
-        else:
-            self.partition_enabled = True
+             
+            self.partition_enabled &= not self.partition_cnt is None
 
     def sw_cnt(self):
         """ Switch count for netkat compilation """

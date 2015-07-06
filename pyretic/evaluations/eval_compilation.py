@@ -25,21 +25,16 @@ class eval_compilation:
         self.integrate_enabled = args.integrate_enabled
         self.multitable_enabled = args.multitable_enabled
         self.ragel_enabled = args.ragel_enabled
-
-        if args.switch_cnt:
-            self.partition_enabled = True
-            self.switch_cnt = args.switch_cnt
-        else:
-            self.partition_enabled = False
-            self.switch_cnt = None
-
+        self.partition_enabled = args.partition_enabled
+        self.switch_cnt = args.switch_cnt
         self.cache_enabled = args.cache_enabled
         self.edge_contraction_enabled = args.edge_contraction_enabled
         self.use_pyretic = args.use_pyretic 
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
                      self.integrate_enabled, self.multitable_enabled,
-                     self.ragel_enabled, self.switch_cnt,
+                     self.ragel_enabled, self.partition_enabled, 
+                     self.switch_cnt,
                      self.cache_enabled, self.edge_contraction_enabled,
                      )
         """ Start the frenetic compiler-server """
@@ -167,7 +162,7 @@ def parse_args():
     parser.add_argument("-t", "--test", required=True
                         , help="Test case to run")
     
-    parser.add_argument("-a", "--added_query", nargs = '+'
+    parser.add_argument("--added_query", nargs = '+'
                         , help= "Test case to be added to the main test")
 
     parser.add_argument("-f", "--results_folder",
@@ -198,10 +193,13 @@ def parse_args():
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
 
-
-    parser.add_argument('--enable_partition', '-s', type=int,
-                    dest = 'switch_cnt',
+    parser.add_argument('--enable_partition', '-a', action = "store_true",
+                    dest = 'partition_enabled',
                     help = 'enable partition optimization')
+    
+    parser.add_argument('--switch_count', '-s', type = int,
+                    dest = 'switch_cnt',
+                    help = 'The expected number of switches, used for offline analysis')
 
     parser.add_argument('--enable_cache', '-c', action="store_true",
                     dest = 'cache_enabled',
