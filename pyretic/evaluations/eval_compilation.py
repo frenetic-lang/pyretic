@@ -35,10 +35,28 @@ class eval_compilation:
 
         self.cache_enabled = args.cache_enabled
         self.edge_contraction_enabled = args.edge_contraction_enabled
+        self.use_pyretic = args.use_pyretic 
+        
+        opt_flags = (self.disjoint_enabled, self.default_enabled, 
+                     self.integrate_enabled, self.multitable_enabled,
+                     self.ragel_enabled, self.switch_cnt,
+                     self.cache_enabled, self.edge_contraction_enabled,
+                     )
+        """ Start the frenetic compiler-server """
+        if not self.use_pyretic:
+            netkat_cmd = "bash start-frenetic.sh"
+            try:
+                output = subprocess.Popen(netkat_cmd, shell=True,
+                                          stderr=subprocess.STDOUT)
+            except Exception as e:
+                print "Could not start frenetic server successfully."
+                print e
+                sys.exit(1)
         
         Stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
-        self.runtime = Runtime(None, eval_path.main, eval_path.path_main, 
-                    kwargs, 'proactive0', use_pyretic = True, offline=True)
+        self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
+                    opt_flags = opt_flags, mode = 'proactive0', 
+                    use_pyretic = self.use_pyretic, offline=True)
         
         Stat.stop()
      
@@ -193,6 +211,9 @@ def parse_args():
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contratction optimization, works only with cache enabled')
 
+    parser.add_argument('--use_pyretic', action="store_true",
+                    dest = 'use_pyretic',
+                    help = 'Use the pyretic compiler (uses netkat by default)')
 
     args = parser.parse_args()
 
