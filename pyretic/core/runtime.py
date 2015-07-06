@@ -74,7 +74,7 @@ class Runtime(object):
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal',use_nx=False, pipeline="default_pipeline",
-                 opt_flags=None, use_pyretic=False):
+                 opt_flags=None, use_pyretic=False, offline=False):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
         self.pipeline = pipeline
@@ -107,8 +107,9 @@ class Runtime(object):
             self.get_subpolicy_compile_stats(path_main)
 
         self.mode = mode
-        self.backend = backend
-        self.backend.runtime = self
+        if not offline:
+            self.backend = backend
+            self.backend.runtime = self
         self.policy_lock = RLock()
         self.network_lock = Lock()
         self.switch_lock = Lock()

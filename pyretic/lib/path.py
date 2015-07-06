@@ -1738,14 +1738,7 @@ class pathcomp(object):
         else:
             raise TypeError
     
-    @classmethod
-    def create_dist(cls, vals):
-        dist = {}
-        for val in vals:
-            if not val in dist:
-                dist[val] = 0
-            dist[val] += 1
-        return dist
+    
 
     @classmethod
     @Stat.collects(['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list'])
@@ -1806,18 +1799,7 @@ class pathcomp(object):
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                    
                     assert typ in [__in__, __out__]
-                    
-                    ### statistics ###
-                    if typ == __in__:
-                        if not pred in in_pred_classifier:
-                            in_pred_classifier[pred] = len(pred.compile().rules)
-                    else:
-                        if not pred in out_pred_classifier:
-                            out_pred_classifier[pred] = len(pred.compile().rules)
-                    ################
-                        
                     action_frag = None
-                   
                     
                     if_pred = not du.is_dead(dfa, src)
                     if default_link:
@@ -1830,15 +1812,7 @@ class pathcomp(object):
                         ### statistics ###
                         if typ == __in__:
                             in_tag_rules += 1
-                            if not src in in_edge_per_state:
-                                in_edge_per_state[src] = 0
-                            in_edge_per_state[src] += 1
-
                         else:
-                            if not src in out_edge_per_state:
-                                out_edge_per_state[src] = 0
-                            out_edge_per_state[src] += 1
-
                             out_tag_rules += 1
                         ################
 
