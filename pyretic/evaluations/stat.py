@@ -3,7 +3,7 @@ import os
 import shutil
 from functools import wraps
 
-class Stat:
+class Stat(object):
     
     ## stat collectors ##
     times = {}
@@ -18,7 +18,7 @@ class Stat:
     ################
 
     ## tmp files ##
-    dfa_path = '/tmp/pyretic-regexes.txt.dot'
+    dfa_path = '/tmp/graph.dot'
     symbol_path = '/tmp/symbols.txt'
     pickle_path = '/tmp/pickle_symbols.txt'
     ################
@@ -69,7 +69,6 @@ class Stat:
         if cls.monitoring:
             cls.dump_stats()
             cls.create_excel_report()
-            cls.create_overall_report()
             cls.monitoring = False
     
     @classmethod
@@ -77,6 +76,8 @@ class Stat:
         #TODO: complete
         print cls.times
         print cls.classifiers
+        print cls.general_stats.keys()
+        cls.report_dfa()
         print cls.general_stats
 
     @classmethod
@@ -196,71 +197,85 @@ class Stat:
     def create_overall_report(cls):
         print 'create overall report'
 
-'''
-def report_dfa(dfa_path, symbol_path, results_path, ragel_enabled):
-    global clean_tmp
-    if clean_tmp:
-        import shutil
+    @classmethod
+    def report_dfa(cls):
+        path = cls.results_path
         try:
-            if not ragel_enabled:
-                shutil.copy(dfa_path, results_path)
-            shutil.copy(symbol_path, results_path)
-            shutil.copy(pickle_path, results_path)
-            print results_path
+            shutil.copy(cls.dfa_path, path)
+            shutil.copy(cls.symbol_path, path)
+            #shutil.copy(cls.pickle_path, path)
         except:
             print 'exception in dfa report'
 
+        d_list = ['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list']
+        args = [cls.general_stats[d]['value'] for d in d_list]
+        analyzer = DFA_Analyzer(*args)
+        for d in d_list:
+            del cls.general_stats[d]
 
-def create_overall_report(results_path, rule_cnt, dfa_path):
-    def adjust_func(file_path):
-        return os.path.join(results_path, file_path)
+        print analyzer.state_count()
+        print analyzer.edge_count()
 
+class DFA_Analyzer(object):
 
-    f = open(adjust_func('performance_report.txt'), 'w')
+    def __init__(self, dfa, dfa_utils, in_list, out_list):
+        self.dfa = dfa
+        self.du = dfa_utils
+        self.edges = [dfa_utils.get_edge_attributes(dfa, e, in_list, out_list) for e in dfa_utils.get_edges(dfa)]
+    
+    def state_count(self):
+        return self.du.get_num_states(self.dfa)
 
-    # rule count on switches
-    try:
-        g = open(adjust_func(rule_cnt), 'r');
-        for line in g.readlines():
-            f.write(line)
-        g.close()
-    except:
-        pass
+    def edge_count(self): 
+        in_count = 0
+        out_count = 0
 
-    # general statstics gathered
-    try:
-        g = open(adjust_func('general_stats.txt'), 'r')
-        for line in g.readlines():
-            f.write(line)
-        f.write('--------------------------------------\n')
-        g.close()
-    except:
-        pass
+        for (_, _, _, _, _, typ) in self.edges:
+            if typ.__name__ == '__in__':
+                in_count += 1
+            elif typ.__name__ == '__out__':
+                out_count += 1
+            else:
+                raise TypeError
 
-    # compile times
-    def getFileName(file_name):
-        return os.path.splitext(file_name)[0]
+        return (in_count, out_count)
 
-    files = os.listdir(results_path)
-    profiles = [ p for p in files if (".profile" in p)]
-    cls = [p for p in files if ".cls" in p]
+    def edge_dist(self):
+        
+        edge_per_state = {'__in__':{}, '__out__':{}} 
+        
+        for (_, src_num, _, _, _, typ) in self.edges:
+            if not src_num in edge_per_state[typ.__name__]:
+                edge_per_state[typ.__name__][src_num] = 0
+            edge_per_state[typ.__name__][src_num] += 1
 
-    for prof in profiles:
-        g = open(adjust_func(prof), 'r')
-        name = prof[:-8]
-        f.write(name + '\n')
-        for line in g.readlines():
-            f.write(line)
-        g.close()
-        c = [p for p in cls if getFileName(name) == getFileName(p)]
-        if len(c) == 1:
-            g = open(adjust_func(c[0]), 'r')
-            for line in g.readlines():
-                f.write(line)
-        f.write('--------------------------------------\n')
+        return (edge_per_state['__in__'], edge_per_state['__out__'])
 
-    f.close()
+    def edge_gen_dist(self):
+        
+        tag_edge = {'__in__':0, '__out__':0}
+        cap_edge = {'__in__':0, '__out__':0}
 
+        for (src, _, dst, _, _, typ) in self.edges:
+            if not du.is_dead(dfa, src):
+                tag_edge[typ.__name__] += 1
+            if du.is_accepting(dfa, dst):
+                cap_edge[typ.__name__] += 1
+
+        return ((tag_edge['__in__'], cap_edge['__in__']), (tag_edge['__out__'], cap_edge['__out__']))
+
+    def pred_size_dist(self):
+
+        classifier_size = {'__in__':{}, '__out__':{}}
+        
+        for (_, _, _, _, pred, typ) in self.edges:
+            if not pred in classifier_size[typ.__name__]:
+                classifier_size[typ.__name__][pred] = len(pred.compile().rules())
+
+        return (classifier_size['__in__'], classifier_size['__out__'])
+
+   
+'''
 def create_excel_report(results_path, rule_cnt, dfa_path):
     global multitable_enabled
     global integrate_enabled

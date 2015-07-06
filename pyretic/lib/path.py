@@ -1748,6 +1748,7 @@ class pathcomp(object):
         return dist
 
     @classmethod
+    @Stat.collects(['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list'])
     def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
         in_cg = __in_re_tree_gen__
         out_cg = __out_re_tree_gen__
@@ -1778,9 +1779,14 @@ class pathcomp(object):
             du = dfa_utils
 
         dfa = du.regexes_to_dfa(re_list)
-        # print 'number of states: ', du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
+
+        Stat.collect_stat('dfa', dfa)
+        Stat.collect_stat('dfa_utils', du)
+        Stat.collect_stat('pred_in_list', in_cg.symbol_to_pred)
+        Stat.collect_stat('pred_out_list', out_cg.symbol_to_pred)
+
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
         edges = du.get_edges(dfa)
         get_edge_attributes = du.get_edge_attributes
@@ -2242,7 +2248,6 @@ class pathcomp(object):
 
         return actual_callback
 
-
 #############################################################################
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
 #############################################################################
@@ -2256,7 +2261,7 @@ class common_dfa_utils(object):
     def get_edges(cls):
         raise NotImplementedError
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         raise NotImplementedError
 
     @classmethod
@@ -2274,6 +2279,7 @@ class common_dfa_utils(object):
     @classmethod
     def get_num_states(cls, dfa):
         raise NotImplementedError
+
 
 class dfa_utils(common_dfa_utils):
     """ Utilities to generate DFAs and access various properties. """
@@ -2440,7 +2446,7 @@ class dfa_utils(common_dfa_utils):
 
     
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         src = cls.get_edge_src(dfa, edge)
         src_num = cls.__get_tag_val__(dfa, src)
         dst = cls.get_edge_dst(dfa, edge)
@@ -2459,7 +2465,7 @@ class dfa_utils(common_dfa_utils):
             symlist = (__in_re_tree_gen__.get_symlist() +
                        __out_re_tree_gen__.get_symlist())
         dfa = makeDFA_vector(re_exps, symlist)
-        cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
+        cls.__dump_file__(dfa.dot_repr(), '/tmp/graph.dot')
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        
@@ -2471,12 +2477,22 @@ class dfa_utils(common_dfa_utils):
         cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')'''
         return dfa
 
-   
+
+class ragel_dfa(object):
+    def __init__(self, state_num, final_states, transition, edges, edge_ordinals):
+        self.state_num = state_num
+        self.final_states = final_states
+        self.transition = transition
+        self.edges = edges
+        self.edge_ordinals = edge_ordinals
+  
+    def __str__(self):
+        return str(self.state_num) + ": " + str(self.edges)
+
 class ragel_dfa_utils(common_dfa_utils):
     @classmethod
     def init(cls, edge_contraction_enabled):
         cls.edge_contraction_enabled = edge_contraction_enabled
-        cls.dfa_dict = {}
     
     @classmethod
     def get_accepting_states(cls, data):
@@ -2506,15 +2522,15 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def is_accepting(cls, dfa, q):
-        return q in cls._accepting_states
+        return q in dfa.final_states
 
     @classmethod
     def get_accepting_exps(cls, dfa, edge, q):
         try:
-            return cls._edge_ordinal[edge]
+            return dfa.edge_ordinals[edge]
         except:
             print edge
-            print cls._edge_ordinal
+            print dfa.edge_ordinals
             raise KeyError
 
     
@@ -2522,7 +2538,7 @@ class ragel_dfa_utils(common_dfa_utils):
     def get_extended_edges_contracted(cls, output):
         res = []
         edge_ordinals = {}
-        cls.dfa_dict = {}
+        dfa_dict = {}
         for line in output.splitlines():
             if not '->' in line or 'IN' in line or 'main' in line:
                 continue
@@ -2536,8 +2552,8 @@ class ragel_dfa_utils(common_dfa_utils):
             dst = cls.get_state(dst)
             src = cls.get_state(src)
             
-            if not (src, dst) in cls.dfa_dict:
-                cls.dfa_dict[(src, dst)] = []
+            if not (src, dst) in dfa_dict:
+                dfa_dict[(src, dst)] = []
 
             parts = [s.strip() for s in label.split('/')]
             exp_list = []
@@ -2557,12 +2573,12 @@ class ragel_dfa_utils(common_dfa_utils):
                     end = int(s[index + 2:])
                     for i in range(start, end + 1):
                         edge = (src, i, dst)
-                        cls.dfa_dict[(src,dst)].append( edge)
+                        dfa_dict[(src,dst)].append( edge)
                         res.append(edge)
                         edge_ordinals[edge] = exp_list
                 else:
                     edge = (src, int(s), dst)
-                    cls.dfa_dict[(src, dst)].append(edge)
+                    dfa_dict[(src, dst)].append(edge)
                     res.append(edge)
                     edge_ordinals[edge] = exp_list
 
@@ -2599,7 +2615,7 @@ class ragel_dfa_utils(common_dfa_utils):
                 out_id = create_id_list(out_cache[identity].re_tree)
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
-                for (src, dst), dfa_list in cls.dfa_dict.items():
+                for (src, dst), dfa_list in dfa_dict.items():
                     if len(dfa_list) > 1:
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
@@ -2614,7 +2630,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-                                cls.dfa_dict[(src, dst)] = [identity]
+                                dfa_dict[(src, dst)] = [identity]
                                 continue
 
                         elif edge_syms == in_id:
@@ -2626,7 +2642,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-                                cls.dfa_dict[(src, dst)] = [identity]
+                                dfa_dict[(src, dst)] = [identity]
                                 continue
                             
                     res.extend(dfa_list)
@@ -2679,7 +2695,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def get_edges(cls, dfa):
-        return cls._edges
+        return dfa.edges
 
     @classmethod
     def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
@@ -2727,7 +2743,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def get_num_states(cls, dfa):
-        return cls._state_num
+        return dfa.state_num
    
     @classmethod
     def get_dead_state(cls, dfa):
@@ -2746,7 +2762,7 @@ class ragel_dfa_utils(common_dfa_utils):
         return res
 
     @classmethod
-    def add_dead_edges(cls):
+    def add_dead_edges(cls, edges, state_num):
         """ Ragel doesn't add edges to dead states by default. Add those
         here. """
         state_edges = {}
@@ -2755,7 +2771,7 @@ class ragel_dfa_utils(common_dfa_utils):
         in_pred_symbols = __in_re_tree_gen__.symbol_to_pred.keys()
         out_pred_symbols = __out_re_tree_gen__.symbol_to_pred.keys()
         """ Determine edges currently in DFA, i.e., "non-dead" """
-        for edge in cls._edges:
+        for edge in edges:
             (s, p, d) = edge
             if s in state_edges:
                 state_edges[s].append(p)
@@ -2770,7 +2786,7 @@ class ragel_dfa_utils(common_dfa_utils):
             else:
                 raise RuntimeError("Outgoing pred must be at least of one\
                                     (in/out) type!")
-        dead = cls._state_num
+        dead = state_num
         """ Add dead edges. """
         for s in state_edges.keys():
             if state_type[s] == "in":
@@ -2780,14 +2796,14 @@ class ragel_dfa_utils(common_dfa_utils):
             state_symbols = set(state_edges[s])
             remaining_symbols = all_symbols - state_symbols
             for sym in remaining_symbols:
-                cls._edges.append((s, sym, dead))
+                edges.append((s, sym, dead))
         """ Add dead edges for accepting states (without outgoing transitions)
         too!! """
         dfa_states = set(state_edges.keys())
-        all_states = set(range(1, cls._state_num))
+        all_states = set(range(1, state_num))
         for s in all_states - dfa_states:
             for sym in in_pred_symbols + out_pred_symbols:
-                cls._edges.append((s, sym, dead))
+                edges.append((s, sym, dead))
 
     @classmethod
     @Stat.elapsed_time
@@ -2814,13 +2830,13 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.cmd
             print e.output
         
-        (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
+        (accepting_states, state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
-            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
+            (edges, edge_ordinal) = cls.get_extended_edges_contracted(output)
         else:
-            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
+            (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
-        cls.add_dead_edges()
+        cls.add_dead_edges(edges, state_num)
        
 
         
@@ -2829,13 +2845,14 @@ class ragel_dfa_utils(common_dfa_utils):
        
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
+        dfa = ragel_dfa(state_num, accepting_states, None, edges, edge_ordinal)
         # TODO(Mina): avoid pickling as of now; fix later
         # leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
         #               __out_re_tree_gen__.get_leaf_pickles())
         
         # dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
         
-        return None
+        return dfa
 
 
 #############################################################################
