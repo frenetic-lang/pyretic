@@ -8,3 +8,10 @@
 *.pyc
 *.DS_Store
 
+# Results Folder #
+##################
+pyretic/evaluations/results
+
+# frenetic #
+###########
+frenetic
