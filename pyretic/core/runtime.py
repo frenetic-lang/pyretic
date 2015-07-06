@@ -229,7 +229,10 @@ class Runtime(object):
                 
         if sketch:
             for s in sketch:
-                s.compile()
+                if self.use_pyretic_compiler:
+                    s.compile()
+                else:
+                    s.netkat_compile(self.sw_cnt())
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,

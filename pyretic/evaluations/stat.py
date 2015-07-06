@@ -87,19 +87,26 @@ class Stat(object):
         def profiled_func(*args, **kwargs):
             start_time = time.time()
             res = func(*args, **kwargs)
-
+            
+            if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], str): 
+                #ATTENTION: This if tries to distinguish only netkat compiler results.
+                #           May need to be changed if other functions are registered  
+                #           for time analysis.
+                try:
+                    elapsed = float(res[1])
+                except:
+                    elapsed = 0.0
+                res = res[0]
+            else:
+                elapsed = time.time() - start_time
+            
             if cls.monitoring:
-                if isinstance(res, tuple) and isinstance(res[1], float):
-                    elapsed = res[1]
-                    res = res[0]
-                else:
-                    elapsed = time.time() - start_time
                 
                 fname = func.__name__
                 if fname not in cls.times:
                     cls.times[fname] = [] #ncalls, times
                 cls.times[fname].append(elapsed)
-
+            
             return res
 
         return profiled_func
@@ -129,7 +136,7 @@ class Stat(object):
         @wraps(func)
         def profiled_func(*args, **kwargs):
             res = func(*args, **kwargs)
-
+            
             if cls.monitoring and res:
                 fname = func.__name__
 

@@ -2015,7 +2015,6 @@ class pathcomp(object):
                             elif typ == __out__:
                                 out_capture += cap_frag
                                 out_cap_rules += 1
-                
                 return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
@@ -2929,6 +2928,15 @@ class Sketch(object):
     def compile(self):
         raise NotImplementedError
 
+    def netkat_compile(self, sw_cnt):
+        if not self.need_stat:
+            return self.pol.netkat_compile(sw_cnt)[0]
+        else:
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt):\n\treturn pol.netkat_compile(sw_cnt)' % (self.name)
+            exec(func_str)
+            func = locals()[self.name]
+            return func(self.pol, sw_cnt) 
+
     def __mul__(self, sketch):
         return SequentalSketch(self, sketch, False)
 
@@ -2942,7 +2950,7 @@ class Sketch(object):
         return ParallelSketch(self, sketch, True)
 
 
-
+    
 class SketchCombinator(Sketch):
 
     def __init__(self, s1, s2, need_stat):
@@ -2965,7 +2973,6 @@ class SketchCombinator(Sketch):
             pol._classifier = res
         self.compiled = True
         return res
-
 
 class SequentalSketch(SketchCombinator):
     
