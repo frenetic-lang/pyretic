@@ -74,9 +74,8 @@ class Stat(object):
     @classmethod
     def dump_stats(cls):
         #TODO: complete
-        print cls.times
-        print cls.classifiers
-        print cls.general_stats.keys()
+        print '\n'.join([str(x) for x in cls.times.items()])
+        print '\n'.join([str(x) for x in cls.classifiers.items()])
         cls.report_dfa()
         print cls.general_stats
 
@@ -222,6 +221,15 @@ class Stat(object):
 
         print analyzer.state_count()
         print analyzer.edge_count()
+
+    @classmethod
+    def create_dist(cls, vals):
+        dist = {}
+        for val in vals:
+            if not val in dist:
+                dist[val] = 0
+            dist[val] += 1
+        return dist
 
 class DFA_Analyzer(object):
 

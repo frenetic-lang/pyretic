@@ -4,6 +4,7 @@ sys.path.append('/home/mina/mininet')
 import os
 import shutil
 
+from pyretic.core.runtime import Runtime
 from pyretic.core.language import *
 from pyretic.lib.corelib import *
 from pyretic.lib.path import *
@@ -16,17 +17,7 @@ import argparse
 class eval_compilation:
 
     def __init__(self, args, kwargs):
-        self.max_states = 65000
-        self.add_calls = 0
-
-        self.policy = eval_path.main(**kwargs)
-        self.path_policy = eval_path.path_main(**kwargs)
-        
-        #for aq in args.added_query:
-        #    self.path_policy += eval_path.path_main(test = aq)
-        
-        
-        self.params = kwargs
+       
         self.results_folder = args.results_folder
 
         self.disjoint_enabled = args.disjoint_enabled
@@ -44,15 +35,14 @@ class eval_compilation:
 
         self.cache_enabled = args.cache_enabled
         self.edge_contraction_enabled = args.edge_contraction_enabled
-
-        if os.path.exists(self.results_folder):
-            for fname in os.listdir(self.results_folder):
-                fpath = os.path.join(self.results_folder, fname)
-                if os.path.isfile(fpath):
-                    os.unlink(fpath)
-                elif os.path.isdir(fpath):
-                    shutil.rmtree(fpath)
-
+        
+        Stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
+        self.runtime = Runtime(None, eval_path.main, eval_path.path_main, 
+                    kwargs, 'proactive0', use_pyretic = True, offline=True)
+        
+        Stat.stop()
+     
+    '''
     def add(self, full_compile, **aparams):
         self.path_policy = eval_path.path_main(**aparams)
         
@@ -144,97 +134,7 @@ class eval_compilation:
 
 
         stat.stop()
-
-
-    def compile(self, full_compile = False):
-
-        stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
-        
-        pathcomp.init(self.max_states, self.switch_cnt, self.cache_enabled, self.edge_contraction_enabled)
-         
-        policy_fragments = pathcomp.compile(self.path_policy, self.max_states, 
-                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.partition_enabled)
-        
-        #return
-        if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table, self.path_out_table) = policy_fragments
-        else:
-            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
-            self.path_in_tagging  = in_tag
-            self.path_in_capture = in_cap
-            self.path_out_tagging= out_tag
-            self.path_out_capture = out_cap
-
-                
-        if self.multitable_enabled:
-            if self.integrate_enabled:
-                self.forwarding_compile(self.switch_cnt)
-                self.in_table_compile(self.switch_cnt)
-                self.out_table_compile(self.switch_cnt)
-                
-            else:
-                
-                self.forwarding_compile()
-                self.tagging_compile()
-                self.out_tagging_compile()
-                self.capture_compile()
-                self.out_capture_compile()
-                
-                self.path_in_table = self.path_in_tagging + self.path_in_capture
-                self.path_out_table = self.path_out_tagging + self.path_out_capture
-                
-                self.in_table_compile()
-                self.out_table_compile()
-
-        else:
-            
-            in_tag_policy = self.path_in_tagging >> self.policy
-            self.forwarding = (in_tag_policy >> self.path_out_tagging)
-            in_capture  = self.path_in_capture
-            self.out_capture = (in_tag_policy >> self.path_out_capture)
-
-            ## gathering stats
-            # forwarding
-            self.forwarding_compile()
-            self.tagging_compile()
-            self.out_tagging_compile()
-            self.tag_fwd_compile()
-
-        
-            #capture
-            self.capture_compile()
-            self.out_capture_compile()
-            self.full_out_capture_compile()
-
-
-        if full_compile:
-            self.virtual_tag = self.get_vf_tagging_policy()
-            self.virtual_untag = self.get_vf_untagging_policy()
-
-            # virtual tags
-            self.vf_tag_compile()
-            self.vf_untag_compile()
-            
-            
-            if multitable_enabled:
-                self.overall_policy = self.virtual_tag >> self.policy >> self.virtual_untag
-                self.whole_policy_compile()
-
-            else:
-                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
-                self.vtag_in_capture = (self.virtual_tag >> in_capture)
-                self.vtag_out_capture = (self.virtual_tag >> out_capture)
-
-                self.vtag_fw_compile()
-                self.vtag_in_capture_compile()
-                self.vtag_out_capture_compile()
-
-                self.overall_policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
-                self.whole_policy_compile()
-
-
-        stat.stop()
+    '''
 
     def get_vf_tagging_policy(self):
         return None
@@ -242,118 +142,6 @@ class eval_compilation:
 
     def get_vf_untagging_policy(self):
         return None
-
-######################
-# Stat Methods 
-######################
-
-    ##### general methods ######
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def forwarding_compile(self, switch_cnt = None):
-        return self.policy.compile()
-        #return self.policy.netkat_compile(switch_cnt)
-     
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def whole_policy_compile(self):
-        return self.overall_policy.compile()
-
-    
-    ##### tagging methods ######
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def tagging_compile(self):
-        return self.path_in_tagging.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_tagging_compile(self):
-        return self.path_out_tagging.compile()
-
-    ##### capture methods ######
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def capture_compile(self):
-        return self.path_in_capture.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_capture_compile(self):
-        return self.path_out_capture.compile()
-
-    
-    ##### virtual tags methods ######
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vf_tag_compile(self):
-        return self.virtual_tag.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vf_untag_compile(self):
-        return self.virtual_untag.compile()
-
-
-    
-    ############## composed methods #################
-    
-    ### single table ###
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def single_table_compile(self):
-        return (self.path_in_table >> self.policy >> self.path_out_table).compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def tag_fwd_compile(self):
-
-        ## this is in_tag >> forwarding >> out_tag 
-        return self.forwarding.compile()
-
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def full_out_capture_compile(self):
-        ## this is in_tag_fwd >> path_out_capture
-        ## tag_fwd is in_tag >> forwarding which is already compiled
-        return self.out_capture.compile()
-
-    
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_fw_compile(self):
-        ## this is vtag >> tag_fwd >> vuntag
-        return self.vtag_forwarding.compile()
-
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_in_capture_compile(self):
-        ## this is vtag >> in_capture
-        return self.vtag_in_capture.compile()
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def vtag_out_capture_compile(self):
-        ## this is vtag >> out_captre
-        return self.vtag_out_capture.compile()
-
-    ### multi table ###
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def in_table_compile(self, switch_cnt = None):
-        #return self.path_in_table.compile()
-        return self.path_in_table.netkat_compile(switch_cnt)
-
-    @Stat.classifier_stat
-    @Stat.elapsed_time
-    def out_table_compile(self, switch_cnt = None):
-        #return self.path_out_table.compile()
-        return self.path_out_table.netkat_compile(switch_cnt)
-
 
 
 def parse_args():
@@ -442,25 +230,13 @@ def get_optimization_flags(args):
             params.append(arg)
 
     return params
-#### profiling
-def profile(args):
-    import cProfile as profile
-
-    p = profile.run('pathcomp.compile(p)', sort='tottime')
-
-
 
 if __name__ == '__main__':
     args = parse_args()
     print get_optimization_flags(args)
-    #p = eval_path.path_main(**get_testwise_params(args))
-    #profile(args)
-    import time
 
     eval_comp = eval_compilation(args, get_testwise_params(args))
-    t_s = time.time()
-    eval_comp.compile()
-    print time.time() - t_s
+    #eval_comp.compile()
     
     
     if args.added_query:
