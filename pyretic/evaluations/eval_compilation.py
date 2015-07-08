@@ -4,7 +4,7 @@ sys.path.append('/home/mina/mininet')
 import os
 import shutil
 
-from pyretic.core.runtime import Runtime
+from pyretic.core.runtime import Runtime, NUM_PATH_TAGS
 from pyretic.core.language import *
 from pyretic.lib.corelib import *
 from pyretic.lib.path import *
@@ -17,7 +17,8 @@ import argparse
 class eval_compilation:
 
     def __init__(self, args, kwargs):
-       
+        
+        self.add_calls = 0       
         self.results_folder = args.results_folder
 
         self.disjoint_enabled = args.disjoint_enabled
@@ -54,100 +55,37 @@ class eval_compilation:
                     use_pyretic = self.use_pyretic, offline=True)
         
         Stat.stop()
-     
-    '''
-    def add(self, full_compile, **aparams):
+    
+    def recompile_paths(self):
+        """ Recompile DFA based on new path policy, which in turns updates the
+        runtime's policy member. """
+        policy_fragments = pathcomp.add_query(self.path_policy, NUM_PATH_TAGS, 
+                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
+                self.ragel_enabled, self.partition_enabled)
+
+        if self.multitable_enabled and self.integrate_enabled:
+            (self.runtime.path_in_table.policy, self.runtime.path_out_table.policy) = policy_fragments
+        else:
+            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+            self.runtime.path_in_tagging.policy  = in_tag
+            self.runtime.path_in_capture.policy  = in_cap
+            self.runtime.path_out_tagging.policy = out_tag
+            self.runtime.path_out_capture.policy = out_cap
+            self.runtime.path_in_table.policy = in_tag + in_cap
+            self.runtime.path_out_table.policy = out_tag + out_cap    
+    
+    def add(self, **aparams):
         self.path_policy = eval_path.path_main(**aparams)
         
         self.add_calls += 1
         results_folder = "%s_%d" % (self.results_folder[:-1], self.add_calls)
-        stat.start(results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        policy_fragments = pathcomp.add_query(self.path_policy, self.max_states, 
-                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.partition_enabled)
+        Stat.start(results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         
-        #return
-        if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table, self.path_out_table) = policy_fragments
-        else:
-            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
-            self.path_in_tagging  = in_tag
-            self.path_in_capture = in_cap
-            self.path_out_tagging= out_tag
-            self.path_out_capture = out_cap
-
-                
-        if self.multitable_enabled:
-            if self.integrate_enabled:
-                self.forwarding_compile(self.switch_cnt)
-                self.in_table_compile(self.switch_cnt)
-                self.out_table_compile(self.switch_cnt)
-                
-            else:
-                
-                self.forwarding_compile()
-                self.tagging_compile()
-                self.out_tagging_compile()
-                self.capture_compile()
-                self.out_capture_compile()
-                
-                self.path_in_table = self.path_in_tagging + self.path_in_capture
-                self.path_out_table = self.path_out_tagging + self.path_out_capture
-                
-                self.in_table_compile()
-                self.out_table_compile()
-
-                
-        else:
-            
-            in_tag_policy = self.path_in_tagging >> self.policy
-            self.forwarding = (in_tag_policy >> self.path_out_tagging)
-            in_capture  = self.path_in_capture
-            self.out_capture = (in_tag_policy >> self.path_out_capture)
-
-            ## gathering stats
-            # forwarding
-            self.forwarding_compile()
-            self.tagging_compile()
-            self.out_tagging_compile()
-            self.tag_fwd_compile()
-
+        self.recompile_paths()
+        self.runtime.get_subpolicy_compile_stats(eval_path.path_main)
         
-            #capture
-            self.capture_compile()
-            self.out_capture_compile()
-            self.full_out_capture_compile()
-
-
-        if full_compile:
-            self.virtual_tag = self.get_vf_tagging_policy()
-            self.virtual_untag = self.get_vf_untagging_policy()
-
-            # virtual tags
-            self.vf_tag_compile()
-            self.vf_untag_compile()
-            
-            
-            if multitable_enabled:
-                self.overall_policy = self.virtual_tag >> self.policy >> self.virtual_untag
-                self.whole_policy_compile()
-
-            else:
-                self.vtag_forwarding = (self.virtual_tag >> self.forwarding >> self.virtual_untag)
-                self.vtag_in_capture = (self.virtual_tag >> in_capture)
-                self.vtag_out_capture = (self.virtual_tag >> out_capture)
-
-                self.vtag_fw_compile()
-                self.vtag_in_capture_compile()
-                self.vtag_out_capture_compile()
-
-                self.overall_policy = self.vtag_forwarding + self.vtag_in_capture + self.vtag_out_capture
-                self.whole_policy_compile()
-
-
-        stat.stop()
-    '''
+        Stat.stop()
 
     def get_vf_tagging_policy(self):
         return None
@@ -255,16 +193,12 @@ if __name__ == '__main__':
     print get_optimization_flags(args)
 
     eval_comp = eval_compilation(args, get_testwise_params(args))
-    #eval_comp.compile()
-    
     
     if args.added_query:
         for aq in args.added_query:
             #aparams = get_added_query_params(args)
             aparams = {'test': aq}
             print aparams 
-            t_s = time.time()
-            eval_comp.add(False, **aparams)
-            print time.time() - t_s
+            eval_comp.add(**aparams)
     
 
