@@ -221,6 +221,7 @@ class Stat(object):
 
         print analyzer.state_count()
         print analyzer.edge_count()
+        print analyzer.edge_gen_dist()
 
     @classmethod
     def create_dist(cls, vals):
@@ -272,9 +273,9 @@ class DFA_Analyzer(object):
         cap_edge = {'__in__':0, '__out__':0}
 
         for (src, _, dst, _, _, typ) in self.edges:
-            if not du.is_dead(dfa, src):
+            if not self.du.is_dead(self.dfa, src):
                 tag_edge[typ.__name__] += 1
-            if du.is_accepting(dfa, dst):
+            if self.du.is_accepting(self.dfa, dst):
                 cap_edge[typ.__name__] += 1
 
         return ((tag_edge['__in__'], cap_edge['__in__']), (tag_edge['__out__'], cap_edge['__out__']))

@@ -2985,11 +2985,10 @@ class ParallelSketch(SketchCombinator):
 
 class LeafSketch(Sketch):
 
-    def __init__(self, name, pol):
+    def __init__(self, name, pol, need_stat=True):
         self.def_name = name
         self.pol = pol
-        super(LeafSketch, self).__init__(True, name)
-        print self.name
+        super(LeafSketch, self).__init__(need_stat, name)
 
     def compile(self):
         res = None
