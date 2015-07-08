@@ -484,14 +484,32 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
+        """TODO(ngsrinivas):
+
+        Unfortunately, compiling the full policy with netkat isn't as simple as
+        self.policy.netkat_compile(...). For some reason, the result of the full
+        policy compilation with netkat has results which forward different
+        packets out of multiple ports -- an action which is disallowed by the
+        classifier installation pipeline -- whenever the ingress tagging and
+        egress untagging policies are included. This needs to be investigated in
+        future.
+        """
         c0 = self.virtual_tag.compile()
-        c1 = self.path_in_table.policy.netkat_compile(self.sw_cnt())[0]
-        c2 = self.forwarding.compile()
-        c3 = self.path_out_table.policy.netkat_compile(self.sw_cnt(), True)[0]
+        # Force recompilation overriding cached policies, if the network has
+        # changed. This is to ensure that a local classifier is regenerated for
+        # each switch in the (new) network topology.
+        force_compile = self.in_network_update
+        c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
+                                               force_compile=force_compile)[0]
+        c2 = self.forwarding.netkat_compile(self.sw_cnt(),
+                                            force_compile=force_compile)[0]
+        c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
+                                                outport=True,
+                                                force_compile=force_compile)[0]
         c4 = self.virtual_untag.compile()
         res = c0 >> c1 >> c2 >> c3 >> c4
         return res
-    
+
     @stat.classifier_size
     @stat.elapsed_time
     def whole_policy_compile(self):
