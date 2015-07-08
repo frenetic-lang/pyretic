@@ -207,7 +207,7 @@ class Runtime(object):
                     in_capture = LeafSketch('in_capture', self.path_in_capture)
                     out_capture = LeafSketch('out_capture', self.path_out_capture)
 
-                    sketch = [in_tag ** in_capture, out_tag ** out_capture, vf_tag, vf_untag]
+                    sketch = [in_tag // in_capture, out_tag // out_capture, vf_tag, vf_untag]
                     
             else:
                 in_tag = LeafSketch('in_tag', self.path_in_tagging)
@@ -215,15 +215,16 @@ class Runtime(object):
                 in_capture = LeafSketch('in_capture', self.path_in_capture)
                 out_capture = LeafSketch('out_capture', self.path_out_capture)
                 
-                in_tag_policy = in_tag ** forwarding
-                in_fwd_out = (in_tag_policy ** out_tag)
-                full_out_cap = (in_tag_policy ** out_capture)
+                in_tag_policy = in_tag * forwarding
+                in_fwd_out = (in_tag_policy * out_tag)
+                full_out_cap = (in_tag_policy * out_capture)
 
-                vtag_forwarding = vf_tag ** in_fwd_out ** vf_untag
-                vtag_in_cap = vf_tag ** in_capture
-                vtag_out_cap = vf_tag ** full_out_cap
+                vtag_forwarding = vf_tag * in_fwd_out * vf_untag
+                vtag_in_cap = vf_tag * in_capture
+                vtag_out_cap = vf_tag * full_out_cap
 
-                final_pol = vtag_forwarding // vtag_in_cap // vtag_out_cap
+                final_pol = vtag_forwarding / vtag_in_cap // vtag_out_cap
+                final_pol.name = 'final_pol'
                 sketch = [final_pol]
                 
         if sketch:

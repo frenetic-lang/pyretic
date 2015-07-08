@@ -2895,9 +2895,13 @@ def pickle_dump(policy):
 
 class Sketch(object):
     
-    def __init__(self, need_stat):
+    def __init__(self, need_stat, name=None):
         self.need_stat = need_stat
         self.compiled = False
+        if not name:
+            self.name = self.get_def_name()
+        else:
+            self.name = name
 
     def compile(self):
         raise NotImplementedError
@@ -2910,6 +2914,9 @@ class Sketch(object):
             exec(func_str)
             func = locals()[self.name]
             return func(self.pol, sw_cnt) 
+
+    def get_def_name(self):
+        raise NotImplementedError
 
     def __mul__(self, sketch):
         return SequentalSketch(self, sketch, False)
@@ -2927,20 +2934,22 @@ class Sketch(object):
     
 class SketchCombinator(Sketch):
 
-    def __init__(self, s1, s2, need_stat):
+    def __init__(self, s1, s2, need_stat, name=None):
         self.s1 = s1
         self.s2 = s2
         self.pol1 = s1.pol
         self.pol2 = s2.pol
-        super(SketchCombinator, self).__init__(need_stat)
-
+        super(SketchCombinator, self).__init__(need_stat, name)
+    
     def compile(self, pol, func_str):
         res = None
+
+        c1 = self.s1.compile()
+        c2 = self.s2.compile()
+        
         if self.compiled or not self.need_stat:
             res = pol.compile()
         else:
-            c1 = self.s1.compile()
-            c2 = self.s2.compile()
             exec(func_str)
             func = locals()[self.name]
             res = func(c1, c2)
@@ -2950,32 +2959,37 @@ class SketchCombinator(Sketch):
 
 class SequentalSketch(SketchCombinator):
     
-    def __init__(self, s1, s2, need_stat):
-        super(SequentalSketch, self).__init__(s1, s2, need_stat)
-        self.name = s1.name + "__seq__" + s2.name
+    def __init__(self, s1, s2, need_stat, name=None):
+        super(SequentalSketch, self).__init__(s1, s2, need_stat, name)
         self.pol = self.pol1 >> self.pol2
 
     def compile(self):
         func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 >> c2' % self.name
         return super(SequentalSketch, self).compile(self.pol, func_str)
-        
+    
+    def get_def_name(self):
+        return self.s1.name + "__seq__" + self.s2.name
+
 class ParallelSketch(SketchCombinator):
     
-    def __init__(self, s1, s2, need_stat):
-        super(ParallelSketch, self).__init__(s1, s2, need_stat)
-        self.name = s1.name + "__par__" + s2.name
+    def __init__(self, s1, s2, need_stat, name=None):
+        super(ParallelSketch, self).__init__(s1, s2, need_stat, name)
         self.pol = self.pol1 + self.pol2
 
     def compile(self):
         func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 + c2' % self.name
         return super(ParallelSketch, self).compile(self.pol, func_str)
 
+    def get_def_name(self):
+        return self.s1.name + "__par__" + self.s2.name
+
 class LeafSketch(Sketch):
 
     def __init__(self, name, pol):
-        super(LeafSketch, self).__init__(True)
-        self.name = name
+        self.def_name = name
         self.pol = pol
+        super(LeafSketch, self).__init__(True, name)
+        print self.name
 
     def compile(self):
         res = None
@@ -2989,3 +3003,6 @@ class LeafSketch(Sketch):
 
         self.compiled = True
         return res
+    
+    def get_def_name(self):
+        return self.def_name
