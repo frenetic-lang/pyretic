@@ -198,7 +198,8 @@ class Runtime(object):
                     in_table = LeafSketch('in_table', self.path_in_table)
                     out_table = LeafSketch('out_table', self.path_out_table)
                     
-                    sketch = [in_table, out_table, vf_tag, vf_untag]
+                    sketch = [(in_table, False), (out_table, True), 
+                                (vf_tag, False), (vf_untag, True)]
 
                 else:
                     
@@ -207,7 +208,9 @@ class Runtime(object):
                     in_capture = LeafSketch('in_capture', self.path_in_capture)
                     out_capture = LeafSketch('out_capture', self.path_out_capture)
 
-                    sketch = [in_tag // in_capture, out_tag // out_capture, vf_tag, vf_untag]
+                    sketch = [(in_tag // in_capture, False), 
+                                (out_tag // out_capture, True), 
+                                (vf_tag, False), (vf_untag, True)]
                     
             else:
                 in_tag = LeafSketch('in_tag', self.path_in_tagging)
@@ -225,14 +228,16 @@ class Runtime(object):
 
                 final_pol = vtag_forwarding / vtag_in_cap // vtag_out_cap
                 final_pol.name = 'final_pol'
-                sketch = [final_pol]
-                
+                #TODO: This is currently not what happens
+                #      in actual compilation with netkat
+                sketch = [(final_pol, False)] 
+
         if sketch:
             for s in sketch:
                 if self.use_pyretic_compiler:
-                    s.compile()
+                    s[0].compile()
                 else:
-                    s.netkat_compile(self.sw_cnt())
+                    s[0].netkat_compile(self.sw_cnt(), s[1])
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
