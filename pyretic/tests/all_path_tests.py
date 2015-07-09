@@ -31,8 +31,11 @@ import sys
 
 num_passed = 0
 num_failed = 0
+num_greyed = 0
 failed_tests = []
 fails_counts = []
+greyed_tests = []
+greys_counts = []
 
 def single_path_test(fwding="static_fwding_chain_3_3",
                      query="path_test_0",
@@ -69,11 +72,18 @@ def single_path_test(fwding="static_fwding_chain_3_3",
     """ Remove pass-fail file, for next test. """
     cmd2 = ("rm -f %s" % pf_file)
     subprocess.call(shlex.split(cmd2))
-    if success_info != 'PASS':
-        print "--- Got success_info: ---"
+    if 'PASS' not in success_info:
+        print "--- Got failure_info: ---"
         print success_info
         fails_counts.append(success_info)
-    return success_info == 'PASS'
+        return "fail"
+    elif 'PASS' in success_info and success_info != 'PASS':
+        print "--- Got success_info: ---"
+        print success_info
+        greys_counts.append(success_info)
+        return "grey"
+    else:
+        return "pass"
 
 def bunched_path_tests(default_pyopts=''):
     results_folder = './pyretic/evaluations/results'
@@ -190,15 +200,21 @@ def bunched_path_tests(default_pyopts=''):
     update_test_stats(query, fwding, pyopts, res)
 
 def update_test_stats(query, fwding, pyopts, res):
-    global num_passed, num_failed, failed_tests
+    global num_passed, num_failed, failed_tests, num_greyed, greyed_tests
     test_name = "%s %s with options '%s'" % (query, fwding, pyopts)
-    if res:
+    if res == "pass":
         print "===== TEST %s PASSED =====" % test_name
         num_passed += 1
-    else:
+    elif res == "fail":
         print "===== TEST %s FAILED =====" % test_name
         failed_tests.append(test_name)
         num_failed += 1
+    elif res == "grey":
+        print "===== TEST %s AMBIGUOUS =====" % test_name
+        greyed_tests.append(test_name)
+        num_greyed += 1
+    else:
+        raise RuntimeError("single test result uninterpreted")
 
 def print_failed_tests():
     print "Failed tests:"
@@ -206,10 +222,15 @@ def print_failed_tests():
     for t in range(0, len(failed_tests)):
         print failed_tests[t]
         print fails_counts[t]
+    print "Ambiguous tests:"
+    assert len(greyed_tests) == len(greys_counts)
+    for t in range(0, len(greyed_tests)):
+        print greyed_tests[t]
+        print greys_counts[t]
 
 if __name__ == "__main__":
     bunched_path_tests(default_pyopts='')
-    bunched_path_tests(default_pyopts='-r -l')
+    bunched_path_tests(default_pyopts='-r')
     bunched_path_tests(default_pyopts='-r -l --use_pyretic')
     bunched_path_tests(default_pyopts='--use_pyretic')
 
