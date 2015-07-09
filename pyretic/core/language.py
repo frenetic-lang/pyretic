@@ -146,10 +146,12 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, outport=False, print_json=False):
+    def netkat_compile(self, switch_cnt, outport=False, print_json=False,
+                       force_compile=False):
         comp_t = 0
         nb = netkat_backend
-        if not NETKAT_CLASSIFIER_CACHE or not self._classifier:
+        if ((not NETKAT_CLASSIFIER_CACHE) or (not self._classifier) or
+            force_compile):
             (self._classifier, comp_t) = nb.generate_classifier(self,
                                                                 switch_cnt,
                                                                 outport,
