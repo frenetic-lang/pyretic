@@ -55,7 +55,7 @@ basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstpor
                  "ethtype", "protocol"]
 tagging_headers = ["vlan_id", "vlan_pcp"]
 native_headers = basic_headers + tagging_headers
-location_headers = ["switch", "inport", "outport"]
+location_headers = ["switch", "port"]
 compilable_headers = native_headers + location_headers
 content_headers = [ "raw", "header_len", "payload_len"]
 
