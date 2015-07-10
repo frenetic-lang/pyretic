@@ -1994,10 +1994,10 @@ class Runtime(object):
         for (s1, s2, ports) in switch_edges:
             p1 = ports[s1]
             p2 = ports[s2]
-            link_transfer_policy = ((match(switch=s1,outport=p1) >>
-                                     modify(switch=s2,inport=p2,outport=None)) +
-                                    (match(switch=s2,outport=p2) >>
-                                     modify(switch=s1,inport=p1,outport=None)))
+            link_transfer_policy = ((match(switch=s1,port=p1) >>
+                                     modify(switch=s2,port=p2)) +
+                                    (match(switch=s2,port=p2) >>
+                                     modify(switch=s1,port=p1)))
             if pol == drop:
                 pol = link_transfer_policy
             else:
