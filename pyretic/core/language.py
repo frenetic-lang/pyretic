@@ -1503,7 +1503,7 @@ class xfwd(DerivedPolicy):
     """
     def __init__(self, outport):
         self.outport = outport
-        super(xfwd,self).__init__((~match(inport=outport)) >> fwd(outport))
+        super(xfwd,self).__init__((~match(port=outport)) >> fwd(outport))
 
     def __repr__(self):
         return "xfwd %s" % self.outport
