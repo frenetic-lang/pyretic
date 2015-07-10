@@ -1613,44 +1613,38 @@ class flood(DynamicPolicy):
             return "flood"
 
 
-class ingress_network(DynamicFilter):
+class edge_network(DynamicFilter):
+    """
+    Returns True if a packet is located at a (switch,port) pair entering or
+    leaving the network, False otherwise.
+    """
+    def __init__(self):
+        self.egresses = None
+        super(edge_network,self).__init__()
+
+    def set_network(self, network):
+        updated_egresses = network.topology.egress_locations()
+        if not self.egresses == updated_egresses:
+            self.egresses = updated_egresses
+            self.policy = parallel([match(switch=l.switch,
+                                       port=l.port_no)
+                                 for l in self.egresses])
+
+
+class ingress_network(edge_network):
     """
     Returns True if a packet is located at a (switch,inport) pair entering
     the network, False otherwise.
     """
-    def __init__(self):
-        self.egresses = None
-        super(ingress_network,self).__init__()
-
-    def set_network(self, network):
-        updated_egresses = network.topology.egress_locations()
-        if not self.egresses == updated_egresses:
-            self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       inport=l.port_no)
-                                 for l in self.egresses])
-
     def __repr__(self):
         return "ingress_network"
 
 
-class egress_network(DynamicFilter):
+class egress_network(edge_network):
     """
     Returns True if a packet is located at a (switch,outport) pair leaving
     the network, False otherwise.
     """
-    def __init__(self):
-        self.egresses = None
-        super(egress_network,self).__init__()
-
-    def set_network(self, network):
-        updated_egresses = network.topology.egress_locations()
-        if not self.egresses == updated_egresses:
-            self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       outport=l.port_no)
-                                 for l in self.egresses])
-
     def __repr__(self):
         return "egress_network"
 
