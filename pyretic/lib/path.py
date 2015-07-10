@@ -50,8 +50,6 @@ from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 
-from enum import Enum
-
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
 TOKEN_END_VALUE = 0xFFFFFFFF 
 # token type definitions
