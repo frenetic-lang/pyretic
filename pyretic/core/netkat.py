@@ -58,8 +58,7 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, outport = False,
-                            print_json=False):
+    def generate_classifier(cls, pol, switch_cnt, print_json=False):
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
             sent to netkat. This is because netkat generates a separate copy of

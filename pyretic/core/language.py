@@ -146,7 +146,7 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, outport=False, print_json=False,
+    def netkat_compile(self, switch_cnt, print_json=False,
                        force_compile=False):
         comp_t = 0
         nb = netkat_backend
@@ -154,7 +154,6 @@ class Policy(object):
             force_compile):
             (self._classifier, comp_t) = nb.generate_classifier(self,
                                                                 switch_cnt,
-                                                                outport,
                                                                 print_json)
         return (self._classifier, comp_t)
 
@@ -1487,7 +1486,7 @@ class fwd(DerivedPolicy):
     """
     def __init__(self, outport):
         self.outport = outport
-        super(fwd,self).__init__(modify(outport=self.outport))
+        super(fwd,self).__init__(modify(port=self.outport))
 
     def __repr__(self):
         return "fwd %s" % self.outport
