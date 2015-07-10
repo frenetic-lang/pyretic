@@ -1272,8 +1272,8 @@ class Runtime(object):
                 for action in new_actions:
                     try:
                         if not isinstance(action, CountBucket):
-                            if action['outport'] == outport:
-                                action['outport'] = OFPP_IN_PORT
+                            if action['port'] == outport:
+                                action['port'] = OFPP_IN_PORT
                     except:
                         raise TypeError  # INVARIANT: every set of actions must go out a port
                                          # this may not hold when we move to OF 1.3
@@ -1283,17 +1283,17 @@ class Runtime(object):
             for rule in classifier.rules:
                 phys_actions = filter(lambda a: (
                         not isinstance(a, CountBucket)
-                        and a['outport'] != OFPP_CONTROLLER
-                        and a['outport'] != OFPP_IN_PORT
-                        and a['outport'] != CUSTOM_NEXT_TABLE_PORT),
+                        and a['port'] != OFPP_CONTROLLER
+                        and a['port'] != OFPP_IN_PORT
+                        and a['port'] != CUSTOM_NEXT_TABLE_PORT),
                                       rule.actions)
-                outports_used = map(lambda a: a['outport'], phys_actions)
-                if not 'inport' in rule.match:
+                outports_used = map(lambda a: a['port'], phys_actions)
+                if not 'port' in rule.match:
                     # Add a modified rule for each of the outports_used
                     switch = rule.match['switch']
                     for outport in outports_used:
                         new_match = copy.deepcopy(rule.match)
-                        new_match['inport'] = outport
+                        new_match['port'] = outport
                         new_actions = specialize_actions(rule.actions,outport)
                         specialized_rules.append(Rule(new_match,new_actions,
                                                       parents=rule.parents,
@@ -1301,9 +1301,9 @@ class Runtime(object):
                     # And a default rule for any inport outside the set of outports_used
                     specialized_rules.append(rule)
                 else:
-                    if rule.match['inport'] in outports_used:
+                    if rule.match['port'] in outports_used:
                         # Modify the set of actions
-                        new_actions = specialize_actions(rule.actions,rule.match['inport'])
+                        new_actions = specialize_actions(rule.actions,rule.match['port'])
                         specialized_rules.append(Rule(rule.match,new_actions,
                                                       parents=rule.parents,
                                                       op=rule.op))
