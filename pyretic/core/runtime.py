@@ -1056,7 +1056,7 @@ class Runtime(object):
                     """If the rule is from the first table of the multi-stage pipeline, then retain
                     the port match, else remove it.
                     """
-                    if table_id != 1:
+                    if table_id != 0:
                         match.pop('port', None)
                 priority = rule.priority
                 actions = rule.actions

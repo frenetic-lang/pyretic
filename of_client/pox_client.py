@@ -353,15 +353,18 @@ class POXClient(revent.EventMixin):
             match.tp_dst = pred['dstport']
         return match
 
-    def build_nx_match(self,switch,inport,outport,pred):
+    def build_nx_match(self,switch,inport,pred,table_id):
         ### BUILD NX MATCH
         match = nx.nx_match()
         if inport:
-            match.of_in_port = inport
-        if outport:
-            """ NXM_NX_REG2 is the per-packet metadata register where we store
-            the outport from previous tables' port-forwarding actions. """
-            match.reg2 = outport
+            if table_id == 0:
+                match.of_in_port = inport
+            else:
+                """NXM_NX_REG2 is the per-packet metadata register where we store the current
+                port value of the packet, including actions from previous tables' forwarding
+                actions.
+                """
+                match.reg2 = inport
 
         if 'srcmac' in pred:
             match.of_eth_src = packetaddr.EthAddr(pred['srcmac'])
@@ -412,8 +415,8 @@ class POXClient(revent.EventMixin):
         ### BUILD OF ACTIONS
         of_actions = []
         for actions in action_list:
-            outport = actions['outport']
-            del actions['outport']
+            outport = actions['port']
+            del actions['port']
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
             if 'dstmac' in actions:
@@ -450,6 +453,9 @@ class POXClient(revent.EventMixin):
         ctlr_outport = False # there is a controller outport action
         phys_outports = list() # list of physical outports to forward out of
         possibly_resubmit_next_table = False # should packet be passed on to next table?
+
+        """ TODO(ngsrinivas): add an additional action for table_id 0: move the
+        current inport value to reg2. """
 
         for actions in action_list:
             if 'srcmac' in actions:
@@ -591,18 +597,13 @@ class POXClient(revent.EventMixin):
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
         switch = pred['switch']
-        """ Set inport from matching predicate """
-        if 'inport' in pred:
-            inport = pred['inport']
+        """ Set `inport` from matching predicate """
+        if 'port' in pred:
+            inport = pred['port']
         else:
             inport = None
-        """ Set outport from matching predicate """
-        if 'outport' in pred:
-            outport = pred['outport']
-        else:
-            outport = None
         if self.use_nx:
-            match = self.build_nx_match(switch,inport,outport,pred)
+            match = self.build_nx_match(switch,inport,pred,table_id)
         else:
             match = self.build_of_match(switch,inport,pred)
         if self.use_nx:
