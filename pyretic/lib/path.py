@@ -1682,10 +1682,12 @@ class pathcomp(object):
         out_cg.clear()
 
         ast_fold(path_pol, inv_trees, None)
+        print 'pred_part started'
         cls.pred_part(path_pol)        
 
-
+        print 'generating re_list'
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
+        print 'compiling'
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
@@ -2809,7 +2811,7 @@ class ragel_dfa_utils(common_dfa_utils):
         # Add missing edges going to dead states, if needed.
         cls.add_dead_edges(edges, state_num)
        
-
+        print 'dfa stat count', state_num
         
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())

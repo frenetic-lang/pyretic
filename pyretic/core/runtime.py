@@ -87,11 +87,10 @@ class Runtime(object):
 
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
-
+        print 'set flags'
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled)
-
         """ Initialize a `policy map', which determines how the network policy
         is mapped onto the tables on switches. By default (i.e., a single stage
         table), the entire policy goes into the first table on each switch.
@@ -240,7 +239,9 @@ class Runtime(object):
                 if self.use_pyretic_compiler:
                     s[0].compile()
                 else:
+                    print "starting to compile %s" % s.name
                     s[0].netkat_compile(self.sw_cnt(), s[1])
+                    print "done compiling %s" % s.name
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -573,10 +574,11 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
+        print 'compiled query start'
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
                 self.ragel_enabled, self.partition_enabled)
-
+        print 'compile query end'
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
