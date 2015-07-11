@@ -207,9 +207,12 @@ class Runtime(object):
                     out_tag = LeafSketch('out_tag', self.path_out_tagging)
                     in_capture = LeafSketch('in_capture', self.path_in_capture)
                     out_capture = LeafSketch('out_capture', self.path_out_capture)
-
-                    sketch = [(in_tag // in_capture, False), 
-                                (out_tag // out_capture, True), 
+                    in_table = in_tag // in_capture
+                    in_table.name = 'in_table'
+                    out_table = out_tag // out_capture
+                    out_table.name = 'out_table'
+                    sketch = [(in_table, False), 
+                                (out_table, True), 
                                 (vf_tag, False), (vf_untag, True)]
                     
             else:

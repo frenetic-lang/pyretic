@@ -73,11 +73,14 @@ class Stat(object):
     
     @classmethod
     def dump_stats(cls):
+        path = os.path.join(cls.results_path, 'stat.txt')
+        f = open(path, 'w')
         #TODO: complete
-        print '\n'.join([str(x) for x in cls.times.items()])
-        print '\n'.join([str(x) for x in cls.classifiers.items()])
+        f.write('\n'.join([str(x) for x in cls.times.items()]) + "\n-------------\n")
+        f.write('\n'.join([str(x) for x in cls.classifiers.items()]) + "\n----------------\n")
         cls.report_dfa()
-        print cls.general_stats
+        f.write(str(cls.general_stats) + "\n--------------\n")
+        f.close()
 
     @classmethod
     def elapsed_time(cls, func):
