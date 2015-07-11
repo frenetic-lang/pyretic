@@ -1769,11 +1769,10 @@ class Runtime(object):
         headers         = {}
 
         """We set the 'outport' field from the current 'port' field of the
-        pyretic_pkt.
+        pyretic_pkt if the outport isn't already set.
 
         This is used to retain the semantics of outport whenever the current
-        pyretic packet is a result of evaluation by a policy. As on date of this
-        comment, this is the context in which this function is always called.
+        pyretic packet is a result of evaluation by a policy.
 
         Note that doing such a setting violates an intuitive property one may
         expect from the pair of functions concrete2pyretic and pyretic2concrete:
@@ -1785,10 +1784,18 @@ class Runtime(object):
 
         as they will differ on the 'outport' value (None -> the initial inport
         value). However this is rarely a problem in practice since the resulting
-        pyretic_pkt from concrete2pyretic is always evaluated by a policy first,
-        before applying pyretic2concrete.
+        pyretic_pkt from concrete2pyretic is either evaluated by a policy first
+        before applying pyretic2concrete, or (as in the case of virtualization
+        or the ARP module) comes with an explicitly set outport value.
         """
-        packet['outport'] = port
+        try:
+            if packet['outport']: # outport explicitly set; ignore
+                pass
+        except KeyError:
+            # no outport set, copy from `port` to `outport'
+            # in this case, the only possibility is that the packet comes from
+            # policy evaluation. So, the `port` field on the packet must be set.
+            packet['outport'] = packet['port']
 
         for header in ['switch','inport','outport','port']:
             try:
