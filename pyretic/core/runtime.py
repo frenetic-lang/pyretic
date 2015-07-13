@@ -1097,10 +1097,10 @@ class Runtime(object):
                 all_rules = to_add + to_delete + to_modify + to_stay
                 bucket_list = collect_buckets(all_rules)
                 map(lambda x: x.start_update(), bucket_list.values())
-                map(lambda x: update_rules_for_buckets(x, "add"), to_add, table_id)
-                map(lambda x: update_rules_for_buckets(x, "delete"), to_delete, table_id)
-                map(lambda x: update_rules_for_buckets(x, "stay"), to_stay, table_id)
-                map(lambda x: update_rules_for_buckets(x, "modify"), to_modify, table_id)
+                map(lambda x: update_rules_for_buckets(x, "add", table_id), to_add)
+                map(lambda x: update_rules_for_buckets(x, "delete", table_id), to_delete)
+                map(lambda x: update_rules_for_buckets(x, "stay", table_id), to_stay)
+                map(lambda x: update_rules_for_buckets(x, "modify", table_id), to_modify)
                 map(lambda x: x.add_pull_stats(self.pull_stats_for_bucket(x)),
                     bucket_list.values())
                 map(lambda x: x.add_pull_existing_stats(
