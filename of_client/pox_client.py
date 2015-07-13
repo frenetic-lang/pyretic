@@ -483,6 +483,9 @@ class POXClient(revent.EventMixin):
                 else:
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
 
+            assert 'port' in actions
+            outport = actions['outport']
+
             assert 'outport' in actions
             outport = actions['outport']
             if outport == of.OFPP_CONTROLLER:
