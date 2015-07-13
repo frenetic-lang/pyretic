@@ -1001,14 +1001,14 @@ class POXClient(revent.EventMixin):
             `outport`.
             """
             if reg2_entry:
-                outport = reg2_entry.value
+                port = reg2_entry.value
             else:
-                outport = None
+                port = event.ofp.in_port
         else:
             cookie = 0
-            outport = None
+            port = event.ofp.in_port
 
-        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data, outport=outport)
+        received = self.packet_from_network(switch=event.dpid, port=port, raw=event.data)
         self.send_to_pyretic(['packet',received,cookie])
         
        

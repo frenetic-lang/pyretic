@@ -1742,24 +1742,7 @@ class Runtime(object):
         packet = get_packet_processor().unpack(raw_pkt['raw'])
         packet['raw'] = raw_pkt['raw']
         packet['switch'] = raw_pkt['switch']
-        packet['inport'] = raw_pkt['inport']
-        packet['outport'] = raw_pkt['outport']
-        """Notes:
-
-        (1) The fact that a raw_pkt's `outport` field is set doesn't necessarily
-        mean that a data plane policy has set an outport on it. In particular, a
-        multi-stage table data plane uses this "outport" field as a proxy for
-        the current "port" the packet is in even before any policy that sets an
-        outport may have acted on it. So, in fact, the `outport` field may just
-        contain the port on which the packet came in and which packet location
-        has been unchanged by the data plane so far.
-
-        (2) For evaluation purposes, we set a "port" value on the packet, even
-        though separate inport and outport are still retained for debug-printing
-        purposes in the runtime.
-        """
-        packet['port'] = (packet['outport'] if not packet['outport'] is None
-                          else packet['inport'])
+        packet['port'] = raw_pkt['port']
 
         def convert(h,val):
             if h in ['srcmac','dstmac']:
