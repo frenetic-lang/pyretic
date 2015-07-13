@@ -573,7 +573,9 @@ class POXClient(revent.EventMixin):
                     table=next_table))
         elif table_id == 0:
             # move the inport value to reg2.
-            """ TODO(ngsrinivas) nx_reg_move action must be appended """
+            of_actions.append(nx.nx_reg_move(src=nx.NXM_OF_IN_PORT,
+                                             dst=nx.NXM_NX_REG2,
+                                             nbits=16))
             of_actions.append(nx.nx_action_resubmit.resubmit_table(
                 table=next_table))
         return of_actions
