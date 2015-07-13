@@ -51,7 +51,7 @@ class port_knocking(DynamicPolicy):
 
     def set_initial_state(self):
         # the basic switching behavior
-        self.switch = (match(inport=1)>>fwd(2)) + (match(inport=2)>>fwd(1))
+        self.switch = (match(port=1)>>fwd(2)) + (match(port=2)>>fwd(1))
 
         # always forward ARP and ICMP
         forwardARP = match(ethtype=0x0806) >> self.switch
