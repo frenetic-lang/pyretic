@@ -453,8 +453,10 @@ class POXClient(revent.EventMixin):
         ctlr_outport = False # there is a controller outport action
         phys_outports = list() # list of physical outports to forward out of
         possibly_resubmit_next_table = False # should packet be passed on to next table?
+        atleast_one_action = False
 
         for actions in action_list:
+            atleast_one_action = True
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
             if 'dstmac' in actions:
@@ -503,17 +505,24 @@ class POXClient(revent.EventMixin):
         to the current rule (and all previous table stages that processed the
         packet), without waiting for any other further processing:
 
-        - if the packet is dropped by the current rule,
-        - if the packet is forwarded to the controller port, or
-        - if this is the last stage of the pipeline.
+        (1) if the packet is dropped by the current rule,
+        (2) if the packet is forwarded to the controller port, or
+        (3) if this is the last stage of the pipeline.
 
-        If neither of the above is true, then we take the following approach:
+        In the case of (1) and (2), packet forwarding may happen immediately and
+        only depend on the current rule. But in (3), the forwarding decision
+        must take the current rule as well as previous port changes into
+        account, as follows:
 
-        (1) Determine if a table is the last table along this chain of tables,
-        or there is a "next" table.
+        (a) if the current rule specifies an output port, forward the packet out
+        of that port.
 
-        (2) If there is a "next" table, and the current rule does not make an
-        immediate forwarding decision (according to conditions above):
+        (b) if the current rule does not specify an outport, then forward the
+        packet out of the port using the value stored in the dedicated
+        per-packet port register.
+
+        If neither of (1)-(3) above is true, then we take the following
+        approach:
 
         (a) if there is an outport set by this rule, write that value into the
         dedicated per-packet register that contains the current port the
@@ -524,94 +533,49 @@ class POXClient(revent.EventMixin):
         register. This denotes that the packet is currently still on its inport.
 
         (c) resubmit the packet to the "next" table (according to the pipeline).
-
-        (3) If this is the last table (i.e., there is no "next" table), and the
-        table does not make an immediate forwarding decision (according to
-        conditions above), then:
-
-        (a) if the current rule specifies an output port, forward the packet out
-        of that port.
-
-        (b) if the current rule does not specify an outport, then forward the
-        packet out of the port using the value stored in the dedicated
-        per-packet port register.
         """
         exists_next_table = table_id in pipeline.edges
-        next_table = pipeline.edges[table_id] if exists_next_table else None
 
-        if ctlr_outport:
-            """ If rule sends packet to controller, this is the sole action. """
+        # Decide first on "immediate forwarding" conditions:
+        immediately_fwd = True
+        if not atleast_one_action: # (1) drop
+            of_actions = []
+        elif ctlr_outport: # (2) controller
             of_actions = []
             of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
-
-        elif possibly_resubmit_next_table and exists_next_table:
-            """ This isn't the last table, and either there is an explicit 'next
-            table' action in the rule or a physical outport that demands
-            forwarding in the last table along the pipeline.
-            """
-            if len(phys_outports) > 0:
-                """ Semantics: create a new copy of the packet for each value of
-                the physical outport specified in the action, and resubmit to
-                the next table as a brand new packet. The 'outport' is carried
-                along in a dedicated per-packet register, namely REG2.
-
-                This also means that earlier outport fields get overwritten by
-                fresh output actions in this table. This is consistent with the
-                sequential composition semantics, i.e.,
-
-                (port <- x) >> ((port <- y) + (port <- z))
-
-                results in two packets, which satisfy (respectively) the tests
-
-                port = y,
-
-                and
-
-                port = z,
-
-                but neither satisfy the test
-
-                port = x.
-                """
-                for p in phys_outports:
-                    of_actions.append(nx.nx_reg_load(dst=nx.NXM_NX_REG2,
-                                                     value=p, nbits=16))
-                    of_actions.append(nx.nx_action_resubmit.resubmit_table(
-                            table=next_table))
-            else:
-                """ Semantics: No physical outports on this table; but older
-                output actions may still be left to complete. Just resubmit to
-                next table. """
-                of_actions.append(nx.nx_action_resubmit.resubmit_table(
-                        table=next_table))
-
-        elif (not exists_next_table) and possibly_resubmit_next_table:
-            """ This case happens when this is the last table. There may or may
-            not be physical output actions on this table. If there are physical
-            output actions, use those to forward the packet. If not, use stored
-            outport information (in the per-packet register) to forward the
-            packet.
-            """
-            if len(phys_outports) > 0:
-                """ By semantics of sequential composition of tables, the latest
-                physical outports take priority over stored outport for
-                forwarding. """
+        elif possibly_resubmit_next_table and (not exists_next_table):
+            # (3) last stage of pipeline
+            if len(phys_outports) > 0: # fwd out of latest assigned ports
                 for p in phys_outports:
                     of_actions.append(of.ofp_action_output(port=p))
             else:
-                """ Forward using outport stored in the dedicated register. """
+                # fwd out of stored port value
                 of_actions.append(nx.nx_output_reg(reg=nx.NXM_NX_REG2,
                                                    nbits=16))
+        elif (not exists_next_table) and (not possibly_resubmit_next_table):
+            raise RuntimeError("Unexpected condition in multi-stage processing")
+        else: # must resubmit packet to subsequent tables for processing
+            immediately_fwd = False
 
-        elif (not possibly_resubmit_next_table):
-            """ This case happens if there aren't any actions in the action list
-            of this rule. By the semantics of sequential composition, this
-            packet should be dropped. Do nothing."""
-            pass
+        if immediately_fwd:
+            return of_actions
 
-        else:
-            raise RuntimeError("Unexpected condition on table flow!")
-
+        # Act on packet with knowledge that subsequent tables must process it
+        assert (possibly_resubmit_next_table and exists_next_table and
+                (not immediately_fwd))
+        next_table = pipeline.edges[table_id]
+        if len(phys_outports) > 0:
+            # move port register to latest assigned port values
+            for p in phys_outports:
+                of_actions.append(nx.nx_reg_load(dst=nx.NXM_NX_REG2,
+                                                 value=p, nbits=16))
+                of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                    table=next_table))
+        elif table_id == 0:
+            # move the inport value to reg2.
+            """ TODO(ngsrinivas) nx_reg_move action must be appended """
+            of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                table=next_table))
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
