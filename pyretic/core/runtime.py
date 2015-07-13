@@ -1760,36 +1760,7 @@ class Runtime(object):
         concrete_packet = {}
         headers         = {}
 
-        """We set the 'outport' field from the current 'port' field of the
-        pyretic_pkt if the outport isn't already set.
-
-        This is used to retain the semantics of outport whenever the current
-        pyretic packet is a result of evaluation by a policy.
-
-        Note that doing such a setting violates an intuitive property one may
-        expect from the pair of functions concrete2pyretic and pyretic2concrete:
-        a concrete_pkt that comes in with no set outport (but a valid inport
-        value) will suddenly find its outport set when it is passed through the
-        2 functions, i.e.,
-
-        pyretic2concrete(concrete2pyretic(concrete_pkt)) != concrete_pkt
-
-        as they will differ on the 'outport' value (None -> the initial inport
-        value). However this is rarely a problem in practice since the resulting
-        pyretic_pkt from concrete2pyretic is either evaluated by a policy first
-        before applying pyretic2concrete, or (as in the case of virtualization
-        or the ARP module) comes with an explicitly set outport value.
-        """
-        try:
-            if packet['outport']: # outport explicitly set; ignore
-                pass
-        except KeyError:
-            # no outport set, copy from `port` to `outport'
-            # in this case, the only possibility is that the packet comes from
-            # policy evaluation. So, the `port` field on the packet must be set.
-            packet['outport'] = packet['port']
-
-        for header in ['switch','inport','outport','port']:
+        for header in ['switch', 'port']:
             try:
                 concrete_packet[header] = packet[header]
                 headers[header]         = packet[header]
@@ -1803,7 +1774,7 @@ class Runtime(object):
                 pass
         for header in packet.header:
             try:
-                if header in ['switch', 'inport', 'outport', 'port']: next
+                if header in ['switch', 'port']: next
                 val = packet[header]
                 headers[header] = val
             except:

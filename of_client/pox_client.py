@@ -288,13 +288,11 @@ class POXClient(revent.EventMixin):
 
     def send_to_switch(self,packet):
         switch = packet["switch"]
-        outport = packet["outport"]
-        try:
-            inport = packet["inport"]
-            if inport == -1 or inport == outport:
-                inport = inport_value_hack(outport)
-        except KeyError:
-            inport = inport_value_hack(outport)
+        outport   = packet["port"]
+        # inport is unnecessary unless we are asking the switch to process the
+        # packet through a flow table. Since this is a direct packet-out through
+        # a switch interface, it's ok to set some garbage value here.
+        inport = inport_value_hack(outport)
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
