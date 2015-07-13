@@ -67,7 +67,7 @@ class mac_learner(DynamicPolicy):
         """Update forward policy based on newly seen (mac,port)"""
         self.forward = if_(match(dstmac=pkt['srcmac'],
                                 switch=pkt['switch']),
-                          fwd(pkt['inport']),
+                          fwd(pkt['port']),
                           self.forward) 
         self.update_policy()
        
