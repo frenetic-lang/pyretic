@@ -646,8 +646,8 @@ class POXClient(revent.EventMixin):
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
-        if 'inport' in pred:        
-            inport = pred['inport']
+        if 'port' in pred:
+            inport = pred['port']
         else:
             inport = None
         match = self.build_of_match(switch,inport,pred)
@@ -754,7 +754,7 @@ class POXClient(revent.EventMixin):
     def of_match_to_dict(self, m):
         h = {}
         if not m.in_port is None:
-            h["inport"] = m.in_port
+            h["port"] = m.in_port
         if not m.dl_src is None:
             h["srcmac"] = m.dl_src.toRaw()
         if not m.dl_dst is None:
@@ -994,6 +994,12 @@ class POXClient(revent.EventMixin):
             assert isinstance(event.ofp, nx.nxt_packet_in)
             cookie = event.ofp.cookie
             reg2_entry = event.ofp.match.find(nx.NXM_NX_REG2)
+            """If the reg2 value is valid, it is not necessary that a policy set a port
+            field on this packet already. It might just be the inport on which
+            the packet came in, which was copied into the reg2 register. So, the
+            name of this raw_pkt field should rather be `port` as opposed to
+            `outport`.
+            """
             if reg2_entry:
                 outport = reg2_entry.value
             else:
