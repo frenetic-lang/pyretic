@@ -454,9 +454,6 @@ class POXClient(revent.EventMixin):
         phys_outports = list() # list of physical outports to forward out of
         possibly_resubmit_next_table = False # should packet be passed on to next table?
 
-        """ TODO(ngsrinivas): add an additional action for table_id 0: move the
-        current inport value to reg2. """
-
         for actions in action_list:
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
@@ -486,39 +483,58 @@ class POXClient(revent.EventMixin):
             assert 'port' in actions
             outport = actions['outport']
 
-            assert 'outport' in actions
-            outport = actions['outport']
             if outport == of.OFPP_CONTROLLER:
                 ctlr_outport = True
             else:
                 """ There is either a physical output action (i.e., on a
                 non-controller port), or a "send to next table" action."""
                 possibly_resubmit_next_table = True
-                if (not inport is None) and outport == inport:
-                    phys_outports.append(of.OFPP_IN_PORT)
-                elif outport != CUSTOM_NEXT_TABLE_PORT:
+                if outport != CUSTOM_NEXT_TABLE_PORT:
                     phys_outports.append(outport)
-                else:
-                    """ No physical outports here; just a possibility of
-                    resubmitting to the next table. """
-                    assert outport == CUSTOM_NEXT_TABLE_PORT
-                    pass
+                """ Otherwise there are no physical outports; just a possibility
+                of resubmitting to the next table. Pass. """
 
-        """ First determine if there is a "next" table from here, or this is the
-        last one. This allows us to append actions appropriately since packet
-        modifications may need to wait until the final table, before sending
-        them out an outport. So, here's the basic approach:
+        """In general, actual packet forwarding may have to wait until the final table
+        in the pipeline. This means we must determine if there is a "next" table
+        that processes the packet from here, or if this is the last one.
 
-        (1) determine if a table is the last table along this chain of tables,
+        But first, the easy part. There are exactly three cases where a
+        forwarding table *will* in fact "immediately forward" a packet according
+        to the current rule (and all previous table stages that processed the
+        packet), without waiting for any other further processing:
+
+        - if the packet is dropped by the current rule,
+        - if the packet is forwarded to the controller port, or
+        - if this is the last stage of the pipeline.
+
+        If neither of the above is true, then we take the following approach:
+
+        (1) Determine if a table is the last table along this chain of tables,
         or there is a "next" table.
 
-        (2) If there are more tables that still need to process the packet,
-        write the outport into a dedicated per-packet register, and resubmit the
-        packet to that table for processing.
+        (2) If there is a "next" table, and the current rule does not make an
+        immediate forwarding decision (according to conditions above):
 
-        (3) If this is the last table, output the packet on any output port that
-        may be specified in actions in the last table, and if there are no such
-        ports by the outport recorded in the per-packet dedicated register.
+        (a) if there is an outport set by this rule, write that value into the
+        dedicated per-packet register that contains the current port the
+        packet is in.
+
+        (b) if there is no outport set by this rule, and if this is table id 0,
+        move the value of the inport into the dedicated per-packet port
+        register. This denotes that the packet is currently still on its inport.
+
+        (c) resubmit the packet to the "next" table (according to the pipeline).
+
+        (3) If this is the last table (i.e., there is no "next" table), and the
+        table does not make an immediate forwarding decision (according to
+        conditions above), then:
+
+        (a) if the current rule specifies an output port, forward the packet out
+        of that port.
+
+        (b) if the current rule does not specify an outport, then forward the
+        packet out of the port using the value stored in the dedicated
+        per-packet port register.
         """
         exists_next_table = table_id in pipeline.edges
         next_table = pipeline.edges[table_id] if exists_next_table else None
