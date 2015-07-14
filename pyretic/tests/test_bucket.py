@@ -82,9 +82,20 @@ def capture_packets(t_out, t_err, ints_list, capture_dir):
     - ip dst for IP packets
     - ip src for ARP packets
     - ip dst for ARP packets
+    - interface where packet captured
     If more fields are needed, the command needs to be modified accordingly.
     """
-    cmd = ("tshark -f '" + capture_dir + " and net 10.0.0/24' -T fields " +
+    # Set up a capture filter suffix based on capture direction:
+    default_suffix = " and net 10.0.0/24"
+    if capture_dir == 'inbound':
+        cap_filter_suffix = default_suffix
+    else:
+        if 'any' in ints_list:
+            cap_filter_suffix = default_suffix
+        else:
+            cap_filter_suffix = ''
+    # Set up tshark command
+    cmd = ("tshark -f '" + capture_dir + cap_filter_suffix + "' -T fields " +
            "-e frame.len -e ip.src " +
            "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
            "-e frame.interface_id " +
