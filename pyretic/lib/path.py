@@ -49,6 +49,7 @@ import pickle
 from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
+import logging
 
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
 TOKEN_END_VALUE = 0xFFFFFFFF 
@@ -1521,6 +1522,9 @@ class QuerySwitch(Policy):
 
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
+    log = logging.getLogger('%s.pathcomp' % __name__)
+    log.setLevel(logging.ERROR)
+
     @classmethod
     def __num_set_tag__(cls, num):
         if num == 0:
@@ -1681,12 +1685,12 @@ class pathcomp(object):
         out_cg.clear()
 
         ast_fold(path_pol, inv_trees, None)
-        print 'pred_part started'
+        cls.log.debug('pred_part started')
         cls.pred_part(path_pol)        
 
-        print 'generating re_list'
+        cls.log.debug('generating re_list')
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
-        print 'compiling'
+        cls.log.debug('compiling')
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res

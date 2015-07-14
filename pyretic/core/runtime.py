@@ -238,9 +238,9 @@ class Runtime(object):
                 if self.use_pyretic_compiler:
                     s[0].compile()
                 else:
-                    print "starting to compile %s" % s.name
+                    self.log.debug("starting to compile %s" % s[0].name)
                     s[0].netkat_compile(self.sw_cnt(), s[1])
-                    print "done compiling %s" % s.name
+                    self.log.debug("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -571,11 +571,11 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        print 'compiled query start'
+        self.log.debug('compiled query start')
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
                 self.ragel_enabled, self.partition_enabled)
-        print 'compile query end'
+        self.log.debug('compile query end')
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
