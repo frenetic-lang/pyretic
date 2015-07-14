@@ -660,7 +660,7 @@ def filt_path_test_23_p1_static_inbound(l):
             pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
 
 def filt_path_test_23_p1_static_outbound(l):
-    return (pkt_interface('s2-eth2', l) and
+    return (pkt_interface('s2-eth3', l) and
             pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
 
 def filt_path_test_23_p2_static_inbound(l):
