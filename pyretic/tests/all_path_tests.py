@@ -251,16 +251,18 @@ def update_test_stats(query, fwding, pyopts, res):
         raise RuntimeError("single test result uninterpreted")
 
 def print_failed_tests():
-    print "Failed tests:"
-    assert len(failed_tests) == len(fails_counts)
-    for t in range(0, len(failed_tests)):
-        print failed_tests[t]
-        print fails_counts[t]
-    print "Ambiguous tests:"
-    assert len(greyed_tests) == len(greys_counts)
-    for t in range(0, len(greyed_tests)):
-        print greyed_tests[t]
-        print greys_counts[t]
+    if len(failed_tests) > 0:
+        print "Failed tests:"
+        assert len(failed_tests) == len(fails_counts)
+        for t in range(0, len(failed_tests)):
+            print failed_tests[t]
+            print fails_counts[t]
+    if len(greyed_tests) > 0:
+        print "Ambiguous tests:"
+        assert len(greyed_tests) == len(greys_counts)
+        for t in range(0, len(greyed_tests)):
+            print greyed_tests[t]
+            print greys_counts[t]
 
 if __name__ == "__main__":
     bunched_path_tests(default_pyopts='')
@@ -269,6 +271,7 @@ if __name__ == "__main__":
     bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="
-    print "%d tests passed, %d failed" % (num_passed, num_failed)
-    if failed_tests:
+    print "%d tests passed, %d failed, %d ambiguous" % (
+        num_passed, num_failed, num_greyed)
+    if failed_tests or greyed_tests:
         print_failed_tests()
