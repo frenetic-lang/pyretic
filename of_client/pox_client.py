@@ -481,7 +481,7 @@ class POXClient(revent.EventMixin):
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
 
             assert 'port' in actions
-            outport = actions['outport']
+            outport = actions['port']
 
             if outport == of.OFPP_CONTROLLER:
                 ctlr_outport = True
@@ -574,6 +574,9 @@ class POXClient(revent.EventMixin):
             of_actions.append(nx.nx_reg_move(src=nx.NXM_OF_IN_PORT,
                                              dst=nx.NXM_NX_REG2,
                                              nbits=16))
+            of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                table=next_table))
+        else:
             of_actions.append(nx.nx_action_resubmit.resubmit_table(
                 table=next_table))
         return of_actions
