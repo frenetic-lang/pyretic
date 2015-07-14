@@ -87,7 +87,7 @@ class Runtime(object):
 
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
-        print 'set flags'
+        self.log.debug('set flags')
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled)
@@ -180,10 +180,9 @@ class Runtime(object):
         self.policy in the runtime. This is done in update_switch_classifiers()
         and set_policy_map(), respectively.
         """
+        sketch = None
         if path_main:
             from pyretic.lib.path import LeafSketch
-
-            sketch = None
 
             forwarding = LeafSketch('forwarding', self.forwarding)
             vf_tag = LeafSketch('vf_tag', self.virtual_tag)
