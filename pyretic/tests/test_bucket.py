@@ -565,6 +565,10 @@ def filt_test7(l):
 def filt_path_test_0(l):
     return pkt_interface('s2-eth3', l)
 
+def filt_path_test_0_outbound(l):
+    return (pkt_srcip(ip2, l) and
+            (pkt_interface('s2-eth1',l) or pkt_interface('s2-eth2',l)))
+
 def filt_path_test_0_5(l):
     return (pkt_srcip(ip2, l) or
             (pkt_srcip(ip1, l) and not pkt_interface('s1-eth2', l)) or
@@ -577,11 +581,22 @@ def filt_path_test_0_5(l):
     multiple hops, i.e., either S2 and S3 or S2 and S1, respectively.
     """
 
+def filt_path_test_0_5_outbound(l):
+    return (pkt_srcip(ip2, l) or
+            (pkt_srcip(ip1, l) and not pkt_interface('s1-eth1',l)) or
+            (pkt_srcip(ip3, l) and not pkt_interface('s3-eth1',l)))
+
 def filt_path_test_1(l):
     return pkt_srcip(ip1, l) and pkt_dstip(ip3, l) and pkt_interface('s3-eth1', l)
 
+def filt_path_test_1_outbound(l):
+    return pkt_srcip(ip1, l) and pkt_dstip(ip3, l) and pkt_interface('s3-eth2', l)
+
 def filt_path_test_2(l):
     return pkt_srcip(ip1, l) and pkt_interface('s3-eth1', l)
+
+def filt_path_test_2_outbound(l):
+    return pkt_srcip(ip1, l) and pkt_interface('s3-eth2', l)
 
 def filt_path_test_gwpv_st1(l):
     """filter function for generalized waypoint violation. This filter function only
@@ -605,6 +620,11 @@ def filt_path_test_gwpv_st1(l):
              ((pkt_interface('s3-eth1',l) or pkt_interface('s3-eth2',l)) and
               pkt_dstip(ip3,l))))
 
+def filt_path_test_gwpv_st1_outbound(l):
+    return ((not (pkt_srcip(ip4,l) or pkt_dstip(ip4,l))) and
+            (pkt_interface('s1-eth3',l) or pkt_interface('s2-eth3',l) or
+             pkt_interface('s3-eth3',l)))
+
 def filt_path_test_gwpv_st2(l):
     """filter function for generalized waypoint violation when the forwarding
     policy uses spanning_tree_2 (see path_query.py example file). Only traffic
@@ -617,15 +637,29 @@ def filt_path_test_gwpv_st2(l):
             (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
              pkt_interface('s2-eth2',l)))
 
+def filt_path_test_gwpv_st2_outbound(l):
+    return ((pkt_srcip(ip2,l) and pkt_dstip(ip3,l) and
+             pkt_interface('s3-eth3',l)) or
+            (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
+             pkt_interface('s2-eth3',l)))
+
 def filt_path_test_23_p1_static(l):
     """ This filter only works for static fwding policy. """
     return (pkt_interface('s2-eth1', l) and
+            pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
+
+def filt_path_test_23_p1_static_outbound(l):
+    return (pkt_interface('s2-eth2', l) and
             pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
 
 def filt_path_test_23_p2_static(l):
     """ This filter only works for static fwding policy. """
     return (pkt_interface('s2-eth1', l) and
             pkt_srcip(ip1, l))
+
+def filt_path_test_23_p2_static_outbound(l):
+    return (pkt_srcip(ip1,l) and
+            (pkt_interface('s2-eth2',l) or pkt_interface('s2-eth3',l)))
 
 ### Interfaces map for packet capture ###
 def map_any():
