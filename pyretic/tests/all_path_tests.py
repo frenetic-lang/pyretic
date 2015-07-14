@@ -47,7 +47,8 @@ def single_path_test(fwding="static_fwding_chain_3_3",
                      success_file='pass-fail.txt',
                      test_nums="0",
                      interface_map="map_chain_3_3",
-                     tshark_slack_sec=10):
+                     tshark_slack_sec=10,
+                     capture_dir="inbound"):
 
     global fails_counts
     pyoptstr = "--pyopts='" + pyopts + "' " if pyopts else ''
@@ -63,7 +64,8 @@ def single_path_test(fwding="static_fwding_chain_3_3",
            "--test_nums=" + test_nums + ' ' +
            "--interface_map=" + interface_map + ' ' +
            pyoptstr +
-           "--tshark_slack_sec=" + str(tshark_slack_sec))
+           "--tshark_slack_sec=" + str(tshark_slack_sec) +
+           "--capture_dir=" + capture_dir)
     test = subprocess.call(shlex.split(cmd))
     pf_file = os.path.join(results_folder, success_file)
     f = open(pf_file, 'r')
