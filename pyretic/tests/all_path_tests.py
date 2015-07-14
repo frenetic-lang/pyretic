@@ -222,7 +222,7 @@ def path_test_23_static_multistage(default_pyopts, capture_dir):
         capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
-def bunched_path_tests(default_pyopts='', capture_dir='inbound'):
+def bunched_path_tests(default_pyopts='', capture_dir='outbound'):
     path_test_0_static_single_stage(default_pyopts, capture_dir)
     path_test_0_5_static_single_stage(default_pyopts, capture_dir)
     path_test_2_mac_learner_single_stage(default_pyopts, capture_dir)
