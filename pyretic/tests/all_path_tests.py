@@ -64,7 +64,7 @@ def single_path_test(fwding="static_fwding_chain_3_3",
            "--test_nums=" + test_nums + ' ' +
            "--interface_map=" + interface_map + ' ' +
            pyoptstr +
-           "--tshark_slack_sec=" + str(tshark_slack_sec) +
+           "--tshark_slack_sec=" + str(tshark_slack_sec) + ' ' +
            "--capture_dir=" + capture_dir)
     test = subprocess.call(shlex.split(cmd))
     pf_file = os.path.join(results_folder, success_file)
@@ -97,10 +97,11 @@ def path_test_0_static_single_stage(default_pyopts, capture_dir):
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_0',
+        tshark_filter_funs='filt_path_test_0_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='0', interface_map="map_chain_3_3")
+        test_nums='0', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_0_5_static_single_stage(default_pyopts, capture_dir):
@@ -110,10 +111,11 @@ def path_test_0_5_static_single_stage(default_pyopts, capture_dir):
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_0_5',
+        tshark_filter_funs='filt_path_test_0_5_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='0.5', interface_map="map_chain_3_3")
+        test_nums='0.5', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_2_mac_learner_single_stage(default_pyopts, capture_dir):
@@ -123,10 +125,11 @@ def path_test_2_mac_learner_single_stage(default_pyopts, capture_dir):
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_2',
+        tshark_filter_funs='filt_path_test_2_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='2', interface_map="map_chain_3_3")
+        test_nums='2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_3_static_single_stage(default_pyopts, capture_dir):
@@ -136,10 +139,12 @@ def path_test_3_static_single_stage(default_pyopts, capture_dir):
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_1,filt_path_test_2',
+        tshark_filter_funs='filt_path_test_1_%s,filt_path_test_2_%s' % (
+            capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='1,2', interface_map="map_chain_3_3")
+        test_nums='1,2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_3_mac_learner_multistage(default_pyopts, capture_dir):
@@ -149,10 +154,12 @@ def path_test_3_mac_learner_multistage(default_pyopts, capture_dir):
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_1,filt_path_test_2',
+        tshark_filter_funs='filt_path_test_1_%s,filt_path_test_2_%s' % (
+            capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='1,2', interface_map="map_chain_3_3")
+        test_nums='1,2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir):
@@ -162,11 +169,12 @@ def waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir):
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_gwpv_st1',
+        tshark_filter_funs='filt_path_test_gwpv_st1_%s' % capture_dir,
         topo_name="CycleTopo", topo_args="4,4",
         results_folder=results_folder, success_file=success_file,
         test_nums='generalized_waypoint_violation',
-        interface_map="map_cycle_4_4", tshark_slack_sec=20)
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir):
@@ -176,11 +184,12 @@ def waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir):
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_gwpv_st2',
+        tshark_filter_funs='filt_path_test_gwpv_st2_%s' % capture_dir,
         topo_name="CycleTopo", topo_args="4,4",
         results_folder=results_folder, success_file=success_file,
         test_nums='generalized_waypoint_violation',
-        interface_map="map_cycle_4_4", tshark_slack_sec=20)
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_23_static_single_stage(default_pyopts, capture_dir):
@@ -190,10 +199,12 @@ def path_test_23_static_single_stage(default_pyopts, capture_dir):
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        tshark_filter_funs='filt_path_test_23_p1_static_%s,filt_path_test_23_p2_static_%s'
+        % (capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_23_static_multistage(default_pyopts, capture_dir):
@@ -203,10 +214,12 @@ def path_test_23_static_multistage(default_pyopts, capture_dir):
     pyopts = '%s --nx --pipeline=path_query_pipeline' % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        tshark_filter_funs='filt_path_test_23_p1_static_%s,filt_path_test_23_p2_static_%s'
+        % (capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
 def bunched_path_tests(default_pyopts='', capture_dir='inbound'):
