@@ -419,8 +419,8 @@ def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts,
         for q in tshark_counts.keys():
             tc = tshark_counts[q]
             bc = buckets_counts[q]
-            (tc_total_pkts, tc_total_bytes) = tc.get('total', 0)
-            (bc_total_pkts, bc_total_bytes) = bc.get('total', 0)
+            (tc_total_pkts, tc_total_bytes) = tc.get('total', (0, 0))
+            (bc_total_pkts, bc_total_bytes) = bc.get('total', (0, 0))
             if tc_total_pkts != bc_total_pkts:
                 output_str += 'FAIL\n'
                 output_str += 'Query: %s\n' % q
