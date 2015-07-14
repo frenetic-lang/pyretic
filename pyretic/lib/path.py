@@ -46,7 +46,7 @@ from pyretic.core.language import Controller, fwd, CombinatorPolicy
 from pyretic.core.language import negate, union, intersection
 from pyretic.core import util
 import pickle
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 
@@ -1652,14 +1652,14 @@ class pathcomp(object):
 
     
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def pred_part(cls, path_pol):
         ast_fold = path_policy_utils.path_policy_ast_fold
         prep_trees = cls.__prep_re_trees__
         ast_fold(path_pol, prep_trees, None)
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, default_enabled = False, 
             integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
@@ -1681,16 +1681,18 @@ class pathcomp(object):
         out_cg.clear()
 
         ast_fold(path_pol, inv_trees, None)
+        print 'pred_part started'
         cls.pred_part(path_pol)        
 
-
+        print 'generating re_list'
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
+        print 'compiling'
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
          
         return res
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, default_enabled = False, 
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
         
@@ -1735,16 +1737,10 @@ class pathcomp(object):
         else:
             raise TypeError
     
-    @classmethod
-    def create_dist(cls, vals):
-        dist = {}
-        for val in vals:
-            if not val in dist:
-                dist[val] = 0
-            dist[val] += 1
-        return dist
+    
 
     @classmethod
+    @Stat.collects(['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list'])
     def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
         in_cg = __in_re_tree_gen__
         out_cg = __out_re_tree_gen__
@@ -1775,17 +1771,17 @@ class pathcomp(object):
             du = dfa_utils
 
         dfa = du.regexes_to_dfa(re_list)
-        # print 'number of states: ', du.get_num_states(dfa)
         assert du.get_num_states(dfa) <= max_states
         
-        stat.gather_general_stats('dfa state count', du.get_num_states(dfa), 0, False)
-        
+
+        Stat.collect_stat('dfa', dfa)
+        Stat.collect_stat('dfa_utils', du)
+        Stat.collect_stat('pred_in_list', in_cg.symbol_to_pred)
+        Stat.collect_stat('pred_out_list', out_cg.symbol_to_pred)
+
         get_pred  = lambda e: cls.__get_pred__(dfa, e)
         edges = du.get_edges(dfa)
         get_edge_attributes = du.get_edge_attributes
-       
-
-        stat.gather_general_stats('dfa edges', len(edges), 0, False) 
 
         in_edge_per_state = {}
         out_edge_per_state = {}
@@ -1802,18 +1798,7 @@ class pathcomp(object):
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                    
                     assert typ in [__in__, __out__]
-                    
-                    ### statistics ###
-                    if typ == __in__:
-                        if not pred in in_pred_classifier:
-                            in_pred_classifier[pred] = len(pred.compile().rules)
-                    else:
-                        if not pred in out_pred_classifier:
-                            out_pred_classifier[pred] = len(pred.compile().rules)
-                    ################
-                        
                     action_frag = None
-                   
                     
                     if_pred = not du.is_dead(dfa, src)
                     if default_link:
@@ -1826,15 +1811,7 @@ class pathcomp(object):
                         ### statistics ###
                         if typ == __in__:
                             in_tag_rules += 1
-                            if not src in in_edge_per_state:
-                                in_edge_per_state[src] = 0
-                            in_edge_per_state[src] += 1
-
                         else:
-                            if not src in out_edge_per_state:
-                                out_edge_per_state[src] = 0
-                            out_edge_per_state[src] += 1
-
                             out_tag_rules += 1
                         ################
 
@@ -1871,48 +1848,6 @@ class pathcomp(object):
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
                 out_table = QuerySwitch('path_tag', out_table_dic, table_default)
                
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-                
-                ### statistics  ###
-                '''### edge per state ###
-                edge_cnts = in_edge_per_state.values()
-                max_edge_per_state = max(edge_cnts)
-                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
-                stat.gather_general_stats("in max edge per state", max_edge_per_state, 0, False)
-                stat.gather_general_stats('in avg edge per state', avg_edge_per_state, 0, False)
-                stat.dump_dist(cls.create_dist(edge_cnts), "in_edge_dist_per_state")
-                
-                edge_cnts = out_edge_per_state.values()
-                max_edge_per_state = max(edge_cnts)
-                avg_edge_per_state = float(sum(edge_cnts)) / len(edge_cnts)
-                stat.gather_general_stats("out max edge per state", max_edge_per_state, 0, False)
-                stat.gather_general_stats('out avg edge per state', avg_edge_per_state, 0, False)
-                stat.dump_dist(cls.create_dist(edge_cnts), "out_edge_dist_per_state")
-
-                cls_sizes = in_pred_classifier.values()
-                max_cls_size = max(cls_sizes)
-                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
-                stat.gather_general_stats("in max pred classifier size", max_cls_size, 0, False)
-                stat.gather_general_stats("in avg pred classifier size", avg_cls_szie, 0, False)
-                stat.dump_dist(cls.create_dist(cls_sizes), "in_pred_classifier_dist.txt")
-                
-                cls_sizes = out_pred_classifier.values()
-                max_cls_size = max(cls_sizes)
-                avg_cls_szie = float(sum(cls_sizes)) / len(cls_sizes)
-                stat.gather_general_stats("out max pred classifier size", max_cls_size, 0, False)
-                stat.gather_general_stats("out avg pred classifier size", avg_cls_szie, 0, False)
-                stat.dump_dist(cls.create_dist(cls_sizes), "out_pred_classifier_dist.txt")
-
-                stat.gather_general_stats("in table ast cnt", cls.ast_node_cnt(in_table), 0, False)
-                stat.gather_general_stats("out table ast cnt", cls.ast_node_cnt(out_table), 0, False)
-
-                '''
-                ################
-
                 return (in_table, out_table)
            
             else:
@@ -1963,12 +1898,6 @@ class pathcomp(object):
                 in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
                 out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
                 
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
                 return (in_tagging, in_capture, out_tagging, out_capture)
 
         else:
@@ -2019,12 +1948,6 @@ class pathcomp(object):
                         elif typ == __out__:
                             out_table += tag_frag
                 
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-
                 return (in_table, out_table)
 
             else:
@@ -2065,13 +1988,6 @@ class pathcomp(object):
                             elif typ == __out__:
                                 out_capture += cap_frag
                                 out_cap_rules += 1
-                
-                stat.gather_general_stats('in tagging edges', in_tag_rules, 0, False)
-                stat.gather_general_stats('in capture edges', in_cap_rules, 0, False)
-
-                stat.gather_general_stats('out tagging edges', out_tag_rules, 0, False)
-                stat.gather_general_stats('out capture edges', out_cap_rules, 0, False)
-               
                 return (in_tagging, in_capture, out_tagging, out_capture)
 
     class policy_frags:
@@ -2304,7 +2220,6 @@ class pathcomp(object):
 
         return actual_callback
 
-
 #############################################################################
 ###        Utilities to get data into ml-ulex, and out into DFA           ###
 #############################################################################
@@ -2318,7 +2233,7 @@ class common_dfa_utils(object):
     def get_edges(cls):
         raise NotImplementedError
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         raise NotImplementedError
 
     @classmethod
@@ -2336,6 +2251,7 @@ class common_dfa_utils(object):
     @classmethod
     def get_num_states(cls, dfa):
         raise NotImplementedError
+
 
 class dfa_utils(common_dfa_utils):
     """ Utilities to generate DFAs and access various properties. """
@@ -2502,7 +2418,7 @@ class dfa_utils(common_dfa_utils):
 
     
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         src = cls.get_edge_src(dfa, edge)
         src_num = cls.__get_tag_val__(dfa, src)
         dst = cls.get_edge_dst(dfa, edge)
@@ -2511,7 +2427,7 @@ class dfa_utils(common_dfa_utils):
         return (src, src_num, dst, dst_num, pred, typ)
     
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_exps, symlist=None):
         """ Convert a list of regular expressions to a DFA. """
         assert reduce(lambda acc, x: acc and isinstance(x, re_deriv),
@@ -2521,7 +2437,7 @@ class dfa_utils(common_dfa_utils):
             symlist = (__in_re_tree_gen__.get_symlist() +
                        __out_re_tree_gen__.get_symlist())
         dfa = makeDFA_vector(re_exps, symlist)
-        cls.__dump_file__(dfa.dot_repr(), '/tmp/pyretic-regexes.txt.dot')
+        cls.__dump_file__(dfa.dot_repr(), '/tmp/graph.dot')
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        
@@ -2533,12 +2449,22 @@ class dfa_utils(common_dfa_utils):
         cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')'''
         return dfa
 
-   
+
+class ragel_dfa(object):
+    def __init__(self, state_num, final_states, transition, edges, edge_ordinals):
+        self.state_num = state_num
+        self.final_states = final_states
+        self.transition = transition
+        self.edges = edges
+        self.edge_ordinals = edge_ordinals
+  
+    def __str__(self):
+        return str(self.state_num) + ": " + str(self.edges)
+
 class ragel_dfa_utils(common_dfa_utils):
     @classmethod
     def init(cls, edge_contraction_enabled):
         cls.edge_contraction_enabled = edge_contraction_enabled
-        cls.dfa_dict = {}
     
     @classmethod
     def get_accepting_states(cls, data):
@@ -2568,15 +2494,15 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def is_accepting(cls, dfa, q):
-        return q in cls._accepting_states
+        return q in dfa.final_states
 
     @classmethod
     def get_accepting_exps(cls, dfa, edge, q):
         try:
-            return cls._edge_ordinal[edge]
+            return dfa.edge_ordinals[edge]
         except:
             print edge
-            print cls._edge_ordinal
+            print dfa.edge_ordinals
             raise KeyError
 
     
@@ -2584,7 +2510,7 @@ class ragel_dfa_utils(common_dfa_utils):
     def get_extended_edges_contracted(cls, output):
         res = []
         edge_ordinals = {}
-        cls.dfa_dict = {}
+        dfa_dict = {}
         for line in output.splitlines():
             if not '->' in line or 'IN' in line or 'main' in line:
                 continue
@@ -2598,8 +2524,8 @@ class ragel_dfa_utils(common_dfa_utils):
             dst = cls.get_state(dst)
             src = cls.get_state(src)
             
-            if not (src, dst) in cls.dfa_dict:
-                cls.dfa_dict[(src, dst)] = []
+            if not (src, dst) in dfa_dict:
+                dfa_dict[(src, dst)] = []
 
             parts = [s.strip() for s in label.split('/')]
             exp_list = []
@@ -2619,12 +2545,12 @@ class ragel_dfa_utils(common_dfa_utils):
                     end = int(s[index + 2:])
                     for i in range(start, end + 1):
                         edge = (src, i, dst)
-                        cls.dfa_dict[(src,dst)].append( edge)
+                        dfa_dict[(src,dst)].append( edge)
                         res.append(edge)
                         edge_ordinals[edge] = exp_list
                 else:
                     edge = (src, int(s), dst)
-                    cls.dfa_dict[(src, dst)].append(edge)
+                    dfa_dict[(src, dst)].append(edge)
                     res.append(edge)
                     edge_ordinals[edge] = exp_list
 
@@ -2661,7 +2587,7 @@ class ragel_dfa_utils(common_dfa_utils):
                 out_id = create_id_list(out_cache[identity].re_tree)
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
-                for (src, dst), dfa_list in cls.dfa_dict.items():
+                for (src, dst), dfa_list in dfa_dict.items():
                     if len(dfa_list) > 1:
                         
                         edge_syms = [sym for (e_src, sym, e_dst) in dfa_list]
@@ -2676,7 +2602,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-                                cls.dfa_dict[(src, dst)] = [identity]
+                                dfa_dict[(src, dst)] = [identity]
                                 continue
 
                         elif edge_syms == in_id:
@@ -2688,7 +2614,7 @@ class ragel_dfa_utils(common_dfa_utils):
 
                                 res.append(new_edge)
                                 edge_ordinals[new_edge] = new_ord
-                                cls.dfa_dict[(src, dst)] = [identity]
+                                dfa_dict[(src, dst)] = [identity]
                                 continue
                             
                     res.extend(dfa_list)
@@ -2741,10 +2667,10 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     def get_edges(cls, dfa):
-        return cls._edges
+        return dfa.edges
 
     @classmethod
-    def get_edge_attributes(cls, dfa, edge):
+    def get_edge_attributes(cls, dfa, edge, in_list=None, out_list=None):
         assert len(edge) == 3
         src = edge[0]
         try:
@@ -2757,9 +2683,12 @@ class ragel_dfa_utils(common_dfa_utils):
             dst_num = int(dst)
         except:
             dst_num = None
-       
-        in_list = __in_re_tree_gen__.symbol_to_pred
-        out_list = __out_re_tree_gen__.symbol_to_pred
+
+        if not in_list:
+            in_list = __in_re_tree_gen__.symbol_to_pred
+        if not out_list:
+            out_list = __out_re_tree_gen__.symbol_to_pred
+
         sym = edge[1]
         if sym == 'IN_ID':
             typ = __in__
@@ -2781,11 +2710,12 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
+        #TODO(mina): fix
         return False
 
     @classmethod
     def get_num_states(cls, dfa):
-        return cls._state_num
+        return dfa.state_num
    
     @classmethod
     def get_dead_state(cls, dfa):
@@ -2804,7 +2734,7 @@ class ragel_dfa_utils(common_dfa_utils):
         return res
 
     @classmethod
-    def add_dead_edges(cls):
+    def add_dead_edges(cls, edges, state_num):
         """ Ragel doesn't add edges to dead states by default. Add those
         here. """
         state_edges = {}
@@ -2813,7 +2743,7 @@ class ragel_dfa_utils(common_dfa_utils):
         in_pred_symbols = __in_re_tree_gen__.symbol_to_pred.keys()
         out_pred_symbols = __out_re_tree_gen__.symbol_to_pred.keys()
         """ Determine edges currently in DFA, i.e., "non-dead" """
-        for edge in cls._edges:
+        for edge in edges:
             (s, p, d) = edge
             if s in state_edges:
                 state_edges[s].append(p)
@@ -2828,7 +2758,7 @@ class ragel_dfa_utils(common_dfa_utils):
             else:
                 raise RuntimeError("Outgoing pred must be at least of one\
                                     (in/out) type!")
-        dead = cls._state_num
+        dead = state_num
         """ Add dead edges. """
         for s in state_edges.keys():
             if state_type[s] == "in":
@@ -2838,17 +2768,17 @@ class ragel_dfa_utils(common_dfa_utils):
             state_symbols = set(state_edges[s])
             remaining_symbols = all_symbols - state_symbols
             for sym in remaining_symbols:
-                cls._edges.append((s, sym, dead))
+                edges.append((s, sym, dead))
         """ Add dead edges for accepting states (without outgoing transitions)
         too!! """
         dfa_states = set(state_edges.keys())
-        all_states = set(range(1, cls._state_num))
+        all_states = set(range(1, state_num))
         for s in all_states - dfa_states:
             for sym in in_pred_symbols + out_pred_symbols:
-                cls._edges.append((s, sym, dead))
+                edges.append((s, sym, dead))
 
     @classmethod
-    @stat.elapsed_time
+    @Stat.elapsed_time
     def regexes_to_dfa(cls, re_list):
         re_list = zip(range(len(re_list)), re_list)
         lex_input = cls.regex_to_ragel_format(re_list)
@@ -2872,28 +2802,29 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.cmd
             print e.output
         
-        (cls._accepting_states, cls._state_num) = cls.get_accepting_states(output)
+        (accepting_states, state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
-            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges_contracted(output)
+            (edges, edge_ordinal) = cls.get_extended_edges_contracted(output)
         else:
-            (cls._edges, cls._edge_ordinal) = cls.get_extended_edges(output)
+            (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
-        cls.add_dead_edges()
+        cls.add_dead_edges(edges, state_num)
        
-
+        print 'dfa stat count', state_num
         
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
+        dfa = ragel_dfa(state_num, accepting_states, None, edges, edge_ordinal)
         # TODO(Mina): avoid pickling as of now; fix later
         # leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
         #               __out_re_tree_gen__.get_leaf_pickles())
         
         # dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
         
-        return None
+        return dfa
 
 
 #############################################################################
@@ -2957,4 +2888,119 @@ def pickle_dump(policy):
     print type(policy)
     raise NotImplementedError
 
+#############################################################################
+###                    Compilation Sketch                                 ###
+#############################################################################
 
+class Sketch(object):
+    
+    def __init__(self, need_stat, name=None):
+        self.need_stat = need_stat
+        self.compiled = False
+        if not name:
+            self.name = self.get_def_name()
+        else:
+            self.name = name
+
+    def compile(self):
+        raise NotImplementedError
+
+    def netkat_compile(self, sw_cnt, outport=False):
+        if not self.need_stat:
+            return self.pol.netkat_compile(sw_cnt, outport)[0]
+        else:
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt, outport):\n\treturn pol.netkat_compile(sw_cnt, outport)' % (self.name)
+            exec(func_str)
+            func = locals()[self.name]
+            return func(self.pol, sw_cnt, outport) 
+
+    def get_def_name(self):
+        raise NotImplementedError
+
+    def __mul__(self, sketch):
+        return SequentalSketch(self, sketch, False)
+
+    def __pow__(self, sketch):
+        return SequentalSketch(self, sketch, True)
+
+    def __div__(self, sketch):
+        return ParallelSketch(self, sketch, False)
+
+    def __floordiv__(self, sketch):
+        return ParallelSketch(self, sketch, True)
+
+
+    
+class SketchCombinator(Sketch):
+
+    def __init__(self, s1, s2, need_stat, name=None):
+        self.s1 = s1
+        self.s2 = s2
+        self.pol1 = s1.pol
+        self.pol2 = s2.pol
+        super(SketchCombinator, self).__init__(need_stat, name)
+    
+    def compile(self, pol, func_str):
+        res = None
+
+        c1 = self.s1.compile()
+        c2 = self.s2.compile()
+        
+        if self.compiled or not self.need_stat:
+            res = pol.compile()
+        else:
+            exec(func_str)
+            func = locals()[self.name]
+            res = func(c1, c2)
+            pol._classifier = res
+        self.compiled = True
+        return res
+
+class SequentalSketch(SketchCombinator):
+    
+    def __init__(self, s1, s2, need_stat, name=None):
+        super(SequentalSketch, self).__init__(s1, s2, need_stat, name)
+        self.pol = self.pol1 >> self.pol2
+
+    def compile(self):
+        func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 >> c2' % self.name
+        return super(SequentalSketch, self).compile(self.pol, func_str)
+    
+    def get_def_name(self):
+        return self.s1.name + "__seq__" + self.s2.name
+
+class ParallelSketch(SketchCombinator):
+    
+    def __init__(self, s1, s2, need_stat, name=None):
+        super(ParallelSketch, self).__init__(s1, s2, need_stat, name)
+        self.pol = self.pol1 + self.pol2
+
+    def compile(self):
+        func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(c1, c2):\n\treturn c1 + c2' % self.name
+        return super(ParallelSketch, self).compile(self.pol, func_str)
+
+    def get_def_name(self):
+        return self.s1.name + "__par__" + self.s2.name
+
+class LeafSketch(Sketch):
+
+    def __init__(self, name, pol, need_stat=True):
+        self.def_name = name
+        self.pol = pol
+        super(LeafSketch, self).__init__(need_stat, name)
+
+    def compile(self):
+        res = None
+        if self.compiled or not self.need_stat:
+            res =  self.pol.compile()
+        else:
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol):\n\treturn pol.compile()' % self.name
+            exec(func_str)
+            func = locals()[self.name]
+            res = func(self.pol) 
+
+        self.compiled = True
+        return res
+    
+    def get_def_name(self):
+        return self.def_name

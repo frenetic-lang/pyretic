@@ -42,7 +42,7 @@ import logging
 from multiprocessing import Queue, Process
 import pyretic.core.util as util
 import yappi
-from pyretic.evaluations import stat
+from pyretic.evaluations.stat import Stat
 import shlex
 
 of_client = None
@@ -69,7 +69,7 @@ def signal_handler(signal, frame):
     
     global eval_profile_enabled
     if eval_profile_enabled:
-        stat.stop()
+        Stat.stop()
 
     sys.exit(0)
 
@@ -126,9 +126,12 @@ def parseArgs():
     op.add_option('--enable_ragel', '-r', action="store_true",
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')
-    op.add_option('--enable_partition', '-s', type = int,
-                    dest = 'switch_cnt',
+    op.add_option('--enable_partition', '-a', action = "store_true",
+                    dest = 'partition_enabled',
                     help = 'enable partition optimization')
+    op.add_option('--switch_count', '-s', type = int,
+                    dest = 'switch_cnt',
+                    help = 'The expected number of switches, used for offline analysis')
     op.add_option('--enable_cache', '-c', action = "store_true",
                     dest = 'cache_enabled',
                     help = 'enable cache optimization')
@@ -141,8 +144,9 @@ def parseArgs():
     op.set_defaults(frontend_only=False, mode='proactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
-                    ragel_enabled=False, switch_cnt=None,
-                    cache_enabled=False, edge_contraction_enabled=False,
+                    ragel_enabled=False, partition_enabled=False, 
+                    switch_cnt=None, cache_enabled=False, 
+                    edge_contraction_enabled=False,
                     nx=False, use_pyretic=False)
 
     options, args = op.parse_args()
@@ -227,7 +231,7 @@ def main():
     if options.eval_result_path:
         global eval_profile_enabled
         eval_profile_enabled = True
-        stat.start(options.eval_result_path)
+        Stat.start(options.eval_result_path)
 
     """ Start the frenetic compiler-server """
     if not options.use_pyretic and options.mode == 'proactive0':
@@ -243,8 +247,9 @@ def main():
     """ Start the runtime. """
     opt_flags_arg = (options.disjoint_enabled, options.default_enabled,
                      options.integrate_enabled, options.multitable_enabled,
-                     options.ragel_enabled, options.switch_cnt,
-                     options.cache_enabled, options.edge_contraction_enabled)
+                     options.ragel_enabled, options.partition_enabled,
+                     options.switch_cnt, options.cache_enabled, 
+                     options.edge_contraction_enabled)
     runtime = Runtime(Backend(),main,path_main,kwargs,
                       mode=options.mode, verbosity=options.verbosity,
                       opt_flags=opt_flags_arg, use_nx=options.nx,
