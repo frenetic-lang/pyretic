@@ -53,7 +53,7 @@ def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err,
     if not "PYTHONPATH" in py_env:
         py_env["PYTHONPATH"] = pythonpath
 
-    cmd = ("pyretic.py -m p0 " + pyopts + ' ' +
+    cmd = ("python pyretic.py -m p0 " + pyopts + ' ' +
            "pyretic.examples." + ctlr_name + ' ' +
            reduce(lambda r, k: r + ("--" + k + "=" + ctlr_params[k] + " "),
                   ctlr_params.keys(), " "))
@@ -245,7 +245,8 @@ def test_bucket_single_test():
     c_name   = args.ctlr
     c_outfile = adjust_path("pyretic-stdout.txt")
     c_errfile = adjust_path("pyretic-stderr.txt")
-    pypath = "/home/mininet/pyretic:/home/mininet/mininet:/home/mininet/pox"
+    usern = subprocess.call('./pyretic/tests/get_user.sh')
+    pypath = "/home/%s/pyretic:/home/%s/mininet:/home/%s/pox" % ((usern,)*3)
     (ctlr, c_out, c_err) = pyretic_controller(c_name, c_params, c_outfile,
                                               c_errfile, pypath, pyopts)
 
