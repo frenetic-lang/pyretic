@@ -534,7 +534,7 @@ class Packet(object):
     def __repr__(self):
         import hashlib
         fixed_fields = {}
-        fixed_fields['location'] = ['switch', 'inport', 'outport']
+        fixed_fields['location'] = ['switch', 'port']
         fixed_fields['vlocation'] = ['vswitch', 'vinport', 'voutport']
         fixed_fields['source']   = ['srcip', 'srcmac']
         fixed_fields['dest']     = ['dstip', 'dstmac']

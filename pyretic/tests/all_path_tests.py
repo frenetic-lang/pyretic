@@ -31,8 +31,11 @@ import sys
 
 num_passed = 0
 num_failed = 0
+num_greyed = 0
 failed_tests = []
 fails_counts = []
+greyed_tests = []
+greys_counts = []
 
 def single_path_test(fwding="static_fwding_chain_3_3",
                      query="path_test_0",
@@ -44,7 +47,8 @@ def single_path_test(fwding="static_fwding_chain_3_3",
                      success_file='pass-fail.txt',
                      test_nums="0",
                      interface_map="map_chain_3_3",
-                     tshark_slack_sec=10):
+                     tshark_slack_sec=10,
+                     capture_dir="inbound"):
 
     global fails_counts
     pyoptstr = "--pyopts='" + pyopts + "' " if pyopts else ''
@@ -60,7 +64,8 @@ def single_path_test(fwding="static_fwding_chain_3_3",
            "--test_nums=" + test_nums + ' ' +
            "--interface_map=" + interface_map + ' ' +
            pyoptstr +
-           "--tshark_slack_sec=" + str(tshark_slack_sec))
+           "--tshark_slack_sec=" + str(tshark_slack_sec) + ' ' +
+           "--capture_dir=" + capture_dir)
     test = subprocess.call(shlex.split(cmd))
     pf_file = os.path.join(results_folder, success_file)
     f = open(pf_file, 'r')
@@ -69,151 +74,204 @@ def single_path_test(fwding="static_fwding_chain_3_3",
     """ Remove pass-fail file, for next test. """
     cmd2 = ("rm -f %s" % pf_file)
     subprocess.call(shlex.split(cmd2))
-    if success_info != 'PASS':
-        print "--- Got success_info: ---"
+    if 'PASS' not in success_info:
+        print "--- Got failure_info: ---"
         print success_info
         fails_counts.append(success_info)
-    return success_info == 'PASS'
+        return "fail"
+    elif 'PASS' in success_info and success_info != 'PASS':
+        print "--- Got success_info: ---"
+        print success_info
+        greys_counts.append(success_info)
+        return "grey"
+    else:
+        return "pass"
 
-def bunched_path_tests(default_pyopts=''):
-    results_folder = './pyretic/evaluations/results'
-    success_file = 'pass-fail.txt'
+results_folder = './pyretic/evaluations/results'
+success_file = 'pass-fail.txt'
 
+def path_test_0_static_single_stage(default_pyopts, capture_dir):
     """ Path test 0 with static policy, single-stage """
     query = "path_test_0"
     fwding = "static_fwding_chain_3_3"
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_0',
+        tshark_filter_funs='filt_path_test_0_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='0', interface_map="map_chain_3_3")
+        test_nums='0', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_0_5_static_single_stage(default_pyopts, capture_dir):
     """ Path test 0.5 with static policy, single-stage """
     query = "path_test_0_5"
     fwding = "static_fwding_chain_3_3"
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_0_5',
+        tshark_filter_funs='filt_path_test_0_5_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='0.5', interface_map="map_chain_3_3")
+        test_nums='0.5', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_2_mac_learner_single_stage(default_pyopts, capture_dir):
     """ Path test 2 with mac learner, single-stage """
     query = "path_test_2"
     fwding = "mac_learner"
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_2',
+        tshark_filter_funs='filt_path_test_2_%s' % capture_dir,
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='2', interface_map="map_chain_3_3")
+        test_nums='2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
-    
+
+def path_test_3_static_single_stage(default_pyopts, capture_dir):
     """ Path test 3 with static policy, single-stage """
     query = "path_test_3"
     fwding = "static_fwding_chain_3_3"
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_1,filt_path_test_2',
+        tshark_filter_funs='filt_path_test_1_%s,filt_path_test_2_%s' % (
+            capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='1,2', interface_map="map_chain_3_3")
+        test_nums='1,2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_3_mac_learner_multistage(default_pyopts, capture_dir):
     """ Path test 3 with mac learner, multistage """
     query = "path_test_3"
     fwding = "mac_learner"
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_1,filt_path_test_2',
+        tshark_filter_funs='filt_path_test_1_%s,filt_path_test_2_%s' % (
+            capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='1,2', interface_map="map_chain_3_3")
+        test_nums='1,2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir):
     """ Waypoint violation with spanning tree 1, multistage """
     query = "path_test_waypoint_violation_general"
     fwding = "static_fwding_cycle_4_4_spanning_tree_1"
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_gwpv_st1',
+        tshark_filter_funs='filt_path_test_gwpv_st1_%s' % capture_dir,
         topo_name="CycleTopo", topo_args="4,4",
         results_folder=results_folder, success_file=success_file,
         test_nums='generalized_waypoint_violation',
-        interface_map="map_cycle_4_4", tshark_slack_sec=20)
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir):
     """ Waypoint violation with spanning tree 2, multistage """
     query = "path_test_waypoint_violation_general"
     fwding = "static_fwding_cycle_4_4_spanning_tree_2"
     pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_gwpv_st2',
+        tshark_filter_funs='filt_path_test_gwpv_st2_%s' % capture_dir,
         topo_name="CycleTopo", topo_args="4,4",
         results_folder=results_folder, success_file=success_file,
         test_nums='generalized_waypoint_violation',
-        interface_map="map_cycle_4_4", tshark_slack_sec=20)
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_23_static_single_stage(default_pyopts, capture_dir):
     """ Path test 23 single-stage, static policy """
     query = "path_test_23"
     fwding = "static_fwding_chain_3_3"
     pyopts = default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        tshark_filter_funs='filt_path_test_23_p1_static_%s,filt_path_test_23_p2_static_%s'
+        % (capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_23_static_multistage(default_pyopts, capture_dir):
     """ Path test 23 multi-stage, static policy """
     query = "path_test_23"
     fwding = "static_fwding_chain_3_3"
     pyopts = '%s --nx --pipeline=path_query_pipeline' % default_pyopts
     res = single_path_test(
         query=query, fwding=fwding, pyopts=pyopts,
-        tshark_filter_funs='filt_path_test_23_p1_static,filt_path_test_23_p2_static',
+        tshark_filter_funs='filt_path_test_23_p1_static_%s,filt_path_test_23_p2_static_%s'
+        % (capture_dir, capture_dir),
         topo_name="ChainTopo", topo_args="3,3",
         results_folder=results_folder, success_file=success_file,
-        test_nums='23.p1,23.p2', interface_map="map_chain_3_3")
+        test_nums='23.p1,23.p2', interface_map="map_chain_3_3",
+        capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def bunched_path_tests(default_pyopts='', capture_dir='outbound'):
+    path_test_0_static_single_stage(default_pyopts, capture_dir)
+    path_test_0_5_static_single_stage(default_pyopts, capture_dir)
+    path_test_2_mac_learner_single_stage(default_pyopts, capture_dir)
+    path_test_3_static_single_stage(default_pyopts, capture_dir)
+    path_test_3_mac_learner_multistage(default_pyopts, capture_dir)
+    waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir)
+    waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir)
+    path_test_23_static_single_stage(default_pyopts, capture_dir)
+    path_test_23_static_multistage(default_pyopts, capture_dir)
+
 def update_test_stats(query, fwding, pyopts, res):
-    global num_passed, num_failed, failed_tests
+    global num_passed, num_failed, failed_tests, num_greyed, greyed_tests
     test_name = "%s %s with options '%s'" % (query, fwding, pyopts)
-    if res:
+    if res == "pass":
         print "===== TEST %s PASSED =====" % test_name
         num_passed += 1
-    else:
+    elif res == "fail":
         print "===== TEST %s FAILED =====" % test_name
         failed_tests.append(test_name)
         num_failed += 1
+    elif res == "grey":
+        print "===== TEST %s AMBIGUOUS =====" % test_name
+        greyed_tests.append(test_name)
+        num_greyed += 1
+    else:
+        raise RuntimeError("single test result uninterpreted")
 
 def print_failed_tests():
-    print "Failed tests:"
-    assert len(failed_tests) == len(fails_counts)
-    for t in range(0, len(failed_tests)):
-        print failed_tests[t]
-        print fails_counts[t]
+    if len(failed_tests) > 0:
+        print "Failed tests:"
+        assert len(failed_tests) == len(fails_counts)
+        for t in range(0, len(failed_tests)):
+            print failed_tests[t]
+            print fails_counts[t]
+    if len(greyed_tests) > 0:
+        print "Ambiguous tests:"
+        assert len(greyed_tests) == len(greys_counts)
+        for t in range(0, len(greyed_tests)):
+            print greyed_tests[t]
+            print greys_counts[t]
 
 if __name__ == "__main__":
     bunched_path_tests(default_pyopts='')
-    bunched_path_tests(default_pyopts='-r -l')
+    bunched_path_tests(default_pyopts='-r')
     bunched_path_tests(default_pyopts='-r -l --use_pyretic')
     bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="
-    print "%d tests passed, %d failed" % (num_passed, num_failed)
-    if failed_tests:
+    print "%d tests passed, %d failed, %d ambiguous" % (
+        num_passed, num_failed, num_greyed)
+    if failed_tests or greyed_tests:
         print_failed_tests()

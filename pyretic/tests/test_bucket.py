@@ -40,6 +40,9 @@ from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
 from pyretic.evaluations.mininet_setup import mn_cleanup, wait_switch_rules_installed, get_abort_handler, get_adjust_path
 
+""" Threshold to check if ping reachability is "reasonable." """
+ping_drop_threshold_pc = 17
+
 def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err,
                        pythonpath, pyopts):
     c_outfile = open(c_out, 'w')
@@ -54,6 +57,7 @@ def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err,
            "pyretic.examples." + ctlr_name + ' ' +
            reduce(lambda r, k: r + ("--" + k + "=" + ctlr_params[k] + " "),
                   ctlr_params.keys(), " "))
+    print "Running controller command line:\n`%s`" % cmd
     c = subprocess.Popen(shlex.split(cmd), stdout=c_outfile, stderr=c_errfile,
                          env=py_env)
     return (c, c_outfile, c_errfile)
@@ -78,9 +82,20 @@ def capture_packets(t_out, t_err, ints_list, capture_dir):
     - ip dst for IP packets
     - ip src for ARP packets
     - ip dst for ARP packets
+    - interface where packet captured
     If more fields are needed, the command needs to be modified accordingly.
     """
-    cmd = ("tshark -f '" + capture_dir + " and net 10.0.0/24' -T fields " +
+    # Set up a capture filter suffix based on capture direction:
+    default_suffix = " and net 10.0.0/24"
+    if capture_dir == 'inbound':
+        cap_filter_suffix = default_suffix
+    else:
+        if 'any' in ints_list:
+            cap_filter_suffix = default_suffix
+        else:
+            cap_filter_suffix = ''
+    # Set up tshark command
+    cmd = ("tshark -f '" + capture_dir + cap_filter_suffix + "' -T fields " +
            "-e frame.len -e ip.src " +
            "-e ip.dst -e arp.src.proto_ipv4 -e arp.dst.proto_ipv4 " +
            "-e frame.interface_id " +
@@ -90,7 +105,9 @@ def capture_packets(t_out, t_err, ints_list, capture_dir):
     return (t, t_outfile, t_errfile)
 
 def workload(net, hosts):
-    net.pingAll()
+    """ Return the ping drop percentage when running an all-pairs-ping. """
+    drop_pc = net.pingAll()
+    return int(drop_pc)
 
 def get_tshark_counts(t_outfile, params, ctlr):
     filter_funs = params['filter_funs'].split(',')
@@ -252,7 +269,7 @@ def test_bucket_single_test():
 
     """ Workload """
     print "Starting workload..."
-    workload(net, hosts)
+    drop_pc = workload(net, hosts)
     time.sleep(test_duration_sec)
 
     """ Finish up """
@@ -271,7 +288,7 @@ def test_bucket_single_test():
     tshark_counts = get_tshark_counts(t_outfile, tshark_filter_params, c_name)
     buckets_counts = ctlr_counts(c_outfile, c_name)
     success_file = adjust_path(args.success_file)
-    write_passfail_info(success_file, tshark_counts, buckets_counts, c_name)
+    write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc, c_name)
 
 #### Helper functions #####
 
@@ -333,15 +350,18 @@ def close_fds(fds, fd_str):
         fd.close()
     print "Closed", fd_str, "file descriptors"
 
-def write_passfail_info(success_file, tshark_counts, buckets_counts, ctlr):
+def write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc, ctlr):
     if ctlr == 'bucket':
-        bucket_write_passfail_info(success_file, tshark_counts, buckets_counts)
+        bucket_write_passfail_info(success_file, tshark_counts, buckets_counts,
+                                   drop_pc)
     elif ctlr == 'path_query':
-        path_query_write_passfail_info(success_file, tshark_counts, buckets_counts)
+        path_query_write_passfail_info(success_file, tshark_counts,
+                                       buckets_counts, drop_pc)
     else:
         raise RuntimeError('unknown controller!')
 
-def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
+def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts,
+                               drop_pc):
     passfail = open(success_file, 'w')
     output_str = ''
     if set(tshark_counts.keys()) != set(buckets_counts.keys()):
@@ -358,13 +378,17 @@ def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts):
                 output_str += "Query: %s\n" % q
                 output_str += "TShark: %s\n" % str(tc)
                 output_str += "Bucket: %s\n" % str(bc)
+    # It's possible to use the ping drop percentage `drop_pc` for additional
+    # diagnostics to determine whether the test ran correctly. Argument left in
+    # place (but not used) if deemed necessary in future.
     if output_str == '':
         output_str += "PASS\n"
     print output_str
     passfail.write(output_str)
     passfail.close()
 
-def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
+def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts,
+                                   drop_pc):
     """ Write pass/fail information summary for this test. This function takes
     the following steps to determine if the output of the path query controller
     is acceptable.
@@ -395,8 +419,8 @@ def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
         for q in tshark_counts.keys():
             tc = tshark_counts[q]
             bc = buckets_counts[q]
-            (tc_total_pkts, tc_total_bytes) = tc.get('total', 0)
-            (bc_total_pkts, bc_total_bytes) = bc.get('total', 0)
+            (tc_total_pkts, tc_total_bytes) = tc.get('total', (0, 0))
+            (bc_total_pkts, bc_total_bytes) = bc.get('total', (0, 0))
             if tc_total_pkts != bc_total_pkts:
                 output_str += 'FAIL\n'
                 output_str += 'Query: %s\n' % q
@@ -440,7 +464,12 @@ def path_query_write_passfail_info(success_file, tshark_counts, buckets_counts):
                         output_str += 'Bucket: %d\n' % bc_pred_bytes
                         break
     if output_str == '':
-        output_str += 'PASS\n'
+        if drop_pc < ping_drop_threshold_pc:
+            output_str += 'PASS\n'
+        else:
+            output_str += 'PASS; %d%% pings dropped\n' % drop_pc
+    else:
+        output_str += '%d%% pings dropped\n' % drop_pc
     print output_str
     passfail.write(output_str)
     passfail.close()
@@ -544,10 +573,14 @@ def filt_test7(l):
     return pkt_srcip(ip1, l)
 
 ## Path Query test cases
-def filt_path_test_0(l):
+def filt_path_test_0_inbound(l):
     return pkt_interface('s2-eth3', l)
 
-def filt_path_test_0_5(l):
+def filt_path_test_0_outbound(l):
+    return (pkt_srcip(ip2, l) and
+            (pkt_interface('s2-eth1',l) or pkt_interface('s2-eth2',l)))
+
+def filt_path_test_0_5_inbound(l):
     return (pkt_srcip(ip2, l) or
             (pkt_srcip(ip1, l) and not pkt_interface('s1-eth2', l)) or
             (pkt_srcip(ip3, l) and not pkt_interface('s3-eth2', l)))
@@ -559,13 +592,24 @@ def filt_path_test_0_5(l):
     multiple hops, i.e., either S2 and S3 or S2 and S1, respectively.
     """
 
-def filt_path_test_1(l):
+def filt_path_test_0_5_outbound(l):
+    return (pkt_srcip(ip2, l) or
+            (pkt_srcip(ip1, l) and not pkt_interface('s1-eth1',l)) or
+            (pkt_srcip(ip3, l) and not pkt_interface('s3-eth1',l)))
+
+def filt_path_test_1_inbound(l):
     return pkt_srcip(ip1, l) and pkt_dstip(ip3, l) and pkt_interface('s3-eth1', l)
 
-def filt_path_test_2(l):
+def filt_path_test_1_outbound(l):
+    return pkt_srcip(ip1, l) and pkt_dstip(ip3, l) and pkt_interface('s3-eth2', l)
+
+def filt_path_test_2_inbound(l):
     return pkt_srcip(ip1, l) and pkt_interface('s3-eth1', l)
 
-def filt_path_test_gwpv_st1(l):
+def filt_path_test_2_outbound(l):
+    return pkt_srcip(ip1, l) and pkt_interface('s3-eth2', l)
+
+def filt_path_test_gwpv_st1_inbound(l):
     """filter function for generalized waypoint violation. This filter function only
     works with the static forwarding policy corresponding to spanning tree 1 (in
     path_query.py examples file).
@@ -587,7 +631,12 @@ def filt_path_test_gwpv_st1(l):
              ((pkt_interface('s3-eth1',l) or pkt_interface('s3-eth2',l)) and
               pkt_dstip(ip3,l))))
 
-def filt_path_test_gwpv_st2(l):
+def filt_path_test_gwpv_st1_outbound(l):
+    return ((not (pkt_srcip(ip4,l) or pkt_dstip(ip4,l))) and
+            (pkt_interface('s1-eth3',l) or pkt_interface('s2-eth3',l) or
+             pkt_interface('s3-eth3',l)))
+
+def filt_path_test_gwpv_st2_inbound(l):
     """filter function for generalized waypoint violation when the forwarding
     policy uses spanning_tree_2 (see path_query.py example file). Only traffic
     from h2 <-> h3 can escape the firewall S4 with this forwarding policy, so
@@ -599,15 +648,29 @@ def filt_path_test_gwpv_st2(l):
             (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
              pkt_interface('s2-eth2',l)))
 
-def filt_path_test_23_p1_static(l):
+def filt_path_test_gwpv_st2_outbound(l):
+    return ((pkt_srcip(ip2,l) and pkt_dstip(ip3,l) and
+             pkt_interface('s3-eth3',l)) or
+            (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
+             pkt_interface('s2-eth3',l)))
+
+def filt_path_test_23_p1_static_inbound(l):
     """ This filter only works for static fwding policy. """
     return (pkt_interface('s2-eth1', l) and
             pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
 
-def filt_path_test_23_p2_static(l):
+def filt_path_test_23_p1_static_outbound(l):
+    return (pkt_interface('s2-eth3', l) and
+            pkt_srcip(ip1,l) and pkt_dstip(ip2,l))
+
+def filt_path_test_23_p2_static_inbound(l):
     """ This filter only works for static fwding policy. """
     return (pkt_interface('s2-eth1', l) and
             pkt_srcip(ip1, l))
+
+def filt_path_test_23_p2_static_outbound(l):
+    return (pkt_srcip(ip1,l) and
+            (pkt_interface('s2-eth2',l) or pkt_interface('s2-eth3',l)))
 
 ### Interfaces map for packet capture ###
 def map_any():

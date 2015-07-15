@@ -113,7 +113,7 @@ def query_callback(test_num):
                 ac.predwise_byte_count = {}
 
         def get_count_key(pkt):
-            predwise_count_key = ['ethtype', 'srcip', 'dstip', 'switch', 'inport']
+            predwise_count_key = ['ethtype', 'srcip', 'dstip', 'switch', 'port']
             return util.frozendict({k: pkt[k] for k in predwise_count_key})
 
         def update_predwise_counts(pkt):
@@ -127,7 +127,7 @@ def query_callback(test_num):
         def get_key_str(pred):
             try:
                 out = "int:%s,ethtype:%s,srcip:%s,dstip:%s" % (
-                    "s%d-eth%d" % (pred['switch'], pred['inport']),
+                    "s%d-eth%d" % (pred['switch'], pred['port']),
                     "ip" if pred['ethtype']==2048 else "arp",
                     str(pred['srcip']), str(pred['dstip']))
             except KeyError:
@@ -295,13 +295,13 @@ def path_test_13():
     return p
 
 def path_test_14():
-    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
+    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['port']) ^
          atom(match(switch=3)))
     p.register_callback(query_callback(14))
     return p
 
 def path_test_15():
-    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['inport']) ^
+    p = (atom(match(switch=1)) ^ hook(match(switch=2), ['port']) ^
          hook(match(switch=3), ['srcip','dstip']))
     p.register_callback(query_callback(15))
     return p
@@ -428,12 +428,12 @@ def path_test_dynamic_1():
     return p
 
 def path_test_19():
-    p = out_atom(match(switch=1, outport=1))
+    p = out_atom(match(switch=1, port=1))
     p.register_callback(query_callback(19))
     return p
 
 def path_test_20():
-    p = in_out_atom(match(switch=2, inport=3), match(switch=2, outport=1))
+    p = in_out_atom(match(switch=2, port=3), match(switch=2, port=1))
     p.register_callback(query_callback(20))
     return p
 
@@ -450,15 +450,15 @@ def path_test_22():
     return p1 + p2
 
 def path_test_23():
-    p1 = in_atom(match(switch=1,inport=2)) ^ out_atom(match(switch=2,outport=3))
-    p2 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
+    p1 = in_atom(match(switch=1,port=2)) ^ out_atom(match(switch=2,port=3))
+    p2 = out_atom(match(switch=1,port=1)) ^ in_atom(match(switch=2,port=1))
     p1.register_callback(query_callback("23.p1"))
     p2.register_callback(query_callback("23.p2"))
     return p1 + p2
 
 def path_test_24():
-    p1 = out_atom(match(switch=1,outport=1)) ^ in_atom(match(switch=2,inport=1))
-    p2 = out_atom(match(switch=2,outport=1)) ^ in_atom(match(switch=1,inport=1))
+    p1 = out_atom(match(switch=1,port=1)) ^ in_atom(match(switch=2,port=1))
+    p2 = out_atom(match(switch=2,port=1)) ^ in_atom(match(switch=1,port=1))
     p1.register_callback(query_callback("24.p1"))
     p2.register_callback(query_callback("24.p2"))
     return p1 + p2

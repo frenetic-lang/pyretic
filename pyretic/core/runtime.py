@@ -179,10 +179,9 @@ class Runtime(object):
         self.policy in the runtime. This is done in update_switch_classifiers()
         and set_policy_map(), respectively.
         """
+        sketch = None
         if path_main:
             from pyretic.lib.path import LeafSketch
-
-            sketch = None
 
             forwarding = LeafSketch('forwarding', self.forwarding)
             vf_tag = LeafSketch('vf_tag', self.virtual_tag)
@@ -238,7 +237,9 @@ class Runtime(object):
                 if self.use_pyretic_compiler:
                     s[0].compile()
                 else:
+                    self.log.debug("starting to compile %s" % s[0].name)
                     s[0].netkat_compile(self.sw_cnt(), s[1])
+                    self.log.debug("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -404,7 +405,6 @@ class Runtime(object):
         c2 = self.forwarding.netkat_compile(self.sw_cnt(),
                                             force_compile=force_compile)[0]
         c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
-                                                outport=True,
                                                 force_compile=force_compile)[0]
         c4 = self.virtual_untag.compile()
         res = c0 >> c1 >> c2 >> c3 >> c4
@@ -435,11 +435,10 @@ class Runtime(object):
             else:
                 c = pol.compile()
         elif self.pipeline == 'path_query_pipeline':
-            use_outport = table > 2 # condition for "egress" stage in the pipeline
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                (c, t) = pol.netkat_compile(self.sw_cnt(), use_outport)
+                (c, t) = pol.netkat_compile(self.sw_cnt())
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")
@@ -650,7 +649,7 @@ class Runtime(object):
             actions = {}
             header_fields = set(concrete_pkt_out.keys()) | set(concrete_pkt_in.keys())
             for field in header_fields:
-                if field not in native_headers + ['outport']:
+                if field not in native_headers + ['port']:
                     continue
                 try:
                     in_val = concrete_pkt_in[field]
@@ -693,14 +692,14 @@ class Runtime(object):
         # Fallback "send to controller" rule under table miss
         self.install_rule(({'switch' : s},
                            TABLE_MISS_PRIORITY,
-                           [{'outport' : OFPP_CONTROLLER}],
+                           [{'port' : OFPP_CONTROLLER}],
                            self.get_cookie(self.default_cookie, table_id),
                            False,
                            table_id))
         # Send all LLDP packets to controller for topology maintenance
         self.install_rule(({'switch' : s, 'ethtype': LLDP_TYPE},
                            TABLE_START_PRIORITY + 2,
-                           [{'outport' : OFPP_CONTROLLER}],
+                           [{'port' : OFPP_CONTROLLER}],
                            self.get_cookie(self.default_cookie, table_id),
                            False,
                            table_id))
@@ -917,7 +916,7 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(diff_lists):
+        def bookkeep_buckets(diff_lists, table_id):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
@@ -942,7 +941,7 @@ class Runtime(object):
                                 bucket_list[id(act)] = act
                 return bucket_list
 
-            def update_rules_for_buckets(rule, op):
+            def update_rules_for_buckets(rule, op, table_id):
                 match = copy.copy(rule.mat)
                 """When running multi-stage table with nicira extensions, we remove
                 matches on outports. The flow stats reply matches don't come
@@ -956,7 +955,11 @@ class Runtime(object):
                 unaffected.
                 """
                 if self.use_nx:
-                    match.pop('outport', None)
+                    """If the rule is from the first table of the multi-stage pipeline, then retain
+                    the port match, else remove it.
+                    """
+                    if table_id != 0:
+                        match.pop('port', None)
                 priority = rule.priority
                 actions = rule.actions
                 version = rule.version
@@ -996,10 +999,10 @@ class Runtime(object):
                 all_rules = to_add + to_delete + to_modify + to_stay
                 bucket_list = collect_buckets(all_rules)
                 map(lambda x: x.start_update(), bucket_list.values())
-                map(lambda x: update_rules_for_buckets(x, "add"), to_add)
-                map(lambda x: update_rules_for_buckets(x, "delete"), to_delete)
-                map(lambda x: update_rules_for_buckets(x, "stay"), to_stay)
-                map(lambda x: update_rules_for_buckets(x, "modify"), to_modify)
+                map(lambda x: update_rules_for_buckets(x, "add", table_id), to_add)
+                map(lambda x: update_rules_for_buckets(x, "delete", table_id), to_delete)
+                map(lambda x: update_rules_for_buckets(x, "stay", table_id), to_stay)
+                map(lambda x: update_rules_for_buckets(x, "modify", table_id), to_modify)
                 map(lambda x: x.add_pull_stats(self.pull_stats_for_bucket(x)),
                     bucket_list.values())
                 map(lambda x: x.add_pull_existing_stats(
@@ -1092,11 +1095,11 @@ class Runtime(object):
                         return concrete_match
                 def concretize_action(a):
                     if a == Controller:
-                        return {'outport' : OFPP_CONTROLLER}
+                        return {'port' : OFPP_CONTROLLER}
                     elif isinstance(a,modify):
                         return { k:v for (k,v) in a.map.iteritems() }
                     elif self.use_nx and a == identity:
-                        return {'outport' : CUSTOM_NEXT_TABLE_PORT }
+                        return {'port' : CUSTOM_NEXT_TABLE_PORT }
                     else: # default
                         return a
                 m = concretize_match(rule.match)
@@ -1116,8 +1119,8 @@ class Runtime(object):
                 mode."""
                 new_acts = []
                 for act in acts:
-                    if not isinstance(act, Query) and not 'outport' in act:
-                        act['outport'] = CUSTOM_NEXT_TABLE_PORT
+                    if not isinstance(act, Query) and not 'port' in act:
+                        act['port'] = CUSTOM_NEXT_TABLE_PORT
                     new_acts.append(act)
                 return new_acts
             return Classifier([Rule(r.match,
@@ -1128,7 +1131,7 @@ class Runtime(object):
         def check_OF_rules(classifier):
             def check_OF_rule_has_outport(r):
                 for a in r.actions:
-                    if not 'outport' in a:
+                    if not 'port' in a:
                         raise TypeError('Invalid rule: concrete actions must have an outport',str(r))  
             def check_OF_rule_has_compilable_action_list(r):
                 if len(r.actions)<2:
@@ -1173,8 +1176,8 @@ class Runtime(object):
                 for action in new_actions:
                     try:
                         if not isinstance(action, CountBucket):
-                            if action['outport'] == outport:
-                                action['outport'] = OFPP_IN_PORT
+                            if action['port'] == outport:
+                                action['port'] = OFPP_IN_PORT
                     except:
                         raise TypeError  # INVARIANT: every set of actions must go out a port
                                          # this may not hold when we move to OF 1.3
@@ -1184,17 +1187,17 @@ class Runtime(object):
             for rule in classifier.rules:
                 phys_actions = filter(lambda a: (
                         not isinstance(a, CountBucket)
-                        and a['outport'] != OFPP_CONTROLLER
-                        and a['outport'] != OFPP_IN_PORT
-                        and a['outport'] != CUSTOM_NEXT_TABLE_PORT),
+                        and a['port'] != OFPP_CONTROLLER
+                        and a['port'] != OFPP_IN_PORT
+                        and a['port'] != CUSTOM_NEXT_TABLE_PORT),
                                       rule.actions)
-                outports_used = map(lambda a: a['outport'], phys_actions)
-                if not 'inport' in rule.match:
+                outports_used = map(lambda a: a['port'], phys_actions)
+                if not 'port' in rule.match:
                     # Add a modified rule for each of the outports_used
                     switch = rule.match['switch']
                     for outport in outports_used:
                         new_match = copy.deepcopy(rule.match)
-                        new_match['inport'] = outport
+                        new_match['port'] = outport
                         new_actions = specialize_actions(rule.actions,outport)
                         specialized_rules.append(Rule(new_match,new_actions,
                                                       parents=rule.parents,
@@ -1202,9 +1205,9 @@ class Runtime(object):
                     # And a default rule for any inport outside the set of outports_used
                     specialized_rules.append(rule)
                 else:
-                    if rule.match['inport'] in outports_used:
+                    if rule.match['port'] in outports_used:
                         # Modify the set of actions
-                        new_actions = specialize_actions(rule.actions,rule.match['inport'])
+                        new_actions = specialize_actions(rule.actions,rule.match['port'])
                         specialized_rules.append(Rule(rule.match,new_actions,
                                                       parents=rule.parents,
                                                       op=rule.op))
@@ -1507,7 +1510,7 @@ class Runtime(object):
         Stat.collect_stat('rule count', len(new_rules))
 
         diff_lists = get_diff_lists(new_rules)
-        bookkeep_buckets(diff_lists)
+        bookkeep_buckets(diff_lists, table_id)
         diff_lists = remove_buckets(diff_lists)
         
         self.log.debug('================================')
@@ -1641,8 +1644,7 @@ class Runtime(object):
         packet = get_packet_processor().unpack(raw_pkt['raw'])
         packet['raw'] = raw_pkt['raw']
         packet['switch'] = raw_pkt['switch']
-        packet['inport'] = raw_pkt['inport']
-        packet['outport'] = raw_pkt['outport']
+        packet['port'] = raw_pkt['port']
 
         def convert(h,val):
             if h in ['srcmac','dstmac']:
@@ -1660,7 +1662,7 @@ class Runtime(object):
         concrete_packet = {}
         headers         = {}
 
-        for header in ['switch','inport','outport']:
+        for header in ['switch', 'port']:
             try:
                 concrete_packet[header] = packet[header]
                 headers[header]         = packet[header]
@@ -1674,7 +1676,7 @@ class Runtime(object):
                 pass
         for header in packet.header:
             try:
-                if header in ['switch', 'inport', 'outport']: next
+                if header in ['switch', 'port']: next
                 val = packet[header]
                 headers[header] = val
             except:
@@ -1866,10 +1868,10 @@ class Runtime(object):
         for (s1, s2, ports) in switch_edges:
             p1 = ports[s1]
             p2 = ports[s2]
-            link_transfer_policy = ((match(switch=s1,outport=p1) >>
-                                     modify(switch=s2,inport=p2,outport=None)) +
-                                    (match(switch=s2,outport=p2) >>
-                                     modify(switch=s1,inport=p1,outport=None)))
+            link_transfer_policy = ((match(switch=s1,port=p1) >>
+                                     modify(switch=s2,port=p2)) +
+                                    (match(switch=s2,port=p2) >>
+                                     modify(switch=s1,port=p1)))
             if pol == drop:
                 pol = link_transfer_policy
             else:
@@ -1881,7 +1883,7 @@ class Runtime(object):
         for p in self.network.topology.egress_locations():
             sw_no = p.switch
             port_no = p.port_no
-            egress_match = match(switch=sw_no,outport=port_no)
+            egress_match = match(switch=sw_no,port=port_no)
             if pol == drop:
                 pol = egress_match
             else:

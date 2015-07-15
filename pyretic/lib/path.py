@@ -49,6 +49,7 @@ import pickle
 from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
+import logging
 
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
 TOKEN_END_VALUE = 0xFFFFFFFF 
@@ -156,7 +157,7 @@ class classifier_utils(object):
         matched_packets = drop
         for rule in pol_classifier.rules:
             fwd_actions = filter(lambda a: (isinstance(a, modify)
-                                         and a['outport'] != OFPP_CONTROLLER),
+                                         and a['port'] != OFPP_CONTROLLER),
                               rule.actions)
             if len(fwd_actions) > 0:
                 matched_packets += rule.match
@@ -1389,13 +1390,12 @@ class path_inters(path_combinator):
 
 class QuerySwitch(Policy):
 
-    def __init__(self, tag, policy_dic, default, outport = False):
+    def __init__(self, tag, policy_dic, default):
         #TODO (mina): add type checks
 
         self.tag = tag
         self.policy_dic = policy_dic
         self.default = default
-        self.outport_enabled = outport
 
     def eval(self, pkt):
         from pyretic.core.language import _match
@@ -1455,8 +1455,7 @@ class QuerySwitch(Policy):
         c = Classifier(final_rules)
         return c
     
-    def netkat_compile(self, switch_cnt, outport = False, print_json = False,
-                            force_compile = False):
+    def netkat_compile(self, switch_cnt):
         from pyretic.core.classifier import Rule, Classifier
         import time
         tot_time = 0
@@ -1480,8 +1479,7 @@ class QuerySwitch(Policy):
         final_rules = []
         for tag_value in self.policy_dic:
             tot_time += time.time() - t_s
-            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, self.outport_enabled, 
-                                                                print_json, force_compile)
+            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt)
             p_rules = p_class[0].rules
             tot_time += float(p_class[1])
             t_s = time.time()
@@ -1524,6 +1522,9 @@ class QuerySwitch(Policy):
 
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
+    log = logging.getLogger('%s.pathcomp' % __name__)
+    log.setLevel(logging.ERROR)
+
     @classmethod
     def __num_set_tag__(cls, num):
         if num == 0:
@@ -1684,9 +1685,12 @@ class pathcomp(object):
         out_cg.clear()
         
         ast_fold(path_pol, inv_trees, None)
+        
+        cls.log.debug('pred_part started')
         cls.pred_part(path_pol)        
 
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
+        cls.log.debug('compiling')
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
         return res
 
@@ -1845,7 +1849,7 @@ class pathcomp(object):
  
                 table_default = set([cls.__set_dead_state_tag__(du, dfa)])
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
-                out_table = QuerySwitch('path_tag', out_table_dic, table_default, True)
+                out_table = QuerySwitch('path_tag', out_table_dic, table_default)
                
                 return (in_table, out_table)
            
@@ -1895,7 +1899,7 @@ class pathcomp(object):
                      
                 tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
                 in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
-                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default, True)
+                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
                 
                 return (in_tagging, in_capture, out_tagging, out_capture)
 

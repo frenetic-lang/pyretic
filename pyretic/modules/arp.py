@@ -55,8 +55,7 @@ def send_arp(msg_type,network,switch,outport,srcip,srcmac,dstip,dstmac):
     rp = rp.modify(protocol=msg_type)
     rp = rp.modify(ethtype=ARP_TYPE)
     rp = rp.modify(switch=switch)
-    rp = rp.modify(inport=-1)
-    rp = rp.modify(outport=outport)
+    rp = rp.modify(port=outport)
     rp = rp.modify(srcip=srcip)
     rp = rp.modify(srcmac=srcmac)
     rp = rp.modify(dstip=dstip)
@@ -99,7 +98,7 @@ class arp(DynamicPolicy):
 
     def handle_arp(self,pkt):
         switch = pkt['switch']
-        inport = pkt['inport']
+        inport = pkt['port']
         srcip  = pkt['srcip']
         srcmac = pkt['srcmac']
         dstip  = pkt['dstip']

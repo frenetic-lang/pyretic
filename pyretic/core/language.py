@@ -55,7 +55,7 @@ basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstpor
                  "ethtype", "protocol"]
 tagging_headers = ["vlan_id", "vlan_pcp"]
 native_headers = basic_headers + tagging_headers
-location_headers = ["switch", "inport", "outport"]
+location_headers = ["switch", "port"]
 compilable_headers = native_headers + location_headers
 content_headers = [ "raw", "header_len", "payload_len"]
 
@@ -146,7 +146,7 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, outport=False, print_json=False,
+    def netkat_compile(self, switch_cnt, print_json=False,
                        force_compile=False):
         comp_t = 0
         nb = netkat_backend
@@ -154,7 +154,6 @@ class Policy(object):
             force_compile):
             (self._classifier, comp_t) = nb.generate_classifier(self,
                                                                 switch_cnt,
-                                                                outport,
                                                                 print_json)
         return (self._classifier, comp_t)
 
@@ -1487,7 +1486,7 @@ class fwd(DerivedPolicy):
     """
     def __init__(self, outport):
         self.outport = outport
-        super(fwd,self).__init__(modify(outport=self.outport))
+        super(fwd,self).__init__(modify(port=self.outport))
 
     def __repr__(self):
         return "fwd %s" % self.outport
@@ -1503,7 +1502,7 @@ class xfwd(DerivedPolicy):
     """
     def __init__(self, outport):
         self.outport = outport
-        super(xfwd,self).__init__((~match(inport=outport)) >> fwd(outport))
+        super(xfwd,self).__init__((~match(port=outport)) >> fwd(outport))
 
     def __repr__(self):
         return "xfwd %s" % self.outport
@@ -1613,44 +1612,38 @@ class flood(DynamicPolicy):
             return "flood"
 
 
-class ingress_network(DynamicFilter):
+class edge_network(DynamicFilter):
+    """
+    Returns True if a packet is located at a (switch,port) pair entering or
+    leaving the network, False otherwise.
+    """
+    def __init__(self):
+        self.egresses = None
+        super(edge_network,self).__init__()
+
+    def set_network(self, network):
+        updated_egresses = network.topology.egress_locations()
+        if not self.egresses == updated_egresses:
+            self.egresses = updated_egresses
+            self.policy = parallel([match(switch=l.switch,
+                                       port=l.port_no)
+                                 for l in self.egresses])
+
+
+class ingress_network(edge_network):
     """
     Returns True if a packet is located at a (switch,inport) pair entering
     the network, False otherwise.
     """
-    def __init__(self):
-        self.egresses = None
-        super(ingress_network,self).__init__()
-
-    def set_network(self, network):
-        updated_egresses = network.topology.egress_locations()
-        if not self.egresses == updated_egresses:
-            self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       inport=l.port_no)
-                                 for l in self.egresses])
-
     def __repr__(self):
         return "ingress_network"
 
 
-class egress_network(DynamicFilter):
+class egress_network(edge_network):
     """
     Returns True if a packet is located at a (switch,outport) pair leaving
     the network, False otherwise.
     """
-    def __init__(self):
-        self.egresses = None
-        super(egress_network,self).__init__()
-
-    def set_network(self, network):
-        updated_egresses = network.topology.egress_locations()
-        if not self.egresses == updated_egresses:
-            self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
-                                       outport=l.port_no)
-                                 for l in self.egresses])
-
     def __repr__(self):
         return "egress_network"
 

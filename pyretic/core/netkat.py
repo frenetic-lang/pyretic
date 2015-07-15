@@ -58,8 +58,7 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, outport = False,
-                            print_json=False):
+    def generate_classifier(cls, pol, switch_cnt, print_json=False):
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
             sent to netkat. This is because netkat generates a separate copy of
@@ -96,7 +95,7 @@ class netkat_backend(object):
             except subprocess.CalledProcessError:
                 print "error in calling frenetic"
 
-            cls = json_to_classifier(output, outport)
+            cls = json_to_classifier(output)
             if print_json:
                 cls.log().error("This is the json output:")
                 cls.log().error(str(output))
@@ -128,7 +127,7 @@ class netkat_backend(object):
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
                 sys.exit(0)
-            classifier = json_to_classifier(netkat_out, outport)
+            classifier = json_to_classifier(netkat_out)
             return (classifier, ctime)
 
         pol = use_explicit_switches(pol)
@@ -188,7 +187,7 @@ def physical(n):
 def header_val(h, v):
   if h == "switch":
     return mk_header("switch", v)
-  elif h == "inport" or h == "outport":
+  elif h == "port":
     return mk_header("location", physical(v))
   elif h == "srcmac":
     return mk_header("ethsrc", unethaddr(v))
@@ -313,7 +312,7 @@ def compile_to_netkat(pyretic_pol):
 field_map = {'dlSrc' : 'srcmac', 'dlDst': 'dstmac', 'dlTyp': 'ethtype', 
                 'dlVlan' : 'vlan_id', 'dlVlanPcp' : 'vlan_pcp',
                 'nwSrc' : 'srcip', 'nwDst' : 'dstip', 'nwProto' : 'protocol',
-                'tpSrc' : 'srcport', 'tpDst' : 'dstport', 'inPort' : 'inport'}
+                'tpSrc' : 'srcport', 'tpDst' : 'dstport', 'inPort' : 'port'}
 
 def create_match(pattern, switch_id):
     from pyretic.core.language import match
@@ -337,7 +336,7 @@ def create_match(pattern, switch_id):
         match_map['vlan_pcp'] = 0
     return match(**match_map)
 
-def create_action(action, inport):
+def create_action(action):
     from pyretic.core.language import (modify, Controller, identity)
     if len(action) == 0:
         return set()
@@ -362,7 +361,7 @@ def create_action(action, inport):
                     outout_seen = True
                     out_info = act[1]
                     if out_info['type'] == 'physical':
-                        mod_dict['outport'] = out_info['port']
+                        mod_dict['port'] = out_info['port']
                     elif out_info['type'] == 'controller':
                         res.add(Controller)
                     #elif out_info['type'] == 'inport' and inport is not None:
@@ -374,12 +373,8 @@ def create_action(action, inport):
             res.add(identity)
     return res
         
-def json_to_classifier(fname, outport = False):
+def json_to_classifier(fname):
     from pyretic.core.classifier import Rule, Classifier
-    if outport:
-        field_map['inPort'] = 'outport'
-    else:
-        field_map['inPort'] = 'inport'
     data = json.loads(fname)
     rules = []
     for sw_tbl in data:
@@ -387,10 +382,7 @@ def json_to_classifier(fname, outport = False):
         for rule in sw_tbl['tbl']:
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id)
-            inport = None
-            if 'inport' in m.map:
-                inport = m.map['inport']
-            action = create_action(rule['action'], inport)
+            action = create_action(rule['action'])
             rules.append( (prio, Rule(m, action, [None], "netkat")))
     #rules.sort()
     rules = [v for (k,v) in rules]

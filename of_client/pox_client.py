@@ -288,13 +288,11 @@ class POXClient(revent.EventMixin):
 
     def send_to_switch(self,packet):
         switch = packet["switch"]
-        outport = packet["outport"]
-        try:
-            inport = packet["inport"]
-            if inport == -1 or inport == outport:
-                inport = inport_value_hack(outport)
-        except KeyError:
-            inport = inport_value_hack(outport)
+        outport   = packet["port"]
+        # inport is unnecessary unless we are asking the switch to process the
+        # packet through a flow table. Since this is a direct packet-out through
+        # a switch interface, it's ok to set some garbage value here.
+        inport = inport_value_hack(outport)
         
         msg = of.ofp_packet_out()
         msg.in_port = inport
@@ -353,15 +351,18 @@ class POXClient(revent.EventMixin):
             match.tp_dst = pred['dstport']
         return match
 
-    def build_nx_match(self,switch,inport,outport,pred):
+    def build_nx_match(self,switch,inport,pred,table_id):
         ### BUILD NX MATCH
         match = nx.nx_match()
         if inport:
-            match.of_in_port = inport
-        if outport:
-            """ NXM_NX_REG2 is the per-packet metadata register where we store
-            the outport from previous tables' port-forwarding actions. """
-            match.reg2 = outport
+            if table_id == 0:
+                match.of_in_port = inport
+            else:
+                """NXM_NX_REG2 is the per-packet metadata register where we store the current
+                port value of the packet, including actions from previous tables' forwarding
+                actions.
+                """
+                match.reg2 = inport
 
         if 'srcmac' in pred:
             match.of_eth_src = packetaddr.EthAddr(pred['srcmac'])
@@ -412,8 +413,8 @@ class POXClient(revent.EventMixin):
         ### BUILD OF ACTIONS
         of_actions = []
         for actions in action_list:
-            outport = actions['outport']
-            del actions['outport']
+            outport = actions['port']
+            del actions['port']
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
             if 'dstmac' in actions:
@@ -450,8 +451,10 @@ class POXClient(revent.EventMixin):
         ctlr_outport = False # there is a controller outport action
         phys_outports = list() # list of physical outports to forward out of
         possibly_resubmit_next_table = False # should packet be passed on to next table?
+        atleast_one_action = False
 
         for actions in action_list:
+            atleast_one_action = True
             if 'srcmac' in actions:
                 of_actions.append(of.ofp_action_dl_addr.set_src(actions['srcmac']))
             if 'dstmac' in actions:
@@ -477,132 +480,116 @@ class POXClient(revent.EventMixin):
                 else:
                     of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
 
-            assert 'outport' in actions
-            outport = actions['outport']
+            assert 'port' in actions
+            outport = actions['port']
+
             if outport == of.OFPP_CONTROLLER:
                 ctlr_outport = True
             else:
                 """ There is either a physical output action (i.e., on a
                 non-controller port), or a "send to next table" action."""
                 possibly_resubmit_next_table = True
-                if (not inport is None) and outport == inport:
-                    phys_outports.append(of.OFPP_IN_PORT)
-                elif outport != CUSTOM_NEXT_TABLE_PORT:
+                if outport != CUSTOM_NEXT_TABLE_PORT:
                     phys_outports.append(outport)
-                else:
-                    """ No physical outports here; just a possibility of
-                    resubmitting to the next table. """
-                    assert outport == CUSTOM_NEXT_TABLE_PORT
-                    pass
+                """ Otherwise there are no physical outports; just a possibility
+                of resubmitting to the next table. Pass. """
 
-        """ First determine if there is a "next" table from here, or this is the
-        last one. This allows us to append actions appropriately since packet
-        modifications may need to wait until the final table, before sending
-        them out an outport. So, here's the basic approach:
+        """In general, actual packet forwarding may have to wait until the final table
+        in the pipeline. This means we must determine if there is a "next" table
+        that processes the packet from here, or if this is the last one.
 
-        (1) determine if a table is the last table along this chain of tables,
-        or there is a "next" table.
+        But first, the easy part. There are exactly three cases where a
+        forwarding table *will* in fact "immediately forward" a packet according
+        to the current rule (and all previous table stages that processed the
+        packet), without waiting for any other further processing:
 
-        (2) If there are more tables that still need to process the packet,
-        write the outport into a dedicated per-packet register, and resubmit the
-        packet to that table for processing.
+        (1) if the packet is dropped by the current rule,
+        (2) if the packet is forwarded to the controller port, or
+        (3) if this is the last stage of the pipeline.
 
-        (3) If this is the last table, output the packet on any output port that
-        may be specified in actions in the last table, and if there are no such
-        ports by the outport recorded in the per-packet dedicated register.
+        In the case of (1) and (2), packet forwarding may happen immediately and
+        only depend on the current rule. But in (3), the forwarding decision
+        must take the current rule as well as previous port changes into
+        account, as follows:
+
+        (a) if the current rule specifies an output port, forward the packet out
+        of that port.
+
+        (b) if the current rule does not specify an outport, then forward the
+        packet out of the port using the value stored in the dedicated
+        per-packet port register.
+
+        If neither of (1)-(3) above is true, then we take the following
+        approach:
+
+        (a) if there is an outport set by this rule, write that value into the
+        dedicated per-packet register that contains the current port the
+        packet is in.
+
+        (b) if there is no outport set by this rule, and if this is table id 0,
+        move the value of the inport into the dedicated per-packet port
+        register. This denotes that the packet is currently still on its inport.
+
+        (c) resubmit the packet to the "next" table (according to the pipeline).
         """
         exists_next_table = table_id in pipeline.edges
-        next_table = pipeline.edges[table_id] if exists_next_table else None
 
-        if ctlr_outport:
-            """ If rule sends packet to controller, this is the sole action. """
+        # Decide first on "immediate forwarding" conditions:
+        immediately_fwd = True
+        if not atleast_one_action: # (1) drop
+            of_actions = []
+        elif ctlr_outport: # (2) controller
             of_actions = []
             of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
-
-        elif possibly_resubmit_next_table and exists_next_table:
-            """ This isn't the last table, and either there is an explicit 'next
-            table' action in the rule or a physical outport that demands
-            forwarding in the last table along the pipeline.
-            """
-            if len(phys_outports) > 0:
-                """ Semantics: create a new copy of the packet for each value of
-                the physical outport specified in the action, and resubmit to
-                the next table as a brand new packet. The 'outport' is carried
-                along in a dedicated per-packet register, namely REG2.
-
-                This also means that earlier outport fields get overwritten by
-                fresh output actions in this table. This is consistent with the
-                sequential composition semantics, i.e.,
-
-                (port <- x) >> ((port <- y) + (port <- z))
-
-                results in two packets, which satisfy (respectively) the tests
-
-                port = y,
-
-                and
-
-                port = z,
-
-                but neither satisfy the test
-
-                port = x.
-                """
-                for p in phys_outports:
-                    of_actions.append(nx.nx_reg_load(dst=nx.NXM_NX_REG2,
-                                                     value=p, nbits=16))
-                    of_actions.append(nx.nx_action_resubmit.resubmit_table(
-                            table=next_table))
-            else:
-                """ Semantics: No physical outports on this table; but older
-                output actions may still be left to complete. Just resubmit to
-                next table. """
-                of_actions.append(nx.nx_action_resubmit.resubmit_table(
-                        table=next_table))
-
-        elif (not exists_next_table) and possibly_resubmit_next_table:
-            """ This case happens when this is the last table. There may or may
-            not be physical output actions on this table. If there are physical
-            output actions, use those to forward the packet. If not, use stored
-            outport information (in the per-packet register) to forward the
-            packet.
-            """
-            if len(phys_outports) > 0:
-                """ By semantics of sequential composition of tables, the latest
-                physical outports take priority over stored outport for
-                forwarding. """
+        elif possibly_resubmit_next_table and (not exists_next_table):
+            # (3) last stage of pipeline
+            if len(phys_outports) > 0: # fwd out of latest assigned ports
                 for p in phys_outports:
                     of_actions.append(of.ofp_action_output(port=p))
             else:
-                """ Forward using outport stored in the dedicated register. """
+                # fwd out of stored port value
                 of_actions.append(nx.nx_output_reg(reg=nx.NXM_NX_REG2,
                                                    nbits=16))
+        elif (not exists_next_table) and (not possibly_resubmit_next_table):
+            raise RuntimeError("Unexpected condition in multi-stage processing")
+        else: # must resubmit packet to subsequent tables for processing
+            immediately_fwd = False
 
-        elif (not possibly_resubmit_next_table):
-            """ This case happens if there aren't any actions in the action list
-            of this rule. By the semantics of sequential composition, this
-            packet should be dropped. Do nothing."""
-            pass
+        if immediately_fwd:
+            return of_actions
 
+        # Act on packet with knowledge that subsequent tables must process it
+        assert (possibly_resubmit_next_table and exists_next_table and
+                (not immediately_fwd))
+        next_table = pipeline.edges[table_id]
+        if len(phys_outports) > 0:
+            # move port register to latest assigned port values
+            for p in phys_outports:
+                of_actions.append(nx.nx_reg_load(dst=nx.NXM_NX_REG2,
+                                                 value=p, nbits=16))
+                of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                    table=next_table))
+        elif table_id == 0:
+            # move the inport value to reg2.
+            of_actions.append(nx.nx_reg_move(src=nx.NXM_OF_IN_PORT,
+                                             dst=nx.NXM_NX_REG2,
+                                             nbits=16))
+            of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                table=next_table))
         else:
-            raise RuntimeError("Unexpected condition on table flow!")
-
+            of_actions.append(nx.nx_action_resubmit.resubmit_table(
+                table=next_table))
         return of_actions
 
     def flow_mod_action(self,pred,priority,action_list,cookie,command,notify,table_id):
         switch = pred['switch']
-        """ Set inport from matching predicate """
-        if 'inport' in pred:
-            inport = pred['inport']
+        """ Set `inport` from matching predicate """
+        if 'port' in pred:
+            inport = pred['port']
         else:
             inport = None
-        """ Set outport from matching predicate """
-        if 'outport' in pred:
-            outport = pred['outport']
-        else:
-            outport = None
         if self.use_nx:
-            match = self.build_nx_match(switch,inport,outport,pred)
+            match = self.build_nx_match(switch,inport,pred,table_id)
         else:
             match = self.build_of_match(switch,inport,pred)
         if self.use_nx:
@@ -660,8 +647,8 @@ class POXClient(revent.EventMixin):
 
     def delete_flow(self,pred,priority):
         switch = pred['switch']
-        if 'inport' in pred:        
-            inport = pred['inport']
+        if 'port' in pred:
+            inport = pred['port']
         else:
             inport = None
         match = self.build_of_match(switch,inport,pred)
@@ -768,7 +755,7 @@ class POXClient(revent.EventMixin):
     def of_match_to_dict(self, m):
         h = {}
         if not m.in_port is None:
-            h["inport"] = m.in_port
+            h["port"] = m.in_port
         if not m.dl_src is None:
             h["srcmac"] = m.dl_src.toRaw()
         if not m.dl_dst is None:
@@ -1008,15 +995,21 @@ class POXClient(revent.EventMixin):
             assert isinstance(event.ofp, nx.nxt_packet_in)
             cookie = event.ofp.cookie
             reg2_entry = event.ofp.match.find(nx.NXM_NX_REG2)
+            """If the reg2 value is valid, it is not necessary that a policy set a port
+            field on this packet already. It might just be the inport on which
+            the packet came in, which was copied into the reg2 register. So, the
+            name of this raw_pkt field should rather be `port` as opposed to
+            `outport`.
+            """
             if reg2_entry:
-                outport = reg2_entry.value
+                port = reg2_entry.value
             else:
-                outport = None
+                port = event.ofp.in_port
         else:
             cookie = 0
-            outport = None
+            port = event.ofp.in_port
 
-        received = self.packet_from_network(switch=event.dpid, inport=event.ofp.in_port, raw=event.data, outport=outport)
+        received = self.packet_from_network(switch=event.dpid, port=port, raw=event.data)
         self.send_to_pyretic(['packet',received,cookie])
         
        
