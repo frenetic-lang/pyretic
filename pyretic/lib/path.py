@@ -180,15 +180,15 @@ class re_tree_gen(object):
     cache = {}
 
     @classmethod
-    def init(cls, switch_cnt = None, cache_enabled = False):
-        if switch_cnt is None:
+    def init(cls, switch_cnt = None, cache_enabled = False, partition_enabled = False):
+        if switch_cnt is None or not partition_enabled:
             cls.simple = True
         else:
             cls.simple = False
         
         cls.switch_cnt = switch_cnt
         cls.cache_enabled = cache_enabled
-
+    
     @classmethod
     def char_in_lexer_language(cls, char):
         return char in ['*', '%', '+', '(', ')', '<', '>',
@@ -1455,7 +1455,8 @@ class QuerySwitch(Policy):
         c = Classifier(final_rules)
         return c
     
-    def netkat_compile(self, switch_cnt, outport = False):
+    def netkat_compile(self, switch_cnt, outport = False, print_json = False,
+                            force_compile = False):
         from pyretic.core.classifier import Rule, Classifier
         import time
         tot_time = 0
@@ -1479,9 +1480,10 @@ class QuerySwitch(Policy):
         final_rules = []
         for tag_value in self.policy_dic:
             tot_time += time.time() - t_s
-            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, self.outport_enabled)
+            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, self.outport_enabled, 
+                                                                print_json, force_compile)
             p_rules = p_class[0].rules
-            tot_time += p_class[1]
+            tot_time += float(p_class[1])
             t_s = time.time()
             for r in p_rules:
                 new_match = r.match.intersect(match(**{self.tag : tag_value}))
@@ -1499,7 +1501,7 @@ class QuerySwitch(Policy):
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
         tot_time += time.time() - t_s
-        return (c, tot_time)
+        return (c, str(tot_time))
 
     def __repr__(self):
         res = ''
@@ -1636,7 +1638,7 @@ class pathcomp(object):
 
     @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
-             edge_contraction_enabled = False):
+             edge_contraction_enabled = False, partition_enabled = False):
         """ Initialize path-related structures, namely:
         - a new virtual field for path tag;
         - in and out character generators.
@@ -1645,7 +1647,7 @@ class pathcomp(object):
                       values=range(0, numvals),
                       type="integer")
        
-        re_tree_gen.init(switch_cnt, cache_enabled) 
+        re_tree_gen.init(switch_cnt, cache_enabled, partition_enabled) 
         __in_re_tree_gen__.clear()
         __out_re_tree_gen__.clear()
 
@@ -1680,16 +1682,12 @@ class pathcomp(object):
         
         in_cg.clear()
         out_cg.clear()
-
+        
         ast_fold(path_pol, inv_trees, None)
-        print 'pred_part started'
         cls.pred_part(path_pol)        
 
-        print 'generating re_list'
         (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
-        print 'compiling'
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
-         
         return res
 
     @classmethod
@@ -1963,7 +1961,6 @@ class pathcomp(object):
                                cls.__get_dead_state_pred__(du, dfa))
                 in_capture = drop
                 out_capture = drop
-                
                 """ Generate transition/accept rules from DFA """
                 for edge in edges:
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
@@ -2711,8 +2708,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
-        #TODO(mina): fix
-        return False
+        return q == cls.get_num_states(dfa)
 
     @classmethod
     def get_num_states(cls, dfa):
@@ -2809,10 +2805,10 @@ class ragel_dfa_utils(common_dfa_utils):
         else:
             (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
-        cls.add_dead_edges(edges, state_num)
+        #cls.add_dead_edges(edges, state_num)
        
-        print 'dfa stat count', state_num
-        
+        #print 'dfa stat count', state_num
+        #print 'dfa edge count', len(edges)  
         leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
                       __out_re_tree_gen__.get_leaf_preds())
        

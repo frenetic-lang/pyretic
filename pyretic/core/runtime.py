@@ -87,7 +87,6 @@ class Runtime(object):
 
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
-        print 'set flags'
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled)
@@ -109,36 +108,36 @@ class Runtime(object):
         if not offline:
             self.backend = backend
             self.backend.runtime = self
-        self.policy_lock = RLock()
-        self.network_lock = Lock()
-        self.switch_lock = Lock()
-        self.vlan_to_extended_values_db = {}
-        self.extended_values_to_vlan_db = {}
-        self.extended_values_lock = RLock()
-        self.dynamic_sub_pols = set()
-        self.in_network_update = False
-        self.in_bucket_apply = False
-        self.network_triggered_policy_update = False
-        self.bucket_triggered_policy_update = False
-        self.global_outstanding_queries_lock = Lock()
-        self.global_outstanding_queries = {}
-        self.last_queried_time_lock = Lock()
-        self.last_queried_time = {}
-        self.global_outstanding_deletes_lock = Lock()
-        self.global_outstanding_deletes = {}
-        self.manager = Manager()
-        self.old_rules_lock = Lock()
-        # self.old_rules = self.manager.list() # not multiprocess state anymore!
-        self.old_rules = []
-        self.update_rules_lock = Lock()
-        self.update_buckets_lock = Lock()
-        self.classifier_version_no = 0
-        self.classifier_version_lock = Lock()
-        self.default_cookie = 0
-        self.packet_in_time = 0
-        self.num_packet_ins = 0
-        self.update_dynamic_sub_pols()
-        self.total_packets_removed = 0 # pkt count from flow removed messages
+            self.policy_lock = RLock()
+            self.network_lock = Lock()
+            self.switch_lock = Lock()
+            self.vlan_to_extended_values_db = {}
+            self.extended_values_to_vlan_db = {}
+            self.extended_values_lock = RLock()
+            self.dynamic_sub_pols = set()
+            self.in_network_update = False
+            self.in_bucket_apply = False
+            self.network_triggered_policy_update = False
+            self.bucket_triggered_policy_update = False
+            self.global_outstanding_queries_lock = Lock()
+            self.global_outstanding_queries = {}
+            self.last_queried_time_lock = Lock()
+            self.last_queried_time = {}
+            self.global_outstanding_deletes_lock = Lock()
+            self.global_outstanding_deletes = {}
+            self.manager = Manager()
+            self.old_rules_lock = Lock()
+            # self.old_rules = self.manager.list() # not multiprocess state anymore!
+            self.old_rules = []
+            self.update_rules_lock = Lock()
+            self.update_buckets_lock = Lock()
+            self.classifier_version_no = 0
+            self.classifier_version_lock = Lock()
+            self.default_cookie = 0
+            self.packet_in_time = 0
+            self.num_packet_ins = 0
+            self.update_dynamic_sub_pols()
+            self.total_packets_removed = 0 # pkt count from flow removed messages
 
 ######################
 # Stat Methods 
@@ -199,7 +198,7 @@ class Runtime(object):
                     
                     sketch = [(in_table, False), (out_table, True), 
                                 (vf_tag, False), (vf_untag, True)]
-
+                    
                 else:
                     
                     in_tag = LeafSketch('in_tag', self.path_in_tagging)
@@ -239,9 +238,7 @@ class Runtime(object):
                 if self.use_pyretic_compiler:
                     s[0].compile()
                 else:
-                    print "starting to compile %s" % s.name
                     s[0].netkat_compile(self.sw_cnt(), s[1])
-                    print "done compiling %s" % s.name
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,
@@ -574,11 +571,10 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        print 'compiled query start'
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
                 self.ragel_enabled, self.partition_enabled)
-        print 'compile query end'
+        
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
@@ -2000,7 +1996,9 @@ class Runtime(object):
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS)
+            pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
+                            self.cache_enabled, self.edge_contraction_enabled
+                            ,self.partition_enabled)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()

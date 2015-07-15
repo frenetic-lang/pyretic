@@ -13,8 +13,9 @@ class Stat(object):
     ################
 
     ## result path ##
-    base_path = "/home/mininet/pyretic/pyretic/evaluations/"
-    results_path = '/home/mininet/pyretic/pyretic/evaluations/results/'
+    home_dir = os.path.expanduser('~')
+    base_path = os.path.join(home_dir, "pyretic/pyretic/evaluations/")
+    results_path = os.path.join(home_dir, 'pyretic/pyretic/evaluations/results/')
     ################
 
     ## tmp files ##
@@ -108,7 +109,7 @@ class Stat(object):
                 if fname not in cls.times:
                     cls.times[fname] = [] #ncalls, times
                 cls.times[fname].append(elapsed)
-            
+                #print fname, elapsed    
             return res
 
         return profiled_func
@@ -122,7 +123,7 @@ class Stat(object):
                 rule_map = rule.match.map
                 if 'switch' in rule_map:
                     s = rule_map['switch']
-                    if not s in res:
+                    if not s in switch_specific:
                         switch_specific[s] = 0
                     switch_specific[s] += 1
                 else:
@@ -155,7 +156,10 @@ class Stat(object):
                     mean_cnt = all_switches
                 
                 cls.classifiers[fname] = (len(res.rules), max_cnt, mean_cnt)
-                
+                #print fname, cls.classifiers[fname]
+                fi = open(os.path.join(cls.results_path, fname), 'w')
+                fi.write(str(res))
+                fi.close() 
             return res
 
         return profiled_func
