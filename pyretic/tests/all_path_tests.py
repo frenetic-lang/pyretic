@@ -28,6 +28,7 @@
 
 import subprocess, shlex, os
 import sys
+import argparse
 
 num_passed = 0
 num_failed = 0
@@ -36,6 +37,13 @@ failed_tests = []
 fails_counts = []
 greyed_tests = []
 greys_counts = []
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run all path query correctness tests.")
+    parser.add_argument('--testrun', action="store_true", dest="testrun",
+                        help="Run just one sample test to check")
+    return parser.parse_args()
 
 def single_path_test(fwding="static_fwding_chain_3_3",
                      query="path_test_0",
@@ -265,10 +273,14 @@ def print_failed_tests():
             print greys_counts[t]
 
 if __name__ == "__main__":
-    bunched_path_tests(default_pyopts='')
-    bunched_path_tests(default_pyopts='-r')
-    bunched_path_tests(default_pyopts='-r -l --use_pyretic')
-    bunched_path_tests(default_pyopts='--use_pyretic')
+    opts = parse_args()
+    if opts.testrun: # just run one test, to sample
+        path_test_0_static_single_stage('', 'outbound')
+    else: # run full suite of tests
+        bunched_path_tests(default_pyopts='')
+        bunched_path_tests(default_pyopts='-r')
+        bunched_path_tests(default_pyopts='-r -l --use_pyretic')
+        bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="
     print "%d tests passed, %d failed, %d ambiguous" % (

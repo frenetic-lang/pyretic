@@ -17,6 +17,16 @@ import pyretic.evaluations.stat
 #### setup functions
 ################################################################################
 
+def get_dpctl(sw_id):
+    try:
+        trial_cmd = subprocess.check_output(['dpctl', '--help'])
+        cmd = "dpctl dump-flows tcp:localhost:%d | grep -v cookie=0 | grep -v \
+               'stats_reply' | grep -v cookie=0 | wc -l" % sw_id
+    except OSError:
+        cmd = "ovs-ofctl dump-flows tcp:127.0.0.1:%d | grep -v cookie=0x0 | \
+               grep -v REPLY | grep -v cookie=0x0 | wc -l" % sw_id
+    return cmd
+
 def setup_network(test_module, params):
     topo_args = params.topo_args
     listen_port = params.listen_port
@@ -59,8 +69,7 @@ def report_rule_counts(switches, file_path):
     rule_cnt = {} 
     for s in switches:
         switch_num = int(s.name[1:])
-        rules = s.cmd("dpctl dump-flows tcp:localhost:%d | grep -v \
-                           'stats_reply' | grep -v cookie=0 | wc -l" % (6633 + switch_num))
+        rules = s.cmd(get_dpctl(6633 + switch_num))
         rules = int(rules)
         rule_cnt[s.name] = rules
 
@@ -123,8 +132,7 @@ def wait_switch_rules_installed(switches, wait_timeout=0):
         for s in switches:
             if not s in num_rules:
                 num_rules[s] = 0
-            rules = s.cmd("dpctl dump-flows tcp:localhost:%d | grep -v \
-                           'stats_reply' | grep -v cookie=0 | wc -l" %(6633 + int(s.name[1:])))
+            rules = s.cmd(get_dpctl(6633 + int(s.name[1:])))
             rules = int(rules)
             if not (rules == num_rules[s] and rules > 2): # not converged!
                 not_fully_installed = True
