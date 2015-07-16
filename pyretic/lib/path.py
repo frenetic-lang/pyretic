@@ -2712,7 +2712,8 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
-        return q == cls.get_num_states(dfa)
+        #TODO(mina): fix
+        return False
 
     @classmethod
     def get_num_states(cls, dfa):
