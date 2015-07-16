@@ -1,4 +1,4 @@
-from pyretic.lib.myeval import *
+from pyretic.lib.netflow import *
 from pyretic.core.language import *
 
 #some sample packets are below.

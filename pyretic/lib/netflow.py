@@ -1,3 +1,6 @@
+from pyretic.core.language import *
+from pyretic.core import util
+
 # assuming that we're in the general base case
 # TODO add lpm
 def innerEval(filt,pkt):
@@ -8,14 +11,13 @@ def innerEval(filt,pkt):
     else:
         for field, pattern in filt.map.iteritems():
             try:
-                v = pkt["header"][field]
                 if not field in ['srcip', 'dstip']:
-                    if pattern is None or pattern is not v:
+                    v = pkt["header"][field]
+                    if pattern is None or v != pattern:
                         return set()
                 else:
-                    #the line below will get fleshed out when I do lpm
-                    #v = util.string_to_IP(v)
-                    if pattern is None or not v in pattern:
+                    v = util.string_to_IP(pkt['header'][field])
+                    if pattern is None or v != pattern:
                         return set()
             except Exception, e:
                 print e
