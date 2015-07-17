@@ -177,7 +177,7 @@ def path_query_tshark_filter_count(t_outfile, filter_fun):
     else:
         bytes_fun = get_bytes_cooked_capture
     for line in t_out:
-        if filter_fun(line.strip()):
+        if net_10_0_0(line.strip()) and filter_fun(line.strip()):
             pred = get_key_str(line)
             (pkt_count, byte_count) = predwise_count.get(pred, (0, 0))
             predwise_count[pred] = (pkt_count + 1, byte_count + bytes_fun(line))
@@ -526,6 +526,11 @@ def pkt_dstip(target_ip, l):
 def pkt_interface(int_name, l):
     global ints_map
     return __get_interface_id(l) == ints_map[int_name]
+
+def net_10_0_0(l):
+    subnet = '10.0.0'
+    return (subnet in __get_ip_srcip(l) or subnet in __get_arp_srcip(l) or
+            subnet in __get_ip_dstip(l) or subnet in __get_arp_dstip(l))
 
 ### Filter functions to parse tshark output for various test cases ###
 ip1 = '10.0.0.1'
