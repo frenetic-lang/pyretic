@@ -1,5 +1,6 @@
 from pyretic.lib.netflow import *
 from pyretic.core.language import *
+import logging
 
 #some sample packets are below.
 p1 = {"header":{"srcmac":"00:0a:95:9d:68:16", "dstmac":"00:0a:95:9d:68:18", "srcip":"192.0.0.1", "dstip":"192.0.0.2", "tos":56, "srcport":8008, "dstport":9900, "ethtype":0x0800, "protocol":"tcp"},"pktcount":40,"bytecount":4000}
@@ -33,3 +34,10 @@ assert myEval(f10,p1) is p1 and myEval(f10,p2) is p2
 
 assert myEval(f1,p2) == myEval(f2,p1) == myEval(f3,p1) == myEval(f4,p1) == set()
 assert myEval(f6,p1) == myEval(f7,p2) == myEval(f8,p1) == myEval(f8,p2) == myEval(f9,p1) == set()
+
+# Test netflow bucket
+logging.basicConfig()
+nb = NetflowBucket()
+nb.start_nfcapd()
+nb.start_nfcapd()
+nb.kill_nfcapd()
