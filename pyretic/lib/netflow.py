@@ -6,6 +6,7 @@ import subprocess, shlex, threading, sys, logging, time
 NFCAPD_PORT = 12345
 SCRATCH_DATA_FOLDER = "pyretic/scratch/"
 PROCESS_SCRIPT = "pyretic/lib/helpers/process_netflow.sh"
+DORMANT_SHELL = "pyretic/lib/helpers/dormant_shell.sh"
 
 class NetflowBucket(Query):
     """
@@ -13,12 +14,16 @@ class NetflowBucket(Query):
     network switches.
     """
     nfcapd_proc  = None
+    cls_counter  = 0
 
     def __init__(self):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
         self.start_nfcapd()
         super(NetflowBucket, self).__init__()
+        t = threading.Thread(target=self.nf_callback, args=(self.test_cb, '', True))
+        t.daemon = True
+        t.start()
 
     def nfcapd_running(self):
         p = subprocess.Popen("ps ax | grep nfcapd | grep -v grep | wc -l",
@@ -49,6 +54,31 @@ class NetflowBucket(Query):
             cls.nfcapd_proc.terminate()
             self.log.info("Terminated process")
             cls.nfcapd_proc = None
+
+    def nf_callback(self, f, f_args, loop=False):
+        p = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
+        self.log.error("Started dormant bash process")
+        p.wait()
+        """ when thread execution reaches here, the dormant shell process has
+        been killed by nfcapd as it just produced a new file. We call the test
+        callback function with its arguments. """
+        self.log.error("Here after dormant shell finished")
+        f(f_args)
+        """ If "loop" is True, we start a new Thread which will do the same
+        thing that this function did. """
+        if loop:
+            t = threading.Thread(target=self.nf_callback,
+                                 args=(f, f_args, True))
+            t.daemon = True
+            t.start()
+        return
+
+    def test_cb(self, cb_args):
+        """ A test callback function, for now. Soon to be replaced by
+        application-registered callbacks. """
+        self.__class__.cls_counter += 1
+        print "Test callback called:"
+        print cb_args, self.__class__.cls_counter
 
 # assuming that we're in the general base case
 # TODO add lpm

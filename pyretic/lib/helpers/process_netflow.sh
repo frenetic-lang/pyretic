@@ -9,6 +9,7 @@
 # a python thread) a python callback function that a new output file has
 # arrived.
 
+echo "Processing triggers from nfcapd file output..."
 cat $1 | nfdump > pyretic/scratch/latest-dump.txt
 kill `ps ax | grep 'bash pyretic/lib/helpers/dormant_shell.sh' | grep -v grep | awk '{print $1}'`
 

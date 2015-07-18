@@ -1,6 +1,6 @@
 from pyretic.lib.netflow import *
 from pyretic.core.language import *
-import logging
+import logging, time
 
 #some sample packets are below.
 p1 = {"header":{"srcmac":"00:0a:95:9d:68:16", "dstmac":"00:0a:95:9d:68:18", "srcip":"192.0.0.1", "dstip":"192.0.0.2", "tos":56, "srcport":8008, "dstport":9900, "ethtype":0x0800, "protocol":"tcp"},"pktcount":40,"bytecount":4000}
@@ -40,4 +40,5 @@ logging.basicConfig()
 nb = NetflowBucket()
 nb.start_nfcapd()
 nb.start_nfcapd()
+time.sleep(300)
 nb.kill_nfcapd()
