@@ -40,5 +40,8 @@ logging.basicConfig()
 nb = NetflowBucket()
 nb.start_nfcapd()
 nb.start_nfcapd()
-time.sleep(300)
+try:
+    time.sleep(120)
+except KeyboardInterrupt:
+    print "Killing netflow test."
 nb.kill_nfcapd()
