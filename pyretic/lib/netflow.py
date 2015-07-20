@@ -4,9 +4,11 @@ from pyretic.lib.query import Query
 import subprocess, shlex, threading, sys, logging, time
 
 NFCAPD_PORT = 12345
+NFCAPD_INTERVAL = 10 # period before producing a new output file
 SCRATCH_DATA_FOLDER = "pyretic/scratch/"
 PROCESS_SCRIPT = "pyretic/lib/helpers/process_netflow.sh"
 DORMANT_SHELL = "pyretic/lib/helpers/dormant_shell.sh"
+NETFLOW_OUTFILE = "pyretic/scratch/latest-dump.txt"
 
 class NetflowBucket(Query):
     """
@@ -15,13 +17,14 @@ class NetflowBucket(Query):
     """
     nfcapd_proc  = None
     cls_counter  = 0
+    callbacks = []
 
     def __init__(self):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
         self.start_nfcapd()
         super(NetflowBucket, self).__init__()
-        t = threading.Thread(target=self.nf_callback, args=(self.test_cb, 'test', True))
+        t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
         t.daemon = True
         t.start()
 
@@ -40,8 +43,9 @@ class NetflowBucket(Query):
     def start_nfcapd(self):
         cls = self.__class__
         if not self.nfcapd_running():
-            nfcapd_cmd  = "nfcapd -p %d -l %s -t 60 -x 'bash %s %%d%%f'" % (
-                NFCAPD_PORT, SCRATCH_DATA_FOLDER, PROCESS_SCRIPT)
+            nfcapd_cmd  = "nfcapd -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
+                NFCAPD_PORT, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
+                PROCESS_SCRIPT)
             cls.nfcapd_proc = subprocess.Popen(nfcapd_cmd, shell=True)
             self.log.info("Started new nfcapd daemon")
         else:
@@ -65,20 +69,33 @@ class NetflowBucket(Query):
         """ If "loop" is True, we start a new Thread which will do the same
         thing that this function did. """
         if loop:
+            self.log.debug("restarting a new thread for nf_callback")
             t = threading.Thread(target=self.nf_callback,
                                  args=(f, f_args, True))
             t.daemon = True
             t.start()
         return
 
-    def test_cb(self, cb_args):
-        """ A test callback function, for now. Soon to be replaced by
-        application-registered callbacks. """
-        self.__class__.cls_counter += 1
-        print "Test callback called:"
-        print cb_args, self.__class__.cls_counter
-        print ("Auxiliary processing of netflow outputs and calling "
-               "application callbacks can be done from this point." )
+    def process_results(self, fname):
+        """ TODO(ngsrinivas): do some basic processing of the netflow results. """
+        f = open(fname, 'r')
+        res = f.read()
+        f.close()
+        return res
+
+    def handle_nf(self, nf_args):
+        """ A callback function which gets invoked whenever nfcapd produces an
+        output file. nf_args is disregarded for now. """
+        cls = self.__class__
+        cls.cls_counter += 1
+        self.log.debug("Calling handle_nf %d'th time" % cls.cls_counter)
+        res = self.process_results(NETFLOW_OUTFILE)
+        for f in cls.callbacks:
+            f(res)
+
+    def register_callback(self, fn):
+        cls = self.__class__
+        cls.callbacks.append(fn)
 
 # assuming that we're in the general base case
 # TODO add lpm

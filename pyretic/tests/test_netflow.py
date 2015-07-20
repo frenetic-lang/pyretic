@@ -36,12 +36,18 @@ assert myEval(f1,p2) == myEval(f2,p1) == myEval(f3,p1) == myEval(f4,p1) == set()
 assert myEval(f6,p1) == myEval(f7,p2) == myEval(f8,p1) == myEval(f8,p2) == myEval(f9,p1) == set()
 
 # Test netflow bucket
+def nf_callback_fn(res):
+    print "This is a netflow bucket callback function. I got results:"
+    print res
+
 logging.basicConfig()
 nb = NetflowBucket()
+nb.register_callback(nf_callback_fn)
 nb.start_nfcapd()
 nb.start_nfcapd()
 try:
-    time.sleep(120)
+    time.sleep(300)
 except KeyboardInterrupt:
     print "Killing netflow test."
 nb.kill_nfcapd()
+print "Test complete"
