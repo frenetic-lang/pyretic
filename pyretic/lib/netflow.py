@@ -21,16 +21,33 @@ class NetflowBucket(Query):
     cls_counter  = 0
     callbacks = []
 
-    def __init__(self, cap_type="netflow"):
+    def __init__(self, cap_type="netflow", start_fcapd=True):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
+        self.runtime_sw_cnt_fun = None
         assert cap_type in ["netflow", "sflow"]
         proc = "nfcapd" if cap_type == "netflow" else "sfcapd"
-        self.start_fcapd(proc)
+        if start_fcapd:
+            self.start_fcapd(proc)
         super(NetflowBucket, self).__init__()
         t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
         t.daemon = True
         t.start()
+        self._classifier = self.generate_classifier()
+
+    def generate_classifier(self):
+        return Classifier([Rule(identity, {self}, [self])])
+
+    def apply(self):
+        with self.bucket_lock:
+            for pkt in self.bucket:
+                self.log.info("In NetflowBucket apply(): packet is:\n"
+                              + str(pkt))
+                self.log.info("NetflowBucket has no eval action.")
+            self.bucket.clear()
+
+    def set_sw_cnt_fun(self, fun):
+        self.runtime_sw_cnt_fun = fun
 
     def fcapd_running(self, daemon_proc):
         p = subprocess.Popen("ps ax | grep %s | grep -v grep | wc -l" %
@@ -129,6 +146,9 @@ class NetflowBucket(Query):
     def register_callback(self, fn):
         cls = self.__class__
         cls.callbacks.append(fn)
+
+    def __repr__(self):
+        return "NetflowBucket %d" % id(self)
 
 # assuming that we're in the general base case
 # TODO add lpm
