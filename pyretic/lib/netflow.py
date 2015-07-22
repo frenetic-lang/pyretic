@@ -150,6 +150,9 @@ class NetflowBucket(Query):
     def __repr__(self):
         return "NetflowBucket %d" % id(self)
 
+    def __eq__(self, other):
+        return isinstance(other, NetflowBucket)
+
 # assuming that we're in the general base case
 # TODO add lpm
 def innerEval(filt,pkt):

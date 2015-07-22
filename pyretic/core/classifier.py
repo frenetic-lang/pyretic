@@ -131,11 +131,13 @@ def _commute_test(act, pkts):
     from pyretic.core.language import (match, modify, drop, identity,
                                        Controller, CountBucket,
                                        DerivedPolicy, PathBucket)
+    from pyretic.lib.netflow import NetflowBucket
     while isinstance(act, DerivedPolicy):
         act = act.policy
     if act == identity:
         return pkts
-    elif (act == Controller or isinstance(act, PathBucket)):
+    elif (act == Controller or isinstance(act, PathBucket) or
+          isinstance(act, NetflowBucket)):
         return identity
     elif isinstance(act, CountBucket):
         """ TODO(ngsrinivas): inspect which possibility is best """
@@ -166,11 +168,12 @@ def _sequence_actions(a1, as2):
     from pyretic.core.language import (match, modify, drop, identity,
                                        Controller, CountBucket,
                                        DerivedPolicy, PathBucket)
+    from pyretic.lib.netflow import NetflowBucket
     while isinstance(a1, DerivedPolicy):
         a1 = a1.policy
     # TODO: be uniform about returning copied or modified objects.
     if (a1 == Controller or isinstance(a1, CountBucket) or 
-        isinstance(a1, PathBucket)):
+        isinstance(a1, PathBucket) or isinstance(a1, NetflowBucket)):
         return {a1}
     elif a1 == identity:
         return copy.copy(as2)
@@ -180,7 +183,7 @@ def _sequence_actions(a1, as2):
             while isinstance(a2, DerivedPolicy):
                 a2 = a2.policy
             if (a2 == Controller or isinstance(a2, CountBucket) or
-                isinstance(a2, PathBucket)):
+                isinstance(a2, PathBucket) or isinstance(a2, NetflowBucket)):
                 new_actions.add(a2)
             elif a2 == identity:
                 new_actions.add(a1)
