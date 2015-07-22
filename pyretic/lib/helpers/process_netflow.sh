@@ -9,5 +9,5 @@
 # a python thread) a python callback function that a new output file has
 # arrived.
 
-cat $1 | nfdump -A router,proto,srcip,dstip,srcport,dstport,srcvlan,dstvlan,insrcmac,outdstmac | head -n -4 | tail -n +2 > pyretic/scratch/latest-dump.txt
+cat $1 | nfdump -A router,proto,srcip,dstip,srcport,dstport,srcvlan,dstvlan,insrcmac,outdstmac,inif,outif | head -n -4 | tail -n +2 > pyretic/scratch/latest-dump.txt
 kill `ps ax | grep 'bash pyretic/lib/helpers/dormant_shell.sh' | grep -v grep | awk '{print $1}'`
