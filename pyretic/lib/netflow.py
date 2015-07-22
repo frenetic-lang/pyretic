@@ -16,20 +16,23 @@ class NetflowBucket(Query):
     network switches.
     """
     nfcapd_proc  = None
+    sfcapd_proc  = None
     cls_counter  = 0
     callbacks = []
 
-    def __init__(self):
+    def __init__(self, capd="netflow"):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
-        self.start_nfcapd()
+        assert capd in ["netflow", "sflow"]
+        self.start_fcapd(capd)
         super(NetflowBucket, self).__init__()
         t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
         t.daemon = True
         t.start()
 
-    def nfcapd_running(self):
-        p = subprocess.Popen("ps ax | grep nfcapd | grep -v grep | wc -l",
+    def fcapd_running(self, daemon_proc):
+        p = subprocess.Popen("ps ax | grep %s | grep -v grep | wc -l" %
+                             daemon_proc,
                              shell=True, stdout=subprocess.PIPE)
         lines = p.stdout.read()
         p.stdout.close()
@@ -40,23 +43,46 @@ class NetflowBucket(Query):
         else:
             return False
 
-    def start_nfcapd(self):
+    def nfcapd_running(self):
+        self.fcapd_running("nfcapd")
+
+    def sfcapd_running(self):
+        self.fcapd_running("sfcapd")
+
+    def start_fcapd(self, daemon_proc):
         cls = self.__class__
         if not self.nfcapd_running():
-            nfcapd_cmd  = "nfcapd -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
-                NFCAPD_PORT, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
+            nfcapd_cmd  = "%s -T all -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
+                daemon_proc, NFCAPD_PORT, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
                 PROCESS_SCRIPT)
             cls.nfcapd_proc = subprocess.Popen(nfcapd_cmd, shell=True)
             self.log.info("Started new nfcapd daemon")
         else:
             self.log.info("nfcapd daemon already running")
 
-    def kill_nfcapd(self):
+    def start_nfcapd(self):
+        self.start_capd("nfcapd")
+
+    def start_sfcapd(self):
+        self.start_capd("sfcapd")
+
+    def kill_fcapd(self, daemon_proc):
         cls = self.__class__
-        if cls.nfcapd_proc:
-            cls.nfcapd_proc.terminate()
+        assert daemon_proc in ["netflow", "sflow"]
+        proc = cls.nfcapd_proc if daemon_proc == "netflow" else cls.sfcapd_proc
+        if proc:
+            proc.terminate()
             self.log.info("Terminated process")
-            cls.nfcapd_proc = None
+            if daemon_proc == "netflow":
+                cls.nfcapd_proc = None
+            else:
+                cls.sfcapd_proc = None
+
+    def kill_nfcapd(self):
+        self.kill_fcapd(self, "nfcapd")
+
+    def kill_sfcapd(self):
+        self.kill_fcapd(self, "sfcapd")
 
     def nf_callback(self, f, f_args, loop=False):
         p = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
