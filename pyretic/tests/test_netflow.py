@@ -2,7 +2,9 @@ from pyretic.lib.netflow import *
 from pyretic.core.language import *
 import logging, time, subprocess, shlex, os, threading
 
+# Pcap test files for testing.
 TESTPCAP = "pyretic/scratch/testpcap.pcap"
+VLANTEST = "pyretic/scratch/vlantest.pcap"
 
 ###################################
 # Test myEval function on packets
@@ -47,7 +49,7 @@ def nf_callback_fn(res):
 
 def traffic_thread(loop=True):
     def run_workload():
-        cmd = "softflowd -n localhost:%d -r %s" % (NFCAPD_PORT, TESTPCAP)
+        cmd = "softflowd -n localhost:%d -r %s" % (NFCAPD_PORT, VLANTEST)
         try:
             p = subprocess.check_output(shlex.split(cmd), stderr=subprocess.STDOUT)
         except OSError:
