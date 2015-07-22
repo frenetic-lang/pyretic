@@ -4,6 +4,7 @@ from pyretic.lib.query import Query
 import subprocess, shlex, threading, sys, logging, time
 
 NFCAPD_PORT = 12345
+SFCAPD_PORT = 12346
 NFCAPD_INTERVAL = 10 # period before producing a new output file
 SCRATCH_DATA_FOLDER = "pyretic/scratch/"
 PROCESS_SCRIPT = "pyretic/lib/helpers/process_netflow.sh"
@@ -52,14 +53,19 @@ class NetflowBucket(Query):
 
     def start_fcapd(self, daemon_proc):
         cls = self.__class__
-        if not self.nfcapd_running():
-            nfcapd_cmd  = "%s -T all -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
-                daemon_proc, NFCAPD_PORT, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
+        daemon_port = NFCAPD_PORT if daemon_proc == "nfcapd" else SFCAPD_PORT
+        if not self.fcapd_running(daemon_proc):
+            fcapd_cmd  = "%s -T all -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
+                daemon_proc, daemon_port, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
                 PROCESS_SCRIPT)
-            cls.nfcapd_proc = subprocess.Popen(nfcapd_cmd, shell=True)
-            self.log.info("Started new nfcapd daemon")
+            if daemon_proc == "nfcapd":
+                cls.nfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True)
+                self.log.info("Started new nfcapd daemon")
+            else:
+                cls.sfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True)
+                self.log.info("Started new sfcapd daemon")
         else:
-            self.log.info("nfcapd daemon already running")
+            self.log.info("*fcapd daemon already running")
 
     def start_nfcapd(self):
         self.start_fcapd("nfcapd")
@@ -69,12 +75,12 @@ class NetflowBucket(Query):
 
     def kill_fcapd(self, daemon_proc):
         cls = self.__class__
-        assert daemon_proc in ["netflow", "sflow"]
-        proc = cls.nfcapd_proc if daemon_proc == "netflow" else cls.sfcapd_proc
+        assert daemon_proc in ["nfcapd", "sfcapd"]
+        proc = cls.nfcapd_proc if daemon_proc == "nfcapd" else cls.sfcapd_proc
         if proc:
             proc.terminate()
             self.log.info("Terminated process")
-            if daemon_proc == "netflow":
+            if daemon_proc == "nfcapd":
                 cls.nfcapd_proc = None
             else:
                 cls.sfcapd_proc = None
