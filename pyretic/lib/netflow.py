@@ -24,7 +24,8 @@ class NetflowBucket(Query):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
         assert capd in ["netflow", "sflow"]
-        self.start_fcapd(capd)
+        proc = "nfcapd" if capd == "netflow" else "sfcapd"
+        self.start_fcapd(proc)
         super(NetflowBucket, self).__init__()
         t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
         t.daemon = True
@@ -61,10 +62,10 @@ class NetflowBucket(Query):
             self.log.info("nfcapd daemon already running")
 
     def start_nfcapd(self):
-        self.start_capd("nfcapd")
+        self.start_fcapd("nfcapd")
 
     def start_sfcapd(self):
-        self.start_capd("sfcapd")
+        self.start_fcapd("sfcapd")
 
     def kill_fcapd(self, daemon_proc):
         cls = self.__class__
