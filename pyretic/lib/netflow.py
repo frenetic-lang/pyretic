@@ -21,11 +21,11 @@ class NetflowBucket(Query):
     cls_counter  = 0
     callbacks = []
 
-    def __init__(self, capd="netflow"):
+    def __init__(self, cap_type="netflow"):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
-        assert capd in ["netflow", "sflow"]
-        proc = "nfcapd" if capd == "netflow" else "sfcapd"
+        assert cap_type in ["netflow", "sflow"]
+        proc = "nfcapd" if cap_type == "netflow" else "sfcapd"
         self.start_fcapd(proc)
         super(NetflowBucket, self).__init__()
         t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
