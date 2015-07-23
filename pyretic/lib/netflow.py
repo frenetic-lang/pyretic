@@ -153,6 +153,26 @@ class NetflowBucket(MatchingAggregateBucket):
     def __eq__(self, other):
         return isinstance(other, NetflowBucket)
 
+    def start_update(self):
+        """This function sets a condition variable to note that the set of matches in
+        the bucket is under update. We use a condition variable instead of locks
+        for reasons described in the comment under `start_update` in the
+        `CountBucket` class.
+        """
+        with self.in_update_cv:
+            self.in_update = True
+            self.runtime_switch_cnt_fun = None
+
+    def finish_update(self):
+        with self.in_update_cv:
+            self.in_update = False
+            self.in_update_cv.notify_all()
+
+    def clear_matches(self):
+        """ Delete all matches. Should always be called in the context of
+        holding the in_update_cv for this bucket. """
+        self.matches = {}
+
 # assuming that we're in the general base case
 # TODO add lpm
 def innerEval(filt,pkt):
