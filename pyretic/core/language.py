@@ -835,14 +835,16 @@ class MatchingAggregateBucket(Query):
         if not k in self.matches:
             self.matches[k] = self.match_status()
 
-    def delete_match(self, match, priority, version, to_be_deleted=False,
-                     existing_rule=False):
+    def delete_match(self, match, priority, version, to_be_deleted=False):
         """If a rule is deleted from the classifier, mark this rule (until we
         get the flow_removed message with the counters on it).
         """
         k = self.match_entry(match, priority,version)
         if k in self.matches:
-            self.matches[k].to_be_deleted = True
+            if to_be_deleted:
+                del self.matches[k]
+            else:
+                self.matches[k].to_be_deleted = True
 
     def __eq__(self, other):
         raise NotImplementedError
