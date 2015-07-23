@@ -1063,9 +1063,11 @@ class Runtime(object):
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
                     notify_flag = True if len(new_acts) < len(acts) else False
+                    newer_acts = filter(lambda x:
+                                        not isinstance(x, NetflowBucket), acts)
                     new_rule = ListedRule(mat=rule.mat,
                                           priority=rule.priority,
-                                          actions=new_acts,
+                                          actions=newer_acts,
                                           version=rule.version,
                                           cookie=rule.cookie,
                                           notify=notify_flag,
