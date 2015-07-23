@@ -209,7 +209,7 @@ class NetflowBucket(MatchingAggregateBucket):
         except TypeError:
             self.log.error("Netflow's runtime_sw_cnt_fun not initialized")
             raise RuntimeError("Couldn't configure switches!")
-        return
+        return sw_cnt
 
     def issue_ovs_cmd(self, cmd):
         try:
@@ -223,12 +223,13 @@ class NetflowBucket(MatchingAggregateBucket):
 
     def config_ovs_flow(self, config_id, config_type, str_params, target_port):
         sw_cnt = self.get_sw_cnt()
-        cmd = 'sudo ovs-vsctl -- --id=%s create %s \
+        cmd = 'sudo ovs-vsctl -- --id=@%s create %s \
                targets=\\"127.0.0.1:%d\\" %s ' % (config_id, config_type,
                                                   target_port, str_params)
         for s in range(1, sw_cnt+1):
             cmd += "-- set bridge s%d %s=@%s " % (s, config_type, config_id)
         self.log.info("Running switch configuration command %s" % cmd)
+        self.issue_ovs_cmd(cmd)
 
     def config_ovs_netflow(self):
         self.config_ovs_flow("nf", "netflow", "active_timeout=20",
