@@ -891,7 +891,7 @@ class Runtime(object):
                     arp_bug = False
                     for action in rule.actions:
                         if ((action == Controller) or
-                            isinstance(action, CountBucket) or
+                            isinstance(action, MatchingAggregateBucket) or
                             (self.use_nx and action == identity)):
                             pass
                         elif len(action.map) > 1:
@@ -1031,7 +1031,7 @@ class Runtime(object):
                 rule_key = (hashable_match, rule.priority, rule.version)
                 for act in rule.actions:
                     if isinstance(act, NetflowBucket):
-                            act.add_match(rule.match,
+                            act.add_match(rule.mat,
                                           rule.priority,
                                           rule.version)
 
@@ -1044,7 +1044,7 @@ class Runtime(object):
                 matched_buckets = to_add + to_modify + to_stay
                 map(lambda x: add_rules_for_buckets(x, table_id),
                     matched_buckets)
-                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), bucket_list)
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
 
         def remove_matching_aggregate_buckets(diff_lists):
@@ -1207,7 +1207,7 @@ class Runtime(object):
             def specialize_actions(actions,outport):
                 new_actions = []
                 for act in actions:
-                    if not isinstance(act, CountBucket):
+                    if not isinstance(act, MatchingAggregateBucket):
                         new_actions.append(copy.deepcopy(act))
                     else:
                         new_actions.append(act) # can't make copies of
@@ -1215,7 +1215,7 @@ class Runtime(object):
                                                 # forking
                 for action in new_actions:
                     try:
-                        if not isinstance(action, CountBucket):
+                        if not isinstance(action, MatchingAggregateBucket):
                             if action['port'] == outport:
                                 action['port'] = OFPP_IN_PORT
                     except:
@@ -1226,7 +1226,7 @@ class Runtime(object):
             specialized_rules = []
             for rule in classifier.rules:
                 phys_actions = filter(lambda a: (
-                        not isinstance(a, CountBucket)
+                        not isinstance(a, MatchingAggregateBucket)
                         and a['port'] != OFPP_CONTROLLER
                         and a['port'] != OFPP_IN_PORT
                         and a['port'] != CUSTOM_NEXT_TABLE_PORT),
@@ -1388,7 +1388,7 @@ class Runtime(object):
             to each table_id. """
             def different_actions(old_acts, new_acts):
                 def buckets_removed(acts):
-                    return filter(lambda a: not isinstance(a, CountBucket),
+                    return filter(lambda a: not isinstance(a, MatchingAggregateBucket),
                                   acts)
                 return buckets_removed(old_acts) != buckets_removed(new_acts)
 
