@@ -54,9 +54,9 @@ class NetflowBucket(MatchingAggregateBucket):
         self.log.setLevel(logging.WARNING)
         self.runtime_sw_cnt_fun = None
         assert cap_type in ["netflow", "sflow"]
-        proc = "nfcapd" if cap_type == "netflow" else "sfcapd"
+        self.cap_type = cap_type
         if start_fcapd:
-            self.start_fcapd(proc)
+            self.start_fcapd()
         super(NetflowBucket, self).__init__()
         t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
         t.daemon = True
@@ -77,7 +77,14 @@ class NetflowBucket(MatchingAggregateBucket):
     def set_sw_cnt_fun(self, fun):
         self.runtime_sw_cnt_fun = fun
 
-    def fcapd_running(self, daemon_proc):
+    def fcapd_running(self):
+        """ Wrapper that detects whether the capture daemon is running
+        independent of collector type. """
+        fun_dict = {"netflow": self.nfcapd_running,
+                    "sflow"  : self.sfcapd_running}
+        return fun_dict[self.cap_type]()
+
+    def _fcapd_running(self, daemon_proc):
         p = subprocess.Popen("ps ax | grep %s | grep -v grep | wc -l" %
                              daemon_proc,
                              shell=True, stdout=subprocess.PIPE)
@@ -91,15 +98,22 @@ class NetflowBucket(MatchingAggregateBucket):
             return False
 
     def nfcapd_running(self):
-        self.fcapd_running("nfcapd")
+        return self._fcapd_running("nfcapd")
 
     def sfcapd_running(self):
-        self.fcapd_running("sfcapd")
+        return self._fcapd_running("sfcapd")
 
-    def start_fcapd(self, daemon_proc):
+    def start_fcapd(self):
+        """Wrapper that starts the capture daemon corresponds to the capture type
+        (i.e. netflow vs sflow) of this bucket instance.
+        """
+        fun_dict = {"netflow": self.start_nfcapd,
+                    "sflow"  : self.start_sfcapd}
+        fun_dict[self.cap_type]()
+
+    def __start_fcapd(self, daemon_proc, daemon_port):
         cls = self.__class__
-        daemon_port = NFCAPD_PORT if daemon_proc == "nfcapd" else SFCAPD_PORT
-        if not self.fcapd_running(daemon_proc):
+        if not self.fcapd_running():
             fcapd_cmd  = "%s -T all -p %d -l %s -t %d -x 'bash %s %%d%%f'" % (
                 daemon_proc, daemon_port, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
                 PROCESS_SCRIPT)
@@ -113,12 +127,19 @@ class NetflowBucket(MatchingAggregateBucket):
             self.log.info("*fcapd daemon already running")
 
     def start_nfcapd(self):
-        self.start_fcapd("nfcapd")
+        self.__start_fcapd("nfcapd", NFCAPD_PORT)
 
     def start_sfcapd(self):
-        self.start_fcapd("sfcapd")
+        self.__start_fcapd("sfcapd", SFCAPD_PORT)
 
-    def kill_fcapd(self, daemon_proc):
+    def kill_fcapd(self):
+        """ Wrapper that kills the currently executing netflow/sflow collector
+        daemon. """
+        fun_dict = {"netflow": self.kill_nfcapd,
+                    "sflow"  : self.kill_sfcapd}
+        fun_dict[self.cap_type]()
+
+    def __kill_fcapd(self, daemon_proc):
         cls = self.__class__
         assert daemon_proc in ["nfcapd", "sfcapd"]
         proc = cls.nfcapd_proc if daemon_proc == "nfcapd" else cls.sfcapd_proc
@@ -131,10 +152,10 @@ class NetflowBucket(MatchingAggregateBucket):
                 cls.sfcapd_proc = None
 
     def kill_nfcapd(self):
-        self.kill_fcapd(self, "nfcapd")
+        self.__kill_fcapd("nfcapd")
 
     def kill_sfcapd(self):
-        self.kill_fcapd(self, "sfcapd")
+        self.__kill_fcapd("sfcapd")
 
     def nf_callback(self, f, f_args, loop=False):
         p = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
@@ -221,7 +242,16 @@ class NetflowBucket(MatchingAggregateBucket):
             self.log.error("Error while calling ovs-vsctl")
             raise RuntimeError("Switch configuration did not succeed")
 
-    def config_ovs_flow(self, config_id, config_type, str_params, target_port):
+    def config_ovs_flow(self):
+        """Wrapper that configures ovs to send samples to a specific collector daemon
+        depending on whether this is a netflow or sflow bucket instance.
+        """
+        fun_dict = {"netflow": self.config_ovs_netflow,
+                    "sflow"  : self.config_ovs_sflow}
+        fun_dict[self.cap_type]()
+
+    def __config_ovs_flow(self, config_id, config_type, str_params,
+                          target_port):
         sw_cnt = self.get_sw_cnt()
         cmd = 'sudo ovs-vsctl -- --id=@%s create %s \
                targets=\\"127.0.0.1:%d\\" %s ' % (config_id, config_type,
@@ -232,12 +262,12 @@ class NetflowBucket(MatchingAggregateBucket):
         self.issue_ovs_cmd(cmd)
 
     def config_ovs_netflow(self):
-        self.config_ovs_flow("nf", "netflow", "active_timeout=20",
-                             NFCAPD_PORT)
+        self.__config_ovs_flow("nf", "netflow", "active_timeout=20",
+                               NFCAPD_PORT)
 
     def config_ovs_sflow(self):
-        self.config_ovs_flow("sf", "sflow", "sampling=2 polling=10",
-                             SFCAPD_PORT)
+        self.__config_ovs_flow("sf", "sflow", "sampling=2 polling=10",
+                               SFCAPD_PORT)
 
 # assuming that we're in the general base case
 # TODO add lpm

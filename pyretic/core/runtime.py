@@ -1046,8 +1046,7 @@ class Runtime(object):
                 curr_buckets = _collect_buckets(added_rules, NetflowBucket)
                 map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
-                # TODO: currently configure sflow directly; only for debugging
-                map(lambda x: x.config_ovs_sflow(), curr_buckets.values())
+                map(lambda x: x.config_ovs_flow(), curr_buckets.values())
 
         def remove_matching_aggregate_buckets(diff_lists):
             """
