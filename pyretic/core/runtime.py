@@ -918,7 +918,21 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(diff_lists, table_id):
+        def _collect_buckets(rules, typ):
+            """
+            Scan classifier rules and collect distinct buckets into a
+            dictionary.
+            """
+            bucket_list = {}
+            for rule in rules:
+                actions = rule.actions
+                for act in actions:
+                    if isinstance(act, typ):
+                        if not id(act) in bucket_list:
+                            bucket_list[id(act)] = act
+            return bucket_list
+
+        def bookkeep_count_buckets(diff_lists, table_id):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
@@ -929,20 +943,6 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            def collect_buckets(rules):
-                """
-                Scan classifier rules and collect distinct buckets into a
-                dictionary.
-                """
-                bucket_list = {}
-                for rule in rules:
-                    actions = rule.actions
-                    for act in actions:
-                        if isinstance(act, CountBucket):
-                            if not id(act) in bucket_list:
-                                bucket_list[id(act)] = act
-                return bucket_list
-
             def update_rules_for_buckets(rule, op, table_id):
                 match = copy.copy(rule.mat)
                 """When running multi-stage table with nicira extensions, we remove
@@ -999,7 +999,7 @@ class Runtime(object):
                 """
                 (to_add, to_delete, to_modify, to_stay) = diff_lists
                 all_rules = to_add + to_delete + to_modify + to_stay
-                bucket_list = collect_buckets(all_rules)
+                bucket_list = _collect_buckets(all_rules, CountBucket)
                 map(lambda x: x.start_update(), bucket_list.values())
                 map(lambda x: update_rules_for_buckets(x, "add", table_id), to_add)
                 map(lambda x: update_rules_for_buckets(x, "delete", table_id), to_delete)
