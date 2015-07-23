@@ -1011,8 +1011,42 @@ class Runtime(object):
                         self.pull_existing_stats_for_bucket(x)),
                     bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
-        
-        def remove_buckets(diff_lists):
+
+        def bookkeep_netflow_buckets(diff_lists, table_id):
+            """Book-keep netflow buckets in the policy by updating the set of matches
+            referred to by each NetflowBucket.
+            """
+            def add_rules_for_buckets(rule, table_id):
+                """This method is very similar to `update_rules_for_buckets` under
+                `bookkeep_count_buckets` above. The operations required to
+                update the matches corresponding to NetflowBuckets are similar
+                to but simpler than those of CountBuckets.
+                """
+                match = copy.copy(rule.mat)
+                if self.use_nx:
+                    if table_id != 0:
+                        match.pop('port', None)
+                hashable_match = util.frozendict(match)
+                rule_key = (hashable_match, priority, version)
+                for act in rule.actions:
+                    if isinstance(act, NetflowBucket):
+                            act.add_match(rule.match,
+                                          rule.priority,
+                                          rule.version)
+
+            with self.update_buckets_lock:
+                (to_add, to_delete, to_modify, to_stay) = diff_lists
+                all_rules = to_add + to_delete + to_modify + to_stay
+                bucket_list = _collect_buckets(all_rules, NetflowBucket)
+                map(lambda x: x.start_update(),  bucket_list.values())
+                map(lambda x: x.clear_matches(), bucket_list.values())
+                matched_buckets = to_add + to_modify + to_stay
+                map(lambda x: add_rules_for_buckets(x, table_id),
+                    matched_buckets)
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), matched_buckets)
+                map(lambda x: x.finish_update(), bucket_list.values())
+
+        def remove_matching_aggregate_buckets(diff_lists):
             """
             Remove CountBucket policies from classifier rule actions.
             
