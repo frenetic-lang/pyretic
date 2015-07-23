@@ -759,7 +759,7 @@ class MatchingAggregateBucket(Query):
         self.matches = {}
         self.in_update_cv = Condition()
         self.in_update = False
-        self.log = logging.getLogger('%s.CountBucket' % __name__)
+        self.log = logging.getLogger('%s.MatchingAggregateBucket' % __name__)
 
     def get_matches(self):
         """ Return matches contained in bucket as a string """
@@ -874,6 +874,7 @@ class CountBucket(MatchingAggregateBucket):
         self.max_num_callbacks = 0
         self.max_num_callbacks_lock = Lock()
         self._classifier = self.generate_classifier()
+        self.log = logging.getLogger('%s.CountBucket' % __name__)
 
     def __repr__(self):
         return "CountBucket " + self.bname
