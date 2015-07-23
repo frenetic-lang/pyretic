@@ -1028,7 +1028,7 @@ class Runtime(object):
                     if table_id != 0:
                         match.pop('port', None)
                 hashable_match = util.frozendict(match)
-                rule_key = (hashable_match, priority, version)
+                rule_key = (hashable_match, rule.priority, rule.version)
                 for act in rule.actions:
                     if isinstance(act, NetflowBucket):
                             act.add_match(rule.match,
@@ -1044,7 +1044,7 @@ class Runtime(object):
                 matched_buckets = to_add + to_modify + to_stay
                 map(lambda x: add_rules_for_buckets(x, table_id),
                     matched_buckets)
-                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), matched_buckets)
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), bucket_list)
                 map(lambda x: x.finish_update(), bucket_list.values())
 
         def remove_matching_aggregate_buckets(diff_lists):
@@ -1066,7 +1066,7 @@ class Runtime(object):
                                       acts)
                     notify_flag = True if len(new_acts) < len(acts) else False
                     newer_acts = filter(lambda x:
-                                        not isinstance(x, NetflowBucket), acts)
+                                        not isinstance(x, NetflowBucket), new_acts)
                     new_rule = ListedRule(mat=rule.mat,
                                           priority=rule.priority,
                                           actions=newer_acts,
