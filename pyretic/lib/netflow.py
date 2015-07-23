@@ -11,7 +11,7 @@ PROCESS_SCRIPT = "pyretic/lib/helpers/process_netflow.sh"
 DORMANT_SHELL = "pyretic/lib/helpers/dormant_shell.sh"
 NETFLOW_OUTFILE = "pyretic/scratch/latest-dump.txt"
 
-class NetflowBucket(Query):
+class NetflowBucket(MatchingAggregateBucket):
     """
     Collect aggregated statistics from streams of Netflow records from
     network switches.
