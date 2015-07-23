@@ -140,6 +140,8 @@ class NetflowBucket(MatchingAggregateBucket):
         cls.cls_counter += 1
         self.log.debug("Calling handle_nf %d'th time" % cls.cls_counter)
         res = self.process_results(NETFLOW_OUTFILE)
+        """ TODO(ngsrinivas): only call callbacks on results which match the
+        packets specified in self.matches """
         for f in cls.callbacks:
             f(res)
 
