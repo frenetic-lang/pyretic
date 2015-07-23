@@ -203,6 +203,41 @@ class NetflowBucket(MatchingAggregateBucket):
         holding the in_update_cv for this bucket. """
         self.matches = {}
 
+    def get_sw_cnt(self):
+        try:
+            sw_cnt = self.runtime_sw_cnt_fun()
+        except TypeError:
+            self.log.error("Netflow's runtime_sw_cnt_fun not initialized")
+            raise RuntimeError("Couldn't configure switches!")
+        return
+
+    def issue_ovs_cmd(self, cmd):
+        try:
+            out = subprocess.check_output(cmd, shell=True)
+        except OSError:
+            self.log.error("Error in calling ovs-vsctl!")
+            raise RuntimeError("Couldn't find ovs-vsctl to configure switches!")
+        except subprocess.CalledProcessError:
+            self.log.error("Error while calling ovs-vsctl")
+            raise RuntimeError("Switch configuration did not succeed")
+
+    def config_ovs_flow(self, config_id, config_type, str_params, target_port):
+        sw_cnt = self.get_sw_cnt()
+        cmd = 'sudo ovs-vsctl -- --id=%s create %s \
+               targets=\\"127.0.0.1:%d\\" %s ' % (config_id, config_type,
+                                                  target_port, str_params)
+        for s in range(1, sw_cnt+1):
+            cmd += "-- set bridge s%d %s=@%s " % (s, config_type, config_id)
+        self.log.info("Running switch configuration command %s" % cmd)
+
+    def config_ovs_netflow(self):
+        self.config_ovs_flow("nf", "netflow", "active_timeout=20",
+                             NFCAPD_PORT)
+
+    def config_ovs_sflow(self):
+        self.config_ovs_flow("sf", "sflow", "sampling=2 polling=10",
+                             SFCAPD_PORT)
+
 # assuming that we're in the general base case
 # TODO add lpm
 def innerEval(filt,pkt):
