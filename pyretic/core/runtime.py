@@ -1512,8 +1512,9 @@ class Runtime(object):
         Stat.collect_stat('rule count', len(new_rules))
 
         diff_lists = get_diff_lists(new_rules)
-        bookkeep_buckets(diff_lists, table_id)
-        diff_lists = remove_buckets(diff_lists)
+        bookkeep_count_buckets(diff_lists, table_id)
+        bookkeep_netflow_buckets(diff_lists, table_id)
+        diff_lists = remove_matching_aggregate_buckets(diff_lists)
         
         self.log.debug('================================')
         self.log.debug('Final classifier to be installed:')
