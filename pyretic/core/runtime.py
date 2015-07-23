@@ -1041,10 +1041,10 @@ class Runtime(object):
                 bucket_list = _collect_buckets(all_rules, NetflowBucket)
                 map(lambda x: x.start_update(),  bucket_list.values())
                 map(lambda x: x.clear_matches(), bucket_list.values())
-                matched_buckets = to_add + to_modify + to_stay
-                map(lambda x: add_rules_for_buckets(x, table_id),
-                    matched_buckets)
-                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), bucket_list.values())
+                added_rules = to_add + to_modify + to_stay
+                map(lambda x: add_rules_for_buckets(x, table_id), added_rules)
+                curr_buckets = _collect_buckets(added_rules, NetflowBucket)
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
 
         def remove_matching_aggregate_buckets(diff_lists):
