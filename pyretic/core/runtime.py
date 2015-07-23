@@ -1016,6 +1016,7 @@ class Runtime(object):
             """Book-keep netflow buckets in the policy by updating the set of matches
             referred to by each NetflowBucket.
             """
+            from pyretic.lib.netflow import NetflowBucket
             def add_rules_for_buckets(rule, table_id):
                 """This method is very similar to `update_rules_for_buckets` under
                 `bookkeep_count_buckets` above. The operations required to
@@ -1055,6 +1056,7 @@ class Runtime(object):
             :returns: new difference lists with bucket actions removed
             :rtype: 4 tuple of rule lists.
             """
+            from pyretic.lib.netflow import NetflowBucket
             new_diff_lists = []
             for lst in diff_lists:
                 new_lst = []
