@@ -49,6 +49,7 @@ class NetflowBucket(MatchingAggregateBucket):
     nfcapd_proc  = None
     sfcapd_proc  = None
     cls_counter  = 0
+    cls_shells   = 0
     callbacks = []
 
     def __init__(self, cap_type="netflow", start_fcapd=True):
@@ -57,12 +58,16 @@ class NetflowBucket(MatchingAggregateBucket):
         self.runtime_sw_cnt_fun = None
         assert cap_type in ["netflow", "sflow"]
         self.cap_type = cap_type
-        if start_fcapd:
-            self.start_fcapd()
         super(NetflowBucket, self).__init__()
-        t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
-        t.daemon = True
-        t.start()
+        if start_fcapd:
+            capd_started = self.start_fcapd()
+            # TODO(ngsrinivas): this must be extended to also start a new
+            # dormant shell when there isn't already one running, for instance
+            # when debugging with a manual instantiation of nfcapd/sfcapd.
+            if capd_started:
+                t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
+                t.daemon = True
+                t.start()
         self._classifier = self.generate_classifier()
 
     def generate_classifier(self):
@@ -111,7 +116,7 @@ class NetflowBucket(MatchingAggregateBucket):
         """
         fun_dict = {"netflow": self.start_nfcapd,
                     "sflow"  : self.start_sfcapd}
-        fun_dict[self.cap_type]()
+        return fun_dict[self.cap_type]()
 
     def __start_fcapd(self, daemon_proc, daemon_port):
         cls = self.__class__
@@ -127,14 +132,16 @@ class NetflowBucket(MatchingAggregateBucket):
                 cls.sfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True,
                                                    stderr=subprocess.PIPE)
                 self.log.info("Started new sfcapd daemon")
+            return True
         else:
             self.log.info("*fcapd daemon already running")
+            return False
 
     def start_nfcapd(self):
-        self.__start_fcapd("nfcapd", NFCAPD_PORT)
+        return self.__start_fcapd("nfcapd", NFCAPD_PORT)
 
     def start_sfcapd(self):
-        self.__start_fcapd("sfcapd", SFCAPD_PORT)
+        return self.__start_fcapd("sfcapd", SFCAPD_PORT)
 
     def kill_fcapd(self):
         """ Wrapper that kills the currently executing netflow/sflow collector
@@ -162,6 +169,8 @@ class NetflowBucket(MatchingAggregateBucket):
         self.__kill_fcapd("sfcapd")
 
     def nf_callback(self, f, f_args, loop=False):
+        cls = self.__class__
+        cls.cls_shells += 1
         p = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
         self.log.info("Started dormant bash process")
         p.wait()
