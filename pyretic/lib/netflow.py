@@ -245,14 +245,16 @@ class NetflowBucket(MatchingAggregateBucket):
         return res
 
     def filter_pkts(self, pkts_list):
-        filtered_pkts = pkts_list
+        filtered_pkts = []
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            m = self.matches
-            """TODO(ngsrinivas): only call callbacks on results which match the packets
-            specified in self.matches
-            """
+            for pkt in pkts_list:
+                for entry in self.matches.keys():
+                    mat = match(entry.match)
+                    if len(mat.eval(pkt)) > 0:
+                        filtered_pkts.append(pkt)
+                        break
         return filtered_pkts
 
     def bucket_specific_cb(self, pkts_list):
