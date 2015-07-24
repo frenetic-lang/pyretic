@@ -78,11 +78,14 @@ def compilation_tests():
 
 ### Netflow bucket testing
 ### Helper functions for netflow bucket tests.
-def nf_callback_fn(res):
-    print '******************'
-    print "This is a netflow bucket callback function. I got results:"
-    print res
-    print '******************'
+def nf_callback_fn(arg=''):
+    def f(res):
+        print '******************'
+        print "Callback identifier:", arg
+        print "This is a netflow bucket callback function. I got results:"
+        print res
+        print '******************'
+    return f
 
 def traffic_thread(loop=True):
     """ Generate a custom workload separately for nfcapd. """
@@ -111,13 +114,17 @@ def netflow_bucket_test1():
     the netflow collector daemon.
     """
     nb = NetflowBucket()
-    nb.register_callback(nf_callback_fn)
+    nb.register_callback(nf_callback_fn('#1'))
     # Check whether multiple nfcapd instances are started, and whether that
     # causes errors by starting different NetflowBuckets. Neither should
     # happen.
     nb.start_nfcapd()
     nb.start_nfcapd()
     nb2 = NetflowBucket()
+    nb2.register_callback(nf_callback_fn('#2'))
+
+    # test "active buckets" by only setting one of the objects above active
+    NetflowBucket.set_active_buckets([nb2])
 
     t = threading.Thread(target=traffic_thread, args=(True,))
     t.daemon = True

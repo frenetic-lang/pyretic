@@ -52,6 +52,7 @@ class NetflowBucket(MatchingAggregateBucket):
     cls_shells   = 0
     callbacks = []
     shell = None # dormant shell process
+    active_buckets = []
 
     def __init__(self, cap_type="netflow", start_fcapd=True):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
@@ -60,6 +61,7 @@ class NetflowBucket(MatchingAggregateBucket):
         assert cap_type in ["netflow", "sflow"]
         self.cap_type = cap_type
         super(NetflowBucket, self).__init__()
+        cls = self.__class__
         if start_fcapd:
             capd_started = self.start_fcapd()
             if capd_started or cls.shell is None:
@@ -168,6 +170,10 @@ class NetflowBucket(MatchingAggregateBucket):
     def kill_sfcapd(self):
         self.__kill_fcapd("sfcapd")
 
+    @classmethod
+    def set_active_buckets(cls, blist):
+        cls.active_buckets = blist
+
     def nf_callback(self, f, f_args, loop=False):
         cls = self.__class__
         cls.cls_shells += 1
@@ -235,21 +241,36 @@ class NetflowBucket(MatchingAggregateBucket):
         f.close()
         return res
 
+    def filter_pkts(self, pkts_list):
+        filtered_pkts = pkts_list
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            m = self.matches
+            """TODO(ngsrinivas): only call callbacks on results which match the packets
+            specified in self.matches
+            """
+        return filtered_pkts
+
+    def bucket_specific_cb(self, pkts_list):
+        """Filter out results from packets don't match the stored matches for this
+        bucket, and then call the bucket's callbacks.
+        """
+        filtered_pkts = self.filter_pkts(pkts_list)
+        for f in self.callbacks:
+            f(filtered_pkts)
+
     def handle_nf(self, nf_args):
         """ A callback function which gets invoked whenever nfcapd produces an
         output file. nf_args is disregarded for now. """
         cls = self.__class__
         cls.cls_counter += 1
         self.log.debug("Calling handle_nf %d'th time" % cls.cls_counter)
-        res = self.process_results(NETFLOW_OUTFILE)
-        """ TODO(ngsrinivas): only call callbacks on results which match the
-        packets specified in self.matches """
-        for f in cls.callbacks:
-            f(res)
+        pkts_list = self.process_results(NETFLOW_OUTFILE)
+        map(lambda x: x.bucket_specific_cb(pkts_list), cls.active_buckets)
 
     def register_callback(self, fn):
-        cls = self.__class__
-        cls.callbacks.append(fn)
+        self.callbacks.append(fn)
 
     def __repr__(self):
         return "NetflowBucket %d" % id(self)
