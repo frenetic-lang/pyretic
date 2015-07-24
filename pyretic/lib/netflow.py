@@ -120,10 +120,12 @@ class NetflowBucket(MatchingAggregateBucket):
                 daemon_proc, daemon_port, SCRATCH_DATA_FOLDER, NFCAPD_INTERVAL,
                 PROCESS_SCRIPT)
             if daemon_proc == "nfcapd":
-                cls.nfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True)
+                cls.nfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True,
+                                                   stderr=subprocess.PIPE)
                 self.log.info("Started new nfcapd daemon")
             else:
-                cls.sfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True)
+                cls.sfcapd_proc = subprocess.Popen(fcapd_cmd, shell=True,
+                                                   stderr=subprocess.PIPE)
                 self.log.info("Started new sfcapd daemon")
         else:
             self.log.info("*fcapd daemon already running")
