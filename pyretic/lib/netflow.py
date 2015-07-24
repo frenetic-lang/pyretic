@@ -28,6 +28,8 @@
 
 from pyretic.core.language import *
 from pyretic.core import util
+from pyretic.core.packet import Packet
+from pyretic.core.network import IP, MAC
 from pyretic.lib.query import Query
 import subprocess, shlex, threading, sys, logging, time
 
@@ -175,10 +177,49 @@ class NetflowBucket(MatchingAggregateBucket):
             t.start()
         return
 
+    def nf_to_pyretic(self, nf_line):
+        """ Parse one line of netflow/sflow output and return a pyretic
+        `Packet`-like structure for evaluation by pyretic policies.
+        """
+        def convert(h,val):
+            if h in ['srcmac','dstmac']:
+                return MAC(val)
+            elif h in ['srcip','dstip']:
+                return IP(val)
+            elif h in ['packets', 'bytes', 'flows', 'port', 'vlan_id',
+                       'srcport', 'dstport']:
+                return int(float(val))
+            elif h in ['protocol']:
+                if val == 'ICMP':
+                    return 2048
+                else:
+                    return val
+            elif h in ['bps', 'Bpp']:
+                return float(val)
+            else:
+                return val
+
+        def parse_line(l):
+            parts = l.split()[3:]
+            order = ['switch', 'protocol', 'srcip', 'dstip', 'srcport',
+                     'dstport', 'vlan_id', 'srcmac', 'dstmac', 'port',
+                     'packets','bytes', 'bps', 'Bpp', 'flows']
+            headers = {}
+            for i in range(0, len(order)):
+                headers[order[i]] = parts[i]
+            return headers
+
+        headers = parse_line(nf_line.strip())
+        headers['raw'] = 'junk'
+        pyretic_pkt = Packet(util.frozendict())
+        d = { h : convert(h,v) for (h,v) in headers.items() }
+        return pyretic_pkt.modifymany(d)
+
     def process_results(self, fname):
-        """ TODO(ngsrinivas): do some basic processing of the netflow results. """
         f = open(fname, 'r')
-        res = f.read()
+        res = []
+        for line in f:
+            res.append(self.nf_to_pyretic(line))
         f.close()
         return res
 

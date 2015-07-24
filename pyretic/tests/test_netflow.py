@@ -79,8 +79,10 @@ def compilation_tests():
 ### Netflow bucket testing
 ### Helper functions for netflow bucket tests.
 def nf_callback_fn(res):
+    print '******************'
     print "This is a netflow bucket callback function. I got results:"
     print res
+    print '******************'
 
 def traffic_thread(loop=True):
     """ Generate a custom workload separately for nfcapd. """
