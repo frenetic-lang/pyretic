@@ -203,7 +203,10 @@ class NetflowBucket(MatchingAggregateBucket):
             if h in ['srcmac','dstmac']:
                 return MAC(val)
             elif h in ['srcip','dstip']:
-                return IP(val)
+                try:
+                    return IP(val)
+                except: # IPv6 packets are not processed well in the IP class
+                    return val
             elif h in ['packets', 'bytes', 'flows', 'port', 'vlan_id',
                        'srcport', 'dstport']:
                 return int(float(val))
