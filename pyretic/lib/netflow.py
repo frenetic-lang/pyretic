@@ -51,6 +51,7 @@ class NetflowBucket(MatchingAggregateBucket):
     cls_counter  = 0
     cls_shells   = 0
     callbacks = []
+    shell = None # dormant shell process
 
     def __init__(self, cap_type="netflow", start_fcapd=True):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
@@ -61,10 +62,9 @@ class NetflowBucket(MatchingAggregateBucket):
         super(NetflowBucket, self).__init__()
         if start_fcapd:
             capd_started = self.start_fcapd()
-            # TODO(ngsrinivas): this must be extended to also start a new
-            # dormant shell when there isn't already one running, for instance
-            # when debugging with a manual instantiation of nfcapd/sfcapd.
-            if capd_started:
+            if capd_started or cls.shell is None:
+                ''' Every new capd instance must go with a dormant shell. Also
+                start a new dormant child if there isn't already one. '''
                 t = threading.Thread(target=self.nf_callback, args=(self.handle_nf, 'test', True))
                 t.daemon = True
                 t.start()
@@ -171,12 +171,13 @@ class NetflowBucket(MatchingAggregateBucket):
     def nf_callback(self, f, f_args, loop=False):
         cls = self.__class__
         cls.cls_shells += 1
-        p = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
+        cls.shell = subprocess.Popen(shlex.split('bash %s' % DORMANT_SHELL))
         self.log.info("Started dormant bash process")
-        p.wait()
+        cls.shell.wait()
         """ when thread execution reaches here, the dormant shell process has
         been killed by nfcapd as it just produced a new file. We call the test
         callback function with its arguments. """
+        cls.shell = None
         f(f_args)
         """ If "loop" is True, we start a new Thread which will do the same
         thing that this function did. """
