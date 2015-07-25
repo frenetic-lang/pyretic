@@ -56,9 +56,12 @@ def static_fwding_chain_3_3():
                               (match(switch=3) >> fwd(2))))
         )
 
-def sf_callback_fn(res):
-    print "*** In callback function: got results:"
-    print res
+def sf_callback_fn(results):
+    print "****** In callback function: got results:"
+    for res in results:
+        print res
+        print '--'
+    print "Got", len(results), "results"
 
 def sf_bucket():
     sfb = NetflowBucket(cap_type="sflow")
