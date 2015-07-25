@@ -32,6 +32,7 @@ from pyretic.core.packet import Packet
 from pyretic.core.network import IP, MAC
 from pyretic.lib.query import Query
 import subprocess, shlex, threading, sys, logging, time
+from multiprocessing import Lock, Condition
 
 NFCAPD_PORT = 12345
 SFCAPD_PORT = 12346
@@ -61,6 +62,8 @@ class NetflowBucket(MatchingAggregateBucket):
         assert cap_type in ["netflow", "sflow"]
         self.cap_type = cap_type
         super(NetflowBucket, self).__init__()
+        self.intfs_map = {}
+        self.intfs_map_lock = Lock()
         cls = self.__class__
         if start_fcapd:
             capd_started = self.start_fcapd()
@@ -323,11 +326,31 @@ class NetflowBucket(MatchingAggregateBucket):
         except subprocess.CalledProcessError:
             self.log.error("Error while calling ovs-vsctl")
             raise RuntimeError("Switch configuration did not succeed")
+        return out
+
+    def update_intf_numbers(self):
+        """ Maintain most current map of OVS `ifindex` value and the switch
+        interface as represented within mininet, i.e., of the form s<i>-eth<j>.
+        """
+        sw_ports = self.get_runtime_info(self.runtime_sw_port_ids_fun,
+                                         "runtime switch port ids")
+        ovs_intfs = []
+        for (sw, ports_list) in sw_ports:
+            for port in ports_list:
+                ovs_intfs.append((sw, port, 's%d-eth%d' % (sw, port)))
+        with self.intfs_map_lock:
+            self.intfs_map = {}
+            for (sw, port, mn_intf) in ovs_intfs:
+                cmd = "sudo ovs-vsctl list interface %s | grep ifindex \
+                       | awk '{print $3}'" % mn_intf
+                intf_index = int(self.issue_ovs_cmd(cmd).strip())
+                self.intfs_map[intf_index] = (sw, port, mn_intf)
 
     def config_ovs_flow(self):
         """Wrapper that configures ovs to send samples to a specific collector daemon
         depending on whether this is a netflow or sflow bucket instance.
         """
+        self.update_intf_numbers()
         fun_dict = {"netflow": self.config_ovs_netflow,
                     "sflow"  : self.config_ovs_sflow}
         fun_dict[self.cap_type]()

@@ -1053,7 +1053,10 @@ class Runtime(object):
                 map(lambda x: x.set_sw_port_ids_fun(self.sw_port_ids),
                     curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
-                map(lambda x: x.config_ovs_flow(), curr_buckets.values())
+                ''' Sufficient to configure OVS from any one active
+                NetflowBucket. '''
+                if curr_buckets:
+                    curr_buckets.values()[0].config_ovs_flow()
 
         def remove_matching_aggregate_buckets(diff_lists):
             """
