@@ -54,6 +54,8 @@ class NetflowBucket(MatchingAggregateBucket):
     callbacks = []
     shell = None # dormant shell process
     active_buckets = []
+    intfs_map = {}
+    intfs_map_lock = Lock()
 
     def __init__(self, cap_type="netflow", start_fcapd=True):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
@@ -62,8 +64,6 @@ class NetflowBucket(MatchingAggregateBucket):
         assert cap_type in ["netflow", "sflow"]
         self.cap_type = cap_type
         super(NetflowBucket, self).__init__()
-        self.intfs_map = {}
-        self.intfs_map_lock = Lock()
         cls = self.__class__
         if start_fcapd:
             capd_started = self.start_fcapd()
@@ -335,16 +335,17 @@ class NetflowBucket(MatchingAggregateBucket):
         sw_ports = self.get_runtime_info(self.runtime_sw_port_ids_fun,
                                          "runtime switch port ids")
         ovs_intfs = []
+        cls = self.__class__
         for (sw, ports_list) in sw_ports:
             for port in ports_list:
                 ovs_intfs.append((sw, port, 's%d-eth%d' % (sw, port)))
-        with self.intfs_map_lock:
+        with cls.intfs_map_lock:
             self.intfs_map = {}
             for (sw, port, mn_intf) in ovs_intfs:
                 cmd = "sudo ovs-vsctl list interface %s | grep ifindex \
                        | awk '{print $3}'" % mn_intf
                 intf_index = int(self.issue_ovs_cmd(cmd).strip())
-                self.intfs_map[intf_index] = (sw, port, mn_intf)
+                cls.intfs_map[intf_index] = (sw, port, mn_intf)
 
     def config_ovs_flow(self):
         """Wrapper that configures ovs to send samples to a specific collector daemon
