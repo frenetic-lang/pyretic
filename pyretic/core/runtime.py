@@ -168,6 +168,9 @@ class Runtime(object):
              
             self.partition_enabled &= not self.partition_cnt is None
 
+    def sw_port_ids(self):
+        return self.network.switch_with_port_ids_list()
+
     def sw_cnt(self):
         """ Switch count for netkat compilation """
         return (self.partition_cnt if self.partition_cnt
@@ -1045,7 +1048,10 @@ class Runtime(object):
                 map(lambda x: x.start_update(),  bucket_list.values())
                 map(lambda x: x.clear_matches(), bucket_list.values())
                 map(lambda x: add_rules_for_buckets(x, table_id), added_rules)
-                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt), curr_buckets.values())
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt),
+                    curr_buckets.values())
+                map(lambda x: x.set_sw_port_ids_fun(self.sw_port_ids),
+                    curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
                 map(lambda x: x.config_ovs_flow(), curr_buckets.values())
 

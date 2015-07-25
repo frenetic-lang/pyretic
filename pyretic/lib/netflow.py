@@ -86,6 +86,9 @@ class NetflowBucket(MatchingAggregateBucket):
     def set_sw_cnt_fun(self, fun):
         self.runtime_sw_cnt_fun = fun
 
+    def set_sw_port_ids_fun(self, fun):
+        self.runtime_sw_port_ids_fun = fun
+
     def fcapd_running(self):
         """ Wrapper that detects whether the capture daemon is running
         independent of collector type. """
