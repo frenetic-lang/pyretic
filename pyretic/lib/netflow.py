@@ -205,6 +205,7 @@ class NetflowBucket(MatchingAggregateBucket):
         """ Parse one line of netflow/sflow output and return a pyretic
         `Packet`-like structure for evaluation by pyretic policies.
         """
+        cls = self.__class__
         def convert(h,val):
             if h in ['srcmac','dstmac']:
                 return MAC(val)
@@ -236,17 +237,26 @@ class NetflowBucket(MatchingAggregateBucket):
                 headers[order[i]] = parts[i]
             return headers
 
-        headers = parse_line(nf_line.strip())
-        headers['raw'] = 'junk'
+        def adjust_location(headers):
+            imap = cls.intfs_map
+            if headers['port'] in cls.intfs_map:
+                (sw, port, _) = cls.intfs_map[headers['port']]
+                headers.update({'switch': sw, 'port': port})
+            return headers
+
+        h1 = parse_line(nf_line.strip())
+        h2 = { h : convert(h,v) for (h,v) in h1.items() }
+        h3 = adjust_location(h2)
+        h3['raw'] = 'junk'
         pyretic_pkt = Packet(util.frozendict())
-        d = { h : convert(h,v) for (h,v) in headers.items() }
-        return pyretic_pkt.modifymany(d)
+        return pyretic_pkt.modifymany(h3)
 
     def process_results(self, fname):
         f = open(fname, 'r')
         res = []
-        for line in f:
-            res.append(self.nf_to_pyretic(line))
+        with self.__class__.intfs_map_lock:
+            for line in f:
+                res.append(self.nf_to_pyretic(line))
         f.close()
         return res
 
