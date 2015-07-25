@@ -68,5 +68,11 @@ def sf_bucket():
     sfb.register_callback(sf_callback_fn)
     return sfb
 
+def test0():
+    return sf_bucket()
+
+def test1():
+    return match(srcip=ip3) >> sf_bucket()
+
 def main(**kwargs):
-    return static_fwding_chain_3_3() + sf_bucket()
+    return static_fwding_chain_3_3() + test1()
