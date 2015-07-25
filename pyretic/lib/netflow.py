@@ -232,6 +232,14 @@ class NetflowBucket(MatchingAggregateBucket):
             headers = {}
             for i in range(0, len(order)):
                 headers[order[i]] = parts[i]
+            '''
+            TODO(): There doesn't seem to be a way to figure out the ethertype
+            of a packet from nfdump. The manpage doesn't give any hints, and it
+            is documented that this was an issue as recently as 2014: see
+            http://sourceforge.net/p/nfdump/mailman/message/33085997/ So we just
+            set it automatically to IP.
+            '''
+            headers['ethtype'] = 2048
             return headers
 
         def adjust_location(headers):
