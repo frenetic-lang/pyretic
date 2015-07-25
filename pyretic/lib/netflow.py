@@ -306,13 +306,13 @@ class NetflowBucket(MatchingAggregateBucket):
         holding the in_update_cv for this bucket. """
         self.matches = {}
 
-    def get_sw_cnt(self):
+    def get_runtime_info(self, fun, fun_text):
         try:
-            sw_cnt = self.runtime_sw_cnt_fun()
+            val = fun()
         except TypeError:
-            self.log.error("Netflow's runtime_sw_cnt_fun not initialized")
+            self.log.error("Netflow's %s not initialized" % fun_text)
             raise RuntimeError("Couldn't configure switches!")
-        return sw_cnt
+        return val
 
     def issue_ovs_cmd(self, cmd):
         try:
@@ -334,7 +334,8 @@ class NetflowBucket(MatchingAggregateBucket):
 
     def __config_ovs_flow(self, config_id, config_type, str_params,
                           target_port):
-        sw_cnt = self.get_sw_cnt()
+        sw_cnt = self.get_runtime_info(self.runtime_sw_cnt_fun,
+                                       "runtime switch count")
         cmd = 'sudo ovs-vsctl -- --id=@%s create %s \
                targets=\\"127.0.0.1:%d\\" %s ' % (config_id, config_type,
                                                   target_port, str_params)
