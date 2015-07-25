@@ -218,10 +218,7 @@ class NetflowBucket(MatchingAggregateBucket):
                        'srcport', 'dstport']:
                 return int(float(val))
             elif h in ['protocol']:
-                if val == 'ICMP':
-                    return 2048
-                else:
-                    return val
+                return int(val)
             elif h in ['bps', 'Bpp']:
                 return float(val)
             else:
