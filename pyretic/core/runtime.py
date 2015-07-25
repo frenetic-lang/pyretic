@@ -1054,7 +1054,14 @@ class Runtime(object):
                     curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
                 ''' Sufficient to configure OVS from any one active
-                NetflowBucket. '''
+                NetflowBucket.
+
+                Caution: this statement in the runtime assumes that the
+                underlying switches are all OVS, and uses ovs-vsctl both to
+                configure netflow/sflow in the network, as well as obtain
+                mappings between the interface indices maintained by OVS and the
+                (sw,port) values that pyretic uses.
+                '''
                 if curr_buckets:
                     curr_buckets.values()[0].config_ovs_flow()
 
