@@ -1036,7 +1036,8 @@ class Runtime(object):
                     if isinstance(act, NetflowBucket):
                             act.add_match(rule.mat,
                                           rule.priority,
-                                          rule.version)
+                                          rule.version,
+                                          table_id)
 
             with self.update_buckets_lock:
                 (to_add, to_delete, to_modify, to_stay) = diff_lists

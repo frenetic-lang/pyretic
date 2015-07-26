@@ -31,7 +31,7 @@ from pyretic.core import util
 from pyretic.core.packet import Packet
 from pyretic.core.network import IP, MAC
 from pyretic.lib.query import Query
-import subprocess, shlex, threading, sys, logging, time
+import subprocess, shlex, threading, sys, logging, time, copy
 from multiprocessing import Lock, Condition
 
 NFCAPD_PORT = 12345
@@ -53,7 +53,7 @@ class NetflowBucket(MatchingAggregateBucket):
     cls_shells   = 0
     callbacks = []
     shell = None # dormant shell process
-    active_buckets = []
+    active_buckets = {}
     intfs_map = {}
     intfs_map_lock = Lock()
 
@@ -61,6 +61,8 @@ class NetflowBucket(MatchingAggregateBucket):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
         self.runtime_sw_cnt_fun = None
+        self.runtime_sw_port_ids_fun = None
+        self.preproc_pol = {}
         assert cap_type in ["netflow", "sflow"]
         self.cap_type = cap_type
         super(NetflowBucket, self).__init__()
@@ -177,8 +179,8 @@ class NetflowBucket(MatchingAggregateBucket):
         self.__kill_fcapd("sfcapd")
 
     @classmethod
-    def set_active_buckets(cls, blist):
-        cls.active_buckets = blist
+    def set_active_buckets(cls, blist, tab):
+        cls.active_buckets[tab] = blist
 
     def nf_callback(self, f, f_args, loop=False):
         cls = self.__class__
@@ -320,7 +322,8 @@ class NetflowBucket(MatchingAggregateBucket):
         cls.cls_counter += 1
         self.log.debug("Calling handle_nf %d'th time" % cls.cls_counter)
         pkts_list = self.process_results(NETFLOW_OUTFILE)
-        map(lambda x: x.bucket_specific_cb(pkts_list), cls.active_buckets)
+        map(lambda x: x.bucket_specific_cb(pkts_list),
+            reduce(lambda acc, z: acc + z, cls.active_buckets.values(), []))
 
     def register_callback(self, fn):
         self.callbacks.append(fn)
@@ -331,7 +334,7 @@ class NetflowBucket(MatchingAggregateBucket):
     def __eq__(self, other):
         return isinstance(other, NetflowBucket)
 
-    def start_update(self):
+    def start_update(self, table_id):
         """This function sets a condition variable to note that the set of matches in
         the bucket is under update. We use a condition variable instead of locks
         for reasons described in the comment under `start_update` in the
@@ -340,16 +343,31 @@ class NetflowBucket(MatchingAggregateBucket):
         with self.in_update_cv:
             self.in_update = True
             self.runtime_switch_cnt_fun = None
+            self.runtime_sw_port_ids_fun = None
+            self.preproc_pol[table_id] = identity
 
     def finish_update(self):
         with self.in_update_cv:
             self.in_update = False
             self.in_update_cv.notify_all()
 
-    def clear_matches(self):
+    def add_match(self, mat, prio, ver, table_id):
+        ''' Add a match of packets going to the NetflowBucket into
+        self.matches. '''
+        new_mat = copy.copy(mat)
+        # remove 'table_id' key from match, because packets from netflow won't
+        # have this information to match, i.e., they are all from table 0 by
+        # design.
+        new_mat.pop('table_id', None)
+        me = self.match_entry(new_mat, prio, ver)
+        if not table_id in self.matches:
+            self.matches[table_id] = {}
+        self.matches[table_id][me] = self.match_status()
+
+    def clear_matches(self, table_id):
         """ Delete all matches. Should always be called in the context of
         holding the in_update_cv for this bucket. """
-        self.matches = {}
+        self.matches[table_id] = {}
 
     def get_runtime_info(self, fun, fun_text):
         try:
