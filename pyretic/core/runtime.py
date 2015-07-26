@@ -1045,13 +1045,17 @@ class Runtime(object):
                 bucket_list = _collect_buckets(all_rules, NetflowBucket)
                 added_rules = to_add + to_modify + to_stay
                 curr_buckets = _collect_buckets(added_rules, NetflowBucket)
-                NetflowBucket.set_active_buckets(curr_buckets.values())
-                map(lambda x: x.start_update(),  bucket_list.values())
-                map(lambda x: x.clear_matches(), bucket_list.values())
+                NetflowBucket.set_active_buckets(curr_buckets.values(),
+                                                 table_id)
+                map(lambda x: x.start_update(table_id),  bucket_list.values())
+                map(lambda x: x.clear_matches(table_id), bucket_list.values())
                 map(lambda x: add_rules_for_buckets(x, table_id), added_rules)
                 map(lambda x: x.set_sw_cnt_fun(self.sw_cnt),
                     curr_buckets.values())
                 map(lambda x: x.set_sw_port_ids_fun(self.sw_port_ids),
+                    curr_buckets.values())
+                preproc_pol = self.get_effective_policy_to_table(table_id)
+                map(lambda x: x.set_preproc_pol(preproc_pol, table_id),
                     curr_buckets.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
                 ''' Sufficient to configure OVS from any one active
