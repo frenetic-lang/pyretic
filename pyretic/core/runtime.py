@@ -2008,6 +2008,14 @@ class Runtime(object):
         seq_list = [self.policy_map[k] for k in range(table_id, num_tables)]
         return sequential(seq_list)
 
+    def get_effective_policy_to_table(self, table_id):
+        """ Return the effective policy to evaluate a packet, if a packet
+        arrives at a switch inport before it arrives at table `table_id`. Assume
+        a sequentual pipeline of policies stored in `policy_map`.
+        """
+        seq_list = [self.policy_map[k] for k in range(0, table_id-1)]
+        return sequential(seq_list)
+
     def single_stage_policy_map(self, pol):
         """ A dummy policy map for single-stage tables. Useful for
         uniformity. """

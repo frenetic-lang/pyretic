@@ -94,6 +94,15 @@ class NetflowBucket(MatchingAggregateBucket):
     def set_sw_port_ids_fun(self, fun):
         self.runtime_sw_port_ids_fun = fun
 
+    def set_preproc_pol(self, pol, table_id):
+        """ The sflow records provided by switches correspond to how the packets
+        looked at their ingress port into the device. To support compositional
+        processing with Netflow buckets with multi-stage tables, it is necessary
+        to evaluate packets by the sequential composition of the policies of all
+        *prior* tables in the pipeline.
+        """
+        self.preproc_pol[table_id] = pol
+
     def fcapd_running(self):
         """ Wrapper that detects whether the capture daemon is running
         independent of collector type. """
