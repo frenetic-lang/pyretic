@@ -249,12 +249,39 @@ class NetflowBucket(MatchingAggregateBucket):
                 headers.update({'switch': sw, 'port': port})
             return headers
 
+        def process_vlan(headers):
+            '''The returned VLAN label from nfdump tools is actually a 2 byte
+            combination of the VLAN id (12 bits), a CFI bit, and the VLAN
+            priority (3 bits) which are arranged in that order from least
+            to most significant bits (see [1-4] below).
+
+            Given that netflow/IPFIX export this information, and that nfcapd
+            output format remains consistent across netflow and sflow, I believe
+            that sflow captures should be no different. @ngsrinivas
+
+            [1] ipfix RFC. http://tools.ietf.org/html/rfc5102#section-5.6.3
+            [2] Table 6, netflow V9 record format.
+                http://www.cisco.com/en/US/technologies/tk648/tk362/technologies_white_paper09186a00800a3db9.html
+            [3] VLAN tag frame format https://wiki.wireshark.org/VLAN
+            [4] libnfread: read netflow records from nfcapd output files.
+                https://github.com/switch-ch/nfdump-libnfread/blob/master/bin/pcaproc.c#L416
+                (see https://github.com/switch-ch/nfdump-libnfread)
+
+            '''
+            if 'vlan_id' in headers:
+                tag = headers['vlan_id']
+                headers.update({'vlan_id': tag & 0xfff,
+                                'vlan_pcp': ((tag & 0xf000) >> 13) & 7,
+                                'vlan_cfi': ((tag & 0xf000) >> 12) & 1})
+            return headers
+
         h1 = parse_line(nf_line.strip())
         h2 = { h : convert(h,v) for (h,v) in h1.items() }
         h3 = adjust_location(h2)
-        h3['raw'] = 'junk'
+        h4 = process_vlan(h3)
+        h4['raw'] = 'junk'
         pyretic_pkt = Packet(util.frozendict())
-        return pyretic_pkt.modifymany(h3)
+        return pyretic_pkt.modifymany(h4)
 
     def process_results(self, fname):
         f = open(fname, 'r')
