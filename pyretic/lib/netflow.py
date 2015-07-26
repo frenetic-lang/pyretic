@@ -303,26 +303,42 @@ class NetflowBucket(MatchingAggregateBucket):
         f.close()
         return res
 
-    def filter_pkts(self, pkts_list):
+    def filter_pkts(self, pkts_list, table_id):
         filtered_pkts = []
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
             for pkt in pkts_list:
-                for entry in self.matches.keys():
+                for entry in self.matches[table_id].keys():
                     mat = match(entry.match)
                     if len(mat.eval(pkt)) > 0:
                         filtered_pkts.append(pkt)
                         break
         return filtered_pkts
 
+    def preproc_pkts(self, pkts_list, table_id):
+        preprocd_pkts = set()
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            for pkt in pkts_list:
+                preprocd_pkts |= self.preproc_pol[table_id].eval(pkt)
+        return list(preprocd_pkts)
+
     def bucket_specific_cb(self, pkts_list):
         """Filter out results from packets don't match the stored matches for this
         bucket, and then call the bucket's callbacks.
         """
-        filtered_pkts = self.filter_pkts(pkts_list)
+        assert set(self.preproc_pol.keys()) == set(self.matches.keys())
+        result_pkts = []
+        for table in self.preproc_pol.keys():
+            preprocd_pkts = self.preproc_pkts(pkts_list, table)
+            filtered_pkts = self.filter_pkts(preprocd_pkts, table)
+            result_pkts += filtered_pkts
+        ''' Call application callbacks on results. '''
         for f in self.callbacks:
-            f(filtered_pkts)
+            f(result_pkts)
+
 
     def handle_nf(self, nf_args):
         """ A callback function which gets invoked whenever nfcapd produces an
