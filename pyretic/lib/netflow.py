@@ -57,7 +57,7 @@ class NetflowBucket(MatchingAggregateBucket):
     intfs_map = {}
     intfs_map_lock = Lock()
 
-    def __init__(self, cap_type="netflow", start_fcapd=True):
+    def __init__(self, cap_type="sflow", start_fcapd=True):
         self.log = logging.getLogger('%s.NetflowBucket' % __name__)
         self.log.setLevel(logging.WARNING)
         self.runtime_sw_cnt_fun = None

@@ -113,14 +113,14 @@ def netflow_bucket_test1():
     functions just test the actions of the library given a running instance of
     the netflow collector daemon.
     """
-    nb = NetflowBucket()
+    nb = NetflowBucket(cap_type="netflow")
     nb.register_callback(nf_callback_fn('#1'))
     # Check whether multiple nfcapd instances are started, and whether that
     # causes errors by starting different NetflowBuckets. Neither should
     # happen.
     nb.start_nfcapd()
     nb.start_nfcapd()
-    nb2 = NetflowBucket()
+    nb2 = NetflowBucket(cap_type="netflow")
     nb2.register_callback(nf_callback_fn('#2'))
 
     # test "active buckets" by only setting one of the objects above active
