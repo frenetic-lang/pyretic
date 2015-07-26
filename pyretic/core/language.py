@@ -746,8 +746,111 @@ class PathBucket(FwdBucket):
         else:
             return []
 
+class MatchingAggregateBucket(Query):
+    """
+    Abstract class which only returns aggregate statistics from packets that it
+    receives, and which only matches a subset of packets in a bucket-specific
+    way. This abstract class defines the match_entry and match_status classes,
+    as well as capabilities to add and delete matches from an instance. Other
+    capabilities must be implemented by children.
+    """
+    def __init__(self):
+        super(MatchingAggregateBucket, self).__init__()
+        self.matches = {}
+        self.in_update_cv = Condition()
+        self.in_update = False
+        self.log = logging.getLogger('%s.MatchingAggregateBucket' % __name__)
 
-class CountBucket(Query):
+    def get_matches(self):
+        """ Return matches contained in bucket as a string """
+        output = ""
+        with self.in_update_cv:
+            while self.in_update:
+                self.in_update_cv.wait()
+            for m in self.matches:
+                output += str(m) + '\n'
+        return output
+
+    def __repr__(self):
+        return "MatchingAggregateBucket %d" % id(self)
+
+    def generate_classifier(self):
+        raise NotImplementedError
+
+    def apply(self):
+        raise NotImplementedError
+
+    def start_update(self):
+        raise NotImplementedError
+
+    def finish_update(self):
+        raise NotImplementedError
+
+    class match_entry(object):
+        def __init__(self,match,priority,version):
+            self.match = util.frozendict(match)
+            self.priority = priority
+            self.version = version
+
+        def __hash__(self):
+            return hash(self.match) ^ hash(self.priority) ^ hash(self.version)
+
+        def __eq__(self,other):
+            try:
+                return (self.match == other.match and
+                        self.priority == other.priority and
+                        self.version == other.version)
+            except:
+                return False
+
+        def __repr__(self):
+            return ('(match=' + repr(self.match) +
+                    ',priority=' + repr(self.priority) +
+                    ',version=' + repr(self.version) + ')')
+
+    class match_status(object):
+        def __init__(self,to_be_deleted=False,existing_rule=False):
+            self.to_be_deleted = to_be_deleted
+            self.existing_rule = existing_rule
+
+        def __hash__(self):
+            return hash(self.to_be_deleted) ^ hash(self.existing_rule)
+
+        def __eq__(self,other):
+            try:
+                return (self.to_be_deleted == other.to_be_deleted and
+                        self.existing_rule == other.existing_rule)
+            except:
+                return False
+
+        def __repr__(self):
+            return '(to_be_deleted=%s,existing_rule=%s)' % \
+                (self.to_be_deleted,self.existing_rule)
+
+    def add_match(self, match, priority, version):
+        """Add a match to list of classifier rules to be queried for counts,
+        corresponding to a given version of the classifier.
+        """
+        k = self.match_entry(match, priority, version)
+        if not k in self.matches:
+            self.matches[k] = self.match_status()
+
+    def delete_match(self, match, priority, version, to_be_deleted=False):
+        """If a rule is deleted from the classifier, mark this rule (until we
+        get the flow_removed message with the counters on it).
+        """
+        k = self.match_entry(match, priority,version)
+        if k in self.matches:
+            if to_be_deleted:
+                del self.matches[k]
+            else:
+                self.matches[k].to_be_deleted = True
+
+    def __eq__(self, other):
+        raise NotImplementedError
+
+
+class CountBucket(MatchingAggregateBucket):
     """
     Class for registering callbacks on counts of packets sent to
     the controller.
@@ -755,7 +858,6 @@ class CountBucket(Query):
     def __init__(self, bname=None):
         self.bname = str(bname) if bname else str(id(self))
         super(CountBucket, self).__init__()
-        self.matches = {}
         self.runtime_stats_query_fun = None
         self.runtime_existing_stats_query_fun = None
         self.outstanding_switches = set()
@@ -770,30 +872,17 @@ class CountBucket(Query):
         self.byte_count_persistent_apply = 0
         self.byte_count_persistent_removed = 0
         self.byte_count_persistent_existing = 0
-        self.in_update_cv = Condition()
-        self.in_update = False
         self.new_bucket = True
         self.max_num_callbacks = 0
         self.max_num_callbacks_lock = Lock()
-        # TODO(ngsrinivas) find a way to avoid having a log *per* bucket
-        self.log = logging.getLogger('%s.CountBucket' % __name__)
         self._classifier = self.generate_classifier()
+        self.log = logging.getLogger('%s.CountBucket' % __name__)
 
     def __repr__(self):
         return "CountBucket " + self.bname
 
     def is_new_bucket(self):
         return self.new_bucket
-
-    def get_matches(self):
-        """ Return matches contained in bucket as a string """
-        output = ""
-        with self.in_update_cv:
-            while self.in_update:
-                self.in_update_cv.wait()
-            for m in self.matches:
-                output += str(m) + '\n'
-        return output
 
     def generate_classifier(self):
         return Classifier([Rule(identity,{self},[self])])
@@ -849,65 +938,6 @@ class CountBucket(Query):
             self.pull_existing_stats()
             self.new_bucket = False
         self.log.info("Updated bucket %s" % self.bname)
-       
-
-    class match_entry(object):
-        def __init__(self,match,priority,version):
-            self.match = util.frozendict(match)
-            self.priority = priority
-            self.version = version
-
-        def __hash__(self):
-            return hash(self.match) ^ hash(self.priority) ^ hash(self.version)
-
-        def __eq__(self,other):
-            try:
-                return (self.match == other.match and 
-                        self.priority == other.priority and 
-                        self.version == other.version)
-            except:
-                return False
-
-        def __repr__(self):
-            return ('(match=' + repr(self.match) + 
-                    ',priority=' + repr(self.priority) + 
-                    ',version=' + repr(self.version) + ')')
-
-    class match_status(object):
-        def __init__(self,to_be_deleted=False,existing_rule=False):
-            self.to_be_deleted = to_be_deleted
-            self.existing_rule = existing_rule
-
-        def __hash__(self):
-            return hash(self.to_be_deleted) ^ hash(self.existing_rule)
-
-        def __eq__(self,other):
-            try:
-                return (self.to_be_deleted == other.to_be_deleted and 
-                        self.existing_rule == other.existing_rule)
-            except:
-                return False
-            
-        def __repr__(self):
-            return '(to_be_deleted=%s,existing_rule=%s)' % \
-                (self.to_be_deleted,self.existing_rule)
-
-    def add_match(self, match, priority, version):
-        """Add a match to list of classifier rules to be queried for counts,
-        corresponding to a given version of the classifier.
-        """
-        k = self.match_entry(match, priority, version)
-        if not k in self.matches:
-            self.matches[k] = self.match_status() 
-
-    def delete_match(self, match, priority, version, to_be_deleted=False,
-                     existing_rule=False):
-        """If a rule is deleted from the classifier, mark this rule (until we
-        get the flow_removed message with the counters on it).
-        """
-        k = self.match_entry(match, priority,version)
-        if k in self.matches:
-            self.matches[k].to_be_deleted = True
 
     def handle_flow_removed(self, match, priority, version, flow_stat):
         """Act on a flow removed message pertaining to a bucket by
