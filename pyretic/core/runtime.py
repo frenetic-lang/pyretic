@@ -192,8 +192,8 @@ class Runtime(object):
 
                 if self.integrate_enabled:
 
-                    in_table = LeafSketch('in_table', self.path_in_table)
-                    out_table = LeafSketch('out_table', self.path_out_table)
+                    in_table = LeafSketch('in_table', self.path_in_table.policy)
+                    out_table = LeafSketch('out_table', self.path_out_table.policy)
                     
                     sketch = [(in_table, False), (out_table, True), 
                                 (vf_tag, False), (vf_untag, True)]
@@ -238,7 +238,7 @@ class Runtime(object):
                     s[0].compile()
                 else:
                     self.log.debug("starting to compile %s" % s[0].name)
-                    s[0].netkat_compile(self.sw_cnt(), s[1])
+                    s[0].netkat_compile(self.sw_cnt())
                     self.log.debug("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):

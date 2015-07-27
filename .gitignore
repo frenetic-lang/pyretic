@@ -11,7 +11,7 @@
 # Results Folder #
 ##################
 pyretic/evaluations/results
-
+pyretic/evaluations/evaluation_results
 # frenetic #
 ###########
 frenetic

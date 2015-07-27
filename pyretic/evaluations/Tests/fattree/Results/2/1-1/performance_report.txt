@@ -1,0 +1,82 @@
+dfa state count : 7 
+--------------------
+rule count statistics: 
+switch count: 4
+total rule count: 418
+average rule count: 104.5
+------details-------
+s3 -> 104
+s2 -> 102
+s1 -> 108
+s4 -> 104
+--------end--------
+compile
+number of calls: 1
+total time: 0.170068
+average time: 0.170068
+---times----
+[0.17006802558898926]
+--------------------------------------
+capture_compile
+number of calls: 1
+total time: 0.000507
+average time: 0.000507
+---times----
+[0.0005071163177490234]
+classifier size: 4
+--------------------------------------
+whole_policy_compile
+number of calls: 1
+total time: 0.083453
+average time: 0.083453
+---times----
+[0.08345293998718262]
+classifier size: 116
+--------------------------------------
+tagging_compile
+number of calls: 1
+total time: 0.212335
+average time: 0.212335
+---times----
+[0.21233487129211426]
+classifier size: 40
+--------------------------------------
+tag_fw_cap_compile
+number of calls: 1
+total time: 0.523993
+average time: 0.523993
+---times----
+[0.5239930152893066]
+classifier size: 110
+--------------------------------------
+forwarding_compile
+number of calls: 1
+total time: 0.040180
+average time: 0.040180
+---times----
+[0.04017996788024902]
+classifier size: 9
+--------------------------------------
+vf_untag_compile
+number of calls: 1
+total time: 0.000849
+average time: 0.000849
+---times----
+[0.0008487701416015625]
+classifier size: 3
+--------------------------------------
+makeDFA_vector
+number of calls: 1
+total time: 0.056620
+average time: 0.056620
+---times----
+[0.056620121002197266]
+--------------------------------------
+vf_tag_compile
+number of calls: 1
+total time: 0.000908
+average time: 0.000908
+---times----
+[0.00090789794921875]
+classifier size: 3
+--------------------------------------

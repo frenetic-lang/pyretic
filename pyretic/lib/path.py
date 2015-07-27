@@ -2712,6 +2712,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
+        #return q == cls.get_dead_state(dfa)
         #TODO(mina): fix
         return False
 
@@ -2907,14 +2908,14 @@ class Sketch(object):
     def compile(self):
         raise NotImplementedError
 
-    def netkat_compile(self, sw_cnt, outport=False):
+    def netkat_compile(self, sw_cnt):
         if not self.need_stat:
             return self.pol.netkat_compile(sw_cnt, outport)[0]
         else:
-            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt, outport):\n\treturn pol.netkat_compile(sw_cnt, outport)' % (self.name)
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt):\n\treturn pol.netkat_compile(sw_cnt)' % (self.name)
             exec(func_str)
             func = locals()[self.name]
-            return func(self.pol, sw_cnt, outport) 
+            return func(self.pol, sw_cnt) 
 
     def get_def_name(self):
         raise NotImplementedError

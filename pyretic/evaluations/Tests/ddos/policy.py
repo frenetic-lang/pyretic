@@ -7,9 +7,6 @@ from Topos import *
 
 import threading
 import itertools
-import os
-import json
-import socket
 
 def query_callback(id_str, print_counts=True):
     def actual_callback(pkt):
