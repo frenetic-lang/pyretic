@@ -78,11 +78,14 @@ def netflow_bucket_test1():
     # happen.
     nb.start_nfcapd()
     nb.start_nfcapd()
+
     nb2 = NetflowBucket(cap_type="netflow")
     nb2.register_callback(nf_callback_fn('#2'))
+    nb2.set_preproc_pol(identity, 0)
+    nb2.add_match({'srcip': IPPrefix('10.0.0/24')}, 60000, 1, 0)
 
     # test "active buckets" by only setting one of the objects above active
-    NetflowBucket.set_active_buckets([nb2])
+    NetflowBucket.set_active_buckets([nb2], 0)
 
     t = threading.Thread(target=traffic_thread, args=(True,))
     t.daemon = True
