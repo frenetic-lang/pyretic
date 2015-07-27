@@ -15,3 +15,8 @@ pyretic/evaluations/results
 # frenetic #
 ###########
 frenetic
+
+# netflow/sflow packet capture dumps #
+######################################
+pyretic/scratch/latest-dump.txt
+pyretic/scratch/nfcapd.*
