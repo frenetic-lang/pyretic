@@ -52,14 +52,14 @@ class TestCase():
         self.out = file(out_path, 'w')
         self.err = file(err_path, 'w')
         self.process = subprocess.Popen(cmd, stdout=self.out, stderr=self.err) 
-        time.sleep(2)
+        #time.sleep(2)
         return [out_name, err_name]
 
     def _stop_controller(self):
         self.process.send_signal(signal.SIGINT)
         self.out.close()
         self.err.close()
-        time.sleep(2)
+        #time.sleep(2)
 
     def _run_mininet(self):
         cmd = shlex.split('sudo %s' % self.test_file)

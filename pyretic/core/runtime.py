@@ -167,6 +167,9 @@ class Runtime(object):
              
             self.partition_enabled &= not self.partition_cnt is None
 
+    def sw_port_ids(self):
+        return self.network.switch_with_port_ids_list()
+
     def sw_cnt(self):
         """ Switch count for netkat compilation """
         return (self.partition_cnt if self.partition_cnt
@@ -889,7 +892,7 @@ class Runtime(object):
                     arp_bug = False
                     for action in rule.actions:
                         if ((action == Controller) or
-                            isinstance(action, CountBucket) or
+                            isinstance(action, MatchingAggregateBucket) or
                             (self.use_nx and action == identity)):
                             pass
                         elif len(action.map) > 1:
@@ -916,7 +919,21 @@ class Runtime(object):
                     specialized_rules.append(rule)
             return Classifier(specialized_rules)
 
-        def bookkeep_buckets(diff_lists, table_id):
+        def _collect_buckets(rules, typ):
+            """
+            Scan classifier rules and collect distinct buckets into a
+            dictionary.
+            """
+            bucket_list = {}
+            for rule in rules:
+                actions = rule.actions
+                for act in actions:
+                    if isinstance(act, typ):
+                        if not id(act) in bucket_list:
+                            bucket_list[id(act)] = act
+            return bucket_list
+
+        def bookkeep_count_buckets(diff_lists, table_id):
             """Whenever rules are associated with counting buckets,
             add a reference to the classifier rule into the respective
             bucket for querying later. Count bucket actions operate at
@@ -927,20 +944,6 @@ class Runtime(object):
             :returns: the output classifier
             :rtype: Classifier
             """
-            def collect_buckets(rules):
-                """
-                Scan classifier rules and collect distinct buckets into a
-                dictionary.
-                """
-                bucket_list = {}
-                for rule in rules:
-                    actions = rule.actions
-                    for act in actions:
-                        if isinstance(act, CountBucket):
-                            if not id(act) in bucket_list:
-                                bucket_list[id(act)] = act
-                return bucket_list
-
             def update_rules_for_buckets(rule, op, table_id):
                 match = copy.copy(rule.mat)
                 """When running multi-stage table with nicira extensions, we remove
@@ -997,7 +1000,7 @@ class Runtime(object):
                 """
                 (to_add, to_delete, to_modify, to_stay) = diff_lists
                 all_rules = to_add + to_delete + to_modify + to_stay
-                bucket_list = collect_buckets(all_rules)
+                bucket_list = _collect_buckets(all_rules, CountBucket)
                 map(lambda x: x.start_update(), bucket_list.values())
                 map(lambda x: update_rules_for_buckets(x, "add", table_id), to_add)
                 map(lambda x: update_rules_for_buckets(x, "delete", table_id), to_delete)
@@ -1009,8 +1012,63 @@ class Runtime(object):
                         self.pull_existing_stats_for_bucket(x)),
                     bucket_list.values())
                 map(lambda x: x.finish_update(), bucket_list.values())
-        
-        def remove_buckets(diff_lists):
+
+        def bookkeep_netflow_buckets(diff_lists, table_id):
+            """Book-keep netflow buckets in the policy by updating the set of matches
+            referred to by each NetflowBucket.
+            """
+            from pyretic.lib.netflow import NetflowBucket
+            def add_rules_for_buckets(rule, table_id):
+                """This method is very similar to `update_rules_for_buckets` under
+                `bookkeep_count_buckets` above. The operations required to
+                update the matches corresponding to NetflowBuckets are similar
+                to but simpler than those of CountBuckets.
+                """
+                match = copy.copy(rule.mat)
+                if self.use_nx:
+                    if table_id != 0:
+                        match.pop('port', None)
+                hashable_match = util.frozendict(match)
+                rule_key = (hashable_match, rule.priority, rule.version)
+                for act in rule.actions:
+                    if isinstance(act, NetflowBucket):
+                            act.add_match(rule.mat,
+                                          rule.priority,
+                                          rule.version,
+                                          table_id)
+
+            with self.update_buckets_lock:
+                (to_add, to_delete, to_modify, to_stay) = diff_lists
+                all_rules = to_add + to_delete + to_modify + to_stay
+                bucket_list = _collect_buckets(all_rules, NetflowBucket)
+                added_rules = to_add + to_modify + to_stay
+                curr_buckets = _collect_buckets(added_rules, NetflowBucket)
+                NetflowBucket.set_active_buckets(curr_buckets.values(),
+                                                 table_id)
+                map(lambda x: x.start_update(table_id),  bucket_list.values())
+                map(lambda x: x.clear_matches(table_id), bucket_list.values())
+                map(lambda x: add_rules_for_buckets(x, table_id), added_rules)
+                map(lambda x: x.set_sw_cnt_fun(self.sw_cnt),
+                    curr_buckets.values())
+                map(lambda x: x.set_sw_port_ids_fun(self.sw_port_ids),
+                    curr_buckets.values())
+                preproc_pol = self.get_effective_policy_to_table(table_id)
+                map(lambda x: x.set_preproc_pol(preproc_pol, table_id),
+                    curr_buckets.values())
+                map(lambda x: x.finish_update(), bucket_list.values())
+                ''' Sufficient to configure OVS from any one active
+                NetflowBucket.
+
+                Caution: this statement in the runtime assumes that the
+                underlying switches are all OVS, and uses ovs-vsctl both to
+                configure netflow/sflow in the network, as well as obtain
+                mappings between the interface indices maintained by OVS and the
+                (sw,port) values that pyretic uses.
+                '''
+                if curr_buckets:
+                    curr_buckets.values()[0].config_ovs_flow()
+
+        def remove_matching_aggregate_buckets(diff_lists):
             """
             Remove CountBucket policies from classifier rule actions.
             
@@ -1019,6 +1077,7 @@ class Runtime(object):
             :returns: new difference lists with bucket actions removed
             :rtype: 4 tuple of rule lists.
             """
+            from pyretic.lib.netflow import NetflowBucket
             new_diff_lists = []
             for lst in diff_lists:
                 new_lst = []
@@ -1027,9 +1086,11 @@ class Runtime(object):
                     new_acts = filter(lambda x: not isinstance(x, CountBucket),
                                       acts)
                     notify_flag = True if len(new_acts) < len(acts) else False
+                    newer_acts = filter(lambda x:
+                                        not isinstance(x, NetflowBucket), new_acts)
                     new_rule = ListedRule(mat=rule.mat,
                                           priority=rule.priority,
-                                          actions=new_acts,
+                                          actions=newer_acts,
                                           version=rule.version,
                                           cookie=rule.cookie,
                                           notify=notify_flag,
@@ -1167,7 +1228,7 @@ class Runtime(object):
             def specialize_actions(actions,outport):
                 new_actions = []
                 for act in actions:
-                    if not isinstance(act, CountBucket):
+                    if not isinstance(act, MatchingAggregateBucket):
                         new_actions.append(copy.deepcopy(act))
                     else:
                         new_actions.append(act) # can't make copies of
@@ -1175,7 +1236,7 @@ class Runtime(object):
                                                 # forking
                 for action in new_actions:
                     try:
-                        if not isinstance(action, CountBucket):
+                        if not isinstance(action, MatchingAggregateBucket):
                             if action['port'] == outport:
                                 action['port'] = OFPP_IN_PORT
                     except:
@@ -1186,7 +1247,7 @@ class Runtime(object):
             specialized_rules = []
             for rule in classifier.rules:
                 phys_actions = filter(lambda a: (
-                        not isinstance(a, CountBucket)
+                        not isinstance(a, MatchingAggregateBucket)
                         and a['port'] != OFPP_CONTROLLER
                         and a['port'] != OFPP_IN_PORT
                         and a['port'] != CUSTOM_NEXT_TABLE_PORT),
@@ -1348,7 +1409,7 @@ class Runtime(object):
             to each table_id. """
             def different_actions(old_acts, new_acts):
                 def buckets_removed(acts):
-                    return filter(lambda a: not isinstance(a, CountBucket),
+                    return filter(lambda a: not isinstance(a, MatchingAggregateBucket),
                                   acts)
                 return buckets_removed(old_acts) != buckets_removed(new_acts)
 
@@ -1510,8 +1571,9 @@ class Runtime(object):
         Stat.collect_stat('rule count', len(new_rules))
 
         diff_lists = get_diff_lists(new_rules)
-        bookkeep_buckets(diff_lists, table_id)
-        diff_lists = remove_buckets(diff_lists)
+        bookkeep_count_buckets(diff_lists, table_id)
+        bookkeep_netflow_buckets(diff_lists, table_id)
+        diff_lists = remove_matching_aggregate_buckets(diff_lists)
         
         self.log.debug('================================')
         self.log.debug('Final classifier to be installed:')
@@ -1942,6 +2004,14 @@ class Runtime(object):
         num_tables = len(self.policy_map.keys())
         """ Assume a sequential pipeline of policies. """
         seq_list = [self.policy_map[k] for k in range(table_id, num_tables)]
+        return sequential(seq_list)
+
+    def get_effective_policy_to_table(self, table_id):
+        """ Return the effective policy to evaluate a packet, if a packet
+        arrives at a switch inport before it arrives at table `table_id`. Assume
+        a sequentual pipeline of policies stored in `policy_map`.
+        """
+        seq_list = [self.policy_map[k] for k in range(0, table_id-1)]
         return sequential(seq_list)
 
     def single_stage_policy_map(self, pol):

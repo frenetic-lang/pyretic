@@ -39,6 +39,7 @@ from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
 from pyretic.lib.path import *
 from pyretic.lib.query import counts
+from pyretic.lib.netflow import NetflowBucket
 from pyretic.core import util
 import copy
 import threading
@@ -240,6 +241,15 @@ def path_test_4_5():
     query_thread = threading.Thread(target=query_func, args=(cb,5.0))
     query_thread.daemon = True
     query_thread.start()
+    return p
+
+def path_test_4_7():
+    a1 = atom(match(switch=1))
+    a2 = atom(match(switch=2))
+    p = a1 ^ a2
+    nb = NetflowBucket()
+    p.set_bucket(nb)
+    p.register_callback(query_callback("4.7"))
     return p
 
 def path_test_5():
