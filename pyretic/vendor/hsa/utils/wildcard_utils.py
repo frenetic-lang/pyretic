@@ -4,8 +4,9 @@ Created on Jul 10, 2012
 @author: Peyman Kazemian
 '''
 
-from utils.wildcard import wildcard_is_subset,wildcard_create_from_int,\
-wildcard_create_bit_repeat
+from pyretic.vendor.hsa.utils.wildcard import \
+    wildcard_is_subset,wildcard_create_from_int,\
+    wildcard_create_bit_repeat
 
 '''
  Non-C helper functions
