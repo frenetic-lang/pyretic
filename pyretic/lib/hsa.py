@@ -230,15 +230,6 @@ if __name__ == "__main__":
     portids = get_portid_map(sw_ports)
     convert_classifier(c, hs_format, portids, sw_ports)
 
-    # TODO: fields to set in a TF rule
-    # in_port
-    # out_port
-    # mask and rewrite for modification rules such that:
-    # new_hs = (old_hs & mask) | rewrite
-
 # a rough TODO(ngsrinivas):
-# try match, mask and modify from various rule combinations
-# call create_standard_rule with a tf object
-# save the tf object to a .tf file
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
 
