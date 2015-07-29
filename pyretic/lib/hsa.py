@@ -108,6 +108,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         return mat
 
     def get_inports(mat_map):
+        ''' Return network-wide unique identifiers from match information in
+        classifiers. '''
         inports = []
         if 'switch' in mat_map:
             sw = mat_map['switch']
@@ -168,19 +170,42 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             ''' No modify actions '''
             return (None, None, [])
 
-    for rule in classifier.rules:
-        if isinstance(rule.match, match):
-            mat = get_match_wc(rule.match.map)
-        elif rule.match == identity:
-            mat = get_match_wc({})
+    def process_outports(mat_map, acts_ports):
+        ''' Return network-wide unique port identifiers from the port values
+        present in classifier actions. '''
+        out_ports = []
+        if 'switch' in mat_map:
+            sw = mat_map['switch']
+            for p in acts_ports:
+                out_ports.append(portids[(sw, p)])
         else:
+            for sw in sw_ports.keys():
+                for p in acts_ports:
+                    if p in sw_ports[sw]:
+                        out_ports.append(portids[(sw,p)])
+        return out_ports
+
+    for rule in classifier.rules:
+        try:
+            mat_map = {} if rule.match == identity else rule.match.map
+        except:
             raise RuntimeError("unexpected rule match in classifier!")
+        mat_wc = get_match_wc(mat_map)
+        in_ports = get_inports(mat_map)
         (mask, rewrite, outports) = get_action_wc(rule.actions)
+        out_ports = process_outports(mat_map, outports)
+        print '*********************'
+        print 'inports:', in_ports
+        print rule.match
+        print '--->', mat_wc
         print rule.actions
-        print '--->', mask, rewrite, outports
+        print '--->', mask, rewrite
+        print 'outports:', out_ports
+        print '*********************'
 
 def get_portid_map(sw_ports):
-    max_port = reduce(lambda acc, (x,y): max(acc, max(y)), sw_ports, 0)
+    max_port = reduce(lambda acc, (x,y): max(acc, max(y)),
+                      sw_ports.iteritems(), 0)
     portid_map = {}
     for (sw, ports) in sw_ports.iteritems():
         for port in ports:
@@ -192,7 +217,6 @@ if __name__ == "__main__":
 
     # get a classifier
     c = static_fwding_chain_3_3().compile()
-    print c
 
     # test a classifier
     sw_ports = get_switch_port_ids()
