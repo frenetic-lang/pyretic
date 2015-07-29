@@ -39,6 +39,11 @@ def pyr_hs_format():
     format["length"] = 31 # 31 byte header overall
     return format
 
+''' Temporary helper to get network switches and ports. '''
+def get_switch_port_ids():
+    return {k: v for (k,v) in
+            [(1, [1,2]), (2, [1,2,3]), (3, [1,2])]}
+
 def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
     ip2 = IPAddr('10.0.0.2')
@@ -154,6 +159,14 @@ def convert_classifier(classifier, hsf):
         (mask, rewrite, outports) = get_action_wc(rule.actions)
         print rule.actions
         print '--->', mask, rewrite, outports
+
+def get_portid_map(sw_ports):
+    max_port = reduce(lambda acc, (x,y): max(acc, max(y)), sw_ports, 0)
+    portid_map = {}
+    for (sw, ports) in sw_ports.iteritems():
+        for port in ports:
+            portid_map[(sw, port)] = (sw * max_port) + port
+    return portid_map
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
