@@ -2,6 +2,7 @@ from pyretic.core.language import *
 from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat
 from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
+from pyretic.vendor.hsa.headerspace.tf import TF
 import copy
 
 def pyr_hs_format():
@@ -185,6 +186,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
                         out_ports.append(portids[(sw,p)])
         return out_ports
 
+    ''' Classifier conversion core logic begins here. '''
+    tf = TF(hsf["length"])
     for rule in classifier.rules:
         try:
             mat_map = {} if rule.match == identity else rule.match.map
@@ -202,6 +205,10 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         print '--->', mask, rewrite
         print 'outports:', out_ports
         print '*********************'
+        rule = TF.create_standard_rule(in_ports, mat_wc,
+                                       out_ports, mask, rewrite)
+        tf.add_fwd_rule(rule)
+    tf.save_object_to_file('/tmp/tf-test.txt')
 
 def get_portid_map(sw_ports):
     max_port = reduce(lambda acc, (x,y): max(acc, max(y)),
