@@ -9,11 +9,11 @@ Major clean up on Jul 10, 2012
 @author: Peyman Kazemian
 '''
 
-from headerspace.hs import *
-from utils.wildcard import *
+from pyretic.vendor.hsa.headerspace.hs import *
+from pyretic.vendor.hsa.utils.wildcard import *
 from array import array
-from utils.wildcard_dictionary import *
-from utils.hs_hash_table import hs_hash_table
+from pyretic.vendor.hsa.utils.wildcard_dictionary import *
+from pyretic.vendor.hsa.utils.hs_hash_table import hs_hash_table
 import json
 
 class TF(object):

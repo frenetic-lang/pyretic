@@ -11,8 +11,8 @@ Replaced bytearray with wildcard on Jul 9,2012
 @author: Peyman Kazemian
 '''
 from operator import xor
-from utils.wildcard import *
-from utils.wildcard_utils import *
+from pyretic.vendor.hsa.utils.wildcard import *
+from pyretic.vendor.hsa.utils.wildcard_utils import *
 from copy import deepcopy
 
 class headerspace(object):
