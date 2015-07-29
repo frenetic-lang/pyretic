@@ -76,18 +76,29 @@ def convert_classifier(classifier, hsf):
             numeric_mac = (numeric_mac << 8) + int(p, 16)
         return numeric_mac
 
+    def set_field_val(wc_obj, field, val, process_field=True):
+        if field in ['srcmac', 'dstmac']:
+            int_val = mac2int(val) if process_field else val
+            set_header_field(hsf, wc_obj, field, int_val, 0)
+        elif field in ['srcip', 'dstip']:
+            int_val = ip2int(val) if process_field else val
+            if process_field:
+                int_val = ip2int(val)
+                right_pfx = 32 - val.prefixlen
+            else:
+                int_val = val
+                right_pfx = 0
+            set_header_field(hsf, wc_obj, field, int_val, right_pfx)
+        elif not field in ['switch', 'port']:
+            set_header_field(hsf, wc_obj, field, val, 0)
+        else:
+            ''' do nothing '''
+            return wc_obj
+
     def get_match_wc(mat_map):
         mat = wildcard_create_bit_repeat(hsf["length"], 3)
         for (field, val) in mat_map.iteritems():
-            if field in ['srcmac', 'dstmac']:
-                int_val = mac2int(val)
-                set_header_field(hsf, mat, field, int_val, 0)
-            elif field in ['srcip', 'dstip']:
-                int_val = ip2int(val)
-                right_mask = 32 - val.prefixlen
-                set_header_field(hsf, mat, field, int_val, right_mask)
-            elif not field in ['switch', 'port']:
-                set_header_field(hsf, mat, field, val, 0)
+            set_field_val(mat, field, val)
         return mat
 
     def get_action_wc(acts):
