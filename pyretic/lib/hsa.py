@@ -2,6 +2,7 @@ from pyretic.core.language import *
 from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat
 from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
+import copy
 
 def pyr_hs_format():
     '''A header-space format which defines all the packet header fields used in
@@ -102,8 +103,46 @@ def convert_classifier(classifier, hsf):
         return mat
 
     def get_action_wc(acts):
-        ''' TODO(implement logic) '''
-        return acts
+        """Return a rewrite mask, rewrite HS, and the list of outports from the
+        action list `acts` provided. For interpretation of these fields check
+        the doctext of hsa.headerspace.tf create_standard_rule.
+        """
+        new_acts = filter(lambda x: isinstance(x, modify), acts)
+        outports = []
+        '''The current transfer function rule implementation can only take one new
+        header space in rewrite rules if there are multiple outports
+        involved. If there is only one action, multiple field rewrites are
+        possible. A port must be set for rewrites to be active.
+        '''
+        if len(new_acts) > 1:
+            hsa_compilable = reduce(lambda acc, a: acc and
+                                    a.map.keys() == ['port'],
+                                    new_acts, True)
+            outports = map(lambda x: x.map['port'], new_acts)
+            if hsa_compilable:
+                return (None, None, outports)
+            else:
+                raise RuntimeError("actions not HSA-compilable! %s" % acts)
+        elif len(new_acts) == 1:
+            mod_dict = copy.copy(new_acts[0].map)
+            if 'port' in mod_dict:
+                outports = [mod_dict['port']]
+                del mod_dict['port']
+            else:
+                return (None, None, [])
+            if len(mod_dict.keys()) > 0:
+                ''' There are rewritten packet header fields. '''
+                mask = wildcard_create_bit_repeat(hsf["length"], 0x2)
+                rewrite = wildcard_create_bit_repeat(hsf["length"], 0x1)
+                for (field, val) in mod_dict.iteritems():
+                    set_field_val(mask, field, 0, process_field=False)
+                    set_field_val(rewrite, field, val)
+                return (mask, rewrite, outports)
+            else:
+                return (None, None, outports)
+        else:
+            ''' No modify actions '''
+            return (None, None, [])
 
     for rule in classifier.rules:
         if isinstance(rule.match, match):
@@ -112,9 +151,9 @@ def convert_classifier(classifier, hsf):
             mat = get_match_wc({})
         else:
             raise RuntimeError("unexpected rule match in classifier!")
-        ''' TODO: implement action logic; create a rule and insert into TF
-        object. '''
-        acts = get_action_wc(rule.actions)
+        (mask, rewrite, outports) = get_action_wc(rule.actions)
+        print rule.actions
+        print '--->', mask, rewrite, outports
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
