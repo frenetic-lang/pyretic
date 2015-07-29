@@ -64,7 +64,7 @@ def static_fwding_chain_3_3():
         (match(dstip=ip4) >> (modify(dstport=80) >> modify(port=4)))
         )
 
-def convert_classifier(classifier, hsf):
+def convert_classifier(classifier, hsf, portids, sw_ports):
     """Function to convert a classifier `classifier` into a header space given by a
     header space format dictionary `hsf`.
     """
@@ -106,6 +106,25 @@ def convert_classifier(classifier, hsf):
         for (field, val) in mat_map.iteritems():
             set_field_val(mat, field, val)
         return mat
+
+    def get_inports(mat_map):
+        inports = []
+        if 'switch' in mat_map:
+            sw = mat_map['switch']
+            if 'port' in mat_map:
+                inports.append(portids[(sw, mat_map['port'])])
+            else:
+                for p in sw_ports[sw]:
+                    inports.append(portids[(sw,p)])
+        else:
+            if 'port' in mat_map:
+                p = mat_map['port']
+                for sw in sw_ports.keys():
+                    if p in sw_ports[sw]:
+                        inports.append(portids[(sw,p)])
+            else:
+                inports = portids.values()
+        return inports
 
     def get_action_wc(acts):
         """Return a rewrite mask, rewrite HS, and the list of outports from the
@@ -176,7 +195,9 @@ if __name__ == "__main__":
     print c
 
     # test a classifier
-    convert_classifier(c, hs_format)
+    sw_ports = get_switch_port_ids()
+    portids = get_portid_map(sw_ports)
+    convert_classifier(c, hs_format, portids, sw_ports)
 
     # TODO: fields to set in a TF rule
     # in_port
