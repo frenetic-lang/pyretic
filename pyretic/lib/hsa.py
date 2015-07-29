@@ -42,6 +42,7 @@ def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
     ip2 = IPAddr('10.0.0.2')
     ip3 = IPAddr('10.0.0.3')
+    ip4 = IPAddr('10.0.0.4')
     return (
         (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
                               (match(switch=2) >> fwd(1)) +
@@ -52,8 +53,9 @@ def static_fwding_chain_3_3():
         (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
                               (match(switch=2) >> fwd(2)) +
                               (match(switch=3) >> fwd(2)))) +
-        ~match(srcmac='00:00:00:00:00:01') +
-        match(ethtype=IP_TYPE)
+        (~match(srcmac='00:00:00:00:00:01')) +
+        (match(ethtype=IP_TYPE)) +
+        (match(dstip=ip4) >> (modify(dstport=80) >> modify(port=4)))
         )
 
 def convert_classifier(classifier, hsf):
@@ -99,8 +101,6 @@ def convert_classifier(classifier, hsf):
             mat = get_match_wc({})
         else:
             raise RuntimeError("unexpected rule match in classifier!")
-        print "Got match header space (excluding sw/port):"
-        print mat
         ''' TODO: implement action logic; create a rule and insert into TF
         object. '''
         acts = get_action_wc(rule.actions)
