@@ -188,9 +188,13 @@ def _sequence_actions(a1, as2):
             elif a2 == identity:
                 new_actions.add(a1)
             elif isinstance(a2, modify):
-                new_a1 = modify(**a1.map.copy())
-                new_a1.map.update(a2.map)
-                new_actions.add(new_a1)
+                new_a1_map = a1.map.copy()
+                new_a1_map.update(a2.map)
+                new_actions.add(modify(**new_a1_map))
+                # TODO(ngsrinivas): remove later if no issues
+                # new_a1 = modify(**a1.map.copy())
+                # new_a1.map.update(a2.map)
+                # new_actions.add(new_a1)
             else:
                 raise TypeError
         return new_actions
