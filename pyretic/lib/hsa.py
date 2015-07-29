@@ -1,6 +1,7 @@
 from pyretic.core.language import *
-from pyretic.vendor.hsa.utils.wildcard import *
-from pyretic.vendor.hsa.utils.wildcard_utils import *
+from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat
+from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
+from ipaddr import IPv4Network
 
 def pyr_hs_format():
     format = {}
