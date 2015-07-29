@@ -107,9 +107,19 @@ def convert_classifier(classifier, hsf):
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
-    match = wildcard_create_bit_repeat(hs_format["length"], 3)
-    set_header_field(hs_format, match, "dstport", 80, 0)
-    print match
+
+    # get a classifier
+    c = static_fwding_chain_3_3().compile()
+    print c
+
+    # test a classifier
+    convert_classifier(c, hs_format)
+
+    # TODO: fields to set in a TF rule
+    # in_port
+    # out_port
+    # mask and rewrite for modification rules such that:
+    # new_hs = (old_hs & mask) | rewrite
 
 # a rough TODO(ngsrinivas):
 # try match, mask and modify from various rule combinations
