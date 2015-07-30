@@ -258,6 +258,14 @@ def get_edge_list(edges):
         edge_list.append((s1, ports[s1], s2, ports[s2]))
     return edge_list
 
+def write_port_map(sw_ports, portids):
+    f = open('%s/port_map.txt' % TFS_FOLDER, 'w')
+    for (sw, ports) in sw_ports.iteritems():
+        f.write('$s%d\n' % sw)
+        for p in ports:
+            f.write('s%d-eth%d:%d\n' % (sw, p, portids[(sw,p)]))
+    f.close()
+
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
     logging.basicConfig()
@@ -273,6 +281,9 @@ if __name__ == "__main__":
     # test a topology transfer function
     edge_list = get_edge_list(get_network_links())
     convert_topology(edge_list, hs_format, portids)
+
+    # write out a port map
+    write_port_map(sw_ports, portids)
 
 # a rough TODO(ngsrinivas):
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
