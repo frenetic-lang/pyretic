@@ -3,7 +3,7 @@ from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat
 from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
-import copy
+import copy, logging
 
 TFS_FOLDER = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
 SWITCH_MULTIPLIER = 100000
@@ -81,6 +81,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
     """Function to convert a classifier `classifier` into a header space given by a
     header space format dictionary `hsf`.
     """
+    hsalib_log = logging.getLogger('%s.convert_classifier' % __name__)
+
     def ip2int(ip):
         assert isinstance(ip, IPv4Network)
         numeric_ip = 0
@@ -115,12 +117,12 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             set_field_val(mat, field, val)
         return mat
 
-    def get_inports(mat_map):
+    def get_inports(mat_map, sw):
         ''' Return network-wide unique identifiers from match information in
         classifiers. '''
         inports = []
         if 'switch' in mat_map:
-            sw = mat_map['switch']
+            assert sw == mat_map['switch']
             if 'port' in mat_map:
                 inports.append(portids[(sw, mat_map['port'])])
             else:
@@ -129,11 +131,10 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         else:
             if 'port' in mat_map:
                 p = mat_map['port']
-                for sw in sw_ports.keys():
-                    if p in sw_ports[sw]:
-                        inports.append(portids[(sw,p)])
+                if p in sw_ports[sw]:
+                    inports.append(portids[(sw,p)])
             else:
-                inports = portids.values()
+                inports = [portids[(sw,x)] for x in sw_ports[sw]]
         return inports
 
     def get_action_wc(acts):
@@ -179,19 +180,17 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             ''' No modify actions '''
             return (None, None, [], False)
 
-    def process_outports(mat_map, acts_ports):
+    def process_outports(mat_map, acts_ports, sw, rule):
         ''' Return network-wide unique port identifiers from the port values
         present in classifier actions. '''
         out_ports = []
-        if 'switch' in mat_map:
-            sw = mat_map['switch']
-            for p in acts_ports:
-                out_ports.append(portids[(sw, p)])
-        else:
-            for sw in sw_ports.keys():
-                for p in acts_ports:
-                    if p in sw_ports[sw]:
-                        out_ports.append(portids[(sw,p)])
+        for p in acts_ports:
+            if p in sw_ports[sw]:
+                out_ports.append(portids[(sw,p)])
+            else:
+                hsalib_log.warn("Non-existent port specified: "
+                                "(sw %d, p %d) in %s" % (
+                                    sw, p, str(rule)))
         return out_ports
 
     def init_tfs():
@@ -213,36 +212,30 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         """ Save a dictionary of transfer functions to various files. """
         global TFS_FOLDER
         for (sw, tf) in tfs_map.iteritems():
-            print tf.to_string()
             tf.save_object_to_file('%s/s%d.tf' % (TFS_FOLDER, sw))
 
     ''' Classifier conversion core logic begins here. '''
     tfs_map = init_tfs()
-    for rule in classifier.rules:
-        try:
-            mat_map = {} if rule.match == identity else rule.match.map
-        except:
-            raise RuntimeError("unexpected rule match in classifier!")
-        mat_wc = get_match_wc(mat_map)
-        in_ports = get_inports(mat_map)
-        (mask, rewrite, outports, rw) = get_action_wc(rule.actions)
-        out_ports = process_outports(mat_map, outports)
-        print '*********************'
-        print 'inports:', in_ports
-        print rule.match
-        print '--->', mat_wc
-        print rule.actions
-        print '--->', mask, rewrite
-        print 'outports:', out_ports
-        print '*********************'
-        rule = TF.create_standard_rule(in_ports, mat_wc,
-                                       out_ports, mask, rewrite)
-        tfs = get_tf_list(mat_map, tfs_map)
-        for tf in tfs:
-            if rw:
-                tf.add_rewrite_rule(rule)
-            else:
-                tf.add_fwd_rule(rule)
+    for sw in sw_ports.keys():
+        tf = tfs_map[sw]
+        for rule in classifier.rules:
+            try:
+                mat_map = {} if rule.match == identity else rule.match.map
+            except:
+                raise RuntimeError("unexpected rule match in classifier!")
+            # determine first if this rule applicable to switch sw
+            if (('switch' in mat_map and mat_map['switch'] == sw) or
+                (not 'switch' in mat_map)):
+                mat_wc = get_match_wc(mat_map)
+                in_ports = get_inports(mat_map, sw)
+                (mask, rewrite, outports, rw) = get_action_wc(rule.actions)
+                out_ports = process_outports(mat_map, outports, sw, rule)
+                rule = TF.create_standard_rule(in_ports, mat_wc, out_ports,
+                                               mask, rewrite)
+                if rw:
+                    tf.add_rewrite_rule(rule)
+                else:
+                    tf.add_fwd_rule(rule)
     save_tfs(tfs_map)
 
 def convert_topology(edges, hsf, portids):
@@ -274,6 +267,7 @@ def get_edge_list(edges):
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
+    logging.basicConfig()
 
     # get a classifier
     c = static_fwding_chain_3_3().compile()
