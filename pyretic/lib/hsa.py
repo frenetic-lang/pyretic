@@ -5,6 +5,8 @@ from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
 import copy
 
+tfs_folder = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
+
 def pyr_hs_format():
     '''A header-space format which defines all the packet header fields used in
     pyretic.
@@ -216,7 +218,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             tf.add_rewrite_rule(rule)
         else:
             tf.add_fwd_rule(rule)
-    tf.save_object_to_file('/tmp/tf-test.txt')
+    global tfs_folder
+    tf.save_object_to_file('%s/mininet.tf' % tfs_folder)
 
 def convert_topology(edges, hsf, portids):
     """ Convert a list of edges representing the topology into a topology
@@ -229,7 +232,8 @@ def convert_topology(edges, hsf, portids):
         rule = TF.create_standard_rule([portids[(s2,p2)]], None,
                                        [portids[(s1,p1)]], None, None)
         ttf.add_link_rule(rule)
-    ttf.save_object_to_file("/tmp/ttf-test.txt")
+    global tfs_folder
+    ttf.save_object_to_file("%s/topology.tf" % tfs_folder)
 
 def get_portid_map(sw_ports):
     max_port = reduce(lambda acc, (x,y): max(acc, max(y)),
