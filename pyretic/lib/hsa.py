@@ -6,6 +6,7 @@ from pyretic.vendor.hsa.headerspace.tf import TF
 import copy
 
 tfs_folder = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
+SWITCH_MULTIPLIER = 100000
 
 def pyr_hs_format():
     '''A header-space format which defines all the packet header fields used in
@@ -236,12 +237,10 @@ def convert_topology(edges, hsf, portids):
     ttf.save_object_to_file("%s/topology.tf" % tfs_folder)
 
 def get_portid_map(sw_ports):
-    max_port = reduce(lambda acc, (x,y): max(acc, max(y)),
-                      sw_ports.iteritems(), 0)
     portid_map = {}
     for (sw, ports) in sw_ports.iteritems():
         for port in ports:
-            portid_map[(sw, port)] = (sw * max_port) + port
+            portid_map[(sw, port)] = ((sw+1) * SWITCH_MULTIPLIER) + port
     return portid_map
 
 def get_edge_list(edges):
