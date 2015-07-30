@@ -223,6 +223,19 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             tf.add_fwd_rule(rule)
     tf.save_object_to_file('/tmp/tf-test.txt')
 
+def convert_topology(edges, hsf, portids):
+    """ Convert a list of edges representing the topology into a topology
+    transfer function. """
+    ttf = TF(hsf["length"] * 2)
+    for (s1, p1, s2, p2) in edges:
+        rule = TF.create_standard_rule([portids[(s1,p1)]], None,
+                                       [portids[(s2,p2)]], None, None)
+        ttf.add_link_rule(rule)
+        rule = TF.create_standard_rule([portids[(s2,p2)]], None,
+                                       [portids[(s1,p1)]], None, None)
+        ttf.add_link_rule(rule)
+    ttf.save_object_to_file("/tmp/ttf-test.txt")
+
 def get_portid_map(sw_ports):
     max_port = reduce(lambda acc, (x,y): max(acc, max(y)),
                       sw_ports.iteritems(), 0)
@@ -248,6 +261,10 @@ if __name__ == "__main__":
     sw_ports = get_switch_port_ids()
     portids = get_portid_map(sw_ports)
     convert_classifier(c, hs_format, portids, sw_ports)
+
+    # test a topology transfer function
+    edge_list = get_edge_list(get_network_links())
+    convert_topology(edge_list, hs_format, portids)
 
 # a rough TODO(ngsrinivas):
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
