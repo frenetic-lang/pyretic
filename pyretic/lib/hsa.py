@@ -5,7 +5,7 @@ from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
 import copy
 
-tfs_folder = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
+TFS_FOLDER = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
 SWITCH_MULTIPLIER = 100000
 
 def pyr_hs_format():
@@ -194,8 +194,30 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
                         out_ports.append(portids[(sw,p)])
         return out_ports
 
+    def init_tfs():
+        """ Initialize one transfer function per device. """
+        tfs_map = {}
+        for sw in sw_ports.keys():
+            tfs_map[sw] = TF(hsf["length"])
+            tfs_map[sw].set_prefix_id("s%d" % sw)
+        return tfs_map
+
+    def get_tf_list(mat_map, tfs_map):
+        """ Return a list of transfer functions affected by a specific match. """
+        if 'switch' in mat_map:
+            return [tfs_map[mat_map['switch']]]
+        else:
+            return tfs_map.values()
+
+    def save_tfs(tfs_map):
+        """ Save a dictionary of transfer functions to various files. """
+        global TFS_FOLDER
+        for (sw, tf) in tfs_map.iteritems():
+            print tf.to_string()
+            tf.save_object_to_file('%s/s%d.tf' % (TFS_FOLDER, sw))
+
     ''' Classifier conversion core logic begins here. '''
-    tf = TF(hsf["length"])
+    tfs_map = init_tfs()
     for rule in classifier.rules:
         try:
             mat_map = {} if rule.match == identity else rule.match.map
@@ -215,12 +237,13 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         print '*********************'
         rule = TF.create_standard_rule(in_ports, mat_wc,
                                        out_ports, mask, rewrite)
-        if rw:
-            tf.add_rewrite_rule(rule)
-        else:
-            tf.add_fwd_rule(rule)
-    global tfs_folder
-    tf.save_object_to_file('%s/mininet.tf' % tfs_folder)
+        tfs = get_tf_list(mat_map, tfs_map)
+        for tf in tfs:
+            if rw:
+                tf.add_rewrite_rule(rule)
+            else:
+                tf.add_fwd_rule(rule)
+    save_tfs(tfs_map)
 
 def convert_topology(edges, hsf, portids):
     """ Convert a list of edges representing the topology into a topology
@@ -233,8 +256,8 @@ def convert_topology(edges, hsf, portids):
         rule = TF.create_standard_rule([portids[(s2,p2)]], None,
                                        [portids[(s1,p1)]], None, None)
         ttf.add_link_rule(rule)
-    global tfs_folder
-    ttf.save_object_to_file("%s/topology.tf" % tfs_folder)
+    global TFS_FOLDER
+    ttf.save_object_to_file("%s/topology.tf" % TFS_FOLDER)
 
 def get_portid_map(sw_ports):
     portid_map = {}
