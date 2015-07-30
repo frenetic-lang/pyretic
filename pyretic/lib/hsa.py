@@ -201,13 +201,6 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             tfs_map[sw].set_prefix_id("s%d" % sw)
         return tfs_map
 
-    def get_tf_list(mat_map, tfs_map):
-        """ Return a list of transfer functions affected by a specific match. """
-        if 'switch' in mat_map:
-            return [tfs_map[mat_map['switch']]]
-        else:
-            return tfs_map.values()
-
     def save_tfs(tfs_map):
         """ Save a dictionary of transfer functions to various files. """
         global TFS_FOLDER
