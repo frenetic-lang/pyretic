@@ -98,12 +98,7 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             set_header_field(hsf, wc_obj, field, int_val, 0)
         elif field in ['srcip', 'dstip']:
             int_val = ip2int(val) if process_field else val
-            if process_field:
-                int_val = ip2int(val)
-                right_pfx = 32 - val.prefixlen
-            else:
-                int_val = val
-                right_pfx = 0
+            right_pfx = (32 - val.prefixlen) if process_field else 0
             set_header_field(hsf, wc_obj, field, int_val, right_pfx)
         elif not field in ['switch', 'port']:
             set_header_field(hsf, wc_obj, field, val, 0)
