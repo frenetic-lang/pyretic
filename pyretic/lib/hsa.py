@@ -147,7 +147,7 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
                                     new_acts, True)
             outports = map(lambda x: x.map['port'], new_acts)
             if hsa_compilable:
-                return (None, None, outports)
+                return (None, None, outports, False)
             else:
                 raise RuntimeError("actions not HSA-compilable! %s" % acts)
         elif len(new_acts) == 1:
@@ -156,20 +156,21 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
                 outports = [mod_dict['port']]
                 del mod_dict['port']
             else:
-                return (None, None, [])
+                return (None, None, [], False)
             if len(mod_dict.keys()) > 0:
                 ''' There are rewritten packet header fields. '''
+                rw_rule = True
                 mask = wildcard_create_bit_repeat(hsf["length"], 0x2)
                 rewrite = wildcard_create_bit_repeat(hsf["length"], 0x1)
                 for (field, val) in mod_dict.iteritems():
                     set_field_val(mask, field, 0, process_field=False)
                     set_field_val(rewrite, field, val)
-                return (mask, rewrite, outports)
+                return (mask, rewrite, outports, True)
             else:
-                return (None, None, outports)
+                return (None, None, outports, False)
         else:
             ''' No modify actions '''
-            return (None, None, [])
+            return (None, None, [], False)
 
     def process_outports(mat_map, acts_ports):
         ''' Return network-wide unique port identifiers from the port values
@@ -195,7 +196,7 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             raise RuntimeError("unexpected rule match in classifier!")
         mat_wc = get_match_wc(mat_map)
         in_ports = get_inports(mat_map)
-        (mask, rewrite, outports) = get_action_wc(rule.actions)
+        (mask, rewrite, outports, rw) = get_action_wc(rule.actions)
         out_ports = process_outports(mat_map, outports)
         print '*********************'
         print 'inports:', in_ports
@@ -207,7 +208,10 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         print '*********************'
         rule = TF.create_standard_rule(in_ports, mat_wc,
                                        out_ports, mask, rewrite)
-        tf.add_fwd_rule(rule)
+        if rw:
+            tf.add_rewrite_rule(rule)
+        else:
+            tf.add_fwd_rule(rule)
     tf.save_object_to_file('/tmp/tf-test.txt')
 
 def get_portid_map(sw_ports):
