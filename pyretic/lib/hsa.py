@@ -45,6 +45,15 @@ def get_switch_port_ids():
     return {k: v for (k,v) in
             [(1, [1,2]), (2, [1,2,3]), (3, [1,2])]}
 
+def get_network_links():
+    '''Temporary helper to get network links.
+
+    Return a list where the format of each entry is (switch_i, switch_j, {i:
+    port_on_i, j: port_on_j}) for each link in the network.
+    '''
+    return [(1, 2, {1:1, 2:1}),
+            (2, 3, {2:2, 3:1})]
+
 def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
     ip2 = IPAddr('10.0.0.2')
@@ -222,6 +231,12 @@ def get_portid_map(sw_ports):
         for port in ports:
             portid_map[(sw, port)] = (sw * max_port) + port
     return portid_map
+
+def get_edge_list(edges):
+    edge_list = []
+    for (s1, s2, ports) in edges:
+        edge_list.append((s1, ports[s1], s2, ports[s2]))
+    return edge_list
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
