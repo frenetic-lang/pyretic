@@ -64,7 +64,8 @@ def static_fwding_chain_3_3():
     ip4 = IPAddr('10.0.0.4')
     return (
         (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                              (match(switch=2) >> fwd(1)) +
+                              (match(switch=2) >> modify(dstport=79)
+                               >> fwd(1)) +
                               (match(switch=3) >> fwd(1)))) +
         (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
                               (match(switch=2) >> fwd(3)) +
@@ -73,9 +74,8 @@ def static_fwding_chain_3_3():
                               (match(switch=2) >> fwd(2)) +
                               (match(switch=3) >> fwd(2)))) +
         (~match(srcmac='00:00:00:00:00:01')) +
-        (match(ethtype=IP_TYPE)) +
-        (match(dstip=ip4) >> (modify(dstport=80) >> modify(port=4)))
-        )
+        (match(ethtype=IP_TYPE))
+    )
 
 def convert_classifier(classifier, hsf, portids, sw_ports):
     """Function to convert a classifier `classifier` into a header space given by a
