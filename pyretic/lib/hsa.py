@@ -199,6 +199,7 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         for sw in sw_ports.keys():
             tfs_map[sw] = TF(hsf["length"])
             tfs_map[sw].set_prefix_id("s%d" % sw)
+            tfs_map[sw].set_send_on_receiving_port(True)
         return tfs_map
 
     def save_tfs(tfs_map):
