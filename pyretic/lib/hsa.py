@@ -249,7 +249,7 @@ def get_portid_map(sw_ports):
     portid_map = {}
     for (sw, ports) in sw_ports.iteritems():
         for port in ports:
-            portid_map[(sw, port)] = ((sw+1) * SWITCH_MULTIPLIER) + port
+            portid_map[(sw, port)] = (sw * SWITCH_MULTIPLIER) + port
     return portid_map
 
 def get_edge_list(edges):
