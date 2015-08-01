@@ -5,7 +5,7 @@ from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
 import copy, logging
 
-TFS_FOLDER = '/home/mininet/hassel-public/hassel-c/tfs/pyretic'
+TFS_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c/tfs/pyretic'
 SWITCH_MULTIPLIER = 100000
 
 def pyr_hs_format():
