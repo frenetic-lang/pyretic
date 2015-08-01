@@ -20,3 +20,17 @@ frenetic
 ######################################
 pyretic/scratch/latest-dump.txt
 pyretic/scratch/nfcapd.*
+
+# hassel-c build and data files #
+#################################
+pyretic/lib/hassel-c/build/*.o
+pyretic/lib/hassel-c/build/apps/*.o
+pyretic/lib/hassel-c/data/pyretic.dat
+pyretic/lib/hassel-c/gen
+pyretic/lib/hassel-c/hs-test
+pyretic/lib/hassel-c/i2
+pyretic/lib/hassel-c/pyretic
+pyretic/lib/hassel-c/stanford
+pyretic/lib/hassel-c/test
+pyretic/lib/hassel-c/tfs/pyretic/port_map.txt
+pyretic/lib/hassel-c/tfs/pyretic/*.tf
