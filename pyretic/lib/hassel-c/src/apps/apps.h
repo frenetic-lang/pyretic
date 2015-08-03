@@ -40,6 +40,38 @@ load (char *net)
   if (atexit (unload)) errx (1, "Failed to set exit handler.");
 }
 
+bool
+hs_inters_test ()
+{
+  struct hs hs1, hs2, hs3, hs4;
+  memset (&hs1, 0, sizeof hs1);
+  memset (&hs2, 0, sizeof hs2);
+  memset (&hs3, 0, sizeof hs3);
+  memset (&hs4, 0, sizeof hs4);
+  hs1.len = hs2.len = hs3.len = hs4.len = data_arrs_len;
+  hs_add (&hs1, array_create (hs1.len, BIT_X));
+  hs_add (&hs2, array_create (hs2.len, BIT_0));
+  hs_add (&hs3, array_create (hs3.len, BIT_1));
+  hs_add (&hs4, array_create (hs4.len, BIT_Z));
+  struct hs hs_res1, hs_res2, hs_res3, hs_res4;
+  array_t * a = array_from_str("xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,00000000,01001111,xxxxxxxx,xxxxxxxx,xxxxxxxx,00001010,00000000,00000000,00000001,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,xxxxxxxx,00000000,00000000,00000000,00000000,00000000,00000001");
+  bool matched;
+  matched = hs_isect_arr (&hs_res1, &hs1, a);
+  printf("Got you there. %d\n", matched);
+  if (matched) hs_print (&hs_res1);
+  matched = hs_isect_arr (&hs_res2, &hs2, a);
+  printf("Got you there. %d\n", matched);
+  if (matched) hs_print (&hs_res2);
+  matched = hs_isect_arr (&hs_res3, &hs3, a);
+  printf("Got you there. %d\n", matched);
+  if (matched) hs_print (&hs_res3);
+  matched = hs_isect_arr (&hs_res4, &hs4, a);
+  printf("Got you there. %d\n", matched);
+  if (matched) hs_print (&hs_res4);
+  printf("All done, apparently.\n");
+  return matched;
+}
+
 int
 main (int argc, char **argv)
 {
@@ -60,6 +92,9 @@ main (int argc, char **argv)
   int hop_count = 0;
   int offset = 1;
   bool find_loop = false;
+
+  // sample header space intersection test. TODO(ngsrinivas): remove later.
+  hs_inters_test();
 
   if (strcmp(argv[offset],"-loop") == 0) {
 	  find_loop = true;
