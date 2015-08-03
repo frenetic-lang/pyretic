@@ -18,6 +18,7 @@ static const uint32_t *g_out;
 static int g_nout;
 static uint32_t g_hop_count;
 static bool g_find_loop;
+static array_t *g_out_arr;
 
 struct tdata {
   pthread_t tid;
@@ -114,6 +115,7 @@ reach_thread (void *vdata)
     pthread_mutex_unlock (&wait_lock);
 
     struct res *cur;
+    struct hs hs_isect_res;
     while ((cur = queue.head)) {
       list_pop (&queue);
 
@@ -125,7 +127,8 @@ reach_thread (void *vdata)
       struct res *ntf_cur = ntf_res.head;
       while (ntf_cur) {
         struct res *ntf_next = ntf_cur->next;
-        if (!g_find_loop && (!out || int_find (ntf_cur->port, out, nout))) {
+        if (!g_find_loop && (!out || int_find (ntf_cur->port, out, nout)) &&
+	    hs_isect_arr(&hs_isect_res, &ntf_cur->hs, g_out_arr)) {
           int count = 0;
           if (g_hop_count > 0) {
           	for (const struct res *r = cur; r != NULL; r = r->parent, count++);
@@ -158,7 +161,11 @@ reach_thread (void *vdata)
           }
 
           ref_add (ttf_cur, cur);
-          if (!g_find_loop && out && int_find (ttf_cur->port, out, nout)) list_append (res, ttf_cur);
+          if (!g_find_loop && ((out && int_find (ttf_cur->port, out, nout)) &&
+			       hs_isect_arr(&hs_isect_res, &ttf_cur->hs,
+						   g_out_arr))) {
+	    list_append (res, ttf_cur);
+	  }
           else {
             int new_sw = ntf_get_sw (ttf_cur->port);
             list_append (&nextqs[new_sw], ttf_cur);
@@ -188,7 +195,8 @@ reach_thread (void *vdata)
 }
 
 struct list_res
-reachability (const uint32_t *out, int nout, int hop_count, bool find_loop)
+reachability (const uint32_t *out, int nout, int hop_count, bool find_loop,
+	      array_t * out_arr)
 {
   struct list_res res = {0};
   int n = data_file->ntfs - 1;
@@ -199,6 +207,7 @@ reachability (const uint32_t *out, int nout, int hop_count, bool find_loop)
   g_nout = nout;
   g_hop_count = hop_count;
   g_find_loop = find_loop;
+  g_out_arr   = out_arr;
 
   for (int i = 0; i < n; i++) {
     struct tdata *p = &data[i];
