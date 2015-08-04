@@ -17,6 +17,8 @@ struct tf;
 struct res_rule {
   char *tf;
   int rule;
+  struct rule *tf_rule;
+  struct tf *tf_tf;
 };
 
 struct res {
@@ -41,7 +43,8 @@ void        res_print    (const struct res *res);
 /* Create res based on SRC, with HS and PORT. If APPEND, copy rules from SRC. */
 struct res *res_extend   (const struct res *src, const struct hs *hs,
                           uint32_t port, bool append);
-void        res_rule_add (struct res *res, const struct tf *tf, int rule);
+void        res_rule_add (struct res *res, const struct tf *tf, int rule,
+			  const struct rule *tf_rule);
 
 LIST (res);
 void list_res_free  (struct list_res *l);

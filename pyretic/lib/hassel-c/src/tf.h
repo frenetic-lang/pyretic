@@ -53,5 +53,7 @@ struct list_res tf_apply (const struct tf *tf, const struct res *in, bool append
 struct tf      *tf_get   (int idx);
 void            tf_print (const struct tf *tf);
 
+void rule_print (const struct rule *r, const struct tf *tf);
+
 #endif
 

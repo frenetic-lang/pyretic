@@ -63,12 +63,17 @@ res_print (const struct res *res)
 {
   if (res->parent) res_print (res->parent);
   printf ("-> Port: %d", res->port);
+  printf ("\n");
+  printf ("-> HS: \n");
+  hs_print (&res->hs);
   if (res->rules.cur) {
     printf (", Rules: ");
     for (int i = 0; i < res->rules.cur; i++) {
       if (i) printf (", ");
       const struct res_rule *r = &res->rules.arr[i];
       printf ("%s_%d", r->tf ? r->tf : "", r->rule);
+      printf ("\n");
+      rule_print (r->tf_rule, r->tf_tf);
     }
   }
   printf ("\n");
@@ -90,9 +95,11 @@ res_extend (const struct res *src, const struct hs *hs, uint32_t port,
 }
 
 void
-res_rule_add (struct res *res, const struct tf *tf, int rule)
+res_rule_add (struct res *res, const struct tf *tf, int rule,
+	      const struct rule *tf_rule)
 {
-  struct res_rule tmp = {tf->prefix ? DATA_STR (tf->prefix) : NULL, rule};
+  struct res_rule tmp = {tf->prefix ? DATA_STR (tf->prefix) : NULL, rule,
+			 (struct rule*) tf_rule, (struct tf*) tf};
   assert (res->rules.cur < res->rules.n);
   res->rules.arr[res->rules.cur++] = tmp;
 }

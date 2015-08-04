@@ -105,7 +105,7 @@ rule_apply (const struct rule *r, const struct tf *tf, const struct res *in,
       tmp->hs = hs;
       used_hs = true;
     }
-    res_rule_add (tmp, tf, r->idx);
+    res_rule_add (tmp, tf, r->idx, r);
     list_append (&res, tmp);
   }
 
@@ -122,7 +122,7 @@ rule_get (const struct tf *tf, uint32_t port)
   return bsearch (&tmp, m->elems, m->n, sizeof tmp, map_cmp);
 }
 
-static void
+void
 rule_print (const struct rule *r, const struct tf *tf)
 {
   printf ("Rule %u\nIn: ", r->idx);
