@@ -2712,9 +2712,9 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
-        #return q == cls.get_dead_state(dfa)
+        return q == cls.get_dead_state(dfa)
         #TODO(mina): fix
-        return False
+        #return False
 
     @classmethod
     def get_num_states(cls, dfa):
@@ -2811,7 +2811,7 @@ class ragel_dfa_utils(common_dfa_utils):
         else:
             (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
-        #cls.add_dead_edges(edges, state_num)
+        cls.add_dead_edges(edges, state_num)
        
         #print 'dfa stat count', state_num
         #print 'dfa edge count', len(edges)  
