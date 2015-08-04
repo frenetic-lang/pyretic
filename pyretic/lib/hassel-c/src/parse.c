@@ -114,7 +114,7 @@ parse_tf (const char *name)
   if (res == 2) tf->prefix = xstrdup (prefix);
 
   /* Skip next line */
-  getline (&line, &n, in);
+  if (getline (&line, &n, in) == -1) printf("Couldn't read the first line of input.\n");
   while ((len = getline (&line, &n, in)) != -1) {
     char *save;
     char *type, *instr, *match, *mask, *rewrite, *outstr, *affected;

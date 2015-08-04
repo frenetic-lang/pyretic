@@ -82,7 +82,7 @@ main (int argc, char **argv)
 
   bool one_step = false;
   char *net = basename (argv[0]);
-  chdir (dirname (argv[0]));
+  if (chdir (dirname (argv[0])) == -1) printf("Couldn't change working directory.\n");
   load (net);
   app_init ();
 
