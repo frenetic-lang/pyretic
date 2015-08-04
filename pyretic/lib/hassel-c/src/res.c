@@ -79,6 +79,28 @@ res_print (const struct res *res)
   printf ("\n");
 }
 
+void
+res_print_backward (const struct res *res)
+{
+  printf ("-> Port: %d", res->port);
+  printf ("\n");
+  printf ("-> HS: \n");
+  hs_print (&res->hs);
+  //printf("trying to print rules\n");
+  if (res->rules.cur) {
+    printf (", Rules: ");
+    for (int i = 0; i < res->rules.cur; i++) {
+      if (i) printf (", ");
+      const struct res_rule *r = &res->rules.arr[i];
+      printf ("%s_%d", r->tf ? r->tf : "", r->rule);
+      printf ("\n");
+      rule_print (r->tf_rule, r->tf_tf);
+    }
+  }
+  printf ("\n");
+  if (res->parent) res_print (res->parent);
+}
+
 
 struct res *
 res_extend (const struct res *src, const struct hs *hs, uint32_t port,
@@ -116,6 +138,19 @@ list_res_print (const struct list_res *l)
   int count = 0;
   for (const struct res *res = l->head; res; res = res->next, count++) {
     res_print (res);
+    printf ("   HS: ");
+    hs_print (&res->hs);
+    printf ("-----\n");
+  }
+  printf ("Count: %d\n", count);
+}
+
+void
+list_res_print_backward (const struct list_res *l)
+{
+  int count = 0;
+  for (const struct res *res = l->head; res; res = res->next, count++) {
+    res_print_backward (res);
     printf ("   HS: ");
     hs_print (&res->hs);
     printf ("-----\n");
