@@ -146,6 +146,71 @@ rule_print (const struct rule *r, const struct tf *tf)
   printf ("-----\n");
 }
 
+static void
+deps_diff_inv (struct hs *hs, uint32_t port, const struct deps *deps,
+	       const struct tf *tf)
+{
+  for (int i = 0; i < deps->n; i++) {
+    const struct dep *dep = &deps->deps[i];
+    if (dep->port > 0 && dep->port != port) continue;
+    if (dep->port < 0 && !port_match (port, dep->port, tf)) continue;
+    hs_diff (hs, DATA_ARR (dep->match));
+  }
+}
+
+struct list_res
+rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in)
+{
+  /* Given a rule `r` in a tf `tf`, apply the inverse of `r` on the input
+     (headerspace,port) `in`. */
+  uint32_t app[MAX_APP];
+  int napp = 0;
+  struct list_res res = {0};
+
+  // prune cases where rule outport doesn't include the current port
+  if (r->out > 0 && r->out != in->port) return res;
+  if (r->out < 0 && !port_match(in->port, r->out, tf)) return res;
+  if (!r->out) return res;
+
+  // set up inverse match and rewrite arrays
+  array_t *new_mat, *inv_mask, *new_rw, *inv_mat, *inv_rw, *masked_mat;
+  array_t *isect_mat;
+  int ln = in->hs->len;
+  if (r->mask) { // rewrite rule
+    assert (r->match); // rewrite rules MUST have a match
+    inv_mask = array_not_a (DATA_ARR (r->mask), ln);
+    new_rw   = array_and_a (inv_mask, DATA_ARR (r->rewrite));
+    masked_mat = array_and_a (DATA_ARR (r->match), DATA_ARR (r->mask));
+    inv_mat  = array_or_a  (new_rw, masked_mat);
+    inv_rw = array_and_a (DATA_ARR (r->match), inv_mask);
+    isect_mat = inv_mat;
+  }
+  else { // fwding and topology rules
+    if (r->match) isect_mat = array_copy (DATA_ARR (r->match), ln);
+  }
+
+  struct hs hs;
+  if (!r->match) hs_copy (&hs, &in->hs); // topology rule
+  else { // fwding and rewrite rules
+    if (!hs_isect_arr (&hs, &in->hs, isect_mat)) return res;
+    if (r->mask) hs_rewrite (&hs, inv_mask, inv_rw);
+    if (r->deps) deps_diff_inv (&hs, in->port, DEPS (tf, r->deps), tf);
+    if (!hs_compact_m (&hs, r->mask ? DATA_ARR (r->mask) : NULL)) { hs_destroy(&hs); return res; }
+  }
+
+  // the rule's inports become the current port of the result
+  // TODO: create a result for each rule inport
+
+  // free memory
+  if (new_mat) array_free (new_mat);
+  if (inv_mask) array_free (inv_mask);
+  if (new_rw) array_free (new_rw);
+  if (inv_mat) array_free (inv_mat);
+  if (inv_rw) array_free (inv_rw);
+  if (masked_mat) array_free (masked_mat);
+  if (isect_mat) array_free (isect_mat);
+}
+
 
 struct list_res
 tf_apply (const struct tf *tf, const struct res *in, bool append)
