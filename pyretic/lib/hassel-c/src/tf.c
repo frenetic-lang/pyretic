@@ -68,6 +68,37 @@ print_ports (int32_t p, const struct tf *tf)
   printf ("\n");
 }
 
+static bool
+port_append_res (struct list_res *res, const struct rule *r,
+		 const struct tf *tf, const struct res *in, int32_t ports,
+		 bool append, const struct hs *hs)
+{
+  /* Create new result containing headerspace `hs` for each port in `ports`. */
+  bool used_hs = false;
+  uint32_t n, x;
+  const uint32_t *a;
+  if (ports > 0) { n = 1; x = ports; a = &x; }
+  else {
+    const struct ports *p = PORTS (tf, ports);
+    n = p->n; a = p->arr;
+  }
+
+  for (int i = 0; i < n; i++) {
+    if (a[i] == in->port) continue;
+    struct res *tmp;
+    if (used_hs) tmp = res_extend (in, hs, a[i], append);
+    else {
+      tmp = res_extend (in, NULL, a[i], append);
+      tmp->hs = *hs;
+      used_hs = true;
+    }
+    res_rule_add (tmp, tf, r->idx, r);
+    list_append (res, tmp);
+  }
+
+  return used_hs;
+}
+
 
 static struct list_res
 rule_apply (const struct rule *r, const struct tf *tf, const struct res *in,
@@ -87,27 +118,7 @@ rule_apply (const struct rule *r, const struct tf *tf, const struct res *in,
     if (r->mask) hs_rewrite (&hs, DATA_ARR (r->mask), DATA_ARR (r->rewrite));
   }
 
-  bool used_hs = false;
-  uint32_t n, x;
-  const uint32_t *a;
-  if (r->out > 0) { n = 1; x = r->out; a = &x; }
-  else {
-    const struct ports *p = PORTS (tf, r->out);
-    n = p->n; a = p->arr;
-  }
-
-  for (int i = 0; i < n; i++) {
-    if (a[i] == in->port) continue;
-    struct res *tmp;
-    if (used_hs) tmp = res_extend (in, &hs, a[i], append);
-    else {
-      tmp = res_extend (in, NULL, a[i], append);
-      tmp->hs = hs;
-      used_hs = true;
-    }
-    res_rule_add (tmp, tf, r->idx, r);
-    list_append (&res, tmp);
-  }
+  bool used_hs = port_append_res (&res, r, tf, in, r->out, append, &hs);
 
   if (res.head) app_add (r->idx, app, napp);
   if (!used_hs) hs_destroy (&hs);
@@ -159,7 +170,8 @@ deps_diff_inv (struct hs *hs, uint32_t port, const struct deps *deps,
 }
 
 struct list_res
-rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in)
+rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in,
+	       bool append)
 {
   /* Given a rule `r` in a tf `tf`, apply the inverse of `r` on the input
      (headerspace,port) `in`. */
@@ -198,8 +210,8 @@ rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in)
     if (!hs_compact_m (&hs, r->mask ? DATA_ARR (r->mask) : NULL)) { hs_destroy(&hs); return res; }
   }
 
-  // the rule's inports become the current port of the result
-  // TODO: create a result for each rule inport
+  // there is a new hs result corresponding to each rule inport
+  bool used_hs = port_append_res (&res, r, tf, in, r->in, append, &hs);
 
   // free memory
   if (new_mat) array_free (new_mat);
@@ -209,6 +221,9 @@ rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in)
   if (inv_rw) array_free (inv_rw);
   if (masked_mat) array_free (masked_mat);
   if (isect_mat) array_free (isect_mat);
+  if (!used_hs) hs_destroy (&hs);
+
+  return res;
 }
 
 
