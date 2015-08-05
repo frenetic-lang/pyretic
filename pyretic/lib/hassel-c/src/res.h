@@ -38,8 +38,7 @@ struct res *res_create   (int nrules);
 void        res_free     (struct res *res);
 /* Thread-safe. If LOCK, acquire lock first; else lock must already be held. */
 void        res_free_mt  (struct res *res, bool lock);
-void        res_print    (const struct res *res);
-void        res_print_backward (const struct res *res);
+void        res_print    (const struct res *res, bool backward);
 
 /* Create res based on SRC, with HS and PORT. If APPEND, copy rules from SRC. */
 struct res *res_extend   (const struct res *src, const struct hs *hs,
@@ -49,8 +48,7 @@ void        res_rule_add (struct res *res, const struct tf *tf, int rule,
 
 LIST (res);
 void list_res_free  (struct list_res *l);
-void list_res_print (const struct list_res *l);
-void list_res_print_backward (const struct list_res *l);
+void list_res_print (const struct list_res *l, bool backward);
 
 #endif
 

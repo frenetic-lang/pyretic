@@ -112,8 +112,7 @@ main (int argc, char **argv)
   }
   gettimeofday (&end, NULL);
 
-  //list_res_print (&res);
-  list_res_print_backward (&res);
+  list_res_print (&res, true);
   printf ("Time: %" PRId64 " us\n", diff (&end, &start));
 
   list_res_free (&res);
