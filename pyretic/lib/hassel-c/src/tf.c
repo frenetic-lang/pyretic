@@ -169,14 +169,35 @@ deps_diff_inv (struct hs *hs, uint32_t port, const struct deps *deps,
   }
 }
 
+static array_t*
+rule_set_inv_mat (const struct rule *r, uint32_t ln)
+{
+  assert (r->match);
+  array_t *inv_mask = array_not_a (DATA_ARR (r->mask), ln);
+  array_t *new_rw   = array_and_a (inv_mask, DATA_ARR (r->rewrite), ln);
+  array_t *masked_mat = array_and_a (DATA_ARR (r->match), DATA_ARR (r->mask), ln);
+  array_t *inv_mat = array_or_a  (new_rw, masked_mat, ln);
+  array_free (inv_mask);
+  array_free (new_rw);
+  array_free (masked_mat);
+  return inv_mat;
+}
+
+static array_t*
+rule_set_inv_rw (const struct rule *r, uint32_t ln)
+{
+  array_t *inv_mask = array_not_a (DATA_ARR (r->mask), ln);
+  array_t *inv_rw = array_and_a (DATA_ARR (r->match), inv_mask, ln);
+  array_free (inv_mask);
+  return inv_rw;
+}
+
 struct list_res
-rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in,
-	       bool append)
+rule_inv_apply (const struct tf *tf, const struct rule *r, const struct res *in,
+		bool append)
 {
   /* Given a rule `r` in a tf `tf`, apply the inverse of `r` on the input
      (headerspace,port) `in`. */
-  uint32_t app[MAX_APP];
-  int napp = 0;
   struct list_res res = {0};
 
   // prune cases where rule outport doesn't include the current port
@@ -185,27 +206,20 @@ rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in,
   if (!r->out) return res;
 
   // set up inverse match and rewrite arrays
-  array_t *new_mat, *inv_mask, *new_rw, *inv_mat, *inv_rw, *masked_mat;
-  array_t *isect_mat;
-  int ln = in->hs->len;
+  array_t *inv_rw=0, *inv_mat=0;
   if (r->mask) { // rewrite rule
-    assert (r->match); // rewrite rules MUST have a match
-    inv_mask = array_not_a (DATA_ARR (r->mask), ln);
-    new_rw   = array_and_a (inv_mask, DATA_ARR (r->rewrite));
-    masked_mat = array_and_a (DATA_ARR (r->match), DATA_ARR (r->mask));
-    inv_mat  = array_or_a  (new_rw, masked_mat);
-    inv_rw = array_and_a (DATA_ARR (r->match), inv_mask);
-    isect_mat = inv_mat;
+    inv_mat = rule_set_inv_mat (r, in->hs.len);
+    inv_rw  = rule_set_inv_rw (r, in->hs.len);
   }
   else { // fwding and topology rules
-    if (r->match) isect_mat = array_copy (DATA_ARR (r->match), ln);
+    if (r->match) inv_mat = array_copy (DATA_ARR (r->match), in->hs.len);
   }
 
   struct hs hs;
   if (!r->match) hs_copy (&hs, &in->hs); // topology rule
   else { // fwding and rewrite rules
-    if (!hs_isect_arr (&hs, &in->hs, isect_mat)) return res;
-    if (r->mask) hs_rewrite (&hs, inv_mask, inv_rw);
+    if (!hs_isect_arr (&hs, &in->hs, inv_mat)) return res;
+    if (r->mask) hs_rewrite (&hs, DATA_ARR (r->mask), inv_rw);
     if (r->deps) deps_diff_inv (&hs, in->port, DEPS (tf, r->deps), tf);
     if (!hs_compact_m (&hs, r->mask ? DATA_ARR (r->mask) : NULL)) { hs_destroy(&hs); return res; }
   }
@@ -213,14 +227,8 @@ rule_inv_apply(const struct tf *tf, const struct rule *r, const struct res *in,
   // there is a new hs result corresponding to each rule inport
   bool used_hs = port_append_res (&res, r, tf, in, r->in, append, &hs);
 
-  // free memory
-  if (new_mat) array_free (new_mat);
-  if (inv_mask) array_free (inv_mask);
-  if (new_rw) array_free (new_rw);
-  if (inv_mat) array_free (inv_mat);
   if (inv_rw) array_free (inv_rw);
-  if (masked_mat) array_free (masked_mat);
-  if (isect_mat) array_free (isect_mat);
+  if (inv_mat) array_free (inv_mat);
   if (!used_hs) hs_destroy (&hs);
 
   return res;
