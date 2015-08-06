@@ -54,6 +54,8 @@ struct tf      *tf_get   (int idx);
 void            tf_print (const struct tf *tf);
 
 void rule_print (const struct rule *r, const struct tf *tf);
+struct list_res rule_inv_apply (const struct tf *tf, const struct rule *r,
+				const struct res *in, bool append);
 
 #endif
 
