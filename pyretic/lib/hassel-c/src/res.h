@@ -46,6 +46,11 @@ struct res *res_extend   (const struct res *src, const struct hs *hs,
 void        res_rule_add (struct res *res, const struct tf *tf, int rule,
 			  const struct rule *tf_rule);
 
+/* Walk the list of results in `out` and generate list of headers at (hs,port)
+   that created the propagation path in `out`. */
+struct list_res res_walk_parents (const struct res *out, const struct hs *hs,
+				  int in_port);
+
 LIST (res);
 void list_res_free  (struct list_res *l);
 void list_res_print (const struct list_res *l, bool backward);

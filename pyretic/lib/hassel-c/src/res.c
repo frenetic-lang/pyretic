@@ -81,7 +81,7 @@ res_print (const struct res *res, bool backward)
 }
 
 struct list_res
-res_walk_parents (const struct res *out, const struct hs *hs, int inport)
+res_walk_parents (const struct res *out, const struct hs *hs, int in_port)
 {
   struct res* curr_res = res_extend (out, &out->hs, out->port, false);
   struct list_res currq = {0}, nextq = {0};
@@ -115,7 +115,7 @@ res_walk_parents (const struct res *out, const struct hs *hs, int inport)
     }
     else {
       hs_copy (next_hs, hs);
-      next_port = inport;
+      next_port = in_port;
     }
 
     // Intersect the results in `currq` with the target (hs,port)
