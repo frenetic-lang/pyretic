@@ -115,6 +115,17 @@ main (int argc, char **argv)
   list_res_print (&res, true);
   printf ("Time: %" PRId64 " us\n", diff (&end, &start));
 
+  // Print header spaces at ingress
+  struct res *cur = res.head;
+  struct list_res inv_res;
+  printf ("\n\n==================\n\n");
+  while (cur) {
+    inv_res = res_walk_parents (cur, &hs, in_port);
+    list_res_print (&inv_res, false);
+    cur = cur->next;
+  }
+  list_res_free (&inv_res);
+
   list_res_free (&res);
   hs_destroy (&hs);
   app_fini ();

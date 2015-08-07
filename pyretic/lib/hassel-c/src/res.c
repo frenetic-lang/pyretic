@@ -83,13 +83,16 @@ res_print (const struct res *res, bool backward)
 struct list_res
 res_walk_parents (const struct res *out, const struct hs *hs, int in_port)
 {
-  struct res* curr_res = res_extend (out, &out->hs, out->port, false);
-  struct list_res currq = {0}, nextq = {0};
-  list_append (&currq, curr_res);
+  struct res *curr_res = (struct res*) out;
+  struct list_res currq = {0};
+  list_append (&currq, res_extend (out, &out->hs, out->port, true));
+
   struct res *cur;
+
   while (curr_res) {
     if (curr_res->rules.cur) {
       for (int i = curr_res->rules.cur - 1; i >= 0; i--) {
+	struct list_res nextq = {0};
 	struct res_rule r = curr_res->rules.arr[i];
 	while ((cur = currq.head)) {
 	  list_pop (&currq);
@@ -100,10 +103,7 @@ res_walk_parents (const struct res *out, const struct hs *hs, int in_port)
 	currq = nextq;
       } // for each rule
     }
-    else {
-      printf ("No rules applied to current result in currq\n");
-      return currq;
-    } // no rules in current result! is that possible?
+    else return currq;
 
     // set (hs,port) which the inverted (hs,port) results must intersect
     struct res *parent = curr_res->parent;
@@ -119,11 +119,14 @@ res_walk_parents (const struct res *out, const struct hs *hs, int in_port)
     }
 
     // Intersect the results in `currq` with the target (hs,port)
+    struct list_res nextq = {0};
     while ((cur = currq.head)) {
       list_pop (&currq);
-      if (cur->port == next_port && hs_isect (&cur->hs, next_hs))
-	list_append (&nextq, cur);
-      res_free (cur);
+      struct hs *new_hs = hs_isect_a (&cur->hs, next_hs);
+      if (cur->port == next_port && new_hs)
+	list_append (&nextq, res_extend (cur, new_hs, next_port, false));
+      else
+	res_free (cur);
     }
     currq = nextq;
     curr_res = parent;
