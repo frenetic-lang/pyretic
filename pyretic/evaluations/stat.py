@@ -76,10 +76,27 @@ class Stat(object):
     def dump_stats(cls):
         path = os.path.join(cls.results_path, 'stat.txt')
         f = open(path, 'w')
-        #TODO: complete
-        f.write('\n'.join([str(x) for x in cls.times.items()]) + "\n-------------\n")
-        f.write('\n'.join([str(x) for x in cls.classifiers.items()]) + "\n----------------\n")
-        cls.report_dfa()
+        
+        times = []
+        for fname in cls.times:
+            ftimes = [(fname, x) for x in cls.times[fname]]
+            times.append(ftimes)
+        classifiers = []
+        for fname in cls.classifiers:
+            fclassifiers = [(fname, x) for x in cls.classifiers[fname]]
+            classifiers.append(fclassifiers)
+        
+        f.write('############# Time/Space Stats ###############\n')
+        compile_phases = ['in_table', 'out_table', 'compile_stage']
+        phase_times = [cls.times[x] for x in cls.times if x in compile_phases]
+        total_time = [sum(x) for x in zip(*phase_times)]
+        stats = zip(*(times + classifiers))
+        for i, stat in zip(range(len(stats)), stats):
+            f.write('-----------%d------------\n' % i)
+            f.write('total time : %f\n' % total_time[i])
+            f.write('\n'.join([str(x) for x in stat]) + "\n----------------\n")
+        
+        cls.report_dfa(f)
         f.write(str(cls.general_stats) + "\n--------------\n")
         f.close()
 
@@ -91,7 +108,7 @@ class Stat(object):
             start_time = time.time()
             res = func(*args, **kwargs)
             
-            if isinstance(res, tuple) and len(res) == 2 and isinstance(res[1], str): 
+            if isinstance(res, tuple) and len(res) == 2 and (isinstance(res[1], float) or isinstance(res[1], str)): 
                 #ATTENTION: This if tries to distinguish only netkat compiler results.
                 #           May need to be changed if other functions are registered  
                 #           for time analysis.
@@ -144,9 +161,13 @@ class Stat(object):
                 fname = func.__name__
 
                 if fname not in cls.classifiers:
-                    cls.classifiers[fname] = (0, 0, 0)
-
-                (switch_specific, all_switches) = cls.classifier_size_stats(res)
+                    cls.classifiers[fname] = []
+                try:
+                    (switch_specific, all_switches) = cls.classifier_size_stats(res)
+                except:
+                    print fname
+                    print res
+                    raise TypeError
                 switch_specific_values = switch_specific.values()
                 if len(switch_specific_values) > 0:
                     max_cnt = max(switch_specific_values) + all_switches
@@ -154,8 +175,8 @@ class Stat(object):
                 else:
                     max_cnt = all_switches
                     mean_cnt = all_switches
-                
-                cls.classifiers[fname] = (len(res.rules), max_cnt, mean_cnt)
+               
+                cls.classifiers[fname].append((len(res.rules), max_cnt, mean_cnt))
                 #print fname, cls.classifiers[fname]
                 fi = open(os.path.join(cls.results_path, fname), 'w')
                 fi.write(str(res))
@@ -198,7 +219,10 @@ class Stat(object):
             if stat_name in cls.general_stats:
                 aggr = cls.general_stats[stat_name]['aggr']
                 if aggr:
-                    cls.general_stats[stat_name] += stat_value
+                    if isinstance(cls.general_stats[stat_name]['value'], list):
+                            cls.general_stats[stat_name]['value'].append(stat_value)
+                    else:
+                        cls.general_stats[stat_name]['value'] += stat_value
                 else:
                     cls.general_stats[stat_name]['value'] = stat_value
 
@@ -211,7 +235,7 @@ class Stat(object):
         print 'create overall report'
 
     @classmethod
-    def report_dfa(cls):
+    def report_dfa(cls, f):
         path = cls.results_path
         try:
             shutil.copy(cls.dfa_path, path)
@@ -222,13 +246,18 @@ class Stat(object):
 
         d_list = ['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list']
         args = [cls.general_stats[d]['value'] for d in d_list]
-        analyzer = DFA_Analyzer(*args)
         for d in d_list:
             del cls.general_stats[d]
 
-        print analyzer.state_count()
-        print analyzer.edge_count()
-        print analyzer.edge_gen_dist()
+        dfa_list_info = zip(*args)
+        f.write('############# DFA Stats ###############\n')
+        for i, info in zip(range(len(dfa_list_info)), dfa_list_info):
+            analyzer = DFA_Analyzer(*info)
+            f.write('-----------%d------------\n' % i)
+            f.write('state count : %s\n' % str(analyzer.state_count()))
+            f.write('edge count : %s\n' % str(analyzer.edge_count()))
+            f.write('in/out tag/cap dist : %s\n' % str(analyzer.edge_gen_dist()))
+            f.write('--------------------\n')
 
     @classmethod
     def create_dist(cls, vals):

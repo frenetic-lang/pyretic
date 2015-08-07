@@ -148,7 +148,7 @@ class Policy(object):
 
     def netkat_compile(self, switch_cnt, print_json=False,
                        force_compile=False):
-        comp_t = 0
+        comp_t = '0'
         nb = netkat_backend
         if ((not NETKAT_CLASSIFIER_CACHE) or (not self._classifier) or
             force_compile):

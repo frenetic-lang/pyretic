@@ -174,8 +174,22 @@ class Runtime(object):
         """ Switch count for netkat compilation """
         return (self.partition_cnt if self.partition_cnt
                 else len(self.network.topology.nodes()))
-
+        
     def get_subpolicy_compile_stats(self, path_main):
+        if path_main:
+            pass
+            if self.integrate_enabled and self.multitable_enabled:
+                for (in_table, out_table) in zip(self.path_in_table, self.path_out_table):
+                    self.get_subpolicy_compile_stats_per_stage(in_table, out_table)
+            else:
+                for (in_table, out_table, ingress, egress) in zip(self.path_in_table, 
+                        self.path_out_table, self.path_ingress, self.path_egress):
+                    self.get_subpolicy_compile_stats_per_stage(in_table, out_table, ingress[0],
+                                                                ingress[1],egress[0], egress[1])
+    
+    def get_subpolicy_compile_stats_per_stage(self, in_table, out_table,
+                                                    in_tag = None, in_cap = None,
+                                                    out_tag = None, out_cap = None):
         """ In the "offline" case, get compile time and classifier size stats
         for sub-policies. This function only compiles the sub-parts of the
         policy. It neither compiles the entire policy, nor touches the
@@ -183,57 +197,55 @@ class Runtime(object):
         and set_policy_map(), respectively.
         """
         sketch = None
-        if path_main:
-            from pyretic.lib.path import LeafSketch
+        from pyretic.lib.path import LeafSketch
 
-            forwarding = LeafSketch('forwarding', self.forwarding)
-            vf_tag = LeafSketch('vf_tag', self.virtual_tag)
-            vf_untag = LeafSketch('vf_untag', self.virtual_untag)
+        forwarding = LeafSketch('forwarding', self.forwarding)
+        vf_tag = LeafSketch('vf_tag', self.virtual_tag)
+        vf_untag = LeafSketch('vf_untag', self.virtual_untag)
+        
+        if self.multitable_enabled:
             
-            if self.multitable_enabled:
+
+            if self.integrate_enabled:
+                in_table = LeafSketch('in_table', in_table)
+                out_table = LeafSketch('out_table', out_table)
                 
-
-                if self.integrate_enabled:
-
-                    in_table = LeafSketch('in_table', self.path_in_table.policy)
-                    out_table = LeafSketch('out_table', self.path_out_table.policy)
-                    
-                    sketch = [(in_table, False), (out_table, True), 
-                                (vf_tag, False), (vf_untag, True)]
-                    
-                else:
-                    
-                    in_tag = LeafSketch('in_tag', self.path_in_tagging)
-                    out_tag = LeafSketch('out_tag', self.path_out_tagging)
-                    in_capture = LeafSketch('in_capture', self.path_in_capture)
-                    out_capture = LeafSketch('out_capture', self.path_out_capture)
-                    in_table = in_tag // in_capture
-                    in_table.name = 'in_table'
-                    out_table = out_tag // out_capture
-                    out_table.name = 'out_table'
-                    sketch = [(in_table, False), 
-                                (out_table, True), 
-                                (vf_tag, False), (vf_untag, True)]
-                    
+                sketch = [(in_table, False), (out_table, True)] 
+                            #(vf_tag, False), (vf_untag, True)]
+                
             else:
-                in_tag = LeafSketch('in_tag', self.path_in_tagging)
-                out_tag = LeafSketch('out_tag', self.path_out_tagging)
-                in_capture = LeafSketch('in_capture', self.path_in_capture)
-                out_capture = LeafSketch('out_capture', self.path_out_capture)
                 
-                in_tag_policy = in_tag * forwarding
-                in_fwd_out = (in_tag_policy * out_tag)
-                full_out_cap = (in_tag_policy * out_capture)
+                in_tag = LeafSketch('in_tag', in_tag)
+                out_tag = LeafSketch('out_tag', out_tag)
+                in_capture = LeafSketch('in_capture', in_cap)
+                out_capture = LeafSketch('out_capture', out_cap)
+                in_table = in_tag // in_capture
+                in_table.name = 'in_table'
+                out_table = out_tag // out_capture
+                out_table.name = 'out_table'
+                sketch = [(in_table, False), 
+                            (out_table, True),] 
+                            #(vf_tag, False), (vf_untag, True)]
+                
+        else:
+            in_tag = LeafSketch('in_tag', in_tag)
+            out_tag = LeafSketch('out_tag', out_tag)
+            in_capture = LeafSketch('in_capture', in_cap)
+            out_capture = LeafSketch('out_capture', out_cap)
+            
+            in_tag_policy = in_tag * forwarding
+            in_fwd_out = (in_tag_policy * out_tag)
+            full_out_cap = (in_tag_policy * out_capture)
 
-                vtag_forwarding = vf_tag * in_fwd_out * vf_untag
-                vtag_in_cap = vf_tag * in_capture
-                vtag_out_cap = vf_tag * full_out_cap
+            vtag_forwarding = vf_tag * in_fwd_out * vf_untag
+            vtag_in_cap = vf_tag * in_capture
+            vtag_out_cap = vf_tag * full_out_cap
 
-                final_pol = vtag_forwarding / vtag_in_cap // vtag_out_cap
-                final_pol.name = 'final_pol'
-                #TODO: This is currently not what happens
-                #      in actual compilation with netkat
-                sketch = [(final_pol, False)] 
+            final_pol = vtag_forwarding / vtag_in_cap // vtag_out_cap
+            final_pol.name = 'final_pol'
+            #TODO: This is currently not what happens
+            #      in actual compilation with netkat
+            sketch = [(final_pol, False)] 
 
         if sketch:
             for s in sketch:
@@ -549,8 +561,9 @@ class Runtime(object):
         """
         import copy
         from pyretic.lib.path import path, path_policy_utils
-        from pyretic.lib.path import __in_re_tree_gen__ as in_cg
-        from pyretic.lib.path import __out_re_tree_gen__ as out_cg
+        #from pyretic.lib.path import __in_re_tree_gen__ as in_cg
+        #from pyretic.lib.path import __out_re_tree_gen__ as out_cg
+        from pyretic.lib.path import re_tree_gen
         old_dynamic_sub_path_pols = copy.copy(self.dynamic_sub_path_pols)
         ast_fold = path_policy_utils.path_policy_ast_fold
         add_pols = path_policy_utils.add_dynamic_path_pols
@@ -560,9 +573,10 @@ class Runtime(object):
         for pp in (self.dynamic_sub_path_pols - old_dynamic_sub_path_pols):
             pp.path_attach(self.handle_path_change)
         old_dynamic_path_preds = copy.copy(self.dynamic_path_preds)
-        dyn_preds_tuples = in_cg.get_dyn_preds() + out_cg.get_dyn_preds()
-        self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
-                                      out_cg.get_dyn_preds())
+        dyn_preds_tuples = re_tree_gen.global_dyn_list()
+        self.dynamic_path_preds = set(re_tree_gen.global_dyn_list())
+        #self.dynamic_path_preds = set(in_cg.get_dyn_preds() +
+        #                              out_cg.get_dyn_preds())
         for olds in (old_dynamic_path_preds - self.dynamic_path_preds):
             olds.pred.path_detach()
         for news in (self.dynamic_path_preds - old_dynamic_path_preds):
@@ -578,16 +592,26 @@ class Runtime(object):
                 self.ragel_enabled, self.partition_enabled)
         
         if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
+            (self.path_in_table, self.path_out_table) = policy_fragments
+            #(self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
-            (in_tag, in_cap, out_tag, out_cap) = policy_fragments
+            (ingress, egress) = policy_fragments
+            self.path_ingress = ingress
+            self.path_egress = egress
+            self.path_in_table = []
+            for (in_tag, in_capture) in self.path_ingress:
+                self.path_in_table.append(in_tag + in_capture)
+            self.path_out_table = []
+            for (out_tag, out_capture) in self.path_egress:
+                self.path_out_table.append(out_tag + out_capture) 
+            '''(in_tag, in_cap, out_tag, out_cap) = policy_fragments
             self.path_in_tagging.policy  = in_tag
             self.path_in_capture.policy  = in_cap
             self.path_out_tagging.policy = out_tag
             self.path_out_capture.policy = out_cap
             self.path_in_table.policy = in_tag + in_cap
             self.path_out_table.policy = out_tag + out_cap
-
+            '''
 
 #######################
 # REACTIVE COMPILATION
@@ -2056,8 +2080,10 @@ class Runtime(object):
         self.path_in_capture  = DynamicPolicy(drop)
         self.path_out_tagging = DynamicPolicy(identity)
         self.path_out_capture = DynamicPolicy(drop)
-        self.path_in_table = DynamicPolicy(identity)
-        self.path_out_table = DynamicPolicy(identity)
+        #self.path_in_table = DynamicPolicy(identity)
+        #self.path_out_table = DynamicPolicy(identity)
+        self.path_in_table = []
+        self.path_out_table = []
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
         self.vf_tag_pol = None

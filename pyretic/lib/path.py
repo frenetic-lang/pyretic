@@ -51,6 +51,8 @@ from netaddr import IPNetwork, cidr_merge
 import time
 import logging
 
+from collections import Counter
+
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
 TOKEN_END_VALUE = 0xFFFFFFFF 
 # token type definitions
@@ -170,26 +172,43 @@ class re_tree_gen(object):
     trees for new predicates.
     """
     token = TOKEN_START_VALUE
-    # Invariants: pred is always a leaf-level predicate in the re AST of some
-    # path query.
-    pred_to_symbol = {}
-    pred_to_atoms  = {}
-    symbol_to_pred = {}
-    part_symbol_to_pred = {}
-    pred_to_neg = {}
-    dyn_preds      = []
-    cache = {}
+    in_cg_list = []
+    out_cg_list = []
+
+    def __init__(self, switch_cnt = None, 
+                    cache_enabled = False, partition_enabled = False):
+        if switch_cnt is None or not partition_enabled:
+            self.simple = True
+        else:
+            self.simple = False
+        
+        self.switch_cnt = switch_cnt
+        self.cache_enabled = cache_enabled
+    
+        # Invariants: pred is always a leaf-level predicate in the re AST of some
+        # path query.
+        self.pred_to_symbol = {}
+        self.pred_to_atoms  = {}
+        self.symbol_to_pred = {}
+        self.part_symbol_to_pred = {}
+        self.pred_to_neg = {}
+        self.dyn_preds      = []
+        self.cache = {}
+    
+    @classmethod
+    def global_sym_list(cls):
+        res = []
+        for cg in cls.in_cg_list + cls.out_cg_list:
+            res.extend(cg.symbol_to_pred.keys())
+        return res
 
     @classmethod
-    def init(cls, switch_cnt = None, cache_enabled = False, partition_enabled = False):
-        if switch_cnt is None or not partition_enabled:
-            cls.simple = True
-        else:
-            cls.simple = False
-        
-        cls.switch_cnt = switch_cnt
-        cls.cache_enabled = cache_enabled
-    
+    def global_dyn_list(cls):
+        res = []
+        for cg in cls.in_cg_list + cls.out_cg_list:
+            res.extend(cg.get_dyn_preds())
+        return res
+
     class dyn_pred_obj(object):
         """ A dynamic predicate occuring as a sub-policy in a bigger predicate."""
         def __init__(self, pred, pol):
@@ -204,17 +223,16 @@ class re_tree_gen(object):
                     id(self.pred) == id(other.pred) and
                     id(self.pol)  == id(other.pol))
 
-    @classmethod
-    def repr_state(cls):
-        if cls.simple:
-            pred_to_symbol = [cls.pred_to_symbol]
-            pred_to_atoms = [cls.pred_to_atoms]
+    def repr_state(self):
+        if self.simple:
+            pred_to_symbol = [self.pred_to_symbol]
+            pred_to_atoms = [self.pred_to_atoms]
         else:
             ''' based on the assumptions that: 
             If items(), keys(), values() are called with no intervening modifications 
             to the dictionary, the lists will directly correspond.'''
-            pred_to_symbol = cls.pred_to_symbol.values()
-            pred_to_atoms = cls.pred_to_symbol.values()
+            pred_to_symbol = self.pred_to_symbol.values()
+            pred_to_atoms = self.pred_to_symbol.values()
         
         output = ''
         for (pred_sym, pred_atom) in zip(pred_to_symbol, pred_to_atoms):
@@ -232,19 +250,18 @@ class re_tree_gen(object):
         return output
 
     
-    @classmethod
-    def __add_pred__(cls, pred, symbol, atoms, pred_neg, partition=None):
+    def __add_pred__(self, pred, symbol, atoms, pred_neg, partition=None):
         """ Add a new predicate to the global state. """
-        if cls.simple:
-            pred_to_sym = cls.pred_to_symbol
-            pred_to_atoms = cls.pred_to_atoms
-            pred_to_neg = cls.pred_to_neg
-            sym_to_pred = cls.symbol_to_pred
+        if self.simple:
+            pred_to_sym = self.pred_to_symbol
+            pred_to_atoms = self.pred_to_atoms
+            pred_to_neg = self.pred_to_neg
+            sym_to_pred = self.symbol_to_pred
         else:
-            pred_to_sym = cls.pred_to_symbol[partition]
-            pred_to_atoms = cls.pred_to_atoms[partition]
-            pred_to_neg = cls.pred_to_neg[partition]
-            sym_to_pred = cls.part_symbol_to_pred[partition]
+            pred_to_sym = self.pred_to_symbol[partition]
+            pred_to_atoms = self.pred_to_atoms[partition]
+            pred_to_neg = self.pred_to_neg[partition]
+            sym_to_pred = self.part_symbol_to_pred[partition]
 
         assert not pred in pred_to_sym
         assert not pred in pred_to_atoms
@@ -255,32 +272,30 @@ class re_tree_gen(object):
         pred_to_atoms[pred] = atoms
         pred_to_neg[pred] = pred_neg
 
-        if not cls.simple:
-            cls.symbol_to_pred[symbol] = pred
-
-    @classmethod
-    def __add_dyn_preds__(cls, preds, atom_pol):
+        if not self.simple:
+            self.symbol_to_pred[symbol] = pred
+    
+    def __add_dyn_preds__(self, preds, atom_pol):
         """ Add each predicate in `preds` to list of dynamic predicates, with
         the corresponding `atom`. """
         for pred in preds:
-            dyn_obj = cls.dyn_pred_obj(pred, atom_pol)
-            cls.dyn_preds.append(dyn_obj)
-
-    @classmethod
-    def __del_pred__(cls, pred, partition=None):
+            dyn_obj = self.dyn_pred_obj(pred, atom_pol)
+            self.dyn_preds.append(dyn_obj)
+    
+    def __del_pred__(self, pred, partition=None):
         """ Remove a predicate from existing global state of leaf-level
         predicates. """
         
-        if cls.simple:
-            pred_sym = cls.pred_to_symbol
-            pred_atoms = cls.pred_to_atoms
-            pred_neg = cls.pred_to_neg
-            sym_pred = cls.symbol_to_pred
+        if self.simple:
+            pred_sym = self.pred_to_symbol
+            pred_atoms = self.pred_to_atoms
+            pred_neg = self.pred_to_neg
+            sym_pred = self.symbol_to_pred
         else:
-            pred_sym = cls.pred_to_symbol[partition]
-            pred_atoms = cls.pred_to_atoms[partition]
-            pred_neg = cls.pred_to_neg[partition]
-            sym_pred = cls.part_symbol_to_pred[partition]
+            pred_sym = self.pred_to_symbol[partition]
+            pred_atoms = self.pred_to_atoms[partition]
+            pred_neg = self.pred_to_neg[partition]
+            sym_pred = self.part_symbol_to_pred[partition]
 
         symbol = pred_sym[pred]
 
@@ -289,30 +304,24 @@ class re_tree_gen(object):
         del pred_atoms[pred]
         del pred_neg[pred]
 
-        if not cls.simple:
-            del cls.symbol_to_pred[symbol]
+        if not self.simple:
+            del self.symbol_to_pred[symbol]
 
-    @classmethod
-    def __new_token__(cls):
-        cls.token += 1
-        if cls.token > TOKEN_END_VALUE:
-            cls.token = TOKEN_START_VALUE
+    def __new_token__(self):
+        re_tree_gen.token += 2
+        if re_tree_gen.token > TOKEN_END_VALUE:
+            re_tree_gen.token = re_tree_gen.token_start
 
-    @classmethod
-    def __new_symbol__(cls):
+    def __new_symbol__(self):
         """ Returns a new token/symbol for a leaf-level predicate. """
-        cls.__new_token__()
-        in_list = __in_re_tree_gen__.symbol_to_pred
-        out_list = __out_re_tree_gen__.symbol_to_pred
-        while (
-                cls.token in in_list
-                or cls.token in out_list):
-            cls.__new_token__()
+        self.__new_token__()
+        sym_list = re_tree_gen.global_sym_list()
+        while re_tree_gen.token in sym_list:
+            self.__new_token__()
 
-        return cls.token
+        return re_tree_gen.token
 
-    @classmethod
-    def __replace_pred__(cls, old_pred, new_preds, partition=None):
+    def __replace_pred__(self, old_pred, new_preds, partition=None):
         """ Replace the re symbol corresponding to `old_pred` with an
         alternation of predicates in `new_preds`. The metadata from the
         old_pred's re symbol is copied over to all leaf nodes of its new re AST.
@@ -350,12 +359,12 @@ class re_tree_gen(object):
             else:
                 raise TypeError("Trees are only allowed to have alternation!")
        
-        if cls.simple:
-            pred_sym = cls.pred_to_symbol
-            pred_atoms = cls.pred_to_atoms
+        if self.simple:
+            pred_sym = self.pred_to_symbol
+            pred_atoms = self.pred_to_atoms
         else:
-            pred_sym = cls.pred_to_symbol[partition]
-            pred_atoms = cls.pred_to_atoms[partition]
+            pred_sym = self.pred_to_symbol[partition]
+            pred_atoms = self.pred_to_atoms[partition]
  
         assert old_pred in pred_sym and old_pred in pred_atoms
         old_sym = pred_sym[old_pred]
@@ -368,22 +377,21 @@ class re_tree_gen(object):
             new_re_tree = new_re_tree | re_symbol(new_sym)
         # For each atom containing old_pred, replace re leaf by new tree.
         for at in pred_atoms[old_pred]:
-            new_atom_re_tree = replace_node(at.re_tree, new_re_tree, old_sym)
+            new_atom_re_tree = replace_node(at.gen_re_tree(self), new_re_tree, old_sym)
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
 
     
-    @classmethod
-    def get_re_tree(cls, new_pred, at):
+    def get_re_tree(self, new_pred, at):
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
         
         def update_dicts(sym, at):
-            if cls.simple:
-                symbol_to_pred = [cls.symbol_to_pred]
-                pred_to_atoms = [cls.pred_to_atoms]
+            if self.simple:
+                symbol_to_pred = [self.symbol_to_pred]
+                pred_to_atoms = [self.pred_to_atoms]
             else:
-                symbol_to_pred = cls.part_symbol_to_pred.values()
-                pred_to_atoms = cls.pred_to_atoms.values()
+                symbol_to_pred = self.part_symbol_to_pred.values()
+                pred_to_atoms = self.pred_to_atoms.values()
             
             ''' based on the assumptions that: 
             If items(), keys(), values() are called with no intervening modifications 
@@ -408,52 +416,51 @@ class re_tree_gen(object):
                 print type(eq_re_tree)
                 raise TypeError
         
-        if cls.cache_enabled:
-            if new_pred in cls.cache:
-                new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
+        if self.cache_enabled:
+            if new_pred in self.cache:
+                new_re_tree = create_re_tree(self.cache[new_pred].gen_re_tree(self), at)
                 return new_re_tree
 
-        if cls.simple:
-            re_tree = cls.get_re_tree_core(new_pred, at)
+        if self.simple:
+            re_tree = self.get_re_tree_core(new_pred, at)
         else:
             re_tree = re_empty()
-            for i in range(1, cls.switch_cnt + 1):
+            for i in range(1, self.switch_cnt + 1):
                 part_pred = match(switch = i) & new_pred
                 inters = classifier_utils.is_not_drop(part_pred)
                 if inters:
-                    res_tree = cls.get_re_tree_core(part_pred, at, i)
+                    res_tree = self.get_re_tree_core(part_pred, at, i)
                     if res_tree != re_empty():
                         re_tree |= res_tree
        
-        if cls.cache_enabled:
-            cls.cache[new_pred] = at
-        elif len(cls.cache) == 0 and new_pred == identity:
-            cls.cache[new_pred] = at
+        if self.cache_enabled:
+            self.cache[new_pred] = at
+        elif len(self.cache) == 0 and new_pred == identity:
+            self.cache[new_pred] = at
 
         return re_tree
 
-    @classmethod
-    def get_re_tree_core(cls, new_pred, at, partition=None):
+    def get_re_tree_core(self, new_pred, at, partition=None):
         """ Deal with existing leaf-level predicates, taking different actions
         based on whether the existing predicates are equal, superset, subset, or
         just intersecting, the new predicate.
         """
 
-        if cls.simple:
-            pred_to_symbol = cls.pred_to_symbol
-            pred_to_atoms = cls.pred_to_atoms
-            pred_to_neg = cls.pred_to_neg
+        if self.simple:
+            pred_to_symbol = self.pred_to_symbol
+            pred_to_atoms = self.pred_to_atoms
+            pred_to_neg = self.pred_to_neg
         else:
-            pred_to_symbol = cls.pred_to_symbol[partition]
-            pred_to_atoms = cls.pred_to_atoms[partition]
-            pred_to_neg = cls.pred_to_neg[partition]
+            pred_to_symbol = self.pred_to_symbol[partition]
+            pred_to_atoms = self.pred_to_atoms[partition]
+            pred_to_neg = self.pred_to_neg[partition]
 
         ne_inters   = classifier_utils.has_nonempty_intersection
         is_not_drop = classifier_utils.is_not_drop
-        add_pred = cls.__add_pred__
-        new_sym  = re_tree_gen.__new_symbol__
-        del_pred = cls.__del_pred__
-        replace_pred = cls.__replace_pred__
+        add_pred = self.__add_pred__
+        new_sym  = self.__new_symbol__
+        del_pred = self.__del_pred__
+        replace_pred = self.__replace_pred__
         ovlap = classifier_utils.get_overlap_mode
 
         re_tree = re_empty()
@@ -464,7 +471,7 @@ class re_tree_gen(object):
         if dyn_pols:
             """ If new_pred contains a dynamic predicate, it must be remembered
             explicitly to set up recompilation routines in the runtime."""
-            cls.__add_dyn_preds__(dyn_pols, at.policy)
+            self.__add_dyn_preds__(dyn_pols, at.policy)
         new_pred_neg = ~new_pred
 
         """ For each case of overlap between new and existing predicates, do
@@ -526,62 +533,55 @@ class re_tree_gen(object):
         
         return re_tree
 
-    @classmethod
-    def clear(cls):
+    def clear(self):
         """ Completely reset character generating structures. """
-        re_tree_gen.token = TOKEN_START_VALUE
-        cls.pred_to_atoms = {}
-        cls.pred_to_symbol = {}
-        cls.symbol_to_pred = {}
-        cls.pred_to_neg = {}
-        cls.dyn_preds = []
-        cls.cache = {}
+        self.pred_to_atoms = {}
+        self.pred_to_symbol = {}
+        self.symbol_to_pred = {}
+        self.pred_to_neg = {}
+        self.dyn_preds = []
+        self.cache = {}
         
-        if not cls.simple:
-            cls.part_symbol_to_pred = {}
-            for i in range(1, cls.switch_cnt + 1):
-               cls.pred_to_symbol[i] = {}
-               cls.pred_to_atoms[i] = {}
-               cls.part_symbol_to_pred[i] = {}
-               cls.pred_to_neg[i] = {}
+        if not self.simple:
+            self.part_symbol_to_pred = {}
+            for i in range(1, self.switch_cnt + 1):
+               self.pred_to_symbol[i] = {}
+               self.pred_to_atoms[i] = {}
+               self.part_symbol_to_pred[i] = {}
+               self.pred_to_neg[i] = {}
 
 
-    @classmethod
-    def get_symlist(cls):
+    def get_symlist(self):
         """ Get a list of symbols which are leaf-level predicates """
-        return cls.symbol_to_pred.keys()
+        return self.symbol_to_pred.keys()
 
-    @classmethod
-    def get_leaf_preds(cls):
+    def get_leaf_preds(self):
         """ Get a string representation of all leaf-level predicates in the
         structure. """
         output = ''
-        for sym in cls.symbol_to_pred:
-            pred = cls.symbol_to_pred[sym]
+        for sym in self.symbol_to_pred:
+            pred = self.symbol_to_pred[sym]
             output += (str(sym) + ': ' + repr(pred) + '\n')
         return output
 
 
-    @classmethod
-    def get_dyn_preds(cls):
-        return cls.dyn_preds
+    def get_dyn_preds(self):
+        return self.dyn_preds
 
-    @classmethod
-    def get_predlist(cls):
-        if cls.simple:
-            pred_to_symbol = [cls.pred_to_symbol]
+    def get_predlist(self):
+        if self.simple:
+            pred_to_symbol = [self.pred_to_symbol]
         else:
-            pred_to_symbol = cls.pred_to_symbol.values()
+            pred_to_symbol = self.pred_to_symbol.values()
 
         res = []
         for pred_sym in pred_to_symbol:
             res.extend(pred_sym.keys())
         return res
 
-    @classmethod
-    def get_unaffected_pred(cls):
+    def get_unaffected_pred(self):
         """ Predicate that covers packets unaffected by query predicates. """
-        pred_list = cls.get_predlist()
+        pred_list = self.get_predlist()
         if len(pred_list) >= 1:
             return ~(reduce(lambda a,x: a | x, pred_list))
         else:
@@ -591,11 +591,20 @@ class re_tree_gen(object):
 predicates, respectively. """
 class __in_re_tree_gen__(re_tree_gen):
     """ Character generator for in_atom matches. """
-    pass
-
+    def __init__(self, switch_cnt = None, 
+                    cache_enabled = False, partition_enabled = False):
+        super(__in_re_tree_gen__, self).__init__(switch_cnt, cache_enabled,
+                                                    partition_enabled)
+        re_tree_gen.in_cg_list.append(self)
 class __out_re_tree_gen__(re_tree_gen):
     """ Character generator for out_atom matches. """
-    pass
+    def __init__(self, switch_cnt = None, 
+                    cache_enabled = False, partition_enabled = False):
+
+        super(__out_re_tree_gen__, self).__init__(switch_cnt, cache_enabled,
+                                                    partition_enabled)
+        re_tree_gen.out_cg_list.append(self)
+
 
 #############################################################################
 ###               Path query language components                          ###
@@ -732,7 +741,7 @@ class dynamic_path_policy(path_policy):
 class path_policy_utils(object):
     """ Utilities to manipulate path policy ASTs. """
     @classmethod
-    def path_policy_ast_fold(cls, ast, fold_f, acc):
+    def path_policy_ast_fold(cls, ast, fold_f, acc, in_cg=None, out_cg=None):
         """ Fold the AST with a function fold_f, which also takes a default
         value.
 
@@ -741,16 +750,17 @@ class path_policy_utils(object):
         :param default: 'a
         """
         if isinstance(ast, path_policy_union):
-            acc = fold_f(acc, ast)
+            acc = fold_f(acc, ast, in_cg, out_cg)
             for pp in ast.path_policies:
-                acc = cls.path_policy_ast_fold(pp, fold_f, acc)
+                acc = cls.path_policy_ast_fold(pp, fold_f, acc, in_cg, out_cg)
             return acc
         elif isinstance(ast, dynamic_path_policy):
-            acc = fold_f(acc, ast)
-            return cls.path_policy_ast_fold(ast.path_policy, fold_f, acc)
+            acc = fold_f(acc, ast, in_cg, out_cg)
+            return cls.path_policy_ast_fold(ast.path_policy, fold_f, acc, in_cg, out_cg)
         elif isinstance(ast, path_policy):
-            return fold_f(acc, ast)
+            return fold_f(acc, ast, in_cg, out_cg)
         else:
+            print type(ast)
             raise TypeError("Can only fold path_policy objects!")
 
     @classmethod
@@ -794,7 +804,7 @@ class path_policy_utils(object):
             raise TypeError("Can only operate on path objects!")
 
     @classmethod
-    def add_dynamic_path_pols(cls, acc, pp):
+    def add_dynamic_path_pols(cls, acc, pp, in_cg, out_cg):
         """ Fold function that can be used to get all dynamic sub path policies
         from a path policy pp. """
         if isinstance(pp, dynamic_path_policy):
@@ -910,21 +920,24 @@ class abstract_atom(object):
     :param m: a Filter (or match) object used to initialize the path atom.
     :type match: Filter
     """
-    def __init__(self, m,re_tree_class=re_tree_gen):
+    def __init__(self, m, re_tree_class=re_tree_gen):
         assert isinstance(m, Filter)
         self.policy = m
         self._re_tree = None
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
         self.re_tree_class = re_tree_class
 
-    @property
-    def re_tree(self):
+    def gen_re_tree(self, cg):
         """ The internal representation of an abstract atom in terms of the
         constituent leaf-level predicates. """
         if not self._re_tree:
             self.tree_counter += 1
-            self._re_tree = self.re_tree_class.get_re_tree(self.policy, self)
+            self._re_tree = cg.get_re_tree(self.policy, self)
             assert self.tree_counter <= 1
+        return self._re_tree
+
+    @property
+    def re_tree(self):
         return self._re_tree
 
     @re_tree.setter
@@ -970,9 +983,8 @@ class in_out_atom(path):
         self.out_atom = __out__(out_pred)
         super(in_out_atom, self).__init__()
 
-    @property
-    def re_tree(self):
-        return self.in_atom.re_tree ^ self.out_atom.re_tree
+    def gen_re_tree(self, in_cg, out_cg):
+        return self.in_atom.gen_re_tree(in_cg) ^ self.out_atom.gen_re_tree(out_cg)
 
     def invalidate_re_tree(self):
         self.in_atom.invalidate_re_tree()
@@ -1081,11 +1093,10 @@ class path_alternate(path_combinator):
         for p in paths:
             assert isinstance(p, path)
 
-    @property
-    def re_tree(self):
+    def gen_re_tree(self, in_cg, out_cg):
         tree = re_empty()
         for p in self.paths:
-            tree = tree | p.re_tree
+            tree = tree | p.gen_re_tree(in_cg, out_cg)
         return tree
 
 
@@ -1098,10 +1109,9 @@ class path_star(path_combinator):
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    @property
-    def re_tree(self):
+    def gen_re_tree(self, in_cg, out_cg):
         p = self.paths[0]
-        return +(p.re_tree)
+        return +(p.gen_re_tree(in_cg, out_cg))
 
 
 class path_concat(path_combinator):
@@ -1131,11 +1141,10 @@ class path_concat(path_combinator):
         else:
             return path_epsilon()
 
-    @property
-    def re_tree(self):
+    def gen_re_tree(self, in_cg, out_cg):
         tree = re_epsilon()
         for p in self.paths:
-            tree = tree ^ p.re_tree
+            tree = tree ^ p.gen_re_tree(in_cg, out_cg)
         return tree
 
 
@@ -1148,10 +1157,9 @@ class path_negate(path_combinator):
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    @property
-    def re_tree(self):
+    def re_tree(self, in_cg, out_cg):
         p = self.paths[0]
-        return ~(p.re_tree)
+        return ~(p.gen_re_tree(in_cg, out_cg))
 
 
 class path_inters(path_combinator):
@@ -1164,11 +1172,10 @@ class path_inters(path_combinator):
         for p in paths:
             assert isinstance(p, path)
 
-    @property
-    def re_tree(self):
+    def gen_re_tree(self, in_cg, out_cg):
         tree = ~re_empty()
         for p in self.paths:
-            tree = tree & p.re_tree
+            tree = tree & p.gen_re_tree(in_cg, out_cg)
         return tree
 
 #############################################################################
@@ -1327,38 +1334,6 @@ class pathcomp(object):
             return match(path_tag=num)
 
     @classmethod
-    def __get_pred__(cls, dfa, edge):
-        """ Get predicate and atom type corresponding to an edge. """
-        def __sym_in_class__(cg, sym):
-            return sym in cg.symbol_to_pred
-
-        def __get_atoms_cg_typ__(atoms, sym):
-            if len(atoms) > 1:
-                typ = type(atoms[0])
-                for a in atoms[1:]:
-                    assert typ == type(a)
-                if typ == __in__:
-                    return (__in_re_tree_gen__, __in__)
-                elif typ == __out__:
-                    return (__out_re_tree_gen__, __out__)
-                else:
-                    raise TypeError("Atoms can only be in or out typed.")
-            else:
-                if __sym_in_class__(__in_re_tree_gen__, sym):
-                    return (__in_re_tree_gen__, __in__)
-                elif __sym_in_class__(__out_re_tree_gen__, sym):
-                    return (__out_re_tree_gen__, __out__)
-                else:
-                    raise TypeError("Symbol can only be in or out typed.")
-
-        edge_label = dfa_utils.get_edge_label(edge)
-        atoms_list = reduce(lambda a,x: a + x,
-                            dfa_utils.get_edge_atoms(dfa,edge),
-                            [])
-        (cg, typ) = __get_atoms_cg_typ__(atoms_list, edge_label)
-        return (cg.symbol_to_pred[edge_label], typ)
-
-    @classmethod
     def __get_dead_state_pred__(cls, du, dfa):
         dead = du.get_dead_state(dfa)
         if dead:
@@ -1375,7 +1350,7 @@ class pathcomp(object):
             return identity
 
     @classmethod
-    def __invalidate_re_trees__(cls, acc, p):
+    def __invalidate_re_trees__(cls, acc, p, in_cg, out_cg):
         """ Invalidate the re_tree values for all abstract atoms in the given
         path policy p. """
         def inv_atoms(acc, x):
@@ -1393,13 +1368,13 @@ class pathcomp(object):
             raise TypeError("Expecting a path_policy")
 
     @classmethod
-    def __prep_re_trees__(cls, acc, p):
+    def __prep_re_trees__(cls, acc, p, in_cg, out_cg):
         """ Access re_trees of constituent path policies to help generate DFA
         later on. """
         if (isinstance(p, path_policy) and
             not isinstance(p, dynamic_path_policy) and
             not isinstance(p, path_policy_union)):
-            tree = p.path.re_tree
+            tree = p.path.gen_re_tree(in_cg, out_cg)
             return None
         elif isinstance(p, path_policy):
             return None
@@ -1407,7 +1382,7 @@ class pathcomp(object):
             raise TypeError("Can't prep re_tree for non-path-policy!")
 
     @classmethod
-    def __get_re_pols__(cls, acc, p):
+    def __get_re_pols__(cls, acc, p, in_cg, out_cg):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths."""
         (re_acc, pol_acc) = acc
@@ -1418,7 +1393,7 @@ class pathcomp(object):
             return acc
         elif isinstance(p, path_policy):
             """ Reached a leaf """
-            tree = p.path.re_tree
+            tree = p.path.gen_re_tree(in_cg, out_cg)
             piped_pol = p.piped_policy
             return (re_acc + [tree], pol_acc + [piped_pol])
         else:
@@ -1426,7 +1401,8 @@ class pathcomp(object):
 
     @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
-             edge_contraction_enabled = False, partition_enabled = False):
+            edge_contraction_enabled = False, partition_enabled = False):
+        
         """ Initialize path-related structures, namely:
         - a new virtual field for path tag;
         - in and out character generators.
@@ -1435,33 +1411,65 @@ class pathcomp(object):
                       values=range(0, numvals),
                       type="integer")
        
-        re_tree_gen.init(switch_cnt, cache_enabled, partition_enabled) 
-        __in_re_tree_gen__.clear()
-        __out_re_tree_gen__.clear()
-
-        ragel_dfa_utils.init(edge_contraction_enabled)
-
+        
+        cls.swich_cnt = switch_cnt
+        cls.cache_enabled = cache_enabled
+        cls.partition_enabled = partition_enabled
+        cls.edge_contraction_enabled = edge_contraction_enabled
     
     @classmethod
     @Stat.elapsed_time
-    def pred_part(cls, path_pol):
+    def pred_part(cls, path_pol, in_cg, out_cg):
         ast_fold = path_policy_utils.path_policy_ast_fold
         prep_trees = cls.__prep_re_trees__
-        ast_fold(path_pol, prep_trees, None)
+        ast_fold(path_pol, prep_trees, None, in_cg, out_cg)
 
     @classmethod
+    def compile(cls, path_pol, max_states=65000,
+            disjoint_enabled=False, default_enabled = False, 
+            integrate_enabled=False, ragel_enabled = False, match_enabled = False):
+        
+        if isinstance(path_pol, path_policy_union):
+            query_list = path_pol.path_policies
+        else:
+            query_list = [path_pol]
+
+        stages = pack_queries(query_list, 2000)
+        
+        in_res = []
+        out_res = []
+        print len(stages)
+        for stage in stages.values():
+            in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
+            out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
+
+            if len(stage) == 1:
+                stage_path_pol = stage[0]
+            else:
+                stage_path_pol = path_policy_union(stage)
+
+            compile_res = cls.compile_stage(stage_path_pol, in_cg, out_cg, max_states, disjoint_enabled,
+                                                default_enabled, integrate_enabled,
+                                                ragel_enabled, match_enabled)
+            sep_index = len(compile_res) / 2
+            in_part = compile_res[:sep_index]
+            out_part = compile_res[sep_index:]
+            in_res.append(in_part if len(in_part) != 1 else in_part[0])
+            out_res.append(out_part if len(out_part) != 1 else out_part[0])
+        
+        return (in_res, out_res)
+    
+    @classmethod
     @Stat.elapsed_time
-    def compile(cls, path_pol, max_states=65000, disjoint_enabled=False, default_enabled = False, 
+    def compile_stage(cls, path_pol, in_cg, out_cg, max_states=65000, 
+            disjoint_enabled=False, default_enabled = False, 
             integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
         
         classifier_utils.__set_init_vars__(match_enabled)
-        cls.path_policy = path_pol
 
-        in_cg = __in_re_tree_gen__
-        out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
         inv_trees = cls.__invalidate_re_trees__
@@ -1470,15 +1478,16 @@ class pathcomp(object):
         
         in_cg.clear()
         out_cg.clear()
-        
-        ast_fold(path_pol, inv_trees, None)
+        ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
         
         cls.log.debug('pred_part started')
-        cls.pred_part(path_pol)        
+        cls.pred_part(path_pol, in_cg, out_cg)        
 
-        (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
+        (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         cls.log.debug('compiling')
-        res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
+        res = cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states, 
+                                disjoint_enabled, default_enabled, 
+                                integrate_enabled, ragel_enabled)
         return res
 
     @classmethod
@@ -1530,11 +1539,12 @@ class pathcomp(object):
     
 
     @classmethod
-    @Stat.collects(['dfa', 'dfa_utils', 'pred_in_list', 'pred_out_list'])
-    def compile_core(cls, re_list, pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled):
-        in_cg = __in_re_tree_gen__
-        out_cg = __out_re_tree_gen__
- 
+    @Stat.collects([('dfa', [], True), ('dfa_utils', [], True), 
+                    ('pred_in_list', [], True), ('pred_out_list', [], True)])
+    def compile_core(cls, re_list, pol_list, in_cg, out_cg, max_states, 
+                        disjoint_enabled, default_enabled, 
+                        integrate_enabled, ragel_enabled):
+
         default_link = default_enabled
        
         du = common_dfa_utils
@@ -1556,8 +1566,10 @@ class pathcomp(object):
         get_edge_attributes = None
 
         if ragel_enabled:
+            ragel_dfa_utils.init(in_cg, out_cg, cls.edge_contraction_enabled)
             du = ragel_dfa_utils
         else:
+            dfa_utils.init(in_cg, out_cg)
             du = dfa_utils
 
         dfa = du.regexes_to_dfa(re_list)
@@ -1569,7 +1581,6 @@ class pathcomp(object):
         Stat.collect_stat('pred_in_list', in_cg.symbol_to_pred)
         Stat.collect_stat('pred_out_list', out_cg.symbol_to_pred)
 
-        get_pred  = lambda e: cls.__get_pred__(dfa, e)
         edges = du.get_edges(dfa)
         get_edge_attributes = du.get_edge_attributes
 
@@ -2045,6 +2056,11 @@ class common_dfa_utils(object):
 class dfa_utils(common_dfa_utils):
     """ Utilities to generate DFAs and access various properties. """
     @classmethod
+    def init(cls, in_cg, out_cg):
+        cls.in_cg = in_cg
+        cls.out_cg = out_cg
+    
+    @classmethod
     def print_dfa(cls, d):
         """ Print a DFA object d. """
         assert isinstance(d, dfa_base)
@@ -2157,14 +2173,6 @@ class dfa_utils(common_dfa_utils):
         f.close()
 
     @classmethod
-    def get_leaf_pred_dumps(cls):
-        output = ''
-        for sym in re_tree_gen.symbol_to_pred:
-            pred = re_tree_gen.symbol_to_pred[sym]
-            output += (sym + ': ' + pickle.dumps(pred) + '\n')
-        return output
-
-    @classmethod
     def __get_pred__(cls, dfa, edge):
         """ Get predicate and atom type corresponding to an edge. """
         def __sym_in_class__(cg, sym):
@@ -2176,16 +2184,16 @@ class dfa_utils(common_dfa_utils):
                 for a in atoms[1:]:
                     assert typ == type(a)
                 if typ == __in__:
-                    return (__in_re_tree_gen__, __in__)
+                    return (cls.in_cg, __in__)
                 elif typ == __out__:
-                    return (__out_re_tree_gen__, __out__)
+                    return (cls.out_cg, __out__)
                 else:
                     raise TypeError("Atoms can only be in or out typed.")
             else:
-                if __sym_in_class__(__in_re_tree_gen__, sym):
-                    return (__in_re_tree_gen__, __in__)
-                elif __sym_in_class__(__out_re_tree_gen__, sym):
-                    return (__out_re_tree_gen__, __out__)
+                if __sym_in_class__(cls.in_cg, sym):
+                    return (cls.in_cg, __in__)
+                elif __sym_in_class__(cls.out_cg, sym):
+                    return (cls.out_cg, __out__)
                 else:
                     raise TypeError("Symbol can only be in or out typed.")
 
@@ -2223,12 +2231,12 @@ class dfa_utils(common_dfa_utils):
                       re_exps, True)
         
         if not symlist:
-            symlist = (__in_re_tree_gen__.get_symlist() +
-                       __out_re_tree_gen__.get_symlist())
+            symlist = (cls.in_cg.get_symlist() +
+                       cls.out_cg.get_symlist())
         dfa = makeDFA_vector(re_exps, symlist)
         cls.__dump_file__(dfa.dot_repr(), '/tmp/graph.dot')
-        leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
-                      __out_re_tree_gen__.get_leaf_preds())
+        leaf_preds = (cls.in_cg.get_leaf_preds() +
+                      cls.out_cg.get_leaf_preds())
        
         cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
@@ -2236,7 +2244,8 @@ class dfa_utils(common_dfa_utils):
 
 
 class ragel_dfa(object):
-    def __init__(self, state_num, final_states, transition, edges, edge_ordinals):
+    def __init__(self, state_num, final_states, transition, 
+                    edges, edge_ordinals):
         self.state_num = state_num
         self.final_states = final_states
         self.transition = transition
@@ -2248,9 +2257,11 @@ class ragel_dfa(object):
 
 class ragel_dfa_utils(common_dfa_utils):
     @classmethod
-    def init(cls, edge_contraction_enabled):
+    def init(cls, in_cg, out_cg, edge_contraction_enabled):
         cls.edge_contraction_enabled = edge_contraction_enabled
-    
+        cls.in_cg = in_cg
+        cls.out_cg = out_cg
+
     @classmethod
     def get_accepting_states(cls, data):
         acc_seen = False
@@ -2359,17 +2370,17 @@ class ragel_dfa_utils(common_dfa_utils):
             return True
 
 
-        in_cache = __in_re_tree_gen__.cache
-        out_cache = __out_re_tree_gen__.cache
+        in_cache = cls.in_cg.cache
+        out_cache = cls.out_cg.cache
         in_in = identity in in_cache
         in_out = identity in out_cache
         if in_in or in_out:
             in_id = []
             out_id = []
             if in_in:
-                in_id = create_id_list(in_cache[identity].re_tree)
+                in_id = create_id_list(in_cache[identity].gen_re_tree(cls.in_cg))
             if in_out:
-                out_id = create_id_list(out_cache[identity].re_tree)
+                out_id = create_id_list(out_cache[identity].gen_re_tree(cls.out_cg))
             if len(in_id) > 1 or len(out_id) > 1:
                 res = []
                 for (src, dst), dfa_list in dfa_dict.items():
@@ -2470,9 +2481,9 @@ class ragel_dfa_utils(common_dfa_utils):
             dst_num = None
 
         if not in_list:
-            in_list = __in_re_tree_gen__.symbol_to_pred
+            in_list = cls.in_cg.symbol_to_pred
         if not out_list:
-            out_list = __out_re_tree_gen__.symbol_to_pred
+            out_list = cls.out_cg.symbol_to_pred
 
         sym = edge[1]
         if sym == 'IN_ID':
@@ -2526,8 +2537,8 @@ class ragel_dfa_utils(common_dfa_utils):
         state_edges = {}
         state_type = {}
         # get list of all predicates
-        in_pred_symbols = __in_re_tree_gen__.symbol_to_pred.keys()
-        out_pred_symbols = __out_re_tree_gen__.symbol_to_pred.keys()
+        in_pred_symbols = cls.in_cg.symbol_to_pred.keys()
+        out_pred_symbols = cls.out_cg.symbol_to_pred.keys()
         """ Determine edges currently in DFA, i.e., "non-dead" """
         for edge in edges:
             (s, p, d) = edge
@@ -2598,8 +2609,8 @@ class ragel_dfa_utils(common_dfa_utils):
        
         #print 'dfa stat count', state_num
         #print 'dfa edge count', len(edges)  
-        leaf_preds = (__in_re_tree_gen__.get_leaf_preds() +
-                      __out_re_tree_gen__.get_leaf_preds())
+        leaf_preds = (cls.in_cg.get_leaf_preds() +
+                      cls.out_cg.get_leaf_preds())
        
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
@@ -2784,3 +2795,136 @@ class LeafSketch(Sketch):
     
     def get_def_name(self):
         return self.def_name
+
+#############################################################################
+###                     Multi-stage : Query Packing                       ###
+#############################################################################
+
+
+def get_filter_type(pol):
+    '''  
+    This is assuming that we have cleared 
+    the match from redundant identity and drops
+    meaning that 
+      id + x is replaced by id
+      id ; x is replaced by x
+      drop + x is replaced by x
+      drop ; x is replaced by drop
+    thus the only case in which we have id or drop
+    in a filter is that the filter is actually equal to
+    id or drop without having anything else
+    '''
+
+    assert isinstance(pol, Filter)
+    
+    if pol == identity:
+        return set()
+    elif pol == drop:
+        return set()
+    elif isinstance(pol, match): 
+        try:
+            return set(pol.map.keys())
+        except:
+            return set()
+    elif isinstance(pol, CombinatorPolicy):
+        res = set()
+        for p in pol.policies:
+            res |= get_filter_type(p)
+        return res
+    else:
+        raise TypeError
+
+def get_types_dict(query):    
+
+    if isinstance(query, path_combinator):
+        in_type = Counter()
+        out_type = Counter()
+        for p in query.paths:
+            (tin, tout) = get_types_dict(p)
+            in_type.update(tin)
+            out_type.update(tout)
+        return (in_type, out_type)
+
+    elif isinstance(query, in_out_atom):
+        in_fields = frozenset(get_filter_type(query.in_pred))  
+        in_type = Counter({ in_fields: 1 if len(in_fields) > 0 else 0})
+        out_fields = frozenset(get_filter_type(query.out_pred))  
+        out_type = Counter({ out_fields: 1 if len(out_fields) > 0 else 0})
+        return (in_type, out_type)
+    else:
+        raise TypeError
+
+def get_type(query):
+    (in_dict, out_dict) = get_types_dict(query)
+    return (join_list(in_dict.items()), join_list(out_dict.items()))
+
+def join_type(t1, t2):
+    (fset1, n1) = t1
+    (fset2, n2) = t2
+    
+    final_count = None
+    if len(fset1) == 0:
+        final_count = n2 + 1
+    elif len(fset2) == 0:   
+        final_count = n1 + 1
+    elif len(fset1 & fset2) == 0:
+        final_count = (n1 + 1) * (n2 + 1) - 1
+    elif fset1 <= fset2 or fset2 <= fset1:
+        final_count = n1 + n2
+    elif len(fset1 & fset2) > 0:
+        final_count = (n1 + 1) * (n2 + 1) - 1
+
+    return (fset1 | fset2, final_count)
+
+def join_list(type_list):
+    if len(type_list) == 0:
+        return (0, [])
+    res = reduce(lambda acc, typ: join_type(acc, typ), type_list)
+    return res
+
+def join_list_inout(type_list):
+    in_list = [t[0] for t in type_list]
+    out_list = [t[1] for t in type_list]
+    return (join_list(in_list), join_list(out_list))
+
+def join((in1, out1), (in2, out2)):
+    return (join_type(in1, in2), join_type(out1, out2))
+
+def pack(type_list, limit):
+    stages = []
+    assgn = {}
+
+    for (q, typ) in type_list:
+        assigned = False
+        for i in range(len(stages)):
+            new_typ = join(stages[i], typ)
+            ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ 
+            if in_cnt <= limit and out_cnt <= limit:
+                stages[i] = new_typ
+                if not i in assgn:
+                    assgn[i] = []
+                assgn[i].append(q)
+                assigned = True
+                break
+        if not assigned:
+            ((_, in_cnt), (_, out_cnt)) = typ 
+            if in_cnt <= limit and out_cnt <= limit:
+                stages.append(typ)
+                assgn[len(stages) - 1] = [q]
+            else:
+                print q, in_cnt, out_cnt
+                raise TypeError
+    return assgn
+
+
+def pack_queries(queries, limit):
+    q_list = [get_type(q) for q in queries]
+    q_list = zip(range(len(q_list)), q_list)
+    assgn = pack(q_list, limit)
+    for i in assgn:
+        res = []
+        for qi in assgn[i]:
+            res.append(queries[qi])  
+        assgn[i] = res
+    return assgn
+

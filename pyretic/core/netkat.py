@@ -113,7 +113,7 @@ class netkat_backend(object):
             write_to_file(json_input, TEMP_INPUT)
             headers = {"Content-Type": "application/x-www-form-urlencoded",
                        "Accept": "*/*"}
-            ctime = 0
+            ctime = '0'
             try:
                 # TODO: make the connection persist across compilations
                 conn = httplib.HTTPConnection("localhost", NETKAT_PORT)
