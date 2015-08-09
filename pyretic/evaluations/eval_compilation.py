@@ -30,7 +30,8 @@ class eval_compilation:
         self.switch_cnt = args.switch_cnt
         self.cache_enabled = args.cache_enabled
         self.edge_contraction_enabled = args.edge_contraction_enabled
-        self.use_pyretic = args.use_pyretic 
+        self.use_pyretic = args.use_pyretic
+        self.use_fdd = args.use_fdd
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
                      self.integrate_enabled, self.multitable_enabled,
@@ -52,7 +53,7 @@ class eval_compilation:
         Stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
                     opt_flags = opt_flags, mode = 'proactive0', 
-                    use_pyretic = self.use_pyretic, offline=True)
+                    use_pyretic = self.use_pyretic, use_fdd = self.use_fdd, offline=True)
         
         Stat.stop()
     
@@ -151,6 +152,10 @@ def parse_args():
                     dest = 'use_pyretic',
                     help = 'Use the pyretic compiler (uses netkat by default)')
 
+    parser.add_argument('--use_fdd', action="store_true",
+                    dest = 'use_fdd',
+                    help = 'Use FDD for predicate decomposition')
+
     args = parser.parse_args()
 
     return args
@@ -191,8 +196,10 @@ def get_optimization_flags(args):
 if __name__ == '__main__':
     args = parse_args()
     print get_optimization_flags(args)
-
-    eval_comp = eval_compilation(args, get_testwise_params(args))
+    
+    #import cProfile
+    #cProfile.run('eval_comp = eval_compilation(args, get_testwise_params(args))')
+    eval_comp = eval_compilation(args, get_testwise_params(args)) 
     
     if args.added_query:
         for aq in args.added_query:

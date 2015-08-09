@@ -1857,7 +1857,8 @@ class pathcomp(object):
 
     @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
-            edge_contraction_enabled = False, partition_enabled = False):
+            edge_contraction_enabled = False, partition_enabled = False,
+            use_fdd = False):
         
         """ Initialize path-related structures, namely:
         - a new virtual field for path tag;
@@ -1872,7 +1873,7 @@ class pathcomp(object):
         cls.cache_enabled = cache_enabled
         cls.partition_enabled = partition_enabled
         cls.edge_contraction_enabled = edge_contraction_enabled
-    
+        cls.use_fdd = use_fdd 
     @classmethod
     @Stat.elapsed_time
     def pred_part(cls, path_pol, in_cg, out_cg):
@@ -1908,12 +1909,14 @@ class pathcomp(object):
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
         vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
-        #in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
-        #                            cls.partition_enabled)
-        #out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
-        #                             cls.partition_enabled)
-        in_cg = __fdd_in_re_tree_gen__()
-        out_cg = __fdd_out_re_tree_gen__()
+        if cls.use_fdd:
+            in_cg = __fdd_in_re_tree_gen__()
+            out_cg = __fdd_out_re_tree_gen__()
+        else:
+            in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                    cls.partition_enabled)
+            out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                     cls.partition_enabled)
 
         ''' Downstream compilation to get full policy to test. '''
         (comp_res, acc_pols) = cls.compile_stage(path_pol, in_cg, out_cg,
@@ -1963,7 +1966,7 @@ class pathcomp(object):
         # TODO(ngsrinivas): revert to rule limited query-packing after testing
         # stages = pack_queries(query_list, 2000)
         if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 1)
+            stages = pack_queries_stagelimited(query_list, 4)
         else:
             stages = {0: [path_pol]}
          
@@ -1971,10 +1974,14 @@ class pathcomp(object):
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))
         for stage in stages.values():
-            #in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
-            #out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
-            in_cg = __fdd_in_re_tree_gen__()
-            out_cg = __fdd_out_re_tree_gen__()
+            if cls.use_fdd:
+                in_cg = __fdd_in_re_tree_gen__()
+                out_cg = __fdd_out_re_tree_gen__()
+            else:
+                in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                        cls.partition_enabled)
+                out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                         cls.partition_enabled)
 
             if len(stage) == 1:
                 stage_path_pol = stage[0]
@@ -2015,16 +2022,16 @@ class pathcomp(object):
         in_cg.clear()
         out_cg.clear()
         ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
-        t_s = time.time()
-        ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
         
-        in_cg.prep_re_tree()
-        out_cg.prep_re_tree()
-        print time.time() - t_s
-        t_s = time.time()
+        if cls.use_fdd:
+            ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
+            
+            in_cg.prep_re_tree()
+            out_cg.prep_re_tree()
+        
         cls.log.debug('pred_part started')
         cls.pred_part(path_pol, in_cg, out_cg)        
-        print time.time() - t_s
+        
         (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         
         cls.log.debug('compiling')

@@ -74,7 +74,7 @@ class Runtime(object):
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal',use_nx=False, pipeline="default_pipeline",
-                 opt_flags=None, use_pyretic=False, offline=False):
+                 opt_flags=None, use_pyretic=False, use_fdd=False, offline=False):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
         self.pipeline = pipeline
@@ -89,7 +89,8 @@ class Runtime(object):
         self.set_optimization_opts(path_main, opt_flags)
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
-                             self.cache_enabled, self.edge_contraction_enabled)
+                             self.cache_enabled, self.edge_contraction_enabled,
+                             use_fdd=use_fdd)
         """ Initialize a `policy map', which determines how the network policy
         is mapped onto the tables on switches. By default (i.e., a single stage
         table), the entire policy goes into the first table on each switch.
@@ -2079,7 +2080,7 @@ class Runtime(object):
 ###############################
 
     def init_path_query(self, path_main, kwargs, partition_cnt, cache_enabled,
-                        edge_contraction_enabled):
+                        edge_contraction_enabled, use_fdd=False):
         """
         Initialization of path query library with optimization parameters.
         * partition_cnt: how many partitions for predicate overlap detection?
@@ -2110,7 +2111,7 @@ class Runtime(object):
             from pyretic.lib.path import pathcomp
             pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
                             self.cache_enabled, self.edge_contraction_enabled
-                            ,self.partition_enabled)
+                            ,self.partition_enabled, use_fdd = use_fdd)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
