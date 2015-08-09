@@ -190,21 +190,6 @@ class re_tree_gen(object):
         cls.switch_cnt = switch_cnt
         cls.cache_enabled = cache_enabled
     
-    @classmethod
-    def char_in_lexer_language(cls, char):
-        return char in ['*', '%', '+', '(', ')', '<', '>',
-                        '?', '=', '"', "'", '[', ']', '-', 
-                        '|', ',', '^', '.', '\\', '{', '}',
-                        '&', '~', ';', '$', '/', '`', '_',
-                        '@', ':', '!']
-        
-    @classmethod    
-    def char_from_token(cls, tok):
-        try:
-            return chr(tok)
-        except:
-            return unichr(tok)
-
     class dyn_pred_obj(object):
         """ A dynamic predicate occuring as a sub-policy in a bigger predicate."""
         def __init__(self, pred, pol):
@@ -222,33 +207,57 @@ class re_tree_gen(object):
     @classmethod
     def repr_state(cls):
         if cls.simple:
-            assert (sorted(cls.pred_to_symbol.keys()) ==
-                    sorted(cls.pred_to_atoms.keys()))
-            output = ''
-            for pred in cls.pred_to_symbol:
+            pred_to_symbol = [cls.pred_to_symbol]
+            pred_to_atoms = [cls.pred_to_atoms]
+        else:
+            ''' based on the assumptions that: 
+            If items(), keys(), values() are called with no intervening modifications 
+            to the dictionary, the lists will directly correspond.'''
+            pred_to_symbol = cls.pred_to_symbol.values()
+            pred_to_atoms = cls.pred_to_symbol.values()
+        
+        output = ''
+        for (pred_sym, pred_atom) in zip(pred_to_symbol, pred_to_atoms):
+            assert (sorted(pred_sym.keys()) ==
+                sorted(pred_atom.keys()))
+
+            for pred in pred_sym:
                 output += repr(pred) + ":\n"
-                output += '  symbol: ' + repr(cls.pred_to_symbol[pred]) + '\n'
+                output += '  symbol: ' + repr(pred_sym[pred]) + '\n'
                 try:
-                    output += '  atoms: ' + repr(cls.pred_to_atoms[pred] ) + '\n'
+                    output += '  atoms: ' + repr(pred_atom[pred] ) + '\n'
                 except:
                     pass
-            return output
-        else:
-            return cls.part_repr_state()
 
+        return output
+
+    
     @classmethod
-    def __add_pred__(cls, pred, symbol, atoms, pred_neg):
+    def __add_pred__(cls, pred, symbol, atoms, pred_neg, partition=None):
         """ Add a new predicate to the global state. """
-        assert cls.simple 
-        assert not pred in cls.pred_to_symbol
-        assert not pred in cls.pred_to_atoms
-        assert not pred in cls.pred_to_neg
+        if cls.simple:
+            pred_to_sym = cls.pred_to_symbol
+            pred_to_atoms = cls.pred_to_atoms
+            pred_to_neg = cls.pred_to_neg
+            sym_to_pred = cls.symbol_to_pred
+        else:
+            pred_to_sym = cls.pred_to_symbol[partition]
+            pred_to_atoms = cls.pred_to_atoms[partition]
+            pred_to_neg = cls.pred_to_neg[partition]
+            sym_to_pred = cls.part_symbol_to_pred[partition]
+
+        assert not pred in pred_to_sym
+        assert not pred in pred_to_atoms
+        assert not pred in pred_to_neg
         
-        cls.pred_to_symbol[pred] = symbol
-        cls.symbol_to_pred[symbol] = pred
-        cls.pred_to_atoms[pred] = atoms
-        cls.pred_to_neg[pred] = pred_neg
-       
+        pred_to_sym[pred] = symbol
+        sym_to_pred[symbol] = pred
+        pred_to_atoms[pred] = atoms
+        pred_to_neg[pred] = pred_neg
+
+        if not cls.simple:
+            cls.symbol_to_pred[symbol] = pred
+
     @classmethod
     def __add_dyn_preds__(cls, preds, atom_pol):
         """ Add each predicate in `preds` to list of dynamic predicates, with
@@ -258,18 +267,30 @@ class re_tree_gen(object):
             cls.dyn_preds.append(dyn_obj)
 
     @classmethod
-    def __del_pred__(cls, pred):
+    def __del_pred__(cls, pred, partition=None):
         """ Remove a predicate from existing global state of leaf-level
         predicates. """
-
-        assert cls.simple
-
-        sym = cls.pred_to_symbol[pred]
         
-        del cls.symbol_to_pred[sym]
-        del cls.pred_to_symbol[pred]
-        del cls.pred_to_atoms[pred]
-        del cls.pred_to_neg[pred]
+        if cls.simple:
+            pred_sym = cls.pred_to_symbol
+            pred_atoms = cls.pred_to_atoms
+            pred_neg = cls.pred_to_neg
+            sym_pred = cls.symbol_to_pred
+        else:
+            pred_sym = cls.pred_to_symbol[partition]
+            pred_atoms = cls.pred_to_atoms[partition]
+            pred_neg = cls.pred_to_neg[partition]
+            sym_pred = cls.part_symbol_to_pred[partition]
+
+        symbol = pred_sym[pred]
+
+        del pred_sym[pred]
+        del sym_pred[symbol]
+        del pred_atoms[pred]
+        del pred_neg[pred]
+
+        if not cls.simple:
+            del cls.symbol_to_pred[symbol]
 
     @classmethod
     def __new_token__(cls):
@@ -291,12 +312,11 @@ class re_tree_gen(object):
         return cls.token
 
     @classmethod
-    def __replace_pred__(cls, old_pred, new_preds):
+    def __replace_pred__(cls, old_pred, new_preds, partition=None):
         """ Replace the re symbol corresponding to `old_pred` with an
         alternation of predicates in `new_preds`. The metadata from the
         old_pred's re symbol is copied over to all leaf nodes of its new re AST.
         """
-        assert cls.simple
 
         def new_metadata_tree(m, re_tree):
             """ Return a new tree which has a given metadata m on all nodes in
@@ -329,402 +349,49 @@ class re_tree_gen(object):
                 return new_re
             else:
                 raise TypeError("Trees are only allowed to have alternation!")
-
-        assert old_pred in cls.pred_to_symbol and old_pred in cls.pred_to_atoms
-        old_sym = cls.pred_to_symbol[old_pred]
-        new_re_tree = re_empty()
-        # Construct replacement tree (without metadata first)
-        for pred in new_preds:
-            assert pred in cls.pred_to_symbol
-            assert pred in cls.pred_to_atoms
-            new_sym = cls.pred_to_symbol[pred]
-            new_re_tree = new_re_tree | re_symbol(new_sym)
-        # For each atom containing old_pred, replace re leaf by new tree.
-        for at in cls.pred_to_atoms[old_pred]:
-            new_atom_re_tree = replace_node(at.re_tree, new_re_tree, old_sym)
-            at.re_tree = new_atom_re_tree # change the atom objects themselves!
-
-         
-    @classmethod
-    def get_re_tree(cls, new_pred, at):
-        if cls.simple:
-            res = cls.get_re_tree_simple(new_pred, at)
-        else:
-            res = cls.part_get_re_tree(new_pred, at)
-        
-        return res
-
-    @classmethod
-    def get_re_tree_simple(cls, new_pred, at):
-        """ Deal with existing leaf-level predicates, taking different actions
-        based on whether the existing predicates are equal, superset, subset, or
-        just intersecting, the new predicate.
-        """
-
-        assert isinstance(at, abstract_atom)
-        assert isinstance(new_pred, Filter)
-
-        def update_dicts(sym, at):
-            pred = cls.symbol_to_pred[sym]
-            cls.pred_to_atoms[pred].append(at)
-
-        def create_re_tree(eq_re_tree, at):
-            if isinstance(eq_re_tree, re_symbol):
-                sym = eq_re_tree.char
-                update_dicts(sym, at)
-                return re_symbol(sym, metadata = at)
-            elif isinstance(eq_re_tree, re_alter):
-                res = re_empty()
-                for sym in eq_re_tree.re_list:
-                    res |= create_re_tree(sym, at)
-                return res
-            else:
-                print type(eq_re_tree)
-                raise TypeError
-        
-        if cls.cache_enabled:
-            if new_pred in cls.cache:
-                new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
-                return new_re_tree
-        
-
-        ne_inters   = classifier_utils.has_nonempty_intersection
-        is_not_drop = classifier_utils.is_not_drop
-        add_pred = cls.__add_pred__
-        new_sym  = re_tree_gen.__new_symbol__
-        del_pred = cls.__del_pred__
-        replace_pred = cls.__replace_pred__
-        ovlap = classifier_utils.get_overlap_mode
-
-        re_tree = re_empty()
-        pred_list = cls.pred_to_symbol.keys()
-
-        """ Record dynamic predicates separately for update purposes."""
-        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
-        if dyn_pols:
-            """ If new_pred contains a dynamic predicate, it must be remembered
-            explicitly to set up recompilation routines in the runtime."""
-            cls.__add_dyn_preds__(dyn_pols, at.policy)
-        new_pred_neg = ~new_pred
-
-        """ For each case of overlap between new and existing predicates, do
-        actions that will only retain and keep track of non-overlapping
-        pieces. """
-        for pred in pred_list:
-            assert pred in cls.pred_to_atoms
-            pred_atoms = cls.pred_to_atoms[pred]
-            pred_symbol = cls.pred_to_symbol[pred]
-            pred_neg = cls.pred_to_neg[pred]
-            (is_equal,is_superset,is_subset,intersects, new_and_not_pred, not_new_and_pred) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
-            if not is_not_drop(new_pred):
-                """ i.e., new_pred empty """
-                re_tree |= re_empty()
-                return re_tree
-            if is_equal:
-                pred_atoms.append(at)
-                re_tree |= re_symbol(pred_symbol, metadata=at)
-                return re_tree
-            elif is_superset:
-                inter = pred & new_pred_neg
-                inter_neg = ~inter
-                add_pred(pred & new_pred_neg, new_sym(), pred_atoms, inter_neg)
-                add_pred(new_pred, new_sym(), pred_atoms + [at], new_pred_neg)
-                replace_pred(pred, [inter, new_pred])
-                del_pred(pred)
-                added_sym = cls.pred_to_symbol[new_pred]
-                re_tree |= re_symbol(added_sym, metadata=at)
-                return re_tree
-            elif is_subset:
-                new_pred = new_pred & pred_neg
-                #new_pred_not_drop = new_and_not_pred
-                new_pred_neg = ~new_pred
-                pred_atoms.append(at)
-                re_tree |= re_symbol(pred_symbol, metadata=at)
-            elif intersects:
-                inter = pred & new_pred_neg
-                inter_neg = ~inter
-                inter_p = pred & new_pred
-                inter_p_neg = ~inter_p
-                add_pred(inter, new_sym(), pred_atoms, inter_neg)
-                add_pred(inter_p, new_sym(), pred_atoms + [at], inter_p_neg)
-                replace_pred(pred, [inter, inter_p])
-                del_pred(pred)
-                added_sym = cls.pred_to_symbol[inter_p]
-                re_tree |= re_symbol(added_sym, metadata=at)
-                new_pred = new_pred & pred_neg
-                #new_pred_not_drop = new_and_not_pred
-                new_pred_neg = ~new_pred
-            else:
-                pass
-        if is_not_drop(new_pred):
-            """ The new predicate should be added if some part of it doesn't
-            intersect any existing predicate, i.e., new_pred is not drop.
-            """
-            add_pred(new_pred, new_sym(), [at], new_pred_neg)
-            added_sym = cls.pred_to_symbol[new_pred]
-            re_tree |= re_symbol(added_sym, metadata=at)
-        
-        if cls.cache_enabled:
-            cls.cache[new_pred] = at
-        
-        elif len(cls.cache) == 0 and new_pred == identity:
-            cls.cache[new_pred] = at
-
-        return re_tree
-
-    @classmethod
-    def clear(cls):
-        if cls.simple:
-            """ Completely reset character generating structures. """
-            re_tree_gen.token = TOKEN_START_VALUE
-            cls.pred_to_symbol  = {}
-            cls.pred_to_atoms   = {}
-            cls.symbol_to_pred  = {}
-            cls.pred_to_neg = {}
-            cls.dyn_preds       = []
-            cls.cache = {}
-        else:
-            cls.part_clear()
-
-    @classmethod
-    def get_symlist(cls):
-        """ Get a list of symbols which are leaf-level predicates """
-        return cls.symbol_to_pred.keys()
-
-    @classmethod
-    def get_leaf_preds(cls):
-        """ Get a string representation of all leaf-level predicates in the
-        structure. """
-        output = ''
-        for sym in cls.symbol_to_pred:
-            pred = cls.symbol_to_pred[sym]
-            output += (str(sym) + ': ' + repr(pred) + '\n')
-        return output
-
-
-    @classmethod
-    def get_leaf_pickles(cls):
-        output = ''
-        for sym in cls.symbol_to_pred:
-            pred = cls.symbol_to_pred[sym]
-            output += (str(sym) + ': ' + pickle_dump(pred) + '\n')
-        return output
-
-
-    @classmethod
-    def get_dyn_preds(cls):
-        return cls.dyn_preds
-
-    @classmethod
-    def get_unaffected_pred(cls):
-        """ Predicate that covers packets unaffected by query predicates. """
-        if cls.simple:
-            if len(cls.pred_to_symbol.keys()) >= 1:
-                return ~(reduce(lambda a,x: a | x, cls.pred_to_symbol.keys()))
-            else:
-                return identity
-        else:
-            return cls.part_get_unaffected_pred()
-
-###########partitioned#########
-        
-    @classmethod
-    def part_repr_state(cls):
-        output = ''
-        for i in range(1, cls.switch_cnt + 1):
-            assert (sorted(cls.pred_to_symbol[i].keys()) ==
-                sorted(cls.pred_to_atoms[i].keys()))
-
-            for pred in cls.pred_to_symbol[i]:
-                output += repr(pred) + ":\n"
-                output += '  symbol: ' + repr(cls.pred_to_symbol[i][pred]) + '\n'
-                try:
-                    output += '  atoms: ' + repr(cls.pred_to_atoms[i][pred] ) + '\n'
-                except:
-                    pass
-
-        return output
-
-    @classmethod
-    def __part_add_pred__(cls, pred, symbol, atoms, pred_neg, partition):
-        """ Add a new predicate to the global state. """
-        assert not pred in cls.pred_to_symbol[partition]
-        assert not pred in cls.pred_to_atoms[partition]
-        assert not pred in cls.pred_to_neg[partition]
-        
-        
-        cls.pred_to_symbol[partition][pred] = symbol
-        cls.part_symbol_to_pred[partition][symbol] = pred
-        cls.symbol_to_pred[symbol] = pred
-
-        cls.pred_to_atoms[partition][pred] = atoms
-        cls.pred_to_neg[partition][pred] = pred_neg
        
-
-    @classmethod
-    def __part_del_pred__(cls, pred, partition):
-        """ Remove a predicate from existing global state of leaf-level
-        predicates. """
-        sym = cls.pred_to_symbol[partition][pred]
-        
-        del cls.part_symbol_to_pred[partition][sym]
-        del cls.symbol_to_pred[sym]
-        
-        del cls.pred_to_symbol[partition][pred]
-        del cls.pred_to_atoms[partition][pred]
-        del cls.pred_to_neg[partition][pred]
-
-
-    @classmethod
-    def __part_replace_pred__(cls, old_pred, new_preds, partition):
-        """ Replace the re symbol corresponding to `old_pred` with an
-        alternation of predicates in `new_preds`. The metadata from the
-        old_pred's re symbol is copied over to all leaf nodes of its new re AST.
-        """
-        def new_metadata_tree(m, re_tree):
-            """ Return a new tree which has a given metadata m on all nodes in
-            the given re_tree."""
-            if isinstance(re_tree, re_symbol):
-                assert re_tree.metadata == []
-                return re_symbol(re_tree.char, metadata=m, lst=False)
-            elif isinstance(re_tree, re_alter):
-                new_re = re_empty()
-                for re in re_tree.re_list:
-                    new_re = new_re | new_metadata_tree(m, re)
-                return new_re
-            else:
-                raise TypeError("Trees are only allowed to have alternation!")
-
-        def replace_node(old_re_tree, new_re_tree, old_sym):
-            """ Replace all nodes in the provided re_tree, which correspond to a
-            symbol `old_sym`, with the re tree `new_re_tree`. Also retain the
-            original metadata that was in the respective old node."""
-            if isinstance(old_re_tree, re_symbol):
-                if old_re_tree.char == old_sym:
-                    # replace with metadata!
-                    return new_metadata_tree(old_re_tree.metadata, new_re_tree)
-                else:
-                    return old_re_tree
-            elif isinstance(old_re_tree, re_alter):
-                new_re = re_empty()
-                for re in old_re_tree.re_list:
-                    new_re = new_re | replace_node(re, new_re_tree, old_sym)
-                return new_re
-            else:
-                raise TypeError("Trees are only allowed to have alternation!")
-
-        assert old_pred in cls.pred_to_symbol[partition] and old_pred in cls.pred_to_atoms[partition]
-        old_sym = cls.pred_to_symbol[partition][old_pred]
+        if cls.simple:
+            pred_sym = cls.pred_to_symbol
+            pred_atoms = cls.pred_to_atoms
+        else:
+            pred_sym = cls.pred_to_symbol[partition]
+            pred_atoms = cls.pred_to_atoms[partition]
+ 
+        assert old_pred in pred_sym and old_pred in pred_atoms
+        old_sym = pred_sym[old_pred]
         new_re_tree = re_empty()
         # Construct replacement tree (without metadata first)
         for pred in new_preds:
-            assert pred in cls.pred_to_symbol[partition]
-            assert pred in cls.pred_to_atoms[partition]
-            new_sym = cls.pred_to_symbol[partition][pred]
+            assert pred in pred_sym
+            assert pred in pred_atoms
+            new_sym = pred_sym[pred]
             new_re_tree = new_re_tree | re_symbol(new_sym)
         # For each atom containing old_pred, replace re leaf by new tree.
-        for at in cls.pred_to_atoms[partition][old_pred]:
+        for at in pred_atoms[old_pred]:
             new_atom_re_tree = replace_node(at.re_tree, new_re_tree, old_sym)
             at.re_tree = new_atom_re_tree # change the atom objects themselves!
-
-         
-    @classmethod
-    def get_re_tree_partition(cls, new_pred, at, partition):
-        """ Deal with existing leaf-level predicates, taking different actions
-        based on whether the existing predicates are equal, superset, subset, or
-        just intersecting, the new predicate.
-        """
-
-        assert isinstance(at, abstract_atom)
-        assert isinstance(new_pred, Filter)
-
-        ne_inters   = classifier_utils.has_nonempty_intersection
-        is_not_drop = classifier_utils.is_not_drop
-        add_pred = cls.__part_add_pred__
-        new_sym  = re_tree_gen.__new_symbol__
-        del_pred = cls.__part_del_pred__
-        replace_pred = cls.__part_replace_pred__
-        ovlap = classifier_utils.get_overlap_mode
-
-        re_tree = re_empty()
-        pred_list = cls.pred_to_symbol[partition].keys()
-
-        """ Record dynamic predicates separately for update purposes."""
-        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
-        if dyn_pols:
-            """ If new_pred contains a dynamic predicate, it must be remembered
-            explicitly to set up recompilation routines in the runtime."""
-            cls.__add_dyn_preds__(dyn_pols, at.policy)
-        
-        new_pred_neg = ~new_pred
-        #new_pred_not_drop = None
-        for pred in pred_list:
-            assert pred in cls.pred_to_atoms[partition]
-            pred_atoms = cls.pred_to_atoms[partition][pred]
-            pred_symbol = cls.pred_to_symbol[partition][pred]
-            pred_neg = cls.pred_to_neg[partition][pred]
-            (is_equal,is_superset,is_subset,intersects, new_and_not_pred, not_new_and_pred) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
-            if is_equal:
-                pred_atoms.append(at)
-                re_tree |= re_symbol(pred_symbol, metadata=at)
-                return re_tree
-            elif is_superset:
-                inter = pred & new_pred_neg
-                inter_neg = ~inter
-                add_pred(pred & new_pred_neg, new_sym(), pred_atoms, inter_neg, partition)
-                add_pred(new_pred, new_sym(), pred_atoms + [at], new_pred_neg, partition)
-                replace_pred(pred, [inter, new_pred], partition)
-                del_pred(pred, partition)
-                added_sym = cls.pred_to_symbol[partition][new_pred]
-                re_tree |= re_symbol(added_sym, metadata=at)
-                return re_tree
-            elif is_subset:
-                new_pred = new_pred & pred_neg
-                #new_pred_not_drop = new_and_not_pred
-                new_pred_neg = ~new_pred
-                pred_atoms.append(at)
-                re_tree |= re_symbol(pred_symbol, metadata=at)
-            elif intersects:
-                inter = pred & new_pred_neg
-                inter_neg = ~inter
-                inter_p = pred & new_pred
-                inter_p_neg = ~inter_p
-                add_pred(inter, new_sym(), pred_atoms, inter_neg, partition)
-                add_pred(inter_p, new_sym(), pred_atoms + [at], inter_p_neg, partition)
-                replace_pred(pred, [inter, inter_p], partition)
-                del_pred(pred, partition)
-                added_sym = cls.pred_to_symbol[partition][inter_p]
-                re_tree |= re_symbol(added_sym, metadata=at)
-                new_pred = new_pred & pred_neg
-                #new_pred_not_drop = new_and_not_pred
-                new_pred_neg = ~new_pred
-            else:
-                pass
-        #if new_pred_not_drop is None:
-            #print 'here'
-            #new_pred_not_drop = is_not_drop(new_pred)
-        
-        #if new_pred_not_drop:
-        if is_not_drop(new_pred):
-            """ The new predicate should be added if some part of it doesn't
-            intersect any existing predicate, i.e., new_pred is not drop.
-            """
-            add_pred(new_pred, new_sym(), [at], new_pred_neg, partition)
-            added_sym = cls.pred_to_symbol[partition][new_pred]
-            re_tree |= re_symbol(added_sym, metadata=at)
-        return re_tree
 
     
     @classmethod
-    def part_get_re_tree(cls, new_pred, at):
+    def get_re_tree(cls, new_pred, at):
         assert isinstance(at, abstract_atom)
         assert isinstance(new_pred, Filter)
         
         def update_dicts(sym, at):
-            for i in range(1, cls.switch_cnt + 1):
-                if sym in cls.part_symbol_to_pred[i]:
-                    pred = cls.part_symbol_to_pred[i][sym]
-                    cls.pred_to_atoms[i][pred].append(at)
+            if cls.simple:
+                symbol_to_pred = [cls.symbol_to_pred]
+                pred_to_atoms = [cls.pred_to_atoms]
+            else:
+                symbol_to_pred = cls.part_symbol_to_pred.values()
+                pred_to_atoms = cls.pred_to_atoms.values()
+            
+            ''' based on the assumptions that: 
+            If items(), keys(), values() are called with no intervening modifications 
+            to the dictionary, the lists will directly correspond.'''
+            for (sym_pred, pred_atom) in zip(symbol_to_pred, pred_to_atoms):               
+                if sym in sym_pred:
+                    pred = sym_pred[sym]
+                    pred_atom[pred].append(at)
                     break
 
         def create_re_tree(eq_re_tree, at):
@@ -746,14 +413,17 @@ class re_tree_gen(object):
                 new_re_tree = create_re_tree(cls.cache[new_pred].re_tree, at)
                 return new_re_tree
 
-        re_tree = re_empty()
-        for i in range(1, cls.switch_cnt + 1):
-            part_pred = match(switch = i) & new_pred
-            inters = classifier_utils.is_not_drop(part_pred)
-            if inters:
-                res_tree = cls.get_re_tree_partition(part_pred, at, i)
-                if res_tree != re_empty():
-                    re_tree |= res_tree
+        if cls.simple:
+            re_tree = cls.get_re_tree_core(new_pred, at)
+        else:
+            re_tree = re_empty()
+            for i in range(1, cls.switch_cnt + 1):
+                part_pred = match(switch = i) & new_pred
+                inters = classifier_utils.is_not_drop(part_pred)
+                if inters:
+                    res_tree = cls.get_re_tree_core(part_pred, at, i)
+                    if res_tree != re_empty():
+                        re_tree |= res_tree
        
         if cls.cache_enabled:
             cls.cache[new_pred] = at
@@ -762,44 +432,161 @@ class re_tree_gen(object):
 
         return re_tree
 
+    @classmethod
+    def get_re_tree_core(cls, new_pred, at, partition=None):
+        """ Deal with existing leaf-level predicates, taking different actions
+        based on whether the existing predicates are equal, superset, subset, or
+        just intersecting, the new predicate.
+        """
+
+        if cls.simple:
+            pred_to_symbol = cls.pred_to_symbol
+            pred_to_atoms = cls.pred_to_atoms
+            pred_to_neg = cls.pred_to_neg
+        else:
+            pred_to_symbol = cls.pred_to_symbol[partition]
+            pred_to_atoms = cls.pred_to_atoms[partition]
+            pred_to_neg = cls.pred_to_neg[partition]
+
+        ne_inters   = classifier_utils.has_nonempty_intersection
+        is_not_drop = classifier_utils.is_not_drop
+        add_pred = cls.__add_pred__
+        new_sym  = re_tree_gen.__new_symbol__
+        del_pred = cls.__del_pred__
+        replace_pred = cls.__replace_pred__
+        ovlap = classifier_utils.get_overlap_mode
+
+        re_tree = re_empty()
+        pred_list = pred_to_symbol.keys()
+
+        """ Record dynamic predicates separately for update purposes."""
+        dyn_pols = path_policy_utils.get_dyn_pols(new_pred)
+        if dyn_pols:
+            """ If new_pred contains a dynamic predicate, it must be remembered
+            explicitly to set up recompilation routines in the runtime."""
+            cls.__add_dyn_preds__(dyn_pols, at.policy)
+        new_pred_neg = ~new_pred
+
+        """ For each case of overlap between new and existing predicates, do
+        actions that will only retain and keep track of non-overlapping
+        pieces. """
+        for pred in pred_list:
+            assert pred in pred_to_atoms
+            pred_atoms = pred_to_atoms[pred]
+            pred_symbol = pred_to_symbol[pred]
+            pred_neg = pred_to_neg[pred]
+            (is_equal,is_superset,is_subset,intersects, new_and_not_pred, not_new_and_pred) = ovlap(pred, pred_neg, new_pred, new_pred_neg)
+            if not is_not_drop(new_pred):
+                """ i.e., new_pred empty """
+                re_tree |= re_empty()
+                return re_tree
+            if is_equal:
+                pred_atoms.append(at)
+                re_tree |= re_symbol(pred_symbol, metadata=at)
+                return re_tree
+            elif is_superset:
+                inter = pred & new_pred_neg
+                inter_neg = ~inter
+                add_pred(pred & new_pred_neg, new_sym(), pred_atoms, inter_neg, partition)
+                add_pred(new_pred, new_sym(), pred_atoms + [at], new_pred_neg, partition)
+                replace_pred(pred, [inter, new_pred], partition)
+                del_pred(pred, partition)
+                added_sym = pred_to_symbol[new_pred]
+                re_tree |= re_symbol(added_sym, metadata=at)
+                return re_tree
+            elif is_subset:
+                new_pred = new_pred & pred_neg
+                #new_pred_not_drop = new_and_not_pred
+                new_pred_neg = ~new_pred
+                pred_atoms.append(at)
+                re_tree |= re_symbol(pred_symbol, metadata=at)
+            elif intersects:
+                inter = pred & new_pred_neg
+                inter_neg = ~inter
+                inter_p = pred & new_pred
+                inter_p_neg = ~inter_p
+                add_pred(inter, new_sym(), pred_atoms, inter_neg, partition)
+                add_pred(inter_p, new_sym(), pred_atoms + [at], inter_p_neg, partition)
+                replace_pred(pred, [inter, inter_p], partition)
+                del_pred(pred, partition)
+                added_sym = pred_to_symbol[inter_p]
+                re_tree |= re_symbol(added_sym, metadata=at)
+                new_pred = new_pred & pred_neg
+                #new_pred_not_drop = new_and_not_pred
+                new_pred_neg = ~new_pred
+            else:
+                pass
+        if is_not_drop(new_pred):
+            """ The new predicate should be added if some part of it doesn't
+            intersect any existing predicate, i.e., new_pred is not drop.
+            """
+            add_pred(new_pred, new_sym(), [at], new_pred_neg, partition)
+            added_sym = pred_to_symbol[new_pred]
+            re_tree |= re_symbol(added_sym, metadata=at)
+        
+        return re_tree
 
     @classmethod
-    def part_clear(cls):
+    def clear(cls):
+        """ Completely reset character generating structures. """
+        re_tree_gen.token = TOKEN_START_VALUE
         cls.pred_to_atoms = {}
         cls.pred_to_symbol = {}
-        cls.part_symbol_to_pred = {}
-        cls.pred_to_neg = {}
-        re_tree_gen.token = TOKEN_START_VALUE
-        for i in range(1, cls.switch_cnt + 1):
-           cls.pred_to_symbol[i] = {}
-           cls.pred_to_atoms[i] = {}
-           cls.part_symbol_to_pred[i] = {}
-           cls.pred_to_neg[i] = {}
-
-        cls.dyn_preds = []
         cls.symbol_to_pred = {}
+        cls.pred_to_neg = {}
+        cls.dyn_preds = []
         cls.cache = {}
+        
+        if not cls.simple:
+            cls.part_symbol_to_pred = {}
+            for i in range(1, cls.switch_cnt + 1):
+               cls.pred_to_symbol[i] = {}
+               cls.pred_to_atoms[i] = {}
+               cls.part_symbol_to_pred[i] = {}
+               cls.pred_to_neg[i] = {}
+
+
+    @classmethod
+    def get_symlist(cls):
+        """ Get a list of symbols which are leaf-level predicates """
+        return cls.symbol_to_pred.keys()
+
+    @classmethod
+    def get_leaf_preds(cls):
+        """ Get a string representation of all leaf-level predicates in the
+        structure. """
+        output = ''
+        for sym in cls.symbol_to_pred:
+            pred = cls.symbol_to_pred[sym]
+            output += (str(sym) + ': ' + repr(pred) + '\n')
+        return output
+
+
+    @classmethod
+    def get_dyn_preds(cls):
+        return cls.dyn_preds
 
     @classmethod
     def get_predlist(cls):
+        if cls.simple:
+            pred_to_symbol = [cls.pred_to_symbol]
+        else:
+            pred_to_symbol = cls.pred_to_symbol.values()
+
         res = []
-        for i in range(1, cls.switch_cnt + 1):
-            res.extend(cls.pred_to_symbol[i].keys())
+        for pred_sym in pred_to_symbol:
+            res.extend(pred_sym.keys())
         return res
 
     @classmethod
-    def part_get_unaffected_pred(cls):
+    def get_unaffected_pred(cls):
         """ Predicate that covers packets unaffected by query predicates. """
         pred_list = cls.get_predlist()
-        if len(pred_list) >= 1 :
+        if len(pred_list) >= 1:
             return ~(reduce(lambda a,x: a | x, pred_list))
         else:
             return identity
 
-
-    @classmethod
-    def stats(cls):
-        print [(k, len(v)) for (k, v) in cls.part_symbol_to_pred.items()]
 """ Character generator classes belonging to "ingress" and "egress" matching
 predicates, respectively. """
 class __in_re_tree_gen__(re_tree_gen):
@@ -2445,10 +2232,6 @@ class dfa_utils(common_dfa_utils):
        
         cls.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
-        '''leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
-                      __out_re_tree_gen__.get_leaf_pickles())
-        
-        cls.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')'''
         return dfa
 
 
@@ -2712,9 +2495,9 @@ class ragel_dfa_utils(common_dfa_utils):
         
     @classmethod
     def is_dead(cls, dfa, q):
-        #return q == cls.get_dead_state(dfa)
+        return q == cls.get_dead_state(dfa)
         #TODO(mina): fix
-        return False
+        #return False
 
     @classmethod
     def get_num_states(cls, dfa):
@@ -2811,7 +2594,7 @@ class ragel_dfa_utils(common_dfa_utils):
         else:
             (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
-        #cls.add_dead_edges(edges, state_num)
+        cls.add_dead_edges(edges, state_num)
        
         #print 'dfa stat count', state_num
         #print 'dfa edge count', len(edges)  
@@ -2821,12 +2604,6 @@ class ragel_dfa_utils(common_dfa_utils):
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
 
         dfa = ragel_dfa(state_num, accepting_states, None, edges, edge_ordinal)
-        # TODO(Mina): avoid pickling as of now; fix later
-        # leaf_pickles = (__in_re_tree_gen__.get_leaf_pickles() +
-        #               __out_re_tree_gen__.get_leaf_pickles())
-        
-        # dfa_utils.__dump_file__(leaf_pickles, '/tmp/pickle_symbols.txt')
-        
         return dfa
 
 
