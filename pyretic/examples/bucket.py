@@ -54,9 +54,9 @@ def static_fwding_single_2():
              (match(dstip=ip2) >> fwd(2)) )
 
 def static_fwding_single_3():
-    return ( (match(dstip=ip1) >> fwd(1)) +
-             (match(dstip=ip2) >> fwd(2)) +
-             (match(dstip=ip3) >> fwd(3)) )
+    return ( (match(ethtype=IP_TYPE, dstip=ip1) >> fwd(1)) +
+             (match(ethtype=IP_TYPE, dstip=ip2) >> fwd(2)) +
+             (match(ethtype=IP_TYPE, dstip=ip3) >> fwd(3)) )
 
 def static_fwding_cycle_3_3():
     return ( (match(dstip=ip1) >> match(switch=1) >> fwd(3)) +
