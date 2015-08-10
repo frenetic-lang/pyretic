@@ -243,6 +243,23 @@ def to_pred(p):
   else:
     raise TypeError(p)
 
+def get_buckets_list(p):
+    from pyretic.core.language import (parallel, sequential, if_, DynamicPolicy,
+                                     ingress_network, egress_network,
+                                     DerivedPolicy, CountBucket)
+    from pyretic.lib.netflow import NetflowBucket
+    if isinstance(p, parallel) or isinstance(p, sequential):
+        return reduce(lambda acc, x: acc | get_buckets_list(x), p.policies, set([]))
+    elif isinstance(p, if_):
+        return get_buckets_list(p.t_branch) | get_buckets_list(p.f_branch)
+    elif ((isinstance(p, DynamicPolicy) or isinstance(p, DerivedPolicy)) and not
+          (isinstance(p, ingress_network) or isinstance(p, egress_network))):
+        return get_buckets_list(p.policy)
+    elif isinstance(p, CountBucket) or isinstance(p, NetflowBucket):
+        return set([p])
+    else:
+        return set([])
+
 # TODO(arjun): Consider using aspects to inject methods into each class. That
 # would be better object-oriented style.
 def to_pol(p):
