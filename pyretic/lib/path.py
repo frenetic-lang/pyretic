@@ -256,7 +256,7 @@ class Leaf(FDD):
         else:
             return Leaf()
 
-    def get_pred(self):
+    def get_pred(self, neg_cache):
         (true_dict, false_set) = self.path
         if len(true_dict) == 0:
             true_match = identity
@@ -266,14 +266,14 @@ class Leaf(FDD):
         for (f, v) in false_set:
             if f in true_dict:
                 continue
-            pred = match(**{f:v})
+            pred = neg_cache[(f,v)]
             if false_match is None:
                 false_match = pred
             else:
-                false_match |= pred
+                false_match &= pred
         if false_match == None:
-            false_match = drop
-        return true_match & (~false_match)
+            false_match = identity
+        return true_match & false_match
 
     def __eq__(self, other):
         res = (isinstance(other, Leaf) and self.pred_set == other.pred_set)
@@ -448,16 +448,18 @@ class FDDTranslator(object):
         raise TypeError
 
     @classmethod
-    def assign_path(cls, fdd, path):
+    def assign_path(cls, fdd, path, neg_cache):
         if isinstance(fdd, Node):
             (true_dict, false_set) = path
             (f, v) = fdd.test
             assert not f in true_dict
             true_dict[f] = v
-            cls.assign_path(fdd.lchild, path)
+            cls.assign_path(fdd.lchild, path, neg_cache)
             del true_dict[f]
             new_false = false_set | {(f, v)}
-            cls.assign_path(fdd.rchild, (true_dict, new_false))
+            if not (f,v) in neg_cache:
+                neg_cache[(f,v)] = ~match(**{f:v})
+            cls.assign_path(fdd.rchild, (true_dict, new_false), neg_cache)
         elif isinstance(fdd, Leaf):
             (true_dict, false_set) = path
             fdd.path = (true_dict.items(), false_set)
@@ -471,6 +473,10 @@ class fdd_re_tree_gen(object):
     out_cg_list = []
 
     def __init__(self):
+        self.num_to_pred = {}
+        self.next = 0
+        self.neg_cache = {}
+
         self.pred_to_atoms = {}
         self.pred_to_leafs = {}
         self.symbol_to_leaf = {}
@@ -480,6 +486,10 @@ class fdd_re_tree_gen(object):
         self.dyn_preds = []
 
     def clear(self):
+        self.num_to_pred = {}
+        self.next = 0
+        self.neg_cache = {}
+
         self.pred_to_atoms = {}
         self.pred_to_leafs = {}
         self.symbol_to_leaf = {}
@@ -539,7 +549,9 @@ class fdd_re_tree_gen(object):
             return
         
         self.pred_to_atoms[pred] = [at]
-        pred_fdd = FDDTranslator.translate(pred, pred)
+        self.num_to_pred[self.next] = pred
+        pred_fdd = FDDTranslator.translate(pred, self.next)
+        self.next += 1
         #FDDTranslator.assign_path(pred_fdd, set())
         if self.base == None:
             self.base = pred_fdd
@@ -547,7 +559,7 @@ class fdd_re_tree_gen(object):
             self.base = FDDTranslator.merge(pred_fdd, self.base, {}, True)
 
     def prep_re_tree(self):
-        FDDTranslator.assign_path(self.base, ({}, set()))
+        FDDTranslator.assign_path(self.base, ({}, set()), self.neg_cache)
         self.leaf_list = self.base.get_leaves()
         for leaf in self.leaf_list:
             if leaf.is_drop():
@@ -555,8 +567,9 @@ class fdd_re_tree_gen(object):
             sym = self.__new_symbol__()
             leaf.symbol = sym
             self.symbol_to_leaf[sym] = leaf
-            self.symbol_to_pred[sym] = leaf.get_pred()
-            for pred in leaf.pred_set:
+            self.symbol_to_pred[sym] = leaf.get_pred(self.neg_cache)
+            for pred_id in leaf.pred_set:
+                pred = self.num_to_pred[pred_id]
                 if not pred in self.pred_to_leafs:
                     self.pred_to_leafs[pred] = []
                 self.pred_to_leafs[pred].append(leaf)
