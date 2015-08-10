@@ -267,7 +267,8 @@ def to_pol(p):
                                      parallel, intersection, ingress_network,
                                      egress_network, sequential, fwd, if_,
                                      FwdBucket, DynamicPolicy, DerivedPolicy,
-                                     Controller, _modify)
+                                     Controller, _modify, CountBucket)
+  from pyretic.lib.netflow import NetflowBucket
   if isinstance(p, match):
     return mk_filter(to_pred(p))
   elif p == identity:
@@ -296,6 +297,8 @@ def to_pol(p):
                      mk_seq([mk_filter({ "type": "neg", "pred": c }), to_pol(p.f_branch)])])    
   elif isinstance(p, FwdBucket):
       return {"type" : "mod", "header" : "location", "value": {"type" : "pipe", "name" : str(id(p))}}
+  elif isinstance(p, CountBucket) or isinstance(p, NetflowBucket):
+      return {"type" : "mod", "header" : "location", "value": {"type" : "query", "name" : str(id(p))}}
   elif isinstance(p, ingress_network) or isinstance(p, egress_network) or isinstance(p, DynamicPolicy):
       return to_pol(p.policy)
   elif isinstance(p, DerivedPolicy):
