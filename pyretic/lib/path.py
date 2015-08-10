@@ -216,7 +216,7 @@ class Node(FDD):
 
 class Leaf(FDD):
 
-    def __init__(self, pred_set = frozenset(), path = frozenset()):
+    def __init__(self, pred_set = frozenset(), path = ([], set())):
         super(Leaf, self).__init__()
         self.pred_set = pred_set
         self.path = path
@@ -235,8 +235,8 @@ class Leaf(FDD):
     def __add__(self, other):
         
         new_pred_set = self.pred_set | other.pred_set
-        new_path = self.path | other.path
-        res = Leaf(new_pred_set, new_path)
+        #new_path = self.path | other.path
+        res = Leaf(new_pred_set)
         #print 'adding'
         #print self.__repr__()
         #print other.__repr__()
@@ -246,8 +246,8 @@ class Leaf(FDD):
 
     def __rshift__(self, other):
         new_pred_set = self.pred_set & other.pred_set
-        new_path = self.path | other.path
-        return Leaf(new_pred_set, new_path)
+        #new_path = self.path | other.path
+        return Leaf(new_pred_set)
 
     def neg(self, pred):
         assert len(self.pred_set) < 2
@@ -257,18 +257,23 @@ class Leaf(FDD):
             return Leaf()
 
     def get_pred(self):
-        res = None
-        for (f, v, holds) in self.path:
+        (true_dict, false_set) = self.path
+        if len(true_dict) == 0:
+            true_match = identity
+        else:
+            true_match = match(**dict(true_dict))
+        false_match = None
+        for (f, v) in false_set:
+            if f in true_dict:
+                continue
             pred = match(**{f:v})
-            if not holds:
-                pred = ~pred
-            if res is None:
-                res = pred
+            if false_match is None:
+                false_match = pred
             else:
-                res &= pred
-        if res == None:
-            res = identity
-        return res
+                false_match |= pred
+        if false_match == None:
+            false_match = drop
+        return true_match & (~false_match)
 
     def __eq__(self, other):
         res = (isinstance(other, Leaf) and self.pred_set == other.pred_set)
@@ -288,16 +293,53 @@ class Leaf(FDD):
         return res
 
 class FDDTranslator(object):
-    
+   
     @classmethod
-    def merge(cls, d1, d2, union):
+    def refine(cls, d, fmap):
+        if isinstance(d, Node):
+            (f, v) = d.test
+            if f in fmap:
+                if fmap[f] == v:
+                    return cls.refine(d.lchild, fmap)
+                else:
+                    return cls.refine(d.rchild, fmap)
+            else:
+                return d
+        else:
+            return d
+
+    @classmethod
+    def fmap_digest(cls, fmap, t):
+        (f, v) = t
+        if f in fmap:
+            return (True, f, fmap[f])
+        else:
+            return (False, f, None)
+
+    @classmethod
+    def revert_fmap(cls, fmap, digest):
+        (changed, f, v) = digest
+        if changed:
+            fmap[f] = v
+        else:
+            del fmap[f]
+        return fmap
+
+    @classmethod
+    def merge(cls, d1, d2, fmap, union):
+        d1 = cls.refine(d1, fmap)
+        d2 = cls.refine(d2, fmap)
         if isinstance(d1, Node):
             t1 = d1.test
             if isinstance(d2, Node):
                 t2 = d2.test
                 if t1 == t2:
-                    lchild = cls.merge(d1.lchild, d2.lchild, union)
-                    rchild = cls.merge(d1.rchild, d2.rchild, union)
+                    digest = cls.fmap_digest(fmap, t1)
+                    (f, v) = t1
+                    fmap[f] = v
+                    lchild = cls.merge(d1.lchild, d2.lchild, fmap, union)
+                    fmap = cls.revert_fmap(fmap, digest)
+                    rchild = cls.merge(d1.rchild, d2.rchild, fmap, union)
                     test = t1
                 else:
                     if t1 > t2:
@@ -306,25 +348,29 @@ class FDDTranslator(object):
                     
                     (f1, v1) = t1
                     (f2, v2) = t2
+                    digest = cls.fmap_digest(fmap, t1)
+                    fmap[f1] = v1
                     if f1 == f2 and v1 != v2:
-                        lchild = cls.merge(d1.lchild, d2.rchild, union)
-                        rchild = cls.merge(d1.rchild, d2, union)
+                        lchild = cls.merge(d1.lchild, d2.rchild, fmap, union)
+                        fmap = cls.revert_fmap(fmap, digest)
+                        rchild = cls.merge(d1.rchild, d2, fmap, union)
                         test = t1
                     else:
-                        lchild = cls.merge(d1.lchild, d2, union)
-                        rchild = cls.merge(d1.rchild, d2, union)
+                        lchild = cls.merge(d1.lchild, d2, fmap, union)
+                        fmap = cls.revert_fmap(fmap, digest)
+                        rchild = cls.merge(d1.rchild, d2, fmap, union)
                         test = t1
                          
             elif isinstance(d2, Leaf):
-                lchild = cls.merge(d1.lchild, d2, union)
-                rchild = cls.merge(d1.rchild, d2, union)
+                lchild = cls.merge(d1.lchild, d2, fmap, union)
+                rchild = cls.merge(d1.rchild, d2, fmap, union)
                 test = t1
             else:
                 raise TypeError
         elif isinstance(d1, Leaf):
             if isinstance(d2, Node):
-                lchild = cls.merge(d2.lchild, d1, union)
-                rchild = cls.merge(d2.rchild, d1, union)
+                lchild = cls.merge(d2.lchild, d1, fmap, union)
+                rchild = cls.merge(d2.rchild, d1, fmap, union)
                 test = d2.test
 
             elif isinstance(d2, Leaf):
@@ -336,12 +382,11 @@ class FDDTranslator(object):
                 raise TypeError
         else: 
             raise TypeError
-        
         if rchild == lchild:
-            return lchild
+            res = lchild
         else:
-            return Node(test, lchild, rchild)
-
+            res = Node(test, lchild, rchild)
+        return res
     @classmethod
     def neg(cls, d, pred):
         if isinstance(d, Node):
@@ -356,11 +401,11 @@ class FDDTranslator(object):
 
 
     @classmethod
-    def get_id(cls, pred, path = set()):
+    def get_id(cls, pred, path = ([], set())):
         return Leaf(frozenset([pred]), path)
 
     @classmethod
-    def get_drop(cls, path = set()):
+    def get_drop(cls, path = ([], set())):
         return Leaf(frozenset(), path)
 
     @classmethod 
@@ -380,7 +425,7 @@ class FDDTranslator(object):
 
             for (f, v) in fmap[1:]:
                 new_match = Node((f, v), cls.get_id(pred), cls.get_drop())
-                res = cls.merge(res, new_match, False)
+                res = cls.merge(res, new_match, {}, False)
             return res
 
         elif typ == negate:
@@ -391,28 +436,31 @@ class FDDTranslator(object):
             res = cls.translate(pol.policies[0], pred)            
             for p in pol.policies[1:]:
                 p_fdd = cls.translate(p, pred)
-                res = cls.merge(res, p_fdd, True)
+                res = cls.merge(res, p_fdd, {}, True)
             return res
         
         if issubclass(typ, intersection):
             res = cls.translate(pol.policies[0], pred)
             for p in pol.policies[1:]:
                 p_fdd = cls.translate(p, pred)
-                res = cls.merge(res, p_fdd, False)
+                res = cls.merge(res, p_fdd, {}, False)
             return res
         raise TypeError
 
     @classmethod
     def assign_path(cls, fdd, path):
         if isinstance(fdd, Node):
-            true_test = fdd.test + (True,)
-            true_path = path | set([true_test])
-            cls.assign_path(fdd.lchild, true_path)
-            false_test = fdd.test + (False,)
-            false_path = path | set([false_test])
-            cls.assign_path(fdd.rchild, false_path)
+            (true_dict, false_set) = path
+            (f, v) = fdd.test
+            assert not f in true_dict
+            true_dict[f] = v
+            cls.assign_path(fdd.lchild, path)
+            del true_dict[f]
+            new_false = false_set | {(f, v)}
+            cls.assign_path(fdd.rchild, (true_dict, new_false))
         elif isinstance(fdd, Leaf):
-            fdd.path = path
+            (true_dict, false_set) = path
+            fdd.path = (true_dict.items(), false_set)
         else:
             raise TypeError
 
@@ -492,13 +540,14 @@ class fdd_re_tree_gen(object):
         
         self.pred_to_atoms[pred] = [at]
         pred_fdd = FDDTranslator.translate(pred, pred)
-        FDDTranslator.assign_path(pred_fdd, set())
+        #FDDTranslator.assign_path(pred_fdd, set())
         if self.base == None:
             self.base = pred_fdd
         else:
-            self.base = FDDTranslator.merge(pred_fdd, self.base, True)
-    
+            self.base = FDDTranslator.merge(pred_fdd, self.base, {}, True)
+
     def prep_re_tree(self):
+        FDDTranslator.assign_path(self.base, ({}, set()))
         self.leaf_list = self.base.get_leaves()
         for leaf in self.leaf_list:
             if leaf.is_drop():
@@ -1966,7 +2015,7 @@ class pathcomp(object):
         # TODO(ngsrinivas): revert to rule limited query-packing after testing
         # stages = pack_queries(query_list, 2000)
         if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 4)
+            stages = pack_queries_stagelimited(query_list, 1)
         else:
             stages = {0: [path_pol]}
          
@@ -1992,6 +2041,8 @@ class pathcomp(object):
                                                  max_states, disjoint_enabled,
                                                  default_enabled, integrate_enabled,
                                                  ragel_enabled, match_enabled)
+            #print '-----------------'
+            #continue
             (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
@@ -2024,14 +2075,23 @@ class pathcomp(object):
         ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
         
         if cls.use_fdd:
+            t_s = time.time()
             ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
-            
+            print time.time() - t_s
+            #print in_cg.base
+            #print out_cg.base
+            t_s = time.time()
             in_cg.prep_re_tree()
+            print time.time() - t_s
+            t_s = time.time()
             out_cg.prep_re_tree()
+            print time.time() - t_s
         
         cls.log.debug('pred_part started')
+        t_s = time.time()
         cls.pred_part(path_pol, in_cg, out_cg)        
-        
+        print time.time() - t_s
+        #return 
         (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         
         cls.log.debug('compiling')
