@@ -2082,7 +2082,7 @@ class pathcomp(object):
         # TODO(ngsrinivas): revert to rule limited query-packing after testing
         # stages = pack_queries(query_list, 2000)
         if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 10)
+            stages = pack_queries_stagelimited(query_list, 1)
         else:
             stages = {0: [path_pol]}
         cls.log.debug('stage assignment %f' % (time.time() - t_s))
