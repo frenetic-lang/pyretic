@@ -76,7 +76,7 @@ class netkat_backend(object):
                 pred_policy = identity
             return pred_policy >> pol
 
-        def curl_channel_compilation(pol):
+        def curl_channel_compilation(pol, qdict):
             """ Communicate with the netKAT compile server through curl. """
             import subprocess
 
@@ -95,7 +95,7 @@ class netkat_backend(object):
             except subprocess.CalledProcessError:
                 print "error in calling frenetic"
 
-            cls = json_to_classifier(output)
+            cls = json_to_classifier(output, qdict)
             if print_json:
                 cls.log().error("This is the json output:")
                 cls.log().error(str(output))
@@ -108,7 +108,7 @@ class netkat_backend(object):
 
             return (cls, time)
 
-        def httplib_channel_compilation(pol):
+        def httplib_channel_compilation(pol, qdict):
             json_input = compile_to_netkat(pol)
             write_to_file(json_input, TEMP_INPUT)
             headers = {"Content-Type": "application/x-www-form-urlencoded",
@@ -127,12 +127,13 @@ class netkat_backend(object):
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
                 sys.exit(0)
-            classifier = json_to_classifier(netkat_out)
+            classifier = json_to_classifier(netkat_out, qdict)
             return (classifier, ctime)
 
         pol = use_explicit_switches(pol)
-        # return curl_channel_compilation(pol)
-        return httplib_channel_compilation(pol)
+        qdict = {str(id(b)) : b for b in get_buckets_list(pol)}
+        # return curl_channel_compilation(pol, qdict)
+        return httplib_channel_compilation(pol, qdict)
 
 ##################### Helper functions #################
 
@@ -392,8 +393,11 @@ def create_action(action):
         if len(res) == 0:
             res.add(identity)
     return res
+
+def get_queries_from_names(qnames, qdict):
+    return set([qdict[x] for x in qnames])
         
-def json_to_classifier(fname):
+def json_to_classifier(fname, qdict):
     from pyretic.core.classifier import Rule, Classifier
     data = json.loads(fname)
     rules = []
@@ -403,7 +407,8 @@ def json_to_classifier(fname):
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id)
             action = create_action(rule['action'])
-            rules.append( (prio, Rule(m, action, [None], "netkat")))
+            queries = get_queries_from_names(rule['queries'], qdict)
+            rules.append( (prio, Rule(m, action | queries, [None], "netkat")))
     #rules.sort()
     rules = [v for (k,v) in rules]
     return Classifier(rules)
