@@ -572,7 +572,17 @@ class fdd_re_tree_gen(object):
         for leaf in self.pred_to_leafs[pred]:
             re_tree |= re_symbol(leaf.symbol, metadata=at)
         return re_tree
-  
+ 
+    def get_re_string(self, pred, at):
+        assert isinstance(at, abstract_atom)
+        assert isinstance(pred, Filter)
+         
+        if not pred in self.pred_to_leafs:
+            return "^any"
+        
+        syms = [str(leaf.symbol) for leaf in self.pred_to_leafs[pred]]
+        return '(' + string.join(syms, ')|(') + ')'
+
     def get_leaf_preds(self):
         output = ''
         for sym in self.symbol_to_pred:
@@ -1382,6 +1392,8 @@ class path_empty(path):
     def gen_re_tree(self, in_cg, out_cg):
         return re_empty()
 
+    def gen_re_string(self, in_cg, out_cg):
+        return "^any"
 
 class abstract_atom(object):
     """A single atomic match in a path expression. This is an abstract class
@@ -1397,6 +1409,7 @@ class abstract_atom(object):
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
         self.re_tree_class = re_tree_class
 
+    
     def gen_re_tree(self, cg):
         """ The internal representation of an abstract atom in terms of the
         constituent leaf-level predicates. """
@@ -1414,6 +1427,9 @@ class abstract_atom(object):
     def re_tree(self, rt):
         self._re_tree = rt
         self.tree_counter += 1
+
+    def gen_re_string(self, cg):
+        return cg.get_re_string(self.policy, self)
 
     def invalidate_re_tree(self):
         """ Invalidate the internal representation in terms of regular
@@ -1461,6 +1477,11 @@ class in_out_atom(path):
         self._re_tree = (self.in_atom.gen_re_tree(in_cg) ^
                          self.out_atom.gen_re_tree(out_cg))
         return self._re_tree
+
+    def gen_re_string(self, in_cg, out_cg):
+        re_string = ('(' + self.in_atom.gen_re_string(in_cg) + ').(' +
+                         self.out_atom.gen_re_string(out_cg) + ')')
+        return re_string
 
     def invalidate_re_tree(self):
         self.in_atom.invalidate_re_tree()
@@ -1586,7 +1607,10 @@ class path_alternate(path_combinator):
         for p in self.paths:
             tree = tree | p.gen_re_tree(in_cg, out_cg)
         return tree
-
+   
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ')|(') + ')'
 
 class path_star(path_combinator):
     """ Kleene star on a path. """
@@ -1601,6 +1625,8 @@ class path_star(path_combinator):
         p = self.paths[0]
         return +(p.gen_re_tree(in_cg, out_cg))
 
+    def gen_re_string(self, in_cg, out_cg):
+        return '(' + self.paths[0].gen_re_string(in_cg, out_cg) + ')*'
 
 class path_concat(path_combinator):
     """ Concatenation of paths. """
@@ -1635,6 +1661,9 @@ class path_concat(path_combinator):
             tree = tree ^ p.gen_re_tree(in_cg, out_cg)
         return tree
 
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ').(') + ')'
 
 class path_negate(path_combinator):
     """ Negation of paths. """
@@ -1649,6 +1678,8 @@ class path_negate(path_combinator):
         p = self.paths[0]
         return ~(p.gen_re_tree(in_cg, out_cg))
 
+    def gen_re_string(self, in_cg, out_cg):
+        return '!(' + self.paths[0] + ')'
 
 class path_inters(path_combinator):
     """ Intersection of paths. """
@@ -1665,6 +1696,11 @@ class path_inters(path_combinator):
         for p in self.paths:
             tree = tree & p.gen_re_tree(in_cg, out_cg)
         return tree
+
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ')&(') + ')'
+
 
 #############################################################################
 ###                      Optimizations                                    ###
@@ -1905,6 +1941,24 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
+    def __get_re_strings__(cls, acc, p, in_cg, out_cg):
+        """ A reduce lambda which extracts an re and a policy to go with the re,
+        from the AST of paths. """
+        (re_acc, pol_acc) = acc
+        """ Skip re extraction for all but the leaves of the path policy ast. """
+        if isinstance(p, dynamic_path_policy):
+            return acc
+        elif isinstance(p, path_policy_union):
+            return acc
+        elif isinstance(p, path_policy):
+            """ Reached a leaf """
+            tree = p.path.gen_re_string(in_cg, out_cg)
+            piped_pol = p.piped_policy
+            return (re_acc + [tree], pol_acc + [piped_pol])
+        else:
+            raise TypeError("Can't get re_pols from non-path-policy!")
+
+    @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
             edge_contraction_enabled = False, partition_enabled = False,
             use_fdd = False):
@@ -2041,8 +2095,8 @@ class pathcomp(object):
                                                  max_states, disjoint_enabled,
                                                  default_enabled, integrate_enabled,
                                                  ragel_enabled, match_enabled)
-            print '-----------------'
-            continue
+            #print '-----------------'
+            #continue
             (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
@@ -2078,21 +2132,20 @@ class pathcomp(object):
             t_s = time.time()
             ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
             print time.time() - t_s
-            #print in_cg.base
-            #print out_cg.base
             t_s = time.time()
             in_cg.prep_re_tree()
             print time.time() - t_s
             t_s = time.time()
             out_cg.prep_re_tree()
             print time.time() - t_s
-        
-        cls.log.debug('pred_part started')
-        t_s = time.time()
-        cls.pred_part(path_pol, in_cg, out_cg)        
-        print time.time() - t_s
-        return 
-        (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
+            (re_list, pol_list) =  ast_fold(path_pol, cls.__get_re_strings__, ([], []), in_cg, out_cg)
+
+        else: 
+            cls.log.debug('pred_part started')
+            t_s = time.time()
+            cls.pred_part(path_pol, in_cg, out_cg)        
+            print time.time() - t_s
+            (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         
         cls.log.debug('compiling')
         res = cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states, 
@@ -3146,7 +3199,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
         re_list_str = '\tmain := '
         for i,q in re_list:
-            re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
+            re_list_str += '((' + q + (') @_%d)|' %i)
         res += re_list_str[:-1] + ';}%%\n%% write data;'
         return res
 
@@ -3625,7 +3678,7 @@ def pack_queries_stagelimited(queries, numstages):
     assert numstages > 0
     q_list = [get_type(q) for q in queries]
     q_list = zip(range(len(q_list)), q_list)
-    assgn = pack_stagelimited(q_list, numstages)
+    assgn = pack_stage(q_list, 3500, numstages)
     for i in assgn:
         res = []
         for qi in assgn[i]:
