@@ -250,15 +250,33 @@ def tm_query(topo, edge_map):
  
     return  pol + port_pol        
 
+def get_queries(params):
+    queries = []
+    for (k, v) in sorted(params.items()):
+        if 'q' in k:
+            queries.append(v)
+    return queries
+
 def path_main(**kwargs):
+    query_dict = {'ddos' : ddos_query, 'congested_link' : link_congestion_query,
+                  'firewall' : firewall_query, 'path_loss' : path_loss_query,
+                  'slice' : slice_query, 'tm' : tm_query}
+    params = dict(**kwargs)
+    queries = get_queries(params)
+    if len(queries) == 0:
+        queries = query_dict.keys()
+        print 'using all queries combined'
+
+    queries = [query_dict[q] for q in queries]
     (topo, edge_map) = get_topo()
-    path_policy = (ddos_query(topo, edge_map) +
-                   link_congestion_query(topo, edge_map) +
-                   firewall_query(topo, edge_map) +
-                   path_loss_query(topo, edge_map) +
-                   slice_query(topo, edge_map) +
-                   tm_query(topo, edge_map)
-                   )
+    path_policy = None
+    for q in queries:
+        path_query = q(topo, edge_map)
+        if path_policy is None:
+            path_policy = path_query
+        else:
+            path_policy += path_query
+    
     return path_policy
 
 def main(**kwargs):
