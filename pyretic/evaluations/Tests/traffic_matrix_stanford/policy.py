@@ -56,7 +56,7 @@ class TrafficMatrixStats:
         t = StanfordTopology.StanfordTopo()
         ports = t.port_map
         switches = ports.keys()
-        print sum([len(v) for k,v in ports.items()])
+        
         egress_pairs = itertools.product(switches, switches)
 	
         pol = None
