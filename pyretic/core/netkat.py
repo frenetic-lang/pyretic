@@ -339,7 +339,7 @@ def to_pol(p):
     c = to_pred(p.pred)
     return mk_union([mk_seq([mk_filter(c), to_pol(p.t_branch)]),
                      mk_seq([mk_filter({ "type": "neg", "pred": c }), to_pol(p.f_branch)])])    
-  elif isinstance(p, FwdBucket):
+  elif isinstance(p, FwdBucket) or p is Controller:
       return {"type" : "mod", "header" : "location", "value": {"type" : "pipe", "name" : str(id(p))}}
   elif isinstance(p, CountBucket) or isinstance(p, NetflowBucket):
       return {"type" : "mod", "header" : "location", "value": {"type" : "query", "name" : str(id(p))}}
@@ -348,7 +348,7 @@ def to_pol(p):
   elif isinstance(p, DerivedPolicy):
       return to_pol(p.policy)
   else:
-    raise TypeError("unknown policy %s" % type(p))
+    raise TypeError("unknown policy %s %s" % (type(p), repr(p)))
 
 def mk_union(pols):
   return { "type": "union", "pols": pols }
