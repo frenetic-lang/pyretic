@@ -387,8 +387,7 @@ def create_match(pattern, switch_id):
     else:
         match_map = {}
     for k,v in pattern.items():
-        # HACKETY HACK: remove nwProto from netkat generated classifier
-        if v is not None and k != "dlTyp" and k != "nwProto":
+        if v is not None:
             if k == 'dlSrc' or k == 'dlDst':
                 """ TODO: NetKat returns MAC addresses reversed. """
                 match_map[field_map[k]] = MAC(__reverse_mac__(v))
