@@ -60,7 +60,7 @@ def single_bucket_test(fwding, query, filt_funs, topo_name, topo_args,
         fails_counts.append(success_info)
     return success_info == 'PASS'
 
-def generic_topo_tests(topo_name, topo_args, fwding_pols):
+def deprecated_generic_topo_tests(topo_name, topo_args, fwding_pols):
     global num_passed, num_failed, failed_tests
     query_pols  = ['test0', 'test1', 'test2', 'test3', 
                    'test4', 'test5', 'test6', 'test7']
@@ -89,6 +89,84 @@ def generic_topo_tests(topo_name, topo_args, fwding_pols):
                                      topo_name, topo_args, results, pass_fail,
                                      test_nums[i])
             test_name = "%s %s on %s" % (query_pols[i], fwding, topo_name)
+            if res:
+                print "===== TEST %s PASSED =====" % test_name
+                num_passed += 1
+            else:
+                print "===== TEST %s FAILED =====" % test_name
+                failed_tests.append(test_name)
+                num_failed += 1
+
+def test0(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test0'
+    return (query_pol, single_bucket_test(fwding, query_pol, 'filt_test0',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '0'))
+
+def test1(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test1'
+    return (query_pol, single_bucket_test(fwding, query_pol, 'filt_test1',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '1'))
+
+def test2(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test2'
+    return (query_pol, single_bucket_test(fwding, query_pol,
+                                          'filt_test2_b0,filt_test2_b1',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '2.b0,2.b1'))
+
+def test3(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test3'
+    return (query_pol, single_bucket_test(fwding, query_pol,
+                                          'filt_test3_b0,filt_test3_b1',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '3.b0,3.b1'))
+
+def test4(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test4'
+    return (query_pol, single_bucket_test(fwding, query_pol,
+                                          'filt_test4_b0,filt_test4_b1,filt_test4_b2',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '4.b0,4.b1,4.b2'))
+
+def test5(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test5'
+    return (query_pol, single_bucket_test(fwding, query_pol, 'filt_test5',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '5'))
+
+def test6(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test6'
+    return (query_pol, single_bucket_test(fwding, query_pol, 'filt_test6',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '6'))
+
+def test7(topo_name, topo_args, fwding, results, pass_fail):
+    query_pol = 'test7'
+    return (query_pol, single_bucket_test(fwding, query_pol, 'filt_test7',
+                                          topo_name, topo_args, results,
+                                          pass_fail, '7'))
+
+def generic_topo_tests(topo_name, topo_args, fwding_pols):
+    global num_passed, num_failed, failed_tests
+    results = './pyretic/evaluations/results'
+    pass_fail = 'pass-fail.txt'
+    test_funs = [test0,
+                 test1,
+                 test2,
+                 test3,
+                 test4,
+                 test5,
+                 test6,
+                 test7
+    ]
+
+    for fwding in fwding_pols:
+        for test_fun in test_funs:
+            (query_pol, res) = test_fun(topo_name, topo_args, fwding, results,
+                                        pass_fail)
+            test_name = "%s %s on %s" % (query_pol, fwding, topo_name)
             if res:
                 print "===== TEST %s PASSED =====" % test_name
                 num_passed += 1
