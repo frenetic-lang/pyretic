@@ -32,7 +32,8 @@ import sys
 import logging
 import httplib
 from ipaddr import IPv4Network
-from pyretic.core.network import MAC
+from pyretic.core.network import *
+import copy
 
 NETKAT_PORT = 9000
 NETKAT_DOM  = "/compile"
@@ -221,13 +222,55 @@ def mod_to_pred(m):
   lst = [ mk_mod(header_val(h, m[h])) for h in m ]
   return mk_seq(lst)
 
+def mk_updated_maps(fmap, fvlist):
+    """update the map `fmap' by appending each (field,value) pair in fvlist in turn.
+    Returns a total of (number of tuples in fvlist) output maps. """
+    mlist = []
+    for (f,v) in fvlist:
+        new_map = copy.copy(fmap)
+        new_map[f] = v
+        mlist.append(new_map)
+    return mlist
+
+def check_tp_prereqs(fmap, iptype_list):
+    if ('srcport' in fmap or 'dstport' in fmap) and not 'protocol' in fmap:
+        return mk_updated_maps(fmap, iptype_list)
+    else:
+        return [fmap]
+
+def check_ip_prereqs(fmap, ethtype_list):
+    if (('srcport' in fmap or 'dstport' in fmap or 'srcip' in fmap or 'dstip' in
+         fmap) and not ('ethtype' in fmap)):
+        return mk_updated_maps(fmap, ethtype_list)
+    else:
+        return [fmap]
+
+def set_field_prereqs(p):
+    """ Set pre-requisite fields for netkat/openflow in match dictionary. """
+    from pyretic.core.language import _match, union
+    iptype_list  = [('ethtype',  IP_TYPE)]
+    ethtype_list = [('ethtype',  IP_TYPE), ('ethtype', ARP_TYPE)]
+    ipproto_list = [('protocol', TCP_TYPE), ('protocol', UDP_TYPE)]
+    ''' Check and set various pairs in the current list of field=value maps. '''
+    fmaps = [copy.copy(dict(_match(**p.map).map))]
+    fmaps = reduce(lambda acc, x: acc + x,
+                    map(lambda m: check_tp_prereqs(m, iptype_list), fmaps),
+                    [])
+    fmaps = reduce(lambda acc, x: acc + x,
+                    map(lambda m: check_ip_prereqs(m, ethtype_list), fmaps),
+                    [])
+    assert len(fmaps) >= 1
+    if len(fmaps) > 1:
+        return to_pred(union([_match(m) for m in fmaps]))
+    else:
+        return match_to_pred(fmaps[0])
 
 def to_pred(p):
   from pyretic.core.language import (match, identity, drop, negate, union,
                                      parallel, intersection, ingress_network,
                                      egress_network, _match)
   if isinstance(p, match):
-    return match_to_pred(_match(**p.map).map)
+    return set_field_prereqs(p)
   elif p == identity:
     return { "type": "true" }
   elif p == drop:

@@ -48,6 +48,8 @@ LLDP_TYPE = 0x88cc
 ARP_TYPE = 0x806
 IP_TYPE  = 0x800
 IPV6_TYPE = 0x86dd
+TCP_TYPE = 0x6
+UDP_TYPE = 0x11
 
 ################################################################################
 # Fixed width stuff
