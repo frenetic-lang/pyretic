@@ -257,7 +257,7 @@ def test_bucket_single_test():
 
     """ Wait for switches to be prepped """
     print "Waiting to install switch rules..."
-    wait_switch_rules_installed(switches, args.install_timeout_sec)
+    rules_installed = wait_switch_rules_installed(switches, args.install_timeout_sec)
 
     """ Capture """
     print "Starting tshark capture..."
@@ -289,7 +289,8 @@ def test_bucket_single_test():
     tshark_counts = get_tshark_counts(t_outfile, tshark_filter_params, c_name)
     buckets_counts = ctlr_counts(c_outfile, c_name)
     success_file = adjust_path(args.success_file)
-    write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc, c_name)
+    write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc,
+                        c_name, rules_installed, c_outfile, c_errfile)
 
 #### Helper functions #####
 
@@ -351,7 +352,31 @@ def close_fds(fds, fd_str):
         fd.close()
     print "Closed", fd_str, "file descriptors"
 
-def write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc, ctlr):
+def write_cerr_info(success_file, c_outfile, c_errfile):
+    """ If all rules were not installed, write the controller stderr stream into
+    the success file as well. """
+    passfail = open(success_file, 'a')
+
+    c_out = open(c_outfile, 'r')
+    c_outstr  = "Rules were not fully installed. Pyretic stdout:\n~~~\n"
+    c_outstr += c_out.read()
+    c_outstr += '~~~\n'
+    passfail.write(c_outstr)
+    print c_outstr
+
+    c_err = open(c_errfile, 'r')
+    c_errstr  = "Rules were not fully installed. Pyretic stderr:\n~~~\n"
+    c_errstr += c_err.read()
+    c_errstr += '~~~\n'
+    passfail.write(c_errstr)
+    print c_errstr
+
+    c_out.close()
+    c_err.close()
+    passfail.close()
+
+def write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc,
+                        ctlr, rules_installed, c_outfile, c_errfile):
     if ctlr == 'bucket':
         bucket_write_passfail_info(success_file, tshark_counts, buckets_counts,
                                    drop_pc)
@@ -360,6 +385,8 @@ def write_passfail_info(success_file, tshark_counts, buckets_counts, drop_pc, ct
                                        buckets_counts, drop_pc)
     else:
         raise RuntimeError('unknown controller!')
+    if not rules_installed:
+        write_cerr_info(success_file, c_outfile, c_errfile)
 
 def bucket_write_passfail_info(success_file, tshark_counts, buckets_counts,
                                drop_pc):
