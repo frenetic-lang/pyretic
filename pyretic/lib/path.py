@@ -1242,7 +1242,7 @@ class QuerySwitch(Policy):
         c = Classifier(final_rules)
         return c
     
-    def netkat_compile(self, switch_cnt):
+    def netkat_compile(self, switch_cnt, multistage=True):
         from pyretic.core.classifier import Rule, Classifier
         import time
         tot_time = 0
@@ -1266,7 +1266,7 @@ class QuerySwitch(Policy):
         final_rules = []
         for tag_value in self.policy_dic:
             tot_time += time.time() - t_s
-            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt)
+            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, multistage)
             p_rules = p_class[0].rules
             tot_time += float(p_class[1])
             t_s = time.time()
@@ -2685,14 +2685,14 @@ class Sketch(object):
     def compile(self):
         raise NotImplementedError
 
-    def netkat_compile(self, sw_cnt):
+    def netkat_compile(self, sw_cnt, multistage=True):
         if not self.need_stat:
-            return self.pol.netkat_compile(sw_cnt, outport)[0]
+            return self.pol.netkat_compile(sw_cnt, multistage)[0]
         else:
-            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt):\n\treturn pol.netkat_compile(sw_cnt)' % (self.name)
+            func_str = '@Stat.classifier_stat\n@Stat.elapsed_time\ndef %s(pol, sw_cnt, multistage):\n\treturn pol.netkat_compile(sw_cnt, multistage)' % (self.name)
             exec(func_str)
             func = locals()[self.name]
-            return func(self.pol, sw_cnt) 
+            return func(self.pol, sw_cnt, multistage)
 
     def get_def_name(self):
         raise NotImplementedError

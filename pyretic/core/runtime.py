@@ -241,7 +241,7 @@ class Runtime(object):
                     s[0].compile()
                 else:
                     self.log.debug("starting to compile %s" % s[0].name)
-                    s[0].netkat_compile(self.sw_cnt())
+                    s[0].netkat_compile(self.sw_cnt(), multistage=True)
                     self.log.debug("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):
@@ -388,29 +388,23 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
-        """TODO(ngsrinivas):
-
-        Unfortunately, compiling the full policy with netkat isn't as simple as
-        self.policy.netkat_compile(...). For some reason, the result of the full
-        policy compilation with netkat has results which forward different
-        packets out of multiple ports -- an action which is disallowed by the
-        classifier installation pipeline -- whenever the ingress tagging and
-        egress untagging policies are included. This needs to be investigated in
-        future.
-        """
-        c0 = self.virtual_tag.compile()
         # Force recompilation overriding cached policies, if the network has
         # changed. This is to ensure that a local classifier is regenerated for
         # each switch in the (new) network topology.
         force_compile = self.in_network_update
-        c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
-                                               force_compile=force_compile)[0]
-        c2 = self.forwarding.netkat_compile(self.sw_cnt(),
-                                            force_compile=force_compile)[0]
-        c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
-                                                force_compile=force_compile)[0]
-        c4 = self.virtual_untag.compile()
-        res = c0 >> c1 >> c2 >> c3 >> c4
+        pyretic_pol = (self.virtual_tag >> self.path_in_table >> self.forwarding
+                       >> self.path_out_table >> self.virtual_untag)
+        res = pyretic_pol.netkat_compile(self.sw_cnt(),
+                                         force_compile=force_compile)[0]
+        # c0 = self.virtual_tag.compile()
+        # c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
+        #                                        force_compile=force_compile)[0]
+        # c2 = self.forwarding.netkat_compile(self.sw_cnt(),
+        #                                     force_compile=force_compile)[0]
+        # c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
+        #                                         force_compile=force_compile)[0]
+        # c4 = self.virtual_untag.compile()
+        # res = c0 >> c1 >> c2 >> c3 >> c4
         return res
     
     @Stat.classifier_stat
@@ -434,14 +428,14 @@ class Runtime(object):
         self.log.debug("Attempting to compile table %d with netkat" % table)
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
-                (c, t) = pol.netkat_compile(self.sw_cnt())
+                (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
             else:
                 c = pol.compile()
         elif self.pipeline == 'path_query_pipeline':
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                (c, t) = pol.netkat_compile(self.sw_cnt())
+                (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")

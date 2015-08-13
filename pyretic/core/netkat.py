@@ -59,7 +59,7 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, print_json=False):
+    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False):
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
             sent to netkat. This is because netkat generates a separate copy of
@@ -96,7 +96,7 @@ class netkat_backend(object):
             except subprocess.CalledProcessError:
                 print "error in calling frenetic"
 
-            cls = json_to_classifier(output, qdict)
+            cls = json_to_classifier(output, qdict, multistage)
             if print_json:
                 cls.log().error("This is the json output:")
                 cls.log().error(str(output))
@@ -128,7 +128,7 @@ class netkat_backend(object):
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
                 sys.exit(0)
-            classifier = json_to_classifier(netkat_out, qdict)
+            classifier = json_to_classifier(netkat_out, qdict, multistage)
             return (classifier, ctime)
 
         pol = use_explicit_switches(pol)
@@ -399,7 +399,7 @@ def create_match(pattern, switch_id):
         match_map['vlan_pcp'] = 0
     return match(**match_map)
 
-def create_action(action):
+def create_action(action, multistage):
     from pyretic.core.language import (modify, Controller, identity)
     if len(action) == 0:
         return set()
@@ -427,8 +427,8 @@ def create_action(action):
                         mod_dict['port'] = out_info['port']
                     elif out_info['type'] == 'controller':
                         res.add(Controller)
-                    #elif out_info['type'] == 'inport' and inport is not None:
-                        #mod_dict['outport'] = inport 
+                    elif out_info['type'] == 'inport' and not multistage:
+                        mod_dict['port'] = OFPP_IN_PORT
             
             if len(mod_dict) > 0:
                 res.add(modify(**mod_dict))
@@ -439,7 +439,7 @@ def create_action(action):
 def get_queries_from_names(qnames, qdict):
     return set([qdict[x] for x in qnames])
         
-def json_to_classifier(fname, qdict):
+def json_to_classifier(fname, qdict, multistage):
     from pyretic.core.classifier import Rule, Classifier
     data = json.loads(fname)
     rules = []
@@ -448,9 +448,13 @@ def json_to_classifier(fname, qdict):
         for rule in sw_tbl['tbl']:
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id)
-            action = create_action(rule['action'])
+            action = create_action(rule['action'], multistage)
             queries = get_queries_from_names(rule['queries'], qdict)
-            rules.append( (prio, Rule(m, action | queries, [None], "netkat")))
+            if rule['queries']:
+                pyrule = Rule(m, action | queries, [None], "netkat_query")
+            else:
+                pyrule = Rule(m, action | queries, [None], "netkat")
+            rules.append((prio, pyrule))
     #rules.sort()
     rules = [v for (k,v) in rules]
     return Classifier(rules)
