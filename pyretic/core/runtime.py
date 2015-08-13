@@ -1184,27 +1184,34 @@ class Runtime(object):
                                for r in classifier.rules])
 
         def check_OF_rules(classifier):
-            def check_OF_rule_has_outport(r):
-                for a in r.actions:
+            def check_OF_rule_has_outport(acts):
+                for a in acts:
                     if not 'port' in a:
                         raise TypeError('Invalid rule: concrete actions must have an outport',str(r))  
-            def check_OF_rule_has_compilable_action_list(r):
-                if len(r.actions)<2:
+            def check_OF_rule_has_compilable_action_list(acts):
+                if len(acts)<2:
                     pass
                 else:
-                    moded_fields = set(r.actions[0].keys())
-                    for a in r.actions:
-                        fields = set(a.keys())
-                        if fields - moded_fields:
+                    prev_moded_fields = set(acts[0].keys())
+                    for a in acts:
+                        curr_moded_fields = set(a.keys())
+                        if prev_moded_fields - curr_moded_fields:
                             raise TypeError('Non-compilable rule',str(r))  
+                        prev_moded_fields = curr_moded_fields
+            new_rules = list()
             for r in classifier.rules:
                 r_minus_queries = Rule(r.match,
                                        filter(lambda x:
                                               not isinstance(x, Query),
                                               r.actions))
-                check_OF_rule_has_outport(r_minus_queries)
-                check_OF_rule_has_compilable_action_list(r_minus_queries)
-            return Classifier(classifier.rules)
+                modify_acts = sorted(filter(lambda x: not isinstance(x, Query),
+                                       r.actions), key=len)
+                query_acts = filter(lambda x: isinstance(x, Query), r.actions)
+                check_OF_rule_has_outport(modify_acts)
+                check_OF_rule_has_compilable_action_list(modify_acts)
+                new_rules.append(Rule(r.match, modify_acts + query_acts,
+                                      r.parents, r.op))
+            return Classifier(new_rules)
 
         def OF_inportize(classifier):
             """
