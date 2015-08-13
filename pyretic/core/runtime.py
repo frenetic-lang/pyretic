@@ -44,7 +44,7 @@ import copy
 
 TABLE_MISS_PRIORITY = 0
 TABLE_START_PRIORITY = 60000
-STATS_REQUERY_THRESHOLD_SEC = 10
+STATS_REQUERY_THRESHOLD_SEC = 4
 NUM_PATH_TAGS = 65000
 DEFAULT_NX_TABLE_ID=1
 
@@ -87,7 +87,6 @@ class Runtime(object):
 
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
-        self.log.debug('set flags')
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled)
@@ -109,36 +108,36 @@ class Runtime(object):
         if not offline:
             self.backend = backend
             self.backend.runtime = self
-        self.policy_lock = RLock()
-        self.network_lock = Lock()
-        self.switch_lock = Lock()
-        self.vlan_to_extended_values_db = {}
-        self.extended_values_to_vlan_db = {}
-        self.extended_values_lock = RLock()
-        self.dynamic_sub_pols = set()
-        self.in_network_update = False
-        self.in_bucket_apply = False
-        self.network_triggered_policy_update = False
-        self.bucket_triggered_policy_update = False
-        self.global_outstanding_queries_lock = Lock()
-        self.global_outstanding_queries = {}
-        self.last_queried_time_lock = Lock()
-        self.last_queried_time = {}
-        self.global_outstanding_deletes_lock = Lock()
-        self.global_outstanding_deletes = {}
-        self.manager = Manager()
-        self.old_rules_lock = Lock()
-        # self.old_rules = self.manager.list() # not multiprocess state anymore!
-        self.old_rules = []
-        self.update_rules_lock = Lock()
-        self.update_buckets_lock = Lock()
-        self.classifier_version_no = 0
-        self.classifier_version_lock = Lock()
-        self.default_cookie = 0
-        self.packet_in_time = 0
-        self.num_packet_ins = 0
-        self.update_dynamic_sub_pols()
-        self.total_packets_removed = 0 # pkt count from flow removed messages
+            self.policy_lock = RLock()
+            self.network_lock = Lock()
+            self.switch_lock = Lock()
+            self.vlan_to_extended_values_db = {}
+            self.extended_values_to_vlan_db = {}
+            self.extended_values_lock = RLock()
+            self.dynamic_sub_pols = set()
+            self.in_network_update = False
+            self.in_bucket_apply = False
+            self.network_triggered_policy_update = False
+            self.bucket_triggered_policy_update = False
+            self.global_outstanding_queries_lock = Lock()
+            self.global_outstanding_queries = {}
+            self.last_queried_time_lock = Lock()
+            self.last_queried_time = {}
+            self.global_outstanding_deletes_lock = Lock()
+            self.global_outstanding_deletes = {}
+            self.manager = Manager()
+            self.old_rules_lock = Lock()
+            # self.old_rules = self.manager.list() # not multiprocess state anymore!
+            self.old_rules = []
+            self.update_rules_lock = Lock()
+            self.update_buckets_lock = Lock()
+            self.classifier_version_no = 0
+            self.classifier_version_lock = Lock()
+            self.default_cookie = 0
+            self.packet_in_time = 0
+            self.num_packet_ins = 0
+            self.update_dynamic_sub_pols()
+            self.total_packets_removed = 0 # pkt count from flow removed messages
 
 ######################
 # Stat Methods 
@@ -196,12 +195,12 @@ class Runtime(object):
 
                 if self.integrate_enabled:
 
-                    in_table = LeafSketch('in_table', self.path_in_table)
-                    out_table = LeafSketch('out_table', self.path_out_table)
+                    in_table = LeafSketch('in_table', self.path_in_table.policy)
+                    out_table = LeafSketch('out_table', self.path_out_table.policy)
                     
                     sketch = [(in_table, False), (out_table, True), 
                                 (vf_tag, False), (vf_untag, True)]
-
+                    
                 else:
                     
                     in_tag = LeafSketch('in_tag', self.path_in_tagging)
@@ -242,7 +241,7 @@ class Runtime(object):
                     s[0].compile()
                 else:
                     self.log.debug("starting to compile %s" % s[0].name)
-                    s[0].netkat_compile(self.sw_cnt(), s[1])
+                    s[0].netkat_compile(self.sw_cnt(), multistage=True)
                     self.log.debug("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):
@@ -389,29 +388,23 @@ class Runtime(object):
 
     
     def netkat_classifier_compile(self):
-        """TODO(ngsrinivas):
-
-        Unfortunately, compiling the full policy with netkat isn't as simple as
-        self.policy.netkat_compile(...). For some reason, the result of the full
-        policy compilation with netkat has results which forward different
-        packets out of multiple ports -- an action which is disallowed by the
-        classifier installation pipeline -- whenever the ingress tagging and
-        egress untagging policies are included. This needs to be investigated in
-        future.
-        """
-        c0 = self.virtual_tag.compile()
         # Force recompilation overriding cached policies, if the network has
         # changed. This is to ensure that a local classifier is regenerated for
         # each switch in the (new) network topology.
         force_compile = self.in_network_update
-        c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
-                                               force_compile=force_compile)[0]
-        c2 = self.forwarding.netkat_compile(self.sw_cnt(),
-                                            force_compile=force_compile)[0]
-        c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
-                                                force_compile=force_compile)[0]
-        c4 = self.virtual_untag.compile()
-        res = c0 >> c1 >> c2 >> c3 >> c4
+        pyretic_pol = (self.virtual_tag >> self.path_in_table >> self.forwarding
+                       >> self.path_out_table >> self.virtual_untag)
+        res = pyretic_pol.netkat_compile(self.sw_cnt(),
+                                         force_compile=force_compile)[0]
+        # c0 = self.virtual_tag.compile()
+        # c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
+        #                                        force_compile=force_compile)[0]
+        # c2 = self.forwarding.netkat_compile(self.sw_cnt(),
+        #                                     force_compile=force_compile)[0]
+        # c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
+        #                                         force_compile=force_compile)[0]
+        # c4 = self.virtual_untag.compile()
+        # res = c0 >> c1 >> c2 >> c3 >> c4
         return res
     
     @Stat.classifier_stat
@@ -435,14 +428,14 @@ class Runtime(object):
         self.log.debug("Attempting to compile table %d with netkat" % table)
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
-                (c, t) = pol.netkat_compile(self.sw_cnt())
+                (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
             else:
                 c = pol.compile()
         elif self.pipeline == 'path_query_pipeline':
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
-                (c, t) = pol.netkat_compile(self.sw_cnt())
+                (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
         else:
             raise RuntimeError("Unknown pipeline type for multitable specific "
                                 + "policy compilation")
@@ -574,11 +567,10 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp
-        self.log.debug('compiled query start')
         policy_fragments = pathcomp.compile(self.path_policy, NUM_PATH_TAGS, 
                 self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
                 self.ragel_enabled, self.partition_enabled)
-        self.log.debug('compile query end')
+        
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
@@ -1192,27 +1184,34 @@ class Runtime(object):
                                for r in classifier.rules])
 
         def check_OF_rules(classifier):
-            def check_OF_rule_has_outport(r):
-                for a in r.actions:
+            def check_OF_rule_has_outport(acts):
+                for a in acts:
                     if not 'port' in a:
                         raise TypeError('Invalid rule: concrete actions must have an outport',str(r))  
-            def check_OF_rule_has_compilable_action_list(r):
-                if len(r.actions)<2:
+            def check_OF_rule_has_compilable_action_list(acts):
+                if len(acts)<2:
                     pass
                 else:
-                    moded_fields = set(r.actions[0].keys())
-                    for a in r.actions:
-                        fields = set(a.keys())
-                        if fields - moded_fields:
+                    prev_moded_fields = set(acts[0].keys())
+                    for a in acts:
+                        curr_moded_fields = set(a.keys())
+                        if prev_moded_fields - curr_moded_fields:
                             raise TypeError('Non-compilable rule',str(r))  
+                        prev_moded_fields = curr_moded_fields
+            new_rules = list()
             for r in classifier.rules:
                 r_minus_queries = Rule(r.match,
                                        filter(lambda x:
                                               not isinstance(x, Query),
                                               r.actions))
-                check_OF_rule_has_outport(r_minus_queries)
-                check_OF_rule_has_compilable_action_list(r_minus_queries)
-            return Classifier(classifier.rules)
+                modify_acts = sorted(filter(lambda x: not isinstance(x, Query),
+                                       r.actions), key=len)
+                query_acts = filter(lambda x: isinstance(x, Query), r.actions)
+                check_OF_rule_has_outport(modify_acts)
+                check_OF_rule_has_compilable_action_list(modify_acts)
+                new_rules.append(Rule(r.match, modify_acts + query_acts,
+                                      r.parents, r.op))
+            return Classifier(new_rules)
 
         def OF_inportize(classifier):
             """
@@ -2070,7 +2069,9 @@ class Runtime(object):
 
         if path_main:
             from pyretic.lib.path import pathcomp
-            pathcomp.init(NUM_PATH_TAGS)
+            pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
+                            self.cache_enabled, self.edge_contraction_enabled
+                            ,self.partition_enabled)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
@@ -2209,7 +2210,11 @@ class ConcreteNetwork(Network):
     def handle_port_join(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         this_update_no = self.get_update_no()
-        self.next_topo.add_port(switch,port_no,config,status,port_type)
+        try:
+            self.next_topo.add_port(switch,port_no,config,status,port_type)
+        except KeyError:
+            self.log.error("Couldn't handle port join. Switch likely "
+                           "doesn't exist yet")
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.next_topo))

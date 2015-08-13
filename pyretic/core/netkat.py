@@ -32,7 +32,8 @@ import sys
 import logging
 import httplib
 from ipaddr import IPv4Network
-from pyretic.core.network import MAC
+from pyretic.core.network import *
+import copy
 
 NETKAT_PORT = 9000
 NETKAT_DOM  = "/compile"
@@ -58,7 +59,7 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, print_json=False):
+    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False):
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
             sent to netkat. This is because netkat generates a separate copy of
@@ -76,7 +77,7 @@ class netkat_backend(object):
                 pred_policy = identity
             return pred_policy >> pol
 
-        def curl_channel_compilation(pol):
+        def curl_channel_compilation(pol, qdict):
             """ Communicate with the netKAT compile server through curl. """
             import subprocess
 
@@ -95,7 +96,7 @@ class netkat_backend(object):
             except subprocess.CalledProcessError:
                 print "error in calling frenetic"
 
-            cls = json_to_classifier(output)
+            cls = json_to_classifier(output, qdict, multistage)
             if print_json:
                 cls.log().error("This is the json output:")
                 cls.log().error(str(output))
@@ -108,7 +109,7 @@ class netkat_backend(object):
 
             return (cls, time)
 
-        def httplib_channel_compilation(pol):
+        def httplib_channel_compilation(pol, qdict):
             json_input = compile_to_netkat(pol)
             write_to_file(json_input, TEMP_INPUT)
             headers = {"Content-Type": "application/x-www-form-urlencoded",
@@ -127,12 +128,13 @@ class netkat_backend(object):
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
                 sys.exit(0)
-            classifier = json_to_classifier(netkat_out)
+            classifier = json_to_classifier(netkat_out, qdict, multistage)
             return (classifier, ctime)
 
         pol = use_explicit_switches(pol)
-        # return curl_channel_compilation(pol)
-        return httplib_channel_compilation(pol)
+        qdict = {str(id(b)) : b for b in get_buckets_list(pol)}
+        # return curl_channel_compilation(pol, qdict)
+        return httplib_channel_compilation(pol, qdict)
 
 ##################### Helper functions #################
 
@@ -220,13 +222,55 @@ def mod_to_pred(m):
   lst = [ mk_mod(header_val(h, m[h])) for h in m ]
   return mk_seq(lst)
 
+def mk_updated_maps(fmap, fvlist):
+    """update the map `fmap' by appending each (field,value) pair in fvlist in turn.
+    Returns a total of (number of tuples in fvlist) output maps. """
+    mlist = []
+    for (f,v) in fvlist:
+        new_map = copy.copy(fmap)
+        new_map[f] = v
+        mlist.append(new_map)
+    return mlist
+
+def check_tp_prereqs(fmap, iptype_list):
+    if ('srcport' in fmap or 'dstport' in fmap) and not 'protocol' in fmap:
+        return mk_updated_maps(fmap, iptype_list)
+    else:
+        return [fmap]
+
+def check_ip_prereqs(fmap, ethtype_list):
+    if (('srcport' in fmap or 'dstport' in fmap or 'srcip' in fmap or 'dstip' in
+         fmap) and not ('ethtype' in fmap)):
+        return mk_updated_maps(fmap, ethtype_list)
+    else:
+        return [fmap]
+
+def set_field_prereqs(p):
+    """ Set pre-requisite fields for netkat/openflow in match dictionary. """
+    from pyretic.core.language import _match, union
+    iptype_list  = [('ethtype',  IP_TYPE)]
+    ethtype_list = [('ethtype',  IP_TYPE), ('ethtype', ARP_TYPE)]
+    ipproto_list = [('protocol', TCP_TYPE), ('protocol', UDP_TYPE)]
+    ''' Check and set various pairs in the current list of field=value maps. '''
+    fmaps = [copy.copy(dict(_match(**p.map).map))]
+    fmaps = reduce(lambda acc, x: acc + x,
+                    map(lambda m: check_tp_prereqs(m, iptype_list), fmaps),
+                    [])
+    fmaps = reduce(lambda acc, x: acc + x,
+                    map(lambda m: check_ip_prereqs(m, ethtype_list), fmaps),
+                    [])
+    assert len(fmaps) >= 1
+    if len(fmaps) > 1:
+        return to_pred(union([_match(m) for m in fmaps]))
+    else:
+        return match_to_pred(fmaps[0])
 
 def to_pred(p):
   from pyretic.core.language import (match, identity, drop, negate, union,
                                      parallel, intersection, ingress_network,
                                      egress_network, _match)
   if isinstance(p, match):
-    return match_to_pred(_match(**p.map).map)
+    return set_field_prereqs(p)
   elif p == identity:
     return { "type": "true" }
   elif p == drop:
@@ -243,6 +287,23 @@ def to_pred(p):
   else:
     raise TypeError(p)
 
+def get_buckets_list(p):
+    from pyretic.core.language import (parallel, sequential, if_, DynamicPolicy,
+                                     ingress_network, egress_network,
+                                     DerivedPolicy, CountBucket)
+    from pyretic.lib.netflow import NetflowBucket
+    if isinstance(p, parallel) or isinstance(p, sequential):
+        return reduce(lambda acc, x: acc | get_buckets_list(x), p.policies, set([]))
+    elif isinstance(p, if_):
+        return get_buckets_list(p.t_branch) | get_buckets_list(p.f_branch)
+    elif ((isinstance(p, DynamicPolicy) or isinstance(p, DerivedPolicy)) and not
+          (isinstance(p, ingress_network) or isinstance(p, egress_network))):
+        return get_buckets_list(p.policy)
+    elif isinstance(p, CountBucket) or isinstance(p, NetflowBucket):
+        return set([p])
+    else:
+        return set([])
+
 # TODO(arjun): Consider using aspects to inject methods into each class. That
 # would be better object-oriented style.
 def to_pol(p):
@@ -250,7 +311,8 @@ def to_pol(p):
                                      parallel, intersection, ingress_network,
                                      egress_network, sequential, fwd, if_,
                                      FwdBucket, DynamicPolicy, DerivedPolicy,
-                                     Controller, _modify)
+                                     Controller, _modify, CountBucket)
+  from pyretic.lib.netflow import NetflowBucket
   if isinstance(p, match):
     return mk_filter(to_pred(p))
   elif p == identity:
@@ -277,14 +339,16 @@ def to_pol(p):
     c = to_pred(p.pred)
     return mk_union([mk_seq([mk_filter(c), to_pol(p.t_branch)]),
                      mk_seq([mk_filter({ "type": "neg", "pred": c }), to_pol(p.f_branch)])])    
-  elif isinstance(p, FwdBucket):
+  elif isinstance(p, FwdBucket) or p is Controller:
       return {"type" : "mod", "header" : "location", "value": {"type" : "pipe", "name" : str(id(p))}}
+  elif isinstance(p, CountBucket) or isinstance(p, NetflowBucket):
+      return {"type" : "mod", "header" : "location", "value": {"type" : "query", "name" : str(id(p))}}
   elif isinstance(p, ingress_network) or isinstance(p, egress_network) or isinstance(p, DynamicPolicy):
       return to_pol(p.policy)
   elif isinstance(p, DerivedPolicy):
       return to_pol(p.policy)
   else:
-    raise TypeError("unknown policy %s" % type(p))
+    raise TypeError("unknown policy %s %s" % (type(p), repr(p)))
 
 def mk_union(pols):
   return { "type": "union", "pols": pols }
@@ -323,8 +387,7 @@ def create_match(pattern, switch_id):
     else:
         match_map = {}
     for k,v in pattern.items():
-        # HACKETY HACK: remove nwProto from netkat generated classifier
-        if v is not None and k != "dlTyp" and k != "nwProto":
+        if v is not None:
             if k == 'dlSrc' or k == 'dlDst':
                 """ TODO: NetKat returns MAC addresses reversed. """
                 match_map[field_map[k]] = MAC(__reverse_mac__(v))
@@ -336,7 +399,7 @@ def create_match(pattern, switch_id):
         match_map['vlan_pcp'] = 0
     return match(**match_map)
 
-def create_action(action):
+def create_action(action, multistage):
     from pyretic.core.language import (modify, Controller, identity)
     if len(action) == 0:
         return set()
@@ -364,16 +427,19 @@ def create_action(action):
                         mod_dict['port'] = out_info['port']
                     elif out_info['type'] == 'controller':
                         res.add(Controller)
-                    #elif out_info['type'] == 'inport' and inport is not None:
-                        #mod_dict['outport'] = inport 
+                    elif out_info['type'] == 'inport' and not multistage:
+                        mod_dict['port'] = OFPP_IN_PORT
             
             if len(mod_dict) > 0:
                 res.add(modify(**mod_dict))
         if len(res) == 0:
             res.add(identity)
     return res
+
+def get_queries_from_names(qnames, qdict):
+    return set([qdict[x] for x in qnames])
         
-def json_to_classifier(fname):
+def json_to_classifier(fname, qdict, multistage):
     from pyretic.core.classifier import Rule, Classifier
     data = json.loads(fname)
     rules = []
@@ -382,8 +448,13 @@ def json_to_classifier(fname):
         for rule in sw_tbl['tbl']:
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id)
-            action = create_action(rule['action'])
-            rules.append( (prio, Rule(m, action, [None], "netkat")))
+            action = create_action(rule['action'], multistage)
+            queries = get_queries_from_names(rule['queries'], qdict)
+            if rule['queries']:
+                pyrule = Rule(m, action | queries, [None], "netkat_query")
+            else:
+                pyrule = Rule(m, action | queries, [None], "netkat")
+            rules.append((prio, pyrule))
     #rules.sort()
     rules = [v for (k,v) in rules]
     return Classifier(rules)

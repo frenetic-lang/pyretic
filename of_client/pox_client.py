@@ -664,7 +664,11 @@ class POXClient(revent.EventMixin):
 
     def barrier(self,switch):
         b = of.ofp_barrier_request()
-        self.switches[switch]['connection'].send(b) 
+        try:
+            self.switches[switch]['connection'].send(b)
+        except KeyError, e:
+            print "WARNING: couldn't send barrier to switch %s (%s)" % (
+                str(switch), e)
 
     def flow_stats_request(self,switch):
         sr = of.ofp_stats_request()

@@ -279,7 +279,7 @@ if __name__ == "__main__":
     else: # run full suite of tests
         bunched_path_tests(default_pyopts='')
         bunched_path_tests(default_pyopts='-r')
-        bunched_path_tests(default_pyopts='-r -l --use_pyretic')
+        bunched_path_tests(default_pyopts='-r --use_pyretic')
         bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="

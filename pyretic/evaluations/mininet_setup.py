@@ -143,8 +143,10 @@ def wait_switch_rules_installed(switches, wait_timeout=0):
     print
     if time_waited >= wait_timeout:
         print "!!! Rules *not* fully installed within the timeout!"
+        return False
     else:
         print "Rules fully installed after waiting", time_waited, "seconds"
+        return True
 
 ################################################################################
 ### The main function.
