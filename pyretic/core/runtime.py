@@ -2210,7 +2210,11 @@ class ConcreteNetwork(Network):
     def handle_port_join(self, switch, port_no, config, status, port_type):
         self.debug_log.debug("handle_port_joins %s:%s:%s:%s" % (switch, port_no, config, status))
         this_update_no = self.get_update_no()
-        self.next_topo.add_port(switch,port_no,config,status,port_type)
+        try:
+            self.next_topo.add_port(switch,port_no,config,status,port_type)
+        except KeyError:
+            self.log.error("Couldn't handle port join. Switch likely "
+                           "doesn't exist yet")
         if config or status:
             self.inject_discovery_packet(switch,port_no)
             self.debug_log.debug(str(self.next_topo))
