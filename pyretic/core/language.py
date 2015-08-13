@@ -146,8 +146,24 @@ class Policy(object):
     def __repr__(self):
         return "%s : %d" % (self.name(),id(self))
 
-    def netkat_compile(self, switch_cnt, multistage=False, print_json=False,
-                       force_compile=False):
+    def netkat_compile(self, switch_cnt=None, multistage=False,
+                       print_json=False, force_compile=False):
+        """
+        Compile a policy using the netkat compiler.
+
+        :param switch_cnt: number of switches in the topology
+        :type switch_cnt: int
+        :param multistage: whether the current policy corresponds to the entire
+        policy, or one stage of a multi-stage table. `False` (i.e., entire
+        policy) by default.
+        :type multistage: boolean
+        :param print_json: debug printing JSON input to log for debugging
+        :type print_json: boolean
+        :param force_compile: disregard cached results and recompile policy
+        anyway
+        :type force_compile: boolean
+        :rtype: (Classifier, int)
+        """
         comp_t = 0
         nb = netkat_backend
         if ((not NETKAT_CLASSIFIER_CACHE) or (not self._classifier) or
