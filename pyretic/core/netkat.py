@@ -245,6 +245,12 @@ def check_ip_prereqs(fmap, ethtype_list):
     else:
         return [fmap]
 
+def check_ip_proto_prereq(fmap, iptype_list):
+    if 'protocol' in fmap and not 'ethtype' in fmap:
+        return mk_updated_maps(fmap, iptype_list)
+    else:
+        return [fmap]
+
 def set_field_prereqs(p):
     """ Set pre-requisite fields for netkat/openflow in match dictionary. """
     from pyretic.core.language import _match, union
@@ -256,6 +262,9 @@ def set_field_prereqs(p):
     fmaps = reduce(lambda acc, x: acc + x,
                     map(lambda m: check_tp_prereqs(m, iptype_list), fmaps),
                     [])
+    fmaps = reduce(lambda acc, x: acc+ x,
+                   map(lambda m: check_ip_proto_prereq(m, iptype_list), fmaps),
+                   [])
     fmaps = reduce(lambda acc, x: acc + x,
                     map(lambda m: check_ip_prereqs(m, ethtype_list), fmaps),
                     [])
