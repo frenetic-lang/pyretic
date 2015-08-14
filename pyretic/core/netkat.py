@@ -202,7 +202,7 @@ def header_val(h, v):
   elif h == "ethtype":
     return mk_header("ethtype", v)
   elif h == "protocol":
-    return mk_header("inproto", v)
+    return mk_header("ipproto", v)
   elif h == "srcip":
     return mk_header("ip4src", unip(v))
   elif h == "dstip":
