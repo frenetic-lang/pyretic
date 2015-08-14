@@ -173,6 +173,7 @@ list_res_print (const struct list_res *l, bool backward)
     res_print (res, backward);
     printf ("   HS: ");
     hs_print (&res->hs);
+    hs_print_json (&res->hs);
     printf ("-----\n");
   }
   printf ("Count: %d\n", count);

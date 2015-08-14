@@ -110,6 +110,29 @@ vec_to_str (const struct hs_vec *v, int len, char *res)
   return res;
 }
 
+static char *
+vec_to_json (const struct hs_vec *v, int len, char *res)
+{
+  res += sprintf (res, "[ ");
+  for (int i = 0; i < v->used; i++) {
+    bool diff = v->diff && v->diff[i].used;
+    if (i) res += sprintf (res, " , ");
+    res += sprintf (res, "{ \"elem\" : ");
+    char *s = array_to_str (v->elems[i], len, true);
+    res += sprintf (res, "\"%s\"", s);
+    free (s);
+    if (diff) {
+      res += sprintf (res, " , ");
+      res += sprintf (res, "\"diff\" : ");
+      res = vec_to_json (&v->diff[i], len, res);
+    }
+    res += sprintf (res, " }");
+  }
+  res += sprintf (res, "]");
+  *res = 0;
+  return res;
+}
+
 
 /* Remove elems of V that are covered by another elem. V must be a diff list.
    LEN is length of each array. */
@@ -202,6 +225,14 @@ hs_print (const struct hs *hs)
 {
   char s[MAX_STR];
   vec_to_str (&hs->list, hs->len, s);
+  printf ("%s\n", s);
+}
+
+void
+hs_print_json (const struct hs *hs)
+{
+  char s[MAX_STR];
+  vec_to_json (&hs->list, hs->len, s);
   printf ("%s\n", s);
 }
 
