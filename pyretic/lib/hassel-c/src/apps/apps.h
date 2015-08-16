@@ -118,13 +118,22 @@ main (int argc, char **argv)
   // Print header spaces at ingress
   struct res *cur = res.head;
   struct list_res inv_res;
+  FILE *ofp = fopen ("out-inverted.json", "w");
+  bool open = true;
+  if (! ofp) {
+    printf ("Could not open output file for inverses.\n");
+    open = false;
+    ofp = stdout;
+  }
   printf ("\n\n==================\n\n");
   while (cur) {
     inv_res = res_walk_parents (cur, &hs, in_port);
     list_res_print (&inv_res, false);
+    list_res_fileprint_json (&inv_res, ofp);
     cur = cur->next;
   }
   list_res_free (&inv_res);
+  if (open) fclose (ofp);
 
   list_res_free (&res);
   hs_destroy (&hs);

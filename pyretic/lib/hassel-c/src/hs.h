@@ -33,6 +33,7 @@ int   hs_count      (const struct hs *hs);
 int   hs_count_diff (const struct hs *hs);
 void  hs_print      (const struct hs *hs);
 void  hs_print_json (const struct hs *hs);
+void  hs_get_json   (const struct hs *hs, char *s);
 char *hs_to_str     (const struct hs *hs);
 
 

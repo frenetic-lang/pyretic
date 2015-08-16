@@ -10,6 +10,8 @@
 #include "data.h"
 #include "tf.h"
 
+#define MAX_STR 65536
+
 struct res *
 res_create (int nrules)
 {
@@ -164,6 +166,16 @@ res_rule_add (struct res *res, const struct tf *tf, int rule,
 void
 list_res_free (struct list_res *l)
 { list_destroy (l, res_free); }
+
+void
+list_res_fileprint_json (const struct list_res *l, FILE* ofp)
+{
+  char s[MAX_STR];
+  for (const struct res *res = l->head; res; res = res->next) {
+    hs_get_json (&res->hs, s);
+    fprintf (ofp, "%s\n", s);
+  }
+}
 
 void
 list_res_print (const struct list_res *l, bool backward)

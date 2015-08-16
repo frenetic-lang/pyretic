@@ -236,6 +236,12 @@ hs_print_json (const struct hs *hs)
   printf ("%s\n", s);
 }
 
+void
+hs_get_json (const struct hs *hs, char *s)
+{
+  vec_to_json(&hs->list, hs->len, s);
+}
+
 char *
 hs_to_str (const struct hs *hs)
 {

@@ -54,6 +54,7 @@ struct list_res res_walk_parents (const struct res *out, const struct hs *hs,
 LIST (res);
 void list_res_free  (struct list_res *l);
 void list_res_print (const struct list_res *l, bool backward);
+void list_res_fileprint_json (const struct list_res *l, FILE* ofp);
 
 #endif
 
