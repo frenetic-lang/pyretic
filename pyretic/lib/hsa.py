@@ -4,8 +4,12 @@ from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
 import copy, logging
+import subprocess, shlex
 
-TFS_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c/tfs/pyretic'
+HSL_C_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c'
+TFS_FOLDER = '%s/tfs/pyretic' % HSL_C_FOLDER
+INVERTED_OUTFILE = "%s/out-inverted.json" % HSL_C_FOLDER
+GEN_BINARY = "%s/gen" % HSL_C_FOLDER
 SWITCH_MULTIPLIER = 100000
 
 def pyr_hs_format():
@@ -42,6 +46,8 @@ def pyr_hs_format():
 
     format["length"] = 31 # 31 byte header overall
     return format
+
+#### Generating a transfer function from a policy ####
 
 ''' Temporary helper to get network switches and ports. '''
 def get_switch_port_ids():
@@ -267,6 +273,18 @@ def write_port_map(sw_ports, portids):
             f.write('s%d-eth%d:%d\n' % (sw, p, portids[(sw,p)]))
     f.close()
 
+#### Running header space analysis ####
+
+def gen_hassel_datafile():
+    datafile_cmd = "%s pyretic" % GEN_BINARY
+    try:
+        result =  subprocess.check_output(shlex.split(datafile_cmd),
+                                          cwd=HSL_C_FOLDER)
+    except subprocess.CalledProcessError as e:
+        print "Could not generate pyretic network data file!"
+        print e.returncode
+        print e.output
+
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
     logging.basicConfig()
@@ -285,6 +303,9 @@ if __name__ == "__main__":
 
     # write out a port map
     write_port_map(sw_ports, portids)
+
+    # Run reachability
+    gen_hassel_datafile()
 
 # a rough TODO(ngsrinivas):
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
