@@ -83,12 +83,8 @@ def static_fwding_chain_3_3():
         (match(ethtype=IP_TYPE))
     )
 
-def convert_classifier(classifier, hsf, portids, sw_ports):
-    """Function to convert a classifier `classifier` into a header space given by a
-    header space format dictionary `hsf`.
-    """
-    hsalib_log = logging.getLogger('%s.convert_classifier' % __name__)
-
+def set_field_val(hsf, wc_obj, field, val, process_field=True):
+    """ Set a specific field in a wildcard using pyretic fields. """
     def ip2int(ip):
         assert isinstance(ip, IPv4Network)
         numeric_ip = 0
@@ -103,45 +99,52 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             numeric_mac = (numeric_mac << 8) + int(p, 16)
         return numeric_mac
 
-    def set_field_val(wc_obj, field, val, process_field=True):
-        if field in ['srcmac', 'dstmac']:
-            int_val = mac2int(val) if process_field else val
-            set_header_field(hsf, wc_obj, field, int_val, 0)
-        elif field in ['srcip', 'dstip']:
-            int_val = ip2int(val) if process_field else val
-            right_pfx = (32 - val.prefixlen) if process_field else 0
-            set_header_field(hsf, wc_obj, field, int_val, right_pfx)
-        elif not field in ['switch', 'port']:
-            set_header_field(hsf, wc_obj, field, val, 0)
-        else:
-            ''' do nothing '''
-            return wc_obj
+    if field in ['srcmac', 'dstmac']:
+        int_val = mac2int(val) if process_field else val
+        set_header_field(hsf, wc_obj, field, int_val, 0)
+    elif field in ['srcip', 'dstip']:
+        int_val = ip2int(val) if process_field else val
+        right_pfx = (32 - val.prefixlen) if process_field else 0
+        set_header_field(hsf, wc_obj, field, int_val, right_pfx)
+    elif not field in ['switch', 'port']:
+        set_header_field(hsf, wc_obj, field, val, 0)
+    else:
+        ''' do nothing '''
+        pass
+    return wc_obj
 
-    def get_match_wc(mat_map):
-        mat = wildcard_create_bit_repeat(hsf["length"], 3)
-        for (field, val) in mat_map.iteritems():
-            set_field_val(mat, field, val)
-        return mat
+def get_match_wc(hsf, mat_map):
+    """ Generate a wildcard from a pyretic match dictionary. """
+    mat = wildcard_create_bit_repeat(hsf["length"], 3)
+    for (field, val) in mat_map.iteritems():
+        set_field_val(hsf, mat, field, val)
+    return mat
 
-    def get_inports(mat_map, sw):
-        ''' Return network-wide unique identifiers from match information in
-        classifiers. '''
-        inports = []
-        if 'switch' in mat_map:
-            assert sw == mat_map['switch']
-            if 'port' in mat_map:
-                inports.append(portids[(sw, mat_map['port'])])
-            else:
-                for p in sw_ports[sw]:
-                    inports.append(portids[(sw,p)])
+def get_ports(hsf, portids, sw_ports, mat_map, sw):
+    ''' Return network-wide unique identifiers from match information in
+    classifiers. '''
+    inports = []
+    if 'switch' in mat_map:
+        assert sw == mat_map['switch']
+        if 'port' in mat_map:
+            inports.append(portids[(sw, mat_map['port'])])
         else:
-            if 'port' in mat_map:
-                p = mat_map['port']
-                if p in sw_ports[sw]:
-                    inports.append(portids[(sw,p)])
-            else:
-                inports = [portids[(sw,x)] for x in sw_ports[sw]]
-        return inports
+            for p in sw_ports[sw]:
+                inports.append(portids[(sw,p)])
+    else:
+        if 'port' in mat_map:
+            p = mat_map['port']
+            if p in sw_ports[sw]:
+                inports.append(portids[(sw,p)])
+        else:
+            inports = [portids[(sw,x)] for x in sw_ports[sw]]
+    return inports
+
+def convert_classifier(classifier, hsf, portids, sw_ports):
+    """Function to convert a classifier `classifier` into a header space given by a
+    header space format dictionary `hsf`.
+    """
+    hsalib_log = logging.getLogger('%s.convert_classifier' % __name__)
 
     def get_action_wc(acts):
         """Return a rewrite mask, rewrite HS, and the list of outports from the
@@ -177,8 +180,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
                 mask = wildcard_create_bit_repeat(hsf["length"], 0x2)
                 rewrite = wildcard_create_bit_repeat(hsf["length"], 0x1)
                 for (field, val) in mod_dict.iteritems():
-                    set_field_val(mask, field, 0, process_field=False)
-                    set_field_val(rewrite, field, val)
+                    set_field_val(hsf, mask, field, 0, process_field=False)
+                    set_field_val(hsf, rewrite, field, val)
                 return (mask, rewrite, outports, True)
             else:
                 return (None, None, outports, False)
@@ -226,8 +229,8 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
             # determine first if this rule applicable to switch sw
             if (('switch' in mat_map and mat_map['switch'] == sw) or
                 (not 'switch' in mat_map)):
-                mat_wc = get_match_wc(mat_map)
-                in_ports = get_inports(mat_map, sw)
+                mat_wc = get_match_wc(hsf, mat_map)
+                in_ports = get_ports(hsf, portids, sw_ports, mat_map, sw)
                 (mask, rewrite, outports, rw) = get_action_wc(rule.actions)
                 out_ports = process_outports(mat_map, outports, sw, rule)
                 rule = TF.create_standard_rule(in_ports, mat_wc, out_ports,
