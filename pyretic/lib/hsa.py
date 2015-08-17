@@ -1,5 +1,5 @@
 from pyretic.core.language import *
-from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat
+from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat, wildcard_to_str
 from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
@@ -10,6 +10,7 @@ HSL_C_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c'
 TFS_FOLDER = '%s/tfs/pyretic' % HSL_C_FOLDER
 INVERTED_OUTFILE = "%s/out-inverted.json" % HSL_C_FOLDER
 GEN_BINARY = "%s/gen" % HSL_C_FOLDER
+PYRETIC_BINARY = "%s/pyretic" % HSL_C_FOLDER
 SWITCH_MULTIPLIER = 100000
 
 def pyr_hs_format():
@@ -288,6 +289,46 @@ def gen_hassel_datafile():
         print e.returncode
         print e.output
 
+def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch):
+    """Function that runs reachability from a given inport to a given output header
+    space, represented by the `match` in outmatch.
+    """
+    from pyretic.core.language import _match
+    in_port = portids[(insw,inport)]
+    mat_map = dict(_match(**outmatch.map).map)
+    mat_wc = get_match_wc(hsf, mat_map)
+    outports = []
+    if 'switch' in mat_map:
+        outports = get_ports(hsf, portids, sw_ports, mat_map, mat_map['switch'])
+    else:
+        outports = reduce(lambda acc, sw: acc + get_ports(hsf, portids, sw_ports,
+                                                         mat_map, sw),
+                          sw_ports.keys(), [])
+    out_ports = reduce(lambda acc, x: acc + ' ' + str(x), outports, '')
+    reachability_cmd = "%s -oh %s %d %s" % (PYRETIC_BINARY,
+                                            wildcard_to_str(mat_wc),
+                                            in_port,
+                                            out_ports)
+    print "The command being tried is:"
+    print reachability_cmd
+    try:
+        result = subprocess.check_output(shlex.split(reachability_cmd),
+                                         cwd=HSL_C_FOLDER)
+    except subprocess.CalledProcessError as e:
+        print "Could not run pyretic reachability on the inputs!"
+        print e.returncode
+        print e.output
+        result = ''
+    return result
+
+def test_reachability_inport_outheader(hsf, portids, sw_ports):
+    res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
+                                        match(switch=1,port=2))
+    print res
+    res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
+                                        match(switch=1,port=2,dstip=IPAddr('10.0.0.2')))
+    print res
+
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
     logging.basicConfig()
@@ -309,6 +350,7 @@ if __name__ == "__main__":
 
     # Run reachability
     gen_hassel_datafile()
+    test_reachability_inport_outheader(hs_format, portids, sw_ports)
 
 # a rough TODO(ngsrinivas):
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
