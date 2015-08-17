@@ -118,7 +118,7 @@ vec_to_json (const struct hs_vec *v, int len, char *res)
     bool diff = v->diff && v->diff[i].used;
     if (i) res += sprintf (res, " , ");
     res += sprintf (res, "{ \"elem\" : ");
-    char *s = array_to_str (v->elems[i], len, true);
+    char *s = array_to_str (v->elems[i], len, false);
     res += sprintf (res, "\"%s\"", s);
     free (s);
     if (diff) {
