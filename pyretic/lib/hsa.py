@@ -309,8 +309,6 @@ def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch
                                             wildcard_to_str(mat_wc),
                                             in_port,
                                             out_ports)
-    print "The command being tried is:"
-    print reachability_cmd
     try:
         result = subprocess.check_output(shlex.split(reachability_cmd),
                                          cwd=HSL_C_FOLDER)
@@ -324,10 +322,8 @@ def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch
 def test_reachability_inport_outheader(hsf, portids, sw_ports):
     res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
                                         match(switch=1,port=2))
-    print res
     res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
                                         match(switch=1,port=2,dstip=IPAddr('10.0.0.2')))
-    print res
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
