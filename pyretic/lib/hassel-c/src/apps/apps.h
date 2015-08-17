@@ -132,7 +132,7 @@ main (int argc, char **argv)
     list_res_fileprint_json (&inv_res, ofp);
     cur = cur->next;
   }
-  list_res_free (&inv_res);
+  // list_res_free (&inv_res);
   if (open) fclose (ofp);
 
   list_res_free (&res);
