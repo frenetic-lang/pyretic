@@ -467,14 +467,21 @@ def test_reachability_inport_outheader(hsf, portids, sw_ports):
                                             inport, outmatch)
         hslines = extract_inversion_results()
         print "test %d:" % testnum
-        print hslines
-        test_match_from_single_elem(hsf, hslines)
-    res = test_single_reachability(3, 2, match(switch=1,port=2), 1)
-    res = test_single_reachability(3, 2, match(switch=1, port=2,
-                                               dstip=IPAddr('10.0.0.2')), 2)
-    res = test_single_reachability(2, 3, match(switch=1, port=2,
-                                               srcip=IPAddr('10.0.0.2')), 3)
-
+        print '(s%d, port %d) --> %s' % (insw, inport, str(outmatch))
+        # print hslines
+        # test_match_from_single_elem(hsf, hslines)
+        print '--->', get_filter_hs(hsf, hslines)
+        return testnum + 1
+    testnum = 0
+    testnum = test_single_reachability(3, 2, match(switch=1,port=2), testnum)
+    testnum = test_single_reachability(3, 2, match(switch=1, port=2,
+                                                   dstip=IPAddr('10.0.0.2')),
+                                       testnum)
+    testnum = test_single_reachability(2, 3, match(switch=1, port=2,
+                                                   srcip=IPAddr('10.0.0.2')),
+                                       testnum)
+    testnum = test_single_reachability(3, 2, match(dstport=79), testnum)
+    testnum = test_single_reachability(1, 2, match(dstport=79), testnum)
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
