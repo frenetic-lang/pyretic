@@ -9,7 +9,7 @@ import json
 
 HSL_C_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c'
 TFS_FOLDER = '%s/tfs/pyretic' % HSL_C_FOLDER
-INVERTED_OUTFILE = "%s/out-inverted.json" % HSL_C_FOLDER
+INVERTED_OUTFILE = "%s/data/out-inverted.json" % HSL_C_FOLDER
 GEN_BINARY = "%s/gen" % HSL_C_FOLDER
 PYRETIC_BINARY = "%s/pyretic" % HSL_C_FOLDER
 SWITCH_MULTIPLIER = 100000

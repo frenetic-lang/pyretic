@@ -118,7 +118,7 @@ main (int argc, char **argv)
   // Print header spaces at ingress
   struct res *cur = res.head;
   struct list_res inv_res;
-  FILE *ofp = fopen ("out-inverted.json", "w");
+  FILE *ofp = fopen ("data/out-inverted.json", "w");
   bool open = true;
   if (! ofp) {
     printf ("Could not open output file for inverses.\n");
