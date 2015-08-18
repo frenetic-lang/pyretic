@@ -1,8 +1,11 @@
 from pyretic.core.language import *
-from pyretic.vendor.hsa.utils.wildcard import wildcard_create_bit_repeat, wildcard_to_str
+from pyretic.vendor.hsa.utils.wildcard import (wildcard_create_bit_repeat,
+                                               wildcard_to_str,
+                                               wildcard_create_from_string)
 from pyretic.vendor.hsa.utils.wildcard_utils import set_header_field
 from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
+from pyretic.core.network import IPAddr, IPPrefix, MAC
 import copy, logging
 import subprocess, shlex
 import json
@@ -320,25 +323,145 @@ def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch
         result = ''
     return result
 
+def get_field_val(hsf, field, wc_str):
+    """Get the value of a field if it is not wildcarded or 'z' in the given
+    wildcard string.
+
+    :rtype: `None` if value is fully wildcarded or has 'z', or value formatted
+    specific to the field if it is set.
+    """
+    def ensure_no_partial_wildcard(val, desc_str):
+        ind = val.find('x')
+        if ind == -1:
+            return False
+        elif ind == 0 and not ('0' in val or '1' in val):
+            return True
+        else:
+            raise RuntimeError("Pyretic doesn't support arbitrary wildcards on "
+                               "%s: value %s" % (desc_str, val))
+
+    def ensure_prefix_wildcard(val, desc_str):
+        ind = val.find('x')
+        if ind != -1:
+            ensure_no_partial_wildcard(val[0:ind], desc_str)
+            ensure_no_partial_wildcard(val[ind:], desc_str)
+            return ind
+        else:
+            return len(val) + 1
+
+    def convert_mac(field_bytes, field_str):
+        ''' Take bytes representing a MAC address and return a MAC value, or
+        None if wildcarded.'''
+        full_wc = ensure_no_partial_wildcard(field_str, "MAC address")
+        if full_wc:
+            ''' fully wildcarded. '''
+            return None
+        else:
+            ''' MAC value completely specified. '''
+            macdigits = []
+            for digitpair in field_bytes:
+                first_digit = hex(int(digitpair[0:4],2))[2:]
+                second_digit = hex(int(digitpair[4:8],2))[2:]
+                macdigits.append(first_digit + second_digit)
+            return MAC(':'.join(macdigits))
+
+    def convert_ip(field_bytes, field_str):
+        ''' Take bytes representing an IP address and return an IP value, or
+        None if completely wildcarded. '''
+        ind = ensure_prefix_wildcard(field_str, "IP address")
+        if ind == 0:
+            ''' fully wildcarded. '''
+            return None
+        else:
+            full_octets = ind / 9
+            assert full_octets >= 0 and full_octets <= 4
+            dotted_quad = []
+            # fully specified octets
+            for octet in range(0, full_octets):
+                dotted_quad.append(int(field_bytes[octet], 2))
+            # partially wildcarded octet
+            if full_octets < 4:
+                dotted_quad.append(int(field_bytes[octet].replace('x', '0'), 2))
+            # fully wildcarded octets
+            for octet in range(full_octets+1, 4):
+                dotted_quad.append(0)
+            prefixlen = ((ind/9) * 8) + (ind % 9)
+            ipaddr_dq = '.'.join(map(str, dotted_quad))
+            if prefixlen < 32:
+                return IPPrefix('%s/%d' % (ipaddr_dq, prefixlen))
+            else:
+                return IPAddr('%s' % ipaddr_dq)
+
+    def convert_to_integer(field_bytes, field_str):
+        ''' Take bytes and convert to integer. '''
+        return int(field_str.replace(',',''), 2)
+
+    wc_bytes = wc_str.split(',')[::-1]
+    assert '%s_pos' % field in hsf.keys()
+    assert '%s_len' % field in hsf.keys()
+    field_start = hsf['%s_pos' % field]
+    field_len   = hsf['%s_len' % field]
+    field_bytes = wc_bytes[field_start:field_start+field_len][::-1]
+    field_str = ','.join(field_bytes)
+    assert not 'z' in field_str # we don't support "null" matches.
+    ''' Process field bytes based on the field. '''
+    if field in ['srcmac', 'dstmac']:
+        return convert_mac(field_bytes, field_str)
+    elif field in ['srcip', 'dstip']:
+        return convert_ip(field_bytes, field_str)
+    else:
+        full_wc = ensure_no_partial_wildcard(field_str, field)
+        if full_wc:
+            return None
+        else:
+            return convert_to_integer(field_bytes, field_str)
+
+def match_from_single_elem(hsf, wc_str):
+    """ Convert a single wildcard string to a pyretic match """
+    fields = set(map(lambda x: x[:-4], filter(lambda x: x != "length",
+                                              hsf.keys())))
+    mat_map = {}
+    for field in fields:
+        val = get_field_val(hsf, field, wc_str)
+        if val:
+            mat_map[field] = val
+    if mat_map:
+        return match(**mat_map)
+    else:
+        return identity
+
+def print_hs(hsf, hsres, indent=''):
+    for hs in hsres:
+        print indent, match_from_single_elem(hsf, hs['elem'])
+        if 'diff' in hs:
+            print indent, '\\'
+            print_hs(hsf, hs['diff'], indent+'  ')
+
+def test_match_from_single_elem(hsf, jsonhs):
+    print_hs(hsf, jsonhs)
+
 def extract_inversion_results():
     f = open(INVERTED_OUTFILE, 'r')
     hslines = []
     for line in f:
-        hslines.append(json.loads(line.strip()))
+        hslines += json.loads(line.strip())
     f.close()
     return hslines
 
 def test_reachability_inport_outheader(hsf, portids, sw_ports):
-    res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
-                                        match(switch=1,port=2))
-    hslines = extract_inversion_results()
-    print "test 1:"
-    print hslines
-    res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
-                                        match(switch=1,port=2,dstip=IPAddr('10.0.0.2')))
-    hslines = extract_inversion_results()
-    print "test 2:"
-    print hslines
+    def test_single_reachability(insw, inport, outmatch, testnum):
+        res = reachability_inport_outheader(hsf, portids, sw_ports, insw,
+                                            inport, outmatch)
+        hslines = extract_inversion_results()
+        print "test %d:" % testnum
+        print hslines
+        test_match_from_single_elem(hsf, hslines)
+    res = test_single_reachability(3, 2, match(switch=1,port=2), 1)
+    res = test_single_reachability(3, 2, match(switch=1, port=2,
+                                               dstip=IPAddr('10.0.0.2')), 2)
+    res = test_single_reachability(2, 3, match(switch=1, port=2,
+                                               srcip=IPAddr('10.0.0.2')), 3)
+
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
