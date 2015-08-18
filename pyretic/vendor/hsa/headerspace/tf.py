@@ -745,7 +745,7 @@ class TF(object):
         '''
         saves all the non-custom transfer function rules to a json file
         '''
-        print "=== Saving transfer function to json file %s ==="%file
+        # print "=== Saving transfer function to json file %s ==="%file
         func = {}
         func["length"] = self.length
         func["prefix_id"] = self.prefix_id
@@ -780,14 +780,14 @@ class TF(object):
         f = open(file, 'w')
         f.write(json.dumps(func, indent=1))
         f.close()
-        print "=== Transfer function saved to json file %s ==="%file
+        # print "=== Transfer function saved to json file %s ==="%file
         
     def save_object_to_file(self, file):
         '''
         Depreciated
         saves all the non-custom transfer function rules to a file
         '''
-        print "=== Saving transfer function to file %s ==="%file
+        # print "=== Saving transfer function to file %s ==="%file
         f = open(file, 'w')
         f.write("%d$%s$%d$%d$%d$\n"%(2*self.length,\
                                      self.prefix_id,\
@@ -821,7 +821,7 @@ class TF(object):
                 f.write("%d,"%ln)
             f.write("$%s$\n"%rule["id"])
         f.close()
-        print "=== Transfer function saved to file %s ==="%file
+        # print "=== Transfer function saved to file %s ==="%file
         
     def load_from_json(self, file):
         print "=== Loading transfer function from file %s ==="%file

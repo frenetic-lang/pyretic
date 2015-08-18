@@ -5,6 +5,7 @@ from ipaddr import IPv4Network
 from pyretic.vendor.hsa.headerspace.tf import TF
 import copy, logging
 import subprocess, shlex
+import json
 
 HSL_C_FOLDER = '/home/mininet/pyretic/pyretic/lib/hassel-c'
 TFS_FOLDER = '%s/tfs/pyretic' % HSL_C_FOLDER
@@ -319,11 +320,25 @@ def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch
         result = ''
     return result
 
+def extract_inversion_results():
+    f = open(INVERTED_OUTFILE, 'r')
+    hslines = []
+    for line in f:
+        hslines.append(json.loads(line.strip()))
+    f.close()
+    return hslines
+
 def test_reachability_inport_outheader(hsf, portids, sw_ports):
     res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
                                         match(switch=1,port=2))
+    hslines = extract_inversion_results()
+    print "test 1:"
+    print hslines
     res = reachability_inport_outheader(hsf, portids, sw_ports, 3, 2,
                                         match(switch=1,port=2,dstip=IPAddr('10.0.0.2')))
+    hslines = extract_inversion_results()
+    print "test 2:"
+    print hslines
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
