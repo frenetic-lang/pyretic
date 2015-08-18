@@ -83,9 +83,9 @@ def static_fwding_chain_3_3():
                               (match(switch=3) >> fwd(1)))) +
         (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
                               (match(switch=2) >> fwd(2)) +
-                              (match(switch=3) >> fwd(2)))) +
-        (~match(srcmac='00:00:00:00:00:01')) +
-        (match(ethtype=IP_TYPE))
+                              (match(switch=3) >> fwd(2))))# +
+        #(~match(srcmac='00:00:00:00:00:01')) +
+        #(match(ethtype=IP_TYPE))
     )
 
 def set_field_val(hsf, wc_obj, field, val, process_field=True):
