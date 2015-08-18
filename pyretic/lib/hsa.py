@@ -440,6 +440,19 @@ def print_hs(hsf, hsres, indent=''):
 def test_match_from_single_elem(hsf, jsonhs):
     print_hs(hsf, jsonhs)
 
+def get_filter_hs(hsf, hsres):
+    res_filter = None
+    for hs in hsres:
+        curr_filter = match_from_single_elem(hsf, hs['elem'])
+        if 'diff' in hs:
+            diff_filter = get_filter_hs(hsf, hs['diff'])
+            curr_filter = curr_filter - diff_filter
+        if res_filter:
+            res_filter = res_filter | curr_filter
+        else:
+            res_filter = curr_filter
+    return res_filter
+
 def extract_inversion_results():
     f = open(INVERTED_OUTFILE, 'r')
     hslines = []
