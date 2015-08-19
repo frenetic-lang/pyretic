@@ -461,6 +461,29 @@ def extract_inversion_results():
     f.close()
     return hslines
 
+def get_reachable_inheaders(hsf, portids, sw_ports, insw, inport, outmatch):
+    """ Given a switch and inport to start from, pick out the headers at this
+    switch and inport which eventually reach a specified output headerspace.
+
+    :param hsf: a headerspace format.
+    :type hsf: dict
+    :param portids: port ID mapping from (sw,port) -> port number
+    :type portids: dict
+    :param sw_ports: mapping from switches to list of port numbers
+    :type sw_ports: dict
+    :param insw: the input switch from which packets logically enter the network
+    :type insw: int
+    :param inport: the input port from which packets logically enter the network
+    :type inport: int
+    :param outmatch: output header space
+    :type outmatch: match
+    :rtype: Filter
+    """
+    reachability_inport_outheader(hsf, portids, sw_ports, insw, inport,
+                                  outmatch)
+    hslines = extract_inversion_results()
+    return get_filter_hs(hsf, hslines)
+
 def test_reachability_inport_outheader(hsf, portids, sw_ports):
     def test_single_reachability(insw, inport, outmatch, testnum):
         res = reachability_inport_outheader(hsf, portids, sw_ports, insw,
@@ -507,6 +530,11 @@ if __name__ == "__main__":
     # Run reachability
     gen_hassel_datafile()
     test_reachability_inport_outheader(hs_format, portids, sw_ports)
+
+    # Test single-shot `reachable inheaders` function
+    print '****'
+    print get_reachable_inheaders(hs_format, portids, sw_ports, 1, 2,
+                                  match(switch=2,port=2,dstport=79))
 
 # a rough TODO(ngsrinivas):
 # run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
