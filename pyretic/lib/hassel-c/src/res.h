@@ -49,7 +49,7 @@ void        res_rule_add (struct res *res, const struct tf *tf, int rule,
 /* Walk the list of results in `out` and generate list of headers at (hs,port)
    that created the propagation path in `out`. */
 struct list_res res_walk_parents (const struct res *out, const struct hs *hs,
-				  int in_port);
+				  int in_port, array_t *out_arr);
 
 LIST (res);
 void list_res_free  (struct list_res *l);

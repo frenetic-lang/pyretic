@@ -127,7 +127,7 @@ main (int argc, char **argv)
   }
   printf ("\n\n==================\n\n");
   while (cur) {
-    inv_res = res_walk_parents (cur, &hs, in_port);
+    inv_res = res_walk_parents (cur, &hs, in_port, out_arr);
     list_res_print (&inv_res, false);
     list_res_fileprint_json (&inv_res, ofp);
     cur = cur->next;

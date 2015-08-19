@@ -83,11 +83,16 @@ res_print (const struct res *res, bool backward)
 }
 
 struct list_res
-res_walk_parents (const struct res *out, const struct hs *hs, int in_port)
+res_walk_parents (const struct res *out, const struct hs *hs, int in_port,
+		  array_t* out_arr)
 {
   struct res *curr_res = (struct res*) out;
   struct list_res currq = {0};
-  list_append (&currq, res_extend (out, &out->hs, out->port, true));
+
+  // set up initial result to start inversion
+  struct hs int_hs;
+  hs_isect_arr (&int_hs, &out->hs, out_arr);
+  list_append (&currq, res_extend (out, &int_hs, out->port, true));
 
   struct res *cur;
 
