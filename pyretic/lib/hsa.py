@@ -54,40 +54,6 @@ def pyr_hs_format():
 
 #### Generating a transfer function from a policy ####
 
-''' Temporary helper to get network switches and ports. '''
-def get_switch_port_ids():
-    return {k: v for (k,v) in
-            [(1, [1,2]), (2, [1,2,3]), (3, [1,2])]}
-
-def get_network_links():
-    '''Temporary helper to get network links.
-
-    Return a list where the format of each entry is (switch_i, switch_j, {i:
-    port_on_i, j: port_on_j}) for each link in the network.
-    '''
-    return [(1, 2, {1:1, 2:1}),
-            (2, 3, {2:2, 3:1})]
-
-def static_fwding_chain_3_3():
-    ip1 = IPAddr('10.0.0.1')
-    ip2 = IPAddr('10.0.0.2')
-    ip3 = IPAddr('10.0.0.3')
-    ip4 = IPAddr('10.0.0.4')
-    return (
-        (match(dstip=ip1) >> ((match(switch=1) >> fwd(2)) +
-                              (match(switch=2) >> modify(dstport=79)
-                               >> fwd(1)) +
-                              (match(switch=3) >> fwd(1)))) +
-        (match(dstip=ip2) >> ((match(switch=1) >> fwd(1)) +
-                              (match(switch=2) >> fwd(3)) +
-                              (match(switch=3) >> fwd(1)))) +
-        (match(dstip=ip3) >> ((match(switch=1) >> fwd(1)) +
-                              (match(switch=2) >> fwd(2)) +
-                              (match(switch=3) >> fwd(2))))# +
-        #(~match(srcmac='00:00:00:00:00:01')) +
-        #(match(ethtype=IP_TYPE))
-    )
-
 def set_field_val(hsf, wc_obj, field, val, process_field=True):
     """ Set a specific field in a wildcard using pyretic fields. """
     def ip2int(ip):
@@ -437,9 +403,6 @@ def print_hs(hsf, hsres, indent=''):
             print indent, '\\'
             print_hs(hsf, hs['diff'], indent+'  ')
 
-def test_match_from_single_elem(hsf, jsonhs):
-    print_hs(hsf, jsonhs)
-
 def get_filter_hs(hsf, hsres):
     res_filter = None
     for hs in hsres:
@@ -483,59 +446,3 @@ def get_reachable_inheaders(hsf, portids, sw_ports, insw, inport, outmatch):
                                   outmatch)
     hslines = extract_inversion_results()
     return get_filter_hs(hsf, hslines)
-
-def test_reachability_inport_outheader(hsf, portids, sw_ports):
-    def test_single_reachability(insw, inport, outmatch, testnum):
-        res = reachability_inport_outheader(hsf, portids, sw_ports, insw,
-                                            inport, outmatch)
-        hslines = extract_inversion_results()
-        print "test %d:" % testnum
-        print '(s%d, port %d) --> %s' % (insw, inport, str(outmatch))
-        # print hslines
-        # test_match_from_single_elem(hsf, hslines)
-        print '--->', get_filter_hs(hsf, hslines)
-        return testnum + 1
-    testnum = 0
-    testnum = test_single_reachability(3, 2, match(switch=1,port=2), testnum)
-    testnum = test_single_reachability(3, 2, match(switch=1, port=2,
-                                                   dstip=IPAddr('10.0.0.2')),
-                                       testnum)
-    testnum = test_single_reachability(2, 3, match(switch=1, port=2,
-                                                   srcip=IPAddr('10.0.0.2')),
-                                       testnum)
-    testnum = test_single_reachability(3, 2, match(switch=2,port=1,dstport=79),
-                                       testnum)
-    testnum = test_single_reachability(1, 2, match(switch=2,port=1,dstport=79),
-                                       testnum)
-
-if __name__ == "__main__":
-    hs_format = pyr_hs_format()
-    logging.basicConfig()
-
-    # get a classifier
-    c = static_fwding_chain_3_3().compile()
-
-    # test a classifier
-    sw_ports = get_switch_port_ids()
-    portids = get_portid_map(sw_ports)
-    convert_classifier(c, hs_format, portids, sw_ports)
-
-    # test a topology transfer function
-    edge_list = get_edge_list(get_network_links())
-    convert_topology(edge_list, hs_format, portids)
-
-    # write out a port map
-    write_port_map(sw_ports, portids)
-
-    # Run reachability
-    gen_hassel_datafile()
-    test_reachability_inport_outheader(hs_format, portids, sw_ports)
-
-    # Test single-shot `reachable inheaders` function
-    print '****'
-    print get_reachable_inheaders(hs_format, portids, sw_ports, 1, 2,
-                                  match(switch=2,port=2,dstport=79))
-
-# a rough TODO(ngsrinivas):
-# run tf -> ./gen -> dat -> ./reachability -> outputs. check for sane outputs
-
