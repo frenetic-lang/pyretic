@@ -480,8 +480,8 @@ def test_reachability_inport_outheader(hsf, portids, sw_ports):
     testnum = test_single_reachability(2, 3, match(switch=1, port=2,
                                                    srcip=IPAddr('10.0.0.2')),
                                        testnum)
-    testnum = test_single_reachability(3, 2, match(dstport=79), testnum)
-    testnum = test_single_reachability(1, 2, match(dstport=79), testnum)
+    testnum = test_single_reachability(3, 2, match(switch=2,port=1,dstport=79), testnum)
+    testnum = test_single_reachability(1, 2, match(switch=2,port=1,dstport=79), testnum)
 
 if __name__ == "__main__":
     hs_format = pyr_hs_format()
