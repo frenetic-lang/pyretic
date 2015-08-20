@@ -1,4 +1,5 @@
 from pyretic.core.language import *
+from pyretic.core.language import _modify
 from pyretic.vendor.hsa.utils.wildcard import (wildcard_create_bit_repeat,
                                                wildcard_to_str,
                                                wildcard_create_from_string)
@@ -163,14 +164,22 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
     def process_outports(mat_map, acts_ports, sw, rule):
         ''' Return network-wide unique port identifiers from the port values
         present in classifier actions. '''
+        def warn_nonexistent_port(p):
+            print sw_ports
+            hsalib_log.warn("Non-existent port specified: "
+                            "(sw %d, p %d) in %s" % (
+                                sw, p, str(rule)))
         out_ports = []
         for p in acts_ports:
             if p in sw_ports[sw]:
                 out_ports.append(portids[(sw,p)])
+            elif p == OFPP_IN_PORT:
+                if 'port' in mat_map:
+                    out_ports.append(portids[(sw,mat_map['port'])])
+                else:
+                    warn_nonexistent_port(p)
             else:
-                hsalib_log.warn("Non-existent port specified: "
-                                "(sw %d, p %d) in %s" % (
-                                    sw, p, str(rule)))
+                warn_nonexistent_port(p)
         return out_ports
 
     def init_tfs():
