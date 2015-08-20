@@ -28,6 +28,9 @@
 
 from pyretic.lib.corelib import *
 from pyretic.lib.hsa import *
+from pyretic.core.runtime import virtual_field
+from pyretic.core.language import _modify
+import copy
 
 ''' Temporary helper to get network switches and ports. '''
 def get_test_switch_port_ids():
@@ -42,6 +45,39 @@ def get_test_network_links():
     '''
     return [(1, 2, {1:1, 2:1}),
             (2, 3, {2:2, 3:1})]
+
+def sample_in_table_policy():
+    """ Temporary in_table policy corresponding to path_test_0 in
+    examples/path_query.py. """
+    return ((~match(switch=2) >> ~match(test_tag=2) >>
+             modify(test_tag=2)) +
+            (match(test_tag=2)) +
+            (match(switch=2, test_tag=None) >> modify(test_tag=1)) +
+            (match(switch=2, test_tag=1) >> modify(test_tag=2)) +
+            (match(switch=2, test_tag=3) >> modify(test_tag=2)))
+
+def sample_out_table_policy():
+    """ Temporary out_table policy corresponding to path_test_0 in
+    examples/path_query.py. """
+    return ((match(test_tag=2)) +
+            (match(test_tag=None) >> modify(test_tag=2)) +
+            (match(test_tag=1) >> modify(test_tag=3)) +
+            (match(test_tag=3) >> modify(test_tag=2)))
+
+def sample_vtagging(sw_ports, network_links):
+    """ Temporary helper equivalent of virtual_untagging() policy. """
+    edge_net = get_hsa_edge_policy(sw_ports, network_links)
+    return ((edge_net >> modify(test_tag=None)) + ~edge_net)
+
+def sample_vuntagging(sw_ports, network_links):
+    """ Temporary helper equivalent of virtual_untagging() policy. """
+    edge_net = get_hsa_edge_policy(sw_ports, network_links)
+    return ((edge_net >> _modify(vlan_id=0, vlan_pcp=0)) + ~edge_net)
+
+def sample_outmatches():
+    """ Temporary list of outmatches which must be covered in the HSA
+    listing, corresponding to path_test_0 in examples/path_query.py. """
+    return [match(test_tag=3)]
 
 def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
