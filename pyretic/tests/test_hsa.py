@@ -161,3 +161,32 @@ def basic_test():
     print '****'
     print get_reachable_inheaders(hs_format, portids, sw_ports, 1, 2,
                                   match(switch=2,port=2,dstport=79))
+
+def hsa_path_test_0():
+    virtual_field(name="test_tag", values=range(0, 10), type="integer")
+    hs_format = pyr_hs_format()
+    sw_ports = get_test_switch_port_ids()
+    net_links = get_test_network_links()
+    pol = (sample_vtagging(sw_ports, net_links) >>
+           sample_in_table_policy() >>
+           static_fwding_chain_3_3() >>
+           sample_out_table_policy() >>
+           sample_vuntagging(sw_ports, net_links))
+    setup_tfs_data(hs_format, pol, sw_ports, net_links)
+    outmatch = sample_outmatches()
+    portids = get_portid_map(sw_ports)
+
+    edge_ports = get_hsa_edge_ports(sw_ports, net_links)
+    for (sw,ports) in edge_ports.iteritems():
+        for p in ports:
+            for outm in outmatch:
+                print '*****'
+                print "Testing reachability from sw %d p %d to %s" % (
+                    sw,p,str(outm))
+                print get_reachable_inheaders(hs_format, portids, sw_ports, sw,
+                                              p, outm)
+
+if __name__ == "__main__":
+    logging.basicConfig()
+    basic_test()
+    hsa_path_test_0()
