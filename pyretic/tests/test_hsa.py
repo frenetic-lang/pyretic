@@ -32,6 +32,17 @@ from pyretic.core.runtime import virtual_field
 from pyretic.core.language import _modify
 import copy
 
+#### Common virtual tagging and untagging policy constructions ####
+def sample_vtagging(sw_ports, network_links):
+    """ Temporary helper equivalent of virtual_untagging() policy. """
+    edge_net = get_hsa_edge_policy(sw_ports, network_links)
+    return ((edge_net >> modify(test_tag=None)) + ~edge_net)
+
+def sample_vuntagging(sw_ports, network_links):
+    """ Temporary helper equivalent of virtual_untagging() policy. """
+    edge_net = get_hsa_edge_policy(sw_ports, network_links)
+    return ((edge_net >> _modify(vlan_id=0, vlan_pcp=0)) + ~edge_net)
+
 ''' Temporary helper to get network switches and ports. '''
 def get_test_switch_port_ids():
     return {k: v for (k,v) in
@@ -46,7 +57,8 @@ def get_test_network_links():
     return [(1, 2, {1:1, 2:1}),
             (2, 3, {2:2, 3:1})]
 
-def sample_in_table_policy():
+### path_test_0 ###
+def sample_in_table_policy_0():
     """ Temporary in_table policy corresponding to path_test_0 in
     examples/path_query.py. """
     return ((~match(switch=2) >> ~match(test_tag=2) >>
@@ -56,7 +68,7 @@ def sample_in_table_policy():
             (match(switch=2, test_tag=1) >> modify(test_tag=2)) +
             (match(switch=2, test_tag=3) >> modify(test_tag=2)))
 
-def sample_out_table_policy():
+def sample_out_table_policy_0():
     """ Temporary out_table policy corresponding to path_test_0 in
     examples/path_query.py. """
     return ((match(test_tag=2)) +
@@ -64,21 +76,12 @@ def sample_out_table_policy():
             (match(test_tag=1) >> modify(test_tag=3)) +
             (match(test_tag=3) >> modify(test_tag=2)))
 
-def sample_vtagging(sw_ports, network_links):
-    """ Temporary helper equivalent of virtual_untagging() policy. """
-    edge_net = get_hsa_edge_policy(sw_ports, network_links)
-    return ((edge_net >> modify(test_tag=None)) + ~edge_net)
-
-def sample_vuntagging(sw_ports, network_links):
-    """ Temporary helper equivalent of virtual_untagging() policy. """
-    edge_net = get_hsa_edge_policy(sw_ports, network_links)
-    return ((edge_net >> _modify(vlan_id=0, vlan_pcp=0)) + ~edge_net)
-
-def sample_outmatches():
+def sample_outmatches_0():
     """ Temporary list of outmatches which must be covered in the HSA
     listing, corresponding to path_test_0 in examples/path_query.py. """
     return [match(test_tag=3)]
 
+### Chain,3,3 forwarding policy ###
 def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
     ip2 = IPAddr('10.0.0.2')
@@ -99,6 +102,7 @@ def static_fwding_chain_3_3():
         #(match(ethtype=IP_TYPE))
     )
 
+### Other generic testing functions ###
 def test_match_from_single_elem(hsf, jsonhs):
     print_hs(hsf, jsonhs)
 
@@ -162,31 +166,37 @@ def basic_test():
     print get_reachable_inheaders(hs_format, portids, sw_ports, 1, 2,
                                   match(switch=2,port=2,dstport=79))
 
-def hsa_path_test_0():
-    virtual_field(name="test_tag", values=range(0, 10), type="integer")
+def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
+    """ Generic template for path query tests on the chain,3,3 topology """
+    print "Path test %d", testnum
     hs_format = pyr_hs_format()
     sw_ports = get_test_switch_port_ids()
     net_links = get_test_network_links()
     pol = (sample_vtagging(sw_ports, net_links) >>
-           sample_in_table_policy() >>
+           in_table_pol >>
            static_fwding_chain_3_3() >>
-           sample_out_table_policy() >>
+           out_table_pol >>
            sample_vuntagging(sw_ports, net_links))
     setup_tfs_data(hs_format, pol, sw_ports, net_links)
-    outmatch = sample_outmatches()
     portids = get_portid_map(sw_ports)
 
     edge_ports = get_hsa_edge_ports(sw_ports, net_links)
     for (sw,ports) in edge_ports.iteritems():
         for p in ports:
-            for outm in outmatch:
+            for outm in outmatches_list:
                 print '*****'
                 print "Testing reachability from sw %d p %d to %s" % (
                     sw,p,str(outm))
                 print get_reachable_inheaders(hs_format, portids, sw_ports, sw,
                                               p, outm)
 
+def hsa_path_test_0():
+    hsa_path_test(0, sample_in_table_policy_0(),
+                  sample_out_table_policy_0(),
+                  sample_outmatches_0())
+
 if __name__ == "__main__":
     logging.basicConfig()
     basic_test()
+    virtual_field(name="test_tag", values=range(0, 10), type="integer")
     hsa_path_test_0()
