@@ -248,6 +248,26 @@ def get_edge_list(edges):
         edge_list.append((s1, ports[s1], s2, ports[s2]))
     return edge_list
 
+def get_hsa_edge_ports(sw_ports, network_links):
+    edge_ports = copy.deepcopy(sw_ports)
+    for (s1, s2, linkdict) in network_links:
+        for s in [s1, s2]:
+            if linkdict[s] in edge_ports[s]:
+                edge_ports[s].remove(linkdict[s])
+    return edge_ports
+
+def get_hsa_edge_policy(sw_ports, network_links):
+    """ Temporary helper to construct an equivalent of the ingress_network() or
+    egress_network() Filters from a switch-ports dictionary and a list of
+    network links.
+    """
+    edge_ports = get_hsa_edge_ports(sw_ports, network_links)
+    match_pols = []
+    for (sw, ports) in edge_ports.iteritems():
+        for p in ports:
+            match_pols.append(match(switch=sw,port=p))
+    return union(match_pols)
+
 def write_port_map(sw_ports, portids):
     f = open('%s/port_map.txt' % TFS_FOLDER, 'w')
     for (sw, ports) in sw_ports.iteritems():
