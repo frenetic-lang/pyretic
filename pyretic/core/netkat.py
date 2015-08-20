@@ -67,12 +67,12 @@ class netkat_backend(object):
             appears in the policy through the policy itself."""
             from pyretic.core.language import match, identity
             pred_policy = None
-            for i in range(1, switch_cnt + 1):
+            used_cnt = switch_cnt if switch_cnt else 0
+            for i in range(1, used_cnt + 1):
                 if pred_policy is None:
                     pred_policy = match(switch = i)
                 else:
                     pred_policy |= match(switch = i)
-
             if pred_policy is None:
                 pred_policy = identity
             return pred_policy >> pol
