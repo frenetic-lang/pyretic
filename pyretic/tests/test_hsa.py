@@ -126,26 +126,24 @@ def test_reachability_inport_outheader(hsf, portids, sw_ports):
     testnum = test_single_reachability(1, 2, match(switch=2,port=1,dstport=79),
                                        testnum)
 
-if __name__ == "__main__":
-    hs_format = pyr_hs_format()
-    logging.basicConfig()
-
+def setup_tfs_data(hsf, pol, sw_ports, network_links):
+    """ Set up transfer functions and hassel-c data files from a given
+    policy, and topology information. """
     # get a classifier
-    c = static_fwding_chain_3_3().compile()
+    c = pol.netkat_compile()[0]
 
-    # test a classifier
-    sw_ports = get_test_switch_port_ids()
+    # get a forwarding transfer function
     portids = get_portid_map(sw_ports)
-    convert_classifier(c, hs_format, portids, sw_ports)
+    convert_classifier(c, hsf, portids, sw_ports)
 
-    # test a topology transfer function
-    edge_list = get_edge_list(get_test_network_links())
-    convert_topology(edge_list, hs_format, portids)
+    # get a topology transfer function
+    edge_list = get_edge_list(network_links)
+    convert_topology(edge_list, hsf, portids)
 
-    # write out a port map
+    # port map, for easy reference
     write_port_map(sw_ports, portids)
 
-    # Run reachability
+    # generate the hassel-c `dat` file
     gen_hassel_datafile()
     test_reachability_inport_outheader(hs_format, portids, sw_ports)
 
