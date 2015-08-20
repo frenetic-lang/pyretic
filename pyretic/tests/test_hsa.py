@@ -145,6 +145,16 @@ def setup_tfs_data(hsf, pol, sw_ports, network_links):
 
     # generate the hassel-c `dat` file
     gen_hassel_datafile()
+
+def basic_test():
+    hs_format = pyr_hs_format()
+    sw_ports = get_test_switch_port_ids()
+    net_links = get_test_network_links()
+    pol = static_fwding_chain_3_3()
+    setup_tfs_data(hs_format, pol, sw_ports, net_links)
+    portids = get_portid_map(sw_ports)
+
+    # basic reachability tests with known samples
     test_reachability_inport_outheader(hs_format, portids, sw_ports)
 
     # Test single-shot `reachable inheaders` function
