@@ -197,8 +197,14 @@ def basic_test():
 
     # Test single-shot `reachable inheaders` function
     print '****'
+    print '(s%d, p%d) ---> %s' % (1, 2, str(match(switch=2,port=2,dstport=79)))
     print get_reachable_inheaders(hs_format, portids, sw_ports, 1, 2,
                                   match(switch=2,port=2,dstport=79))
+
+    print '****'
+    print '(s%d, p%d) ---> %s' % (2, 3, str(match(dstport=79)))
+    print get_reachable_inheaders(hs_format, portids, sw_ports, 2, 3,
+                                  match(dstport=79))
 
 def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
     """ Generic template for path query tests on the chain,3,3 topology """
