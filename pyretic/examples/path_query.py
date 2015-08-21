@@ -259,6 +259,13 @@ def path_test_5():
     p.register_callback(query_callback(5))
     return p
 
+def path_test_5_1():
+    a1 = in_atom(match(switch=1))
+    a2 = out_atom(match(switch=2))
+    p = (a1 ^ a2) | (a2 ^ a1)
+    p.register_callback(query_callback("5.1"))
+    return p
+
 def path_test_6():
     p = +atom(identity)
     p.register_callback(query_callback(6))
