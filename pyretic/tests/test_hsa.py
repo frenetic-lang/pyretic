@@ -222,7 +222,7 @@ def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
                 print "Testing reachability from sw %d p %d to %s" % (
                     sw,p,str(outm))
                 print get_reachable_inheaders(hs_format, portids, sw_ports, sw,
-                                              p, outm)
+                                              p, outm, no_vlan=True)
 
 def hsa_path_test_0():
     hsa_path_test(0, sample_in_table_policy_0(),

@@ -460,7 +460,8 @@ def extract_inversion_results():
     f.close()
     return hslines
 
-def get_reachable_inheaders(hsf, portids, sw_ports, insw, inport, outmatch):
+def get_reachable_inheaders(hsf, portids, sw_ports, insw, inport, outmatch,
+                            no_vlan=False):
     """ Given a switch and inport to start from, pick out the headers at this
     switch and inport which eventually reach a specified output headerspace.
 
@@ -479,6 +480,6 @@ def get_reachable_inheaders(hsf, portids, sw_ports, insw, inport, outmatch):
     :rtype: Filter
     """
     reachability_inport_outheader(hsf, portids, sw_ports, insw, inport,
-                                  outmatch)
+                                  outmatch, no_vlan)
     hslines = extract_inversion_results()
     return get_filter_hs(hsf, hslines)
