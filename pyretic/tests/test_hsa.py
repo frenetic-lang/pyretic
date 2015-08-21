@@ -81,6 +81,40 @@ def sample_outmatches_0():
     listing, corresponding to path_test_0 in examples/path_query.py. """
     return [match(test_tag=3)]
 
+### path test 5.1  ###
+def sample_in_table_policy_5():
+    return ((match(test_tag=2)) +
+            (match(switch=1,test_tag=6) >> modify(test_tag=7)) +
+            (match(test_tag=6) >> ~match(switch=1) >> modify(test_tag=4)) +
+            (match(switch=1,test_tag=9) >> modify(test_tag=7)) +
+            (match(test_tag=9) >> ~match(switch=1) >> modify(test_tag=2)) +
+            (match(test_tag=5) >> modify(test_tag=2)) +
+            (match(test_tag=1) >> modify(test_tag=2)) +
+            (match(test_tag=3) >> modify(test_tag=4)) +
+            (match(switch=1,test_tag=None) >> modify(test_tag=1)) +
+            (match(test_tag=None) >> ~match(switch=1) >> modify(test_tag=8)) +
+            (match(test_tag=7) >> modify(test_tag=2)) +
+            (match(test_tag=8) >> modify(test_tag=2)) +
+            (match(test_tag=4) >> modify(test_tag=2)))
+
+def sample_out_table_policy_5():
+    return ((match(test_tag=2)) +
+            (match(test_tag=6) >> modify(test_tag=2)) +
+            (match(test_tag=9) >> modify(test_tag=2)) +
+            (match(test_tag=5) >> modify(test_tag=2)) +
+            (match(switch=2,test_tag=1) >> modify(test_tag=6)) +
+            (match(test_tag=1) >> ~match(switch=2) >> modify(test_tag=3)) +
+            (match(test_tag=3) >> modify(test_tag=2)) +
+            (match(test_tag=None) >> modify(test_tag=2)) +
+            (match(test_tag=7) >> modify(test_tag=5)) +
+            (match(switch=2,test_tag=8) >> modify(test_tag=9)) +
+            (match(test_tag=8) >> ~match(switch=2) >> modify(test_tag=2)) +
+            (match(switch=2,test_tag=4) >> modify(test_tag=5)) +
+            (match(test_tag=4) >> ~match(switch=2) >> modify(test_tag=2)))
+
+def sample_outmatches_5():
+    return [match(test_tag=5)]
+
 ### Chain,3,3 forwarding policy ###
 def static_fwding_chain_3_3():
     ip1 = IPAddr('10.0.0.1')
@@ -168,7 +202,7 @@ def basic_test():
 
 def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
     """ Generic template for path query tests on the chain,3,3 topology """
-    print "Path test %d", testnum
+    print "Path test %s" % str(testnum)
     hs_format = pyr_hs_format()
     sw_ports = get_test_switch_port_ids()
     net_links = get_test_network_links()
@@ -195,8 +229,14 @@ def hsa_path_test_0():
                   sample_out_table_policy_0(),
                   sample_outmatches_0())
 
+def hsa_path_test_5():
+    hsa_path_test('5.1', sample_in_table_policy_5(),
+                  sample_out_table_policy_5(),
+                  sample_outmatches_5())
+
 if __name__ == "__main__":
     logging.basicConfig()
     basic_test()
     virtual_field(name="test_tag", values=range(0, 10), type="integer")
     hsa_path_test_0()
+    hsa_path_test_5()
