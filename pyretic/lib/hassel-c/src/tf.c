@@ -52,6 +52,18 @@ deps_diff (struct hs *hs, uint32_t port, const struct deps *deps,
 }
 
 static void
+deps_diff_inv (struct hs *hs, uint32_t port, const struct deps *deps,
+	       const struct tf *tf)
+{
+  for (int i = 0; i < deps->n; i++) {
+    const struct dep *dep = &deps->deps[i];
+    if (dep->port > 0 && dep->port != port) continue;
+    if (dep->port < 0 && !port_match (port, dep->port, tf)) continue;
+    hs_diff (hs, DATA_ARR (dep->match));
+  }
+}
+
+static void
 print_ports (int32_t p, const struct tf *tf)
 {
   if (p >= 0) {
@@ -71,10 +83,11 @@ print_ports (int32_t p, const struct tf *tf)
 static bool
 port_append_res (struct list_res *res, const struct rule *r,
 		 const struct tf *tf, const struct res *in, int32_t ports,
-		 bool append, const struct hs *hs)
+		 bool append, const struct hs *hs, bool inv_remove_deps)
 {
   /* Create new result containing headerspace `hs` for each port in `ports`. */
   bool used_hs = false;
+  struct hs *new_hs;
   uint32_t n, x;
   const uint32_t *a;
   if (ports > 0) { n = 1; x = ports; a = &x; }
@@ -85,12 +98,31 @@ port_append_res (struct list_res *res, const struct rule *r,
 
   for (int i = 0; i < n; i++) {
     if (a[i] == in->port) continue;
+
+    if (inv_remove_deps) {
+      /* For inversion, also remove dependencies for each input port of the
+	 inverted rule. */
+      new_hs = hs_create (hs->len);
+      hs_copy (new_hs, hs);
+      if (r->deps) deps_diff_inv (new_hs, a[i], DEPS (tf, r->deps), tf);
+
+      if (!hs_compact_m (new_hs, r->mask ? DATA_ARR (r->mask) : NULL)) { hs_destroy(new_hs); continue; }
+    }
+    else new_hs = (struct hs*) hs;
+
+    // now *new_hs has the latest hs at this port
     struct res *tmp;
-    if (used_hs) tmp = res_extend (in, hs, a[i], append);
+    if (! inv_remove_deps) {
+      if (used_hs) tmp = res_extend (in, hs, a[i], append);
+      else {
+	tmp = res_extend (in, NULL, a[i], append);
+	tmp->hs = *hs;
+	used_hs = true;
+      }
+    }
     else {
       tmp = res_extend (in, NULL, a[i], append);
-      tmp->hs = *hs;
-      used_hs = true;
+      tmp->hs = *new_hs;
     }
     res_rule_add (tmp, tf, r->idx, r);
     list_append (res, tmp);
@@ -118,7 +150,7 @@ rule_apply (const struct rule *r, const struct tf *tf, const struct res *in,
     if (r->mask) hs_rewrite (&hs, DATA_ARR (r->mask), DATA_ARR (r->rewrite));
   }
 
-  bool used_hs = port_append_res (&res, r, tf, in, r->out, append, &hs);
+  bool used_hs = port_append_res (&res, r, tf, in, r->out, append, &hs, false);
 
   if (res.head) app_add (r->idx, app, napp);
   if (!used_hs) hs_destroy (&hs);
@@ -155,18 +187,6 @@ rule_print (const struct rule *r, const struct tf *tf)
     //deps_print (r->deps);
   }
   printf ("-----\n");
-}
-
-static void
-deps_diff_inv (struct hs *hs, uint32_t port, const struct deps *deps,
-	       const struct tf *tf)
-{
-  for (int i = 0; i < deps->n; i++) {
-    const struct dep *dep = &deps->deps[i];
-    if (dep->port > 0 && dep->port != port) continue;
-    if (dep->port < 0 && !port_match (port, dep->port, tf)) continue;
-    hs_diff (hs, DATA_ARR (dep->match));
-  }
 }
 
 static array_t*
@@ -220,12 +240,10 @@ rule_inv_apply (const struct tf *tf, const struct rule *r, const struct res *in,
   else { // fwding and rewrite rules
     if (!hs_isect_arr (&hs, &in->hs, inv_mat)) return res;
     if (r->mask) hs_rewrite (&hs, DATA_ARR (r->mask), inv_rw);
-    if (r->deps) deps_diff_inv (&hs, in->port, DEPS (tf, r->deps), tf);
-    if (!hs_compact_m (&hs, r->mask ? DATA_ARR (r->mask) : NULL)) { hs_destroy(&hs); return res; }
   }
 
   // there is a new hs result corresponding to each rule inport
-  bool used_hs = port_append_res (&res, r, tf, in, r->in, append, &hs);
+  bool used_hs = port_append_res (&res, r, tf, in, r->in, append, &hs, true);
 
   if (inv_rw) array_free (inv_rw);
   if (inv_mat) array_free (inv_mat);
