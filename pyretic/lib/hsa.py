@@ -288,26 +288,33 @@ def gen_hassel_datafile():
         print e.returncode
         print e.output
 
-def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport, outmatch):
+def reachability_inport_outheader(hsf, portids, sw_ports, insw, inport,
+                                  outmatch, no_vlan=False):
     """Function that runs reachability from a given inport to a given output header
     space, represented by the `match` in outmatch.
     """
     from pyretic.core.language import _match
     in_port = portids[(insw,inport)]
-    mat_map = dict(_match(**outmatch.map).map)
-    mat_wc = get_match_wc(hsf, mat_map)
+    outmat_map = dict(_match(**outmatch.map).map)
+    outmat_wc = get_match_wc(hsf, outmat_map)
     outports = []
-    if 'switch' in mat_map:
-        outports = get_ports(hsf, portids, sw_ports, mat_map, mat_map['switch'])
+    if 'switch' in outmat_map:
+        outports_lst = get_ports(hsf, portids, sw_ports, outmat_map,
+                                 outmat_map['switch'])
     else:
-        outports = reduce(lambda acc, sw: acc + get_ports(hsf, portids, sw_ports,
-                                                         mat_map, sw),
-                          sw_ports.keys(), [])
-    out_ports = reduce(lambda acc, x: acc + ' ' + str(x), outports, '')
-    reachability_cmd = "%s -oh %s %d %s" % (PYRETIC_BINARY,
-                                            wildcard_to_str(mat_wc),
-                                            in_port,
-                                            out_ports)
+        outports_lst = reduce(lambda acc, sw: acc +
+                              get_ports(hsf, portids, sw_ports, outmat_map, sw),
+                              sw_ports.keys(), [])
+    outports_str = reduce(lambda acc, x: acc + ' ' + str(x), outports_lst, '')
+    inmat_wc = get_match_wc(hsf, {})
+    if no_vlan:
+        inmat_wc = get_match_wc(hsf, {'vlan_id': 0, 'vlan_pcp': 0})
+    ih_str = '-ih %s' % wildcard_to_str(inmat_wc) if no_vlan else ''
+    reachability_cmd = "%s %s -oh %s %d %s" % (PYRETIC_BINARY,
+                                               ih_str,
+                                               wildcard_to_str(outmat_wc),
+                                               in_port,
+                                               outports_str)
     try:
         result = subprocess.check_output(shlex.split(reachability_cmd),
                                          cwd=HSL_C_FOLDER)
