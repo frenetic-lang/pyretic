@@ -209,8 +209,7 @@ def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
     pol = (sample_vtagging(sw_ports, net_links) >>
            in_table_pol >>
            static_fwding_chain_3_3() >>
-           out_table_pol >>
-           sample_vuntagging(sw_ports, net_links))
+           out_table_pol)
     setup_tfs_data(hs_format, pol, sw_ports, net_links)
     portids = get_portid_map(sw_ports)
 
