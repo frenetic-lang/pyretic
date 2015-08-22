@@ -99,23 +99,32 @@ def pack(type_list, limit):
     assgn = {}
 
     for (q, typ) in type_list:
+        assigned = False
         for i in range(len(stages)):
             new_typ = join(stages[i], typ)
             ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ 
             if in_cnt <= limit and out_cnt <= limit:
                 stages[i] = new_typ
-                assgn[q] = i
+                if not i in assgn:
+                    assgn[i] = []
+                assgn[i].append(q)
+                assigned = True
                 break
-        if not q in assgn:
+        if not assigned:
             ((_, in_cnt), (_, out_cnt)) = typ 
             if in_cnt <= limit and out_cnt <= limit:
                 stages.append(typ)
-                assgn[q] = len(stages) - 1
+                assgn[len(stages) - 1] = [q]
             else:
                 print q, in_cnt, out_cnt
                 raise TypeError
-    print stages
     return assgn
+
+
+def pack_queries(q_list, limit):
+    q_list = [get_type(q) for q in q_list]
+    q_list = zip(range(len(q_list)), q_list)
+    return pack(q_list, limit)
 
 def compact(l):
     if len(l) == 0:
@@ -137,15 +146,6 @@ def compact(l):
         res.append(last)
     return res
 
-def stage_assgn(assgn):
-    res = {}
-    for q in assgn:
-        stage = assgn[q]
-        if not stage in res:
-            res[stage] = []
-        res[stage].append(q)    
-    return res
-
 def all_queries_together(limit = 2000):
     queries = [t.policy.path_main(k = 8, fout = 4) for t in tests]  
     offsets = []
@@ -160,9 +160,7 @@ def all_queries_together(limit = 2000):
     print offsets
     query = reduce(lambda acc, p: acc + p, queries)
     t_s = time.time()
-    q_list = [get_type(q) for q in query.path_policies]
-    q_list = zip(range(len(q_list)), q_list)
-    res = stage_assgn(pack(q_list, limit))
+    res = pack_queries(query.path_policies, limit)
     print time.time() - t_s
     print len(res)
     for s in res:
@@ -179,12 +177,12 @@ def each_query_as_unit(limit = 2000):
             q_list.append(get_type(q))
     print q_list
     q_list = zip(range(len(q_list)), q_list)
-    res = stage_assgn(pack(q_list, limit))
+    res = pack(q_list, limit)
     print len(res)
     for s in res:
         print s, compact(res[s])
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     all_queries_together()
-    print '-----------------------------'
+    print '----------------'
     each_query_as_unit(3500)

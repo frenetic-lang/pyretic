@@ -98,7 +98,7 @@ class LinkCongestionStats:
             for p in ports[pair[1]]:
                 partial_match_1 |= match(outport = p)
             partial_match_1 = match(switch = pair[1]) & partial_match_1
-
+            
             partial_query = in_atom(partial_match_0) ** out_atom(match(switch = s1)) ^ in_atom(match(switch = s2)) ** out_atom(partial_match_1)
             partial_query.register_callback(query_callback(pair)) 
             cb = CountBucket()
