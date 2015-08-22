@@ -1445,9 +1445,35 @@ class pathcomp(object):
 
     @classmethod
     def compile(cls, path_pol, max_states=65000,
-            disjoint_enabled=False, default_enabled = False, 
-            integrate_enabled=False, ragel_enabled = False, match_enabled = False):
-        
+                disjoint_enabled=False, default_enabled = False,
+                integrate_enabled=False, ragel_enabled = False, match_enabled = False):
+        def get_directional_pathpol(path_pol, dirn):
+            is_dir_q = lambda pp: (pp.path.measure_loc == dirn)
+            if isinstance(path_pol, path_policy_union):
+                query_list = filter(is_dir_q, path_pol.path_policies)
+            else:
+                query_list = [path_pol] if is_dir_q(path_pol) else []
+            if len(query_list) > 1:
+                return path_policy_union(query_list)
+            elif len(query_list) == 1:
+                return query_list[0]
+            else:
+                return []
+
+        ds_path_pol = get_directional_pathpol(path_pol,
+                                              path.MEASURE_LOC_DOWNSTREAM)
+        dsres = cls.compile_downstream(ds_path_pol, max_states,
+                                       disjoint_enabled, default_enabled,
+                                       integrate_enabled, ragel_enabled,
+                                       match_enabled)
+        return dsres
+        # TODO(ngsrinivas): add upstream query compilation function
+
+    @classmethod
+    def compile_downstream(cls, path_pol, max_states=65000,
+                           disjoint_enabled=False, default_enabled=False,
+                           integrate_enabled=False, ragel_enabled=False,
+                           match_enabled=False):
         if isinstance(path_pol, path_policy_union):
             query_list = path_pol.path_policies
         else:
