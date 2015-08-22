@@ -1395,7 +1395,7 @@ class pathcomp(object):
             raise TypeError("Can't prep re_tree for non-path-policy!")
 
     @classmethod
-    def __get_re_pols__(cls, acc, p, dirn=path.MEASURE_LOC_DOWNSTREAM):
+    def __get_re_pols__(cls, acc, p, in_cg, out_cg, dirn=path.MEASURE_LOC_DOWNSTREAM):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths. The direction argument `dirn` specifies a
         way to collect paths that only measure at a certain point (upstream or
@@ -1491,10 +1491,12 @@ class pathcomp(object):
 
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
-        re_pols_up   = lambda acc, x: re_pols(acc, x, dirn =
-                                              path.MEASURE_LOC_UPSTREAM)
-        re_pols_down = lambda acc, x: re_pols(acc, x, dirn =
-                                              path.MEASURE_LOC_DOWNSTREAM)
+        re_pols_up   = lambda acc, p, in_cg, out_cg: re_pols(acc, x, in_cg,
+                                                             out_cg, dirn =
+                                                             path.MEASURE_LOC_UPSTREAM)
+        re_pols_down = lambda acc, p, in_cg, out_cg: re_pols(acc, x, in_cg,
+                                                             out_cg, dirn =
+                                                             path.MEASURE_LOC_DOWNSTREAM)
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
@@ -1522,10 +1524,12 @@ class pathcomp(object):
 
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
-        re_pols_up   = lambda acc, x: re_pols(acc, x, dirn =
-                                              path.MEASURE_LOC_UPSTREAM)
-        re_pols_down = lambda acc, x: re_pols(acc, x, dirn =
-                                              path.MEASURE_LOC_DOWNSTREAM)        
+        re_pols_up   = lambda acc, p, in_cg, out_cg: re_pols(acc, p, in_cg,
+                                                             out_cg, dirn =
+                                                             path.MEASURE_LOC_UPSTREAM)
+        re_pols_down = lambda acc, p, in_cg, out_cg: re_pols(acc, p, in_cg,
+                                                             out_cg, dirn =
+                                                             path.MEASURE_LOC_DOWNSTREAM)
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
