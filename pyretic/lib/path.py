@@ -1533,14 +1533,17 @@ class pathcomp(object):
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
-        ast_fold(path_pol, inv_trees, None)
+        ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
         
         cls.pred_part(path_pol)
 
         cls.path_policy += path_pol
-        (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols_down, ([], []))
+        (re_list, pol_list) = ast_fold(cls.path_policy, re_pols_down, ([], []),
+                                       in_cg, out_cg)
 
-        return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
+        return cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states,
+                                disjoint_enabled, default_enabled,
+                                integrate_enabled, ragel_enabled)
 
     @classmethod
     def ast_node_cnt(cls, pol):
