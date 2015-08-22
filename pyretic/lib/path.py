@@ -808,6 +808,9 @@ class path_policy_utils(object):
 
 
 class path(path_policy):
+    MEASURE_LOC_UPSTREAM = 1
+    MEASURE_LOC_DOWNSTREAM = 2
+
     def __init__(self):
         """A way to select packets or count traffic volumes satisfying regular
         expressions denoting paths of located packets.
@@ -816,6 +819,7 @@ class path(path_policy):
         :type atom: atom
         """
         super(path, self).__init__(self, FwdBucket())
+        self.measure_loc = path.MEASURE_LOC_DOWNSTREAM
 
     @property
     def expr(self):
@@ -870,6 +874,15 @@ class path(path_policy):
         assert isinstance(other, path)
         return path_inters([self, other])
 
+    def measure_upstream(self):
+        """ Instruct the runtime to measure packets satisfying this query
+        upstream. """
+        self.measure_loc = path.MEASURE_LOC_UPSTREAM
+
+    def measure_downstream(self):
+        """ Instruct the runtime to measure packets satisfying this query
+        upstream. """
+        self.measure_loc = path.MEASURE_LOC_DOWNSTREAM
 
 class path_epsilon(path):
     """ Path of length 0. """
@@ -1407,9 +1420,11 @@ class pathcomp(object):
             raise TypeError("Can't prep re_tree for non-path-policy!")
 
     @classmethod
-    def __get_re_pols__(cls, acc, p):
+    def __get_re_pols__(cls, acc, p, dirn=path.MEASURE_LOC_DOWNSTREAM):
         """ A reduce lambda which extracts an re and a policy to go with the re,
-        from the AST of paths."""
+        from the AST of paths. The direction argument `dirn` specifies a
+        way to collect paths that only measure at a certain point (upstream or
+        downstream of the path). """
         (re_acc, pol_acc) = acc
         """ Skip re extraction for all but the leaves of the path policy ast. """
         if isinstance(p, dynamic_path_policy):
@@ -1418,9 +1433,13 @@ class pathcomp(object):
             return acc
         elif isinstance(p, path_policy):
             """ Reached a leaf """
-            tree = p.path.re_tree
-            piped_pol = p.piped_policy
-            return (re_acc + [tree], pol_acc + [piped_pol])
+            if p.path.measure_loc == dirn:
+                ''' Accumulate only paths in a given direction. '''
+                tree = p.path.re_tree
+                piped_pol = p.piped_policy
+                return (re_acc + [tree], pol_acc + [piped_pol])
+            else:
+                return acc
         else:
             raise TypeError("Can't get re_pols from non-path-policy!")
 
@@ -1464,6 +1483,10 @@ class pathcomp(object):
         out_cg = __out_re_tree_gen__
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
+        re_pols_up   = lambda acc, x: re_pols(acc, x, dirn =
+                                              path.MEASURE_LOC_UPSTREAM)
+        re_pols_down = lambda acc, x: re_pols(acc, x, dirn =
+                                              path.MEASURE_LOC_DOWNSTREAM)
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
@@ -1476,7 +1499,7 @@ class pathcomp(object):
         cls.log.debug('pred_part started')
         cls.pred_part(path_pol)        
 
-        (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols, ([], []))
+        (cls.re_list, cls.pol_list) =  ast_fold(path_pol, re_pols_down, ([], []))
         cls.log.debug('compiling')
         res = cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
         return res
@@ -1490,6 +1513,10 @@ class pathcomp(object):
 
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
+        re_pols_up   = lambda acc, x: re_pols(acc, x, dirn =
+                                              path.MEASURE_LOC_UPSTREAM)
+        re_pols_down = lambda acc, x: re_pols(acc, x, dirn =
+                                              path.MEASURE_LOC_DOWNSTREAM)        
         inv_trees = cls.__invalidate_re_trees__
         prep_trees = cls.__prep_re_trees__
 
@@ -1498,7 +1525,7 @@ class pathcomp(object):
         cls.pred_part(path_pol)
 
         cls.path_policy += path_pol
-        (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols, ([], []))
+        (cls.re_list, cls.pol_list) = ast_fold(cls.path_policy, re_pols_down, ([], []))
 
         return cls.compile_core(cls.re_list, cls.pol_list, max_states, disjoint_enabled, default_enabled, integrate_enabled, ragel_enabled)
 
