@@ -1458,7 +1458,7 @@ class pathcomp(object):
             elif len(query_list) == 1:
                 return query_list[0]
             else:
-                return []
+                return path_empty()
 
         ds_path_pol = get_directional_pathpol(path_pol,
                                               path.MEASURE_LOC_DOWNSTREAM)
