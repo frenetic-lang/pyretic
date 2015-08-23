@@ -1583,15 +1583,18 @@ class pathcomp(object):
             return s
         else:
             raise TypeError
-    
-    
+
+    @classmethod
+    def compile_core(*args):
+        compile_res = compile_core_with_dfa(*args)
+        return compile_res
 
     @classmethod
     @Stat.collects([('dfa', [], True), ('dfa_utils', [], True), 
                     ('pred_in_list', [], True), ('pred_out_list', [], True)])
-    def compile_core(cls, re_list, pol_list, in_cg, out_cg, max_states, 
-                        disjoint_enabled, default_enabled, 
-                        integrate_enabled, ragel_enabled):
+    def compile_core_with_dfa(cls, re_list, pol_list, in_cg, out_cg, max_states,
+                              disjoint_enabled, default_enabled,
+                              integrate_enabled, ragel_enabled):
 
         default_link = default_enabled
        
