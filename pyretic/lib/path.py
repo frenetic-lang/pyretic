@@ -1444,10 +1444,7 @@ class pathcomp(object):
         ast_fold(path_pol, prep_trees, None, in_cg, out_cg)
 
     @classmethod
-    def compile(cls, path_pol, max_states=65000,
-                disjoint_enabled=False, default_enabled = False,
-                integrate_enabled=False, ragel_enabled = False, match_enabled = False):
-        def get_directional_pathpol(path_pol, dirn):
+    def get_directional_pathpol(cls, path_pol, dirn):
             is_dir_q = lambda pp: (pp.path.measure_loc == dirn)
             if isinstance(path_pol, path_policy_union):
                 query_list = filter(is_dir_q, path_pol.path_policies)
@@ -1459,15 +1456,6 @@ class pathcomp(object):
                 return query_list[0]
             else:
                 return path_empty()
-
-        ds_path_pol = get_directional_pathpol(path_pol,
-                                              path.MEASURE_LOC_DOWNSTREAM)
-        dsres = cls.compile_downstream(ds_path_pol, max_states,
-                                       disjoint_enabled, default_enabled,
-                                       integrate_enabled, ragel_enabled,
-                                       match_enabled)
-        return dsres
-        # TODO(ngsrinivas): add upstream query compilation function
 
     @classmethod
     def compile_downstream(cls, path_pol, max_states=65000,
