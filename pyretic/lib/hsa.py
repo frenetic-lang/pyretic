@@ -276,6 +276,26 @@ def write_port_map(sw_ports, portids):
             f.write('s%d-eth%d:%d\n' % (sw, p, portids[(sw,p)]))
     f.close()
 
+def setup_tfs_data(hsf, pol, sw_ports, network_links):
+    """ Set up transfer functions and hassel-c data files from a given
+    policy, and topology information. """
+    # get a classifier
+    c = pol.netkat_compile()[0]
+
+    # get a forwarding transfer function
+    portids = get_portid_map(sw_ports)
+    convert_classifier(c, hsf, portids, sw_ports)
+
+    # get a topology transfer function
+    edge_list = get_edge_list(network_links)
+    convert_topology(edge_list, hsf, portids)
+
+    # port map, for easy reference
+    write_port_map(sw_ports, portids)
+
+    # generate the hassel-c `dat` file
+    gen_hassel_datafile()
+
 #### Running header space analysis ####
 
 def gen_hassel_datafile():
