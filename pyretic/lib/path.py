@@ -1586,7 +1586,7 @@ class pathcomp(object):
 
     @classmethod
     def compile_core(*args):
-        compile_res = compile_core_with_dfa(*args)
+        (compile_res, _) = compile_core_with_dfa(*args)
         return compile_res
 
     @classmethod
@@ -1639,6 +1639,15 @@ class pathcomp(object):
         out_edge_per_state = {}
         in_pred_classifier = {}
         out_pred_classifier = {}
+
+        ''' Construct a map from DFA accepting states to policies that should
+        process packets. Useful for upstream queries. '''
+        accstates_to_pols = {}
+        for edge in edges:
+            (_, _, dst, dst_num, _, _) = get_edge_attributes(dfa, edge)
+            if du.is_accepting(dfa, dst):
+                ords = du.get_accepting_exps(dfa, edge, dst)
+                accstates_to_pols[dst_num] = [pol_list[i] for i in ords]
 
         if disjoint_enabled:
             
@@ -1700,7 +1709,7 @@ class pathcomp(object):
                 in_table = QuerySwitch('path_tag', in_table_dic, table_default)
                 out_table = QuerySwitch('path_tag', out_table_dic, table_default)
                
-                return (in_table, out_table)
+                return ((in_table, out_table), accstates_to_pols)
            
             else:
                 in_tagging_dic = {}
@@ -1750,7 +1759,7 @@ class pathcomp(object):
                 in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
                 out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
                 
-                return (in_tagging, in_capture, out_tagging, out_capture)
+                return ((in_tagging, in_capture, out_tagging, out_capture), accstates_to_pols)
 
         else:
             if integrate_enabled:
@@ -1800,7 +1809,7 @@ class pathcomp(object):
                         elif typ == __out__:
                             out_table += tag_frag
                 
-                return (in_table, out_table)
+                return ((in_table, out_table), accstates_to_pols)
 
             else:
                 """ Initialize tagging and capture policies. """
@@ -1839,7 +1848,7 @@ class pathcomp(object):
                             elif typ == __out__:
                                 out_capture += cap_frag
                                 out_cap_rules += 1
-                return (in_tagging, in_capture, out_tagging, out_capture)
+                return ((in_tagging, in_capture, out_tagging, out_capture), accstates_to_pols)
 
     class policy_frags:
         def __init__(self):
