@@ -170,6 +170,9 @@ class Runtime(object):
     def sw_port_ids(self):
         return self.network.switch_with_port_ids_list()
 
+    def nw_edges(self):
+        return self.network.topology.edges(data=True)
+
     def sw_cnt(self):
         """ Switch count for netkat compilation """
         return (self.partition_cnt if self.partition_cnt
@@ -583,10 +586,20 @@ class Runtime(object):
         from pyretic.lib.path import pathcomp, path
         ds_pols = pathcomp.get_directional_pathpol(self.path_policy,
                                                    path.MEASURE_LOC_DOWNSTREAM)
-        policy_fragments = pathcomp.compile_downstream(ds_pols, NUM_PATH_TAGS,
-                self.disjoint_enabled, self.default_enabled, self.multitable_enabled and self.integrate_enabled, 
-                self.ragel_enabled, self.partition_enabled)
-        
+        us_pols = pathcomp.get_directional_pathpol(self.path_policy,
+                                                   path.MEASURE_LOC_UPSTREAM)
+
+        ds_policy_fragments = pathcomp.compile_downstream(ds_pols,
+            NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
+            self.multitable_enabled and self.integrate_enabled,
+            self.ragel_enabled, self.partition_enabled)
+
+        us_policy_fragments = pathcomp.compile_upstream(us_pols,
+            self.sw_port_ids(), self.nw_edges(), self.forwarding,
+            NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
+            self.multitable_enabled and self.integrate_enabled,
+            self.ragel_enabled, self.partition_enabled)
+
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = policy_fragments
             #(self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
