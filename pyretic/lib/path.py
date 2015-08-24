@@ -1526,9 +1526,10 @@ class pathcomp(object):
             else:
                 stage_path_pol = path_policy_union(stage)
 
-            compile_res = cls.compile_stage(stage_path_pol, in_cg, out_cg, max_states, disjoint_enabled,
-                                                default_enabled, integrate_enabled,
-                                                ragel_enabled, match_enabled)
+            (compile_res, _) = cls.compile_stage(stage_path_pol, in_cg, out_cg,
+                                                 max_states, disjoint_enabled,
+                                                 default_enabled, integrate_enabled,
+                                                 ragel_enabled, match_enabled)
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
             out_part = compile_res[sep_index:]
@@ -1618,16 +1619,11 @@ class pathcomp(object):
             raise TypeError
 
     @classmethod
-    def compile_core(*args):
-        (compile_res, _) = compile_core_with_dfa(*args)
-        return compile_res
-
-    @classmethod
     @Stat.collects([('dfa', [], True), ('dfa_utils', [], True), 
                     ('pred_in_list', [], True), ('pred_out_list', [], True)])
-    def compile_core_with_dfa(cls, re_list, pol_list, in_cg, out_cg, max_states,
-                              disjoint_enabled, default_enabled,
-                              integrate_enabled, ragel_enabled):
+    def compile_core(cls, re_list, pol_list, in_cg, out_cg, max_states,
+                     disjoint_enabled, default_enabled,
+                     integrate_enabled, ragel_enabled):
 
         default_link = default_enabled
        
