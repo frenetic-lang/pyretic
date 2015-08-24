@@ -1452,6 +1452,57 @@ class pathcomp(object):
                 return path_empty()
 
     @classmethod
+    def compile_upstream(cls, path_pol, switch_ports, network_links, fwding,
+                         max_states=65000, disjoint_enabled=False,
+                         default_enabled=False, integrate_enabled=False,
+                         ragel_enabled=False, match_enabled=False):
+        """ Generates a policy corresponding to upstream path queries. """
+        from pyretic.lib.hsa import (pyr_hs_format, get_hsa_edge_policy,
+                                     setup_tfs_data, get_portid_map,
+                                     get_hsa_edge_ports,
+                                     get_reachable_inheaders)
+        hs_format = pyr_hs_format()
+        edge_pol = get_hsa_edge_policy(switch_ports, network_links)
+        vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
+        in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                   cls.partition_enabled)
+        out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                     cls.partition_enabled)
+
+        ''' Downstream compilation to get full policy to test. '''
+        (comp_res, acc_pols) = cls.compile_stage(path_pol, in_cg, out_cg,
+                                                 max_states, disjoint_enabled,
+                                                 default_enabled,
+                                                 integrate_enabled=True,
+                                                 ragel_enabled, match_enabled)
+        (in_table_pol, out_table_pol) = comp_res
+        pol = (vin_tagging >>
+               in_table_pol >>
+               fwding >>
+               out_table_pol)
+
+        ''' Set up headerspace reachability preliminaries '''
+        setup_tfs_data(hs_format, pol, switch_ports, network_links)
+        portids = get_portid_map(switch_ports)
+        edge_ports = get_hsa_edge_ports(switch_ports, network_links)
+
+        ''' Run reachability and construct upstream measurement policy. '''
+        up_capture = None
+        reach_filter = get_reachable_inheaders
+        for (sw,ports) in edge_ports.iteritems():
+            for p in ports:
+                for (accstate, pol_list) in acc_pols:
+                    res_filter = reach_filter(hs_format, portids, switch_ports,
+                                              sw, p,
+                                              match(path_tag=accstate),
+                                              no_vlan=True)
+                    if up_capture:
+                        up_capture += (res_filter >> parallel(pol_list)
+                    else:
+                        up_capture = res_filter >> parallel(pol_list)
+        return up_capture
+
+    @classmethod
     def compile_downstream(cls, path_pol, max_states=65000,
                            disjoint_enabled=False, default_enabled=False,
                            integrate_enabled=False, ragel_enabled=False,
