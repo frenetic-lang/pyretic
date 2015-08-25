@@ -2010,10 +2010,9 @@ class Runtime(object):
             self.policy = self.policy_map[1]
         elif use_nx and pipeline == 'path_query_pipeline' and path_main:
             self.policy_map = self.path_query_pipeline_policy_map(
-                self.virtual_tag, self.virtual_untag,
-                self.path_in_tagging, self.path_in_capture,
-                self.forwarding,
-                self.path_out_tagging, self.path_out_capture)
+                self.virtual_tag, sequential(self.path_in_table),
+                self.forwarding, sequential(self.path_out_table),
+                self.virtual_untag)
             self.policy = (self.policy_map[0] >>
                            self.policy_map[1] >>
                            self.policy_map[2] >>
@@ -2061,13 +2060,12 @@ class Runtime(object):
         return {0: identity,
                 1: pol}
 
-    def path_query_pipeline_policy_map(self, virtual_tag, virtual_untag,
-                                   in_tagging, in_capture, forwarding,
-                                   out_tagging, out_capture):
+    def path_query_pipeline_policy_map(self, virtual_tag, in_table, forwarding,
+                                       out_table, virtual_untag):
         return {0: virtual_tag,
-                1: in_tagging + in_capture,
+                1: in_table,
                 2: forwarding,
-                3: out_tagging + out_capture,
+                3: out_table,
                 4: virtual_untag}
 
 
