@@ -407,21 +407,8 @@ class Runtime(object):
         # changed. This is to ensure that a local classifier is regenerated for
         # each switch in the (new) network topology.
         force_compile = self.in_network_update
-        pyretic_pol = (self.virtual_tag >> sequential(self.path_in_table) >>
-                       self.forwarding
-                       >> sequential(self.path_out_table) >> self.virtual_untag)
-        res = pyretic_pol.netkat_compile(self.sw_cnt(),
-                                         force_compile=force_compile)[0]
-        # c0 = self.virtual_tag.compile()
-        # c1 = self.path_in_table.netkat_compile(self.sw_cnt(),
-        #                                        force_compile=force_compile)[0]
-        # c2 = self.forwarding.netkat_compile(self.sw_cnt(),
-        #                                     force_compile=force_compile)[0]
-        # c3 = self.path_out_table.netkat_compile(self.sw_cnt(),
-        #                                         force_compile=force_compile)[0]
-        # c4 = self.virtual_untag.compile()
-        # res = c0 >> c1 >> c2 >> c3 >> c4
-        return res
+        return self.policy.netkat_compile(self.sw_cnt(),
+                                          force_compile=force_compile)[0]
     
     @Stat.classifier_stat
     @Stat.elapsed_time
@@ -608,7 +595,6 @@ class Runtime(object):
 
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = ds_policy_fragments
-            #(self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
             (ingress, egress) = ds_policy_fragments
             self.path_ingress = ingress
@@ -2102,8 +2088,6 @@ class Runtime(object):
         self.path_in_capture  = DynamicPolicy(drop)
         self.path_out_tagging = DynamicPolicy(identity)
         self.path_out_capture = DynamicPolicy(drop)
-        #self.path_in_table = DynamicPolicy(identity)
-        #self.path_out_table = DynamicPolicy(identity)
         self.path_in_table = []
         self.path_out_table = []
         self.dynamic_sub_path_pols = set()
@@ -2123,24 +2107,14 @@ class Runtime(object):
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
-            # self.path_based_forwarding = (self.virtual_tag >>
-            #                               (self.path_in_tagging +
-            #                                self.path_in_capture) >>
-            #                               self.forwarding >>
-            #                               (self.path_out_tagging +
-            #                                self.path_out_capture) >>
-            #                               self.virtual_untag)
-            self.path_based_forwarding = ((self.virtual_tag >>
-                                           self.path_in_tagging >>
-                                           self.forwarding >>
-                                           self.path_out_tagging >>
-                                           self.virtual_untag) +
-                                          (self.virtual_tag >>
-                                           self.path_in_capture) +
-                                          (self.virtual_tag >>
-                                           self.path_in_tagging >>
-                                           self.forwarding >>
-                                           self.path_out_capture))
+            # Path_based_forwarding, below, is the policy used in the
+            # interpreter, and to compile down when running single-table
+            # switches.
+            self.path_based_forwarding = (self.virtual_tag >>
+                                          sequential(self.path_in_table) >>
+                                          self.forwarding >>
+                                          sequential(self.path_out_table) >>
+                                          self.virtual_untag)
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
