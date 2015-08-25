@@ -1000,10 +1000,13 @@ class in_out_atom(path):
         self.out_pred = out_pred
         self.in_atom  = __in__(in_pred)
         self.out_atom = __out__(out_pred)
+        self._re_tree = None
         super(in_out_atom, self).__init__()
 
     def gen_re_tree(self, in_cg, out_cg):
-        return self.in_atom.gen_re_tree(in_cg) ^ self.out_atom.gen_re_tree(out_cg)
+        self._re_tree = (self.in_atom.gen_re_tree(in_cg) ^
+                         self.out_atom.gen_re_tree(out_cg))
+        return self._re_tree
 
     def invalidate_re_tree(self):
         self.in_atom.invalidate_re_tree()
@@ -1019,6 +1022,14 @@ class in_out_atom(path):
                                              repr(self.out_pred),
                                              self.expr)
 
+    @property
+    def re_tree(self):
+        return self._re_tree if self._re_tree else re_empty()
+
+    @re_tree.setter
+    def re_tree(self, rt):
+        self._re_tree = rt
+        self.tree_counter += 1
 
 class in_atom(in_out_atom):
     def __init__(self, m):
