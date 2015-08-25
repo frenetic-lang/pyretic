@@ -589,11 +589,7 @@ class Runtime(object):
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled)
-
-        if us_policy:
-            us_policy = identity + us_policy
-        else:
-            us_policy = identity
+        self.path_up_table.policy = us_policy
 
         if self.multitable_enabled and self.integrate_enabled:
             (self.path_in_table, self.path_out_table) = ds_policy_fragments
@@ -2090,6 +2086,7 @@ class Runtime(object):
         self.path_out_capture = DynamicPolicy(drop)
         self.path_in_table = []
         self.path_out_table = []
+        self.path_up_table = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
         self.vf_tag_pol = None
@@ -2110,11 +2107,12 @@ class Runtime(object):
             # Path_based_forwarding, below, is the policy used in the
             # interpreter, and to compile down when running single-table
             # switches.
-            self.path_based_forwarding = (self.virtual_tag >>
-                                          sequential(self.path_in_table) >>
-                                          self.forwarding >>
-                                          sequential(self.path_out_table) >>
-                                          self.virtual_untag)
+            self.path_based_forwarding = (self.path_up_table +
+                (self.virtual_tag >>
+                 sequential(self.path_in_table) >>
+                 self.forwarding >>
+                 sequential(self.path_out_table) >>
+                 self.virtual_untag))
 
 ##########################
 # VIRTUAL HEADER SUPPORT 
