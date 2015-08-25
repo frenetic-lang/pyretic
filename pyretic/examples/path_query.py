@@ -219,6 +219,14 @@ def path_test_2():
 def path_test_3():
     return path_test_2() + path_test_1()
 
+def path_test_3_1():
+    """ Run simultaneous upstream and downstream path_test_3. """
+    p1 = path_test_1()
+    p1.measure_upstream()
+    p2 = path_test_2()
+    p2.measure_upstream()
+    return p1 + p2 + path_test_3()
+
 def path_test_4():
     a1 = atom(match(switch=1))
     a2 = atom(match(switch=3))
@@ -274,6 +282,10 @@ def path_test_5_2():
     p.register_callback(query_callback("5.2"))
     p.measure_upstream()
     return p
+
+def path_test_5_3():
+    """ One upstream and one downstream query. """
+    return path_test_5_2() + path_test_3()
 
 def path_test_6():
     p = +atom(identity)
