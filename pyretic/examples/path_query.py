@@ -266,6 +266,15 @@ def path_test_5_1():
     p.register_callback(query_callback("5.1"))
     return p
 
+def path_test_5_2():
+    """ upstream path query test. """
+    a1 = in_atom(match(switch=1))
+    a2 = out_atom(match(switch=2))
+    p = (a1 ^ a2) | (a2 ^ a1)
+    p.register_callback(query_callback("5.2"))
+    p.measure_upstream()
+    return p
+
 def path_test_6():
     p = +atom(identity)
     p.register_callback(query_callback(6))
@@ -598,7 +607,7 @@ def path_main(**kwargs):
     return get_query(kwargs, default)()
 
 def main(**kwargs):
-#    return mac_learner()
-#    return static_fwding_chain_3_3
-    default = static_fwding_cycle_4_4_spanning_tree_1
+#    default = mac_learner()
+    default = static_fwding_chain_3_3
+#    default = static_fwding_cycle_4_4_spanning_tree_1
     return get_fwding(kwargs, default)()
