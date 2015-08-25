@@ -2010,12 +2010,13 @@ class Runtime(object):
             self.policy_map = self.path_query_pipeline_policy_map(
                 self.virtual_tag, sequential(self.path_in_table),
                 self.forwarding, sequential(self.path_out_table),
-                self.virtual_untag)
+                self.virtual_untag, self.path_up_table)
             self.policy = (self.policy_map[0] >>
                            self.policy_map[1] >>
                            self.policy_map[2] >>
                            self.policy_map[3] >>
-                           self.policy_map[4])
+                           self.policy_map[4] >>
+                           self.policy_map[5])
         elif use_nx:
             path_exists = 'not' if path_main is None else ''
             raise RuntimeError("No table to policy map configuration defined for"
@@ -2059,12 +2060,13 @@ class Runtime(object):
                 1: pol}
 
     def path_query_pipeline_policy_map(self, virtual_tag, in_table, forwarding,
-                                       out_table, virtual_untag):
-        return {0: virtual_tag,
-                1: in_table,
-                2: forwarding,
-                3: out_table,
-                4: virtual_untag}
+                                       out_table, virtual_untag, up_table):
+        return {0: identity + up_table,
+                1: virtual_tag,
+                2: in_table,
+                3: forwarding,
+                4: out_table,
+                5: virtual_untag}
 
 
 ###############################
