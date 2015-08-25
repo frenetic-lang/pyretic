@@ -122,8 +122,20 @@ def convert_classifier(classifier, hsf, portids, sw_ports):
         """Return a rewrite mask, rewrite HS, and the list of outports from the
         action list `acts` provided. For interpretation of these fields check
         the doctext of hsa.headerspace.tf create_standard_rule.
+
+        In this function, we assume that the actions correspond to the actions
+        of a single-stage table classifier, in addition to other
+        restrictions. Specifically:
+        - all non-`modify` actions are ignored
+        - actions that do not set an output port are ignored
+        - if there are multiple actions satisfying the above conditions, they
+        may only simply output the packet via a port. i.e., No packet
+        modifications. This is an artificial restriction because
+        tf.create_standard_rule can only take a single rewrite wildcard for
+        packet modification.
         """
-        new_acts = filter(lambda x: isinstance(x, modify), acts)
+        new_acts = filter(lambda x: isinstance(x, modify) and 'port' in x.map,
+                          acts)
         outports = []
         '''The current transfer function rule implementation can only take one new
         header space in rewrite rules if there are multiple outports
