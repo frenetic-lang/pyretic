@@ -1477,7 +1477,7 @@ class pathcomp(object):
         (comp_res, acc_pols) = cls.compile_stage(path_pol, in_cg, out_cg,
                                                  max_states, disjoint_enabled,
                                                  default_enabled,
-                                                 integrate_enabled=True,
+                                                 True,
                                                  ragel_enabled, match_enabled)
         (in_table_pol, out_table_pol) = comp_res
         pol = (vin_tagging >>
