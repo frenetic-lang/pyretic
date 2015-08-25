@@ -1464,8 +1464,9 @@ class pathcomp(object):
                                      setup_tfs_data, get_portid_map,
                                      get_hsa_edge_ports,
                                      get_reachable_inheaders)
+        sw_ports = {k:v for (k,v) in switch_ports}
         hs_format = pyr_hs_format()
-        edge_pol = get_hsa_edge_policy(switch_ports, network_links)
+        edge_pol = get_hsa_edge_policy(sw_ports, network_links)
         vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
         in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
                                    cls.partition_enabled)
@@ -1485,9 +1486,9 @@ class pathcomp(object):
                out_table_pol)
 
         ''' Set up headerspace reachability preliminaries '''
-        setup_tfs_data(hs_format, pol, switch_ports, network_links)
-        portids = get_portid_map(switch_ports)
-        edge_ports = get_hsa_edge_ports(switch_ports, network_links)
+        setup_tfs_data(hs_format, pol, sw_ports, network_links)
+        portids = get_portid_map(sw_ports)
+        edge_ports = get_hsa_edge_ports(sw_ports, network_links)
 
         ''' Run reachability and construct upstream measurement policy. '''
         up_capture = None
@@ -1495,7 +1496,7 @@ class pathcomp(object):
         for (sw,ports) in edge_ports.iteritems():
             for p in ports:
                 for (accstate, pol_list) in acc_pols:
-                    res_filter = reach_filter(hs_format, portids, switch_ports,
+                    res_filter = reach_filter(hs_format, portids, sw_ports,
                                               sw, p,
                                               match(path_tag=accstate),
                                               no_vlan=True)
