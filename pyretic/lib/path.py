@@ -3005,6 +3005,30 @@ def pack(type_list, limit):
                 raise TypeError
     return assgn
 
+def pack_stagelimited(type_list, numstages):
+    stages = []
+    assgn = {}
+
+    for (q, typ) in type_list:
+        min_max_size  = -1
+        min_max_stage = -1
+        min_max_type  = None
+        for i in range(numstages):
+            new_typ = join(stages[i], typ)
+            ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ
+            val = max(in_cnt, out_cnt)
+            if min_max_size == -1 or val < min_max_size:
+                min_max_size  = val
+                min_max_stage = i
+                min_max_type = new_typ
+        assert min_max_stage > 0 and min_max_size > 0 and not (
+            min_max_type is None)
+        stages[min_max_stage] = min_max_type
+        if not min_max_stage in assgn:
+            assgn[min_max_stage] = []
+        assgn[min_max_stage].append(q)
+
+    return assgn
 
 def pack_queries(queries, limit):
     q_list = [get_type(q) for q in queries]
@@ -3017,3 +3041,14 @@ def pack_queries(queries, limit):
         assgn[i] = res
     return assgn
 
+def pack_queries_stagelimited(queries, numstages):
+    assert numstages > 0
+    q_list = [get_type(q) for q in queries]
+    q_list = zip(range(len(q_list)), q_list)
+    assgn = pack_stagelimited(q_list, numstages)
+    for i in assgn:
+        res = []
+        for qi in assgn[i]:
+            res.append(queries[qi])
+        assgn[i] = res
+    return assgn

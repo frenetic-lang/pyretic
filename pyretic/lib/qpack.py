@@ -120,7 +120,6 @@ def pack(type_list, limit):
                 raise TypeError
     return assgn
 
-
 def pack_queries(q_list, limit):
     q_list = [get_type(q) for q in q_list]
     q_list = zip(range(len(q_list)), q_list)
