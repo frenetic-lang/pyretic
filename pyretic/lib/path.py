@@ -1497,7 +1497,7 @@ class pathcomp(object):
                                               match(path_tag=accstate),
                                               no_vlan=True)
                     if up_capture:
-                        up_capture += (res_filter >> parallel(pol_list)
+                        up_capture += (res_filter >> parallel(pol_list))
                     else:
                         up_capture = res_filter >> parallel(pol_list)
         return up_capture
