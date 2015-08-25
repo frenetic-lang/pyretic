@@ -657,7 +657,10 @@ class path_policy(object):
         """ Implements the '+' operator for path policies, producing a
         collection of path predicates and corresponding piped policies."""
         assert isinstance(ppol, path_policy)
-        return path_policy_union([self, ppol])
+        if isinstance(ppol, path_policy_union):
+            return ppol + self
+        else:
+            return path_policy_union([self, ppol])
 
     def __eq__(self, other):
         if isinstance(other, path_policy):
