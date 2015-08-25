@@ -407,8 +407,9 @@ class Runtime(object):
         # changed. This is to ensure that a local classifier is regenerated for
         # each switch in the (new) network topology.
         force_compile = self.in_network_update
-        pyretic_pol = (self.virtual_tag >> self.path_in_table >> self.forwarding
-                       >> self.path_out_table >> self.virtual_untag)
+        pyretic_pol = (self.virtual_tag >> sequential(self.path_in_table) >>
+                       self.forwarding
+                       >> sequential(self.path_out_table) >> self.virtual_untag)
         res = pyretic_pol.netkat_compile(self.sw_cnt(),
                                          force_compile=force_compile)[0]
         # c0 = self.virtual_tag.compile()
@@ -594,17 +595,22 @@ class Runtime(object):
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled)
 
-        us_policy_fragments = pathcomp.compile_upstream(us_pols,
+        us_policy = pathcomp.compile_upstream(us_pols,
             self.sw_port_ids(), self.nw_edges(), self.forwarding,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled)
 
+        if us_policy:
+            us_policy = identity + us_policy
+        else:
+            us_policy = identity
+
         if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table, self.path_out_table) = policy_fragments
+            (self.path_in_table, self.path_out_table) = ds_policy_fragments
             #(self.path_in_table.policy, self.path_out_table.policy) = policy_fragments
         else:
-            (ingress, egress) = policy_fragments
+            (ingress, egress) = ds_policy_fragments
             self.path_ingress = ingress
             self.path_egress = egress
             self.path_in_table = []
