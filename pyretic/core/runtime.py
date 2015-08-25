@@ -386,7 +386,9 @@ class Runtime(object):
                 self.dyn_path_pred_changed = False
                 for dyn_pred_obj in self.dynamic_path_preds:
                     dyn_pred_obj.pred.set_network(self.network)
-                if self.dyn_path_pred_changed:
+                from pyretic.lib.path import path_empty
+                if (self.dyn_path_pred_changed or not
+                    isinstance(self.us_path_policy, path_empty)):
                     self.handle_path_change()
                     self.dyn_path_pred_changed = False
 
@@ -572,17 +574,17 @@ class Runtime(object):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
         from pyretic.lib.path import pathcomp, path
-        ds_pols = pathcomp.get_directional_pathpol(self.path_policy,
-                                                   path.MEASURE_LOC_DOWNSTREAM)
-        us_pols = pathcomp.get_directional_pathpol(self.path_policy,
-                                                   path.MEASURE_LOC_UPSTREAM)
+        self.ds_path_policy = pathcomp.get_directional_pathpol(self.path_policy,
+                                                               path.MEASURE_LOC_DOWNSTREAM)
+        self.us_path_policy = pathcomp.get_directional_pathpol(self.path_policy,
+                                                               path.MEASURE_LOC_UPSTREAM)
 
-        ds_policy_fragments = pathcomp.compile_downstream(ds_pols,
+        ds_policy_fragments = pathcomp.compile_downstream(self.ds_path_policy,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled)
 
-        us_policy = pathcomp.compile_upstream(us_pols,
+        us_policy = pathcomp.compile_upstream(self.us_path_policy,
             self.sw_port_ids(), self.nw_edges(), self.forwarding,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
