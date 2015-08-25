@@ -1512,7 +1512,9 @@ class pathcomp(object):
         else:
             query_list = [path_pol]
 
-        stages = pack_queries(query_list, 2000)
+        # TODO(ngsrinivas): revert to rule limited query-packing after testing
+        # stages = pack_queries(query_list, 2000)
+        stages = pack_queries_stagelimited(query_list, 1)
         
         in_res = []
         out_res = []
