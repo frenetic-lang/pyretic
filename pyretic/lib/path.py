@@ -925,6 +925,9 @@ class path_empty(path):
     def __repr__(self):
         return "path_empty"
 
+    def gen_re_tree(self, in_cg, out_cg):
+        return re_empty()
+
 
 class abstract_atom(object):
     """A single atomic match in a path expression. This is an abstract class
@@ -1170,7 +1173,7 @@ class path_negate(path_combinator):
     def __check_type(self, p):
         assert isinstance(p, path)
 
-    def re_tree(self, in_cg, out_cg):
+    def gen_re_tree(self, in_cg, out_cg):
         p = self.paths[0]
         return ~(p.gen_re_tree(in_cg, out_cg))
 
@@ -1406,7 +1409,7 @@ class pathcomp(object):
             return acc
         elif isinstance(p, path_policy):
             """ Reached a leaf """
-            tree = p.path.re_tree
+            tree = p.path.gen_re_tree(in_cg, out_cg)
             piped_pol = p.piped_policy
             return (re_acc + [tree], pol_acc + [piped_pol])
         else:
