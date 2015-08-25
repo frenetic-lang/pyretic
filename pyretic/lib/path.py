@@ -1493,13 +1493,15 @@ class pathcomp(object):
         ''' Run reachability and construct upstream measurement policy. '''
         up_capture = None
         reach_filter = get_reachable_inheaders
+        from pyretic.core.language import parallel
         for (sw,ports) in edge_ports.iteritems():
             for p in ports:
-                for (accstate, pol_list) in acc_pols:
+                for (accstate, pol_list) in acc_pols.iteritems():
                     res_filter = reach_filter(hs_format, portids, sw_ports,
                                               sw, p,
                                               match(path_tag=accstate),
                                               no_vlan=True)
+                    res_filter = res_filter & match(switch=sw,port=p)
                     if up_capture:
                         up_capture += (res_filter >> parallel(pol_list))
                     else:

@@ -472,16 +472,16 @@ def print_hs(hsf, hsres, indent=''):
             print_hs(hsf, hs['diff'], indent+'  ')
 
 def get_filter_hs(hsf, hsres):
-    res_filter = None
+    res_filter = drop
     for hs in hsres:
         curr_filter = match_from_single_elem(hsf, hs['elem'])
         if 'diff' in hs:
             diff_filter = get_filter_hs(hsf, hs['diff'])
             curr_filter = curr_filter - diff_filter
-        if res_filter:
-            res_filter = res_filter | curr_filter
-        else:
+        if res_filter == drop:
             res_filter = curr_filter
+        else:
+            res_filter = res_filter | curr_filter
     return res_filter
 
 def extract_inversion_results():
