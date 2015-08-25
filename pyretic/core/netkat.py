@@ -277,7 +277,7 @@ def set_field_prereqs(p):
 def to_pred(p):
   from pyretic.core.language import (match, identity, drop, negate, union,
                                      parallel, intersection, ingress_network,
-                                     egress_network, _match)
+                                     egress_network, _match, difference)
   if isinstance(p, match):
     return set_field_prereqs(p)
   elif p == identity:
@@ -289,6 +289,9 @@ def to_pred(p):
     return { "type": "neg", "pred": to_pred(p.policies[0]) }
   elif isinstance(p, union) or isinstance(p, parallel):
     return mk_or(map(to_pred, p.policies))
+  elif isinstance(p, difference):
+    # Here, p.policy is a Filter (e.g., f1 & ~f2), so convert that.
+    return to_pred(p.policy)
   elif isinstance(p, intersection):
     return mk_and(map(to_pred, p.policies))
   elif isinstance(p, ingress_network) or isinstance(p, egress_network):
