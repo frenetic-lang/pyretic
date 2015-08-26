@@ -231,15 +231,15 @@ def path_test_23_static_multistage(default_pyopts, capture_dir):
     update_test_stats(query, fwding, pyopts, res)
 
 def bunched_path_tests(default_pyopts='', capture_dir='outbound'):
-    #path_test_0_static_single_stage(default_pyopts, capture_dir)
-    #path_test_0_5_static_single_stage(default_pyopts, capture_dir)
-    #path_test_2_mac_learner_single_stage(default_pyopts, capture_dir)
-    #path_test_3_static_single_stage(default_pyopts, capture_dir)
-    #path_test_3_mac_learner_multistage(default_pyopts, capture_dir)
+    path_test_0_static_single_stage(default_pyopts, capture_dir)
+    path_test_0_5_static_single_stage(default_pyopts, capture_dir)
+    path_test_2_mac_learner_single_stage(default_pyopts, capture_dir)
+    path_test_3_static_single_stage(default_pyopts, capture_dir)
+    path_test_3_mac_learner_multistage(default_pyopts, capture_dir)
     waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir)
     waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir)
-    #path_test_23_static_single_stage(default_pyopts, capture_dir)
-    #path_test_23_static_multistage(default_pyopts, capture_dir)
+    path_test_23_static_single_stage(default_pyopts, capture_dir)
+    path_test_23_static_multistage(default_pyopts, capture_dir)
 
 def update_test_stats(query, fwding, pyopts, res):
     global num_passed, num_failed, failed_tests, num_greyed, greyed_tests
