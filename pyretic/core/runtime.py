@@ -182,11 +182,11 @@ class Runtime(object):
         if path_main:
             pass
             if self.integrate_enabled and self.multitable_enabled:
-                for (in_table, out_table) in zip(self.path_in_table, self.path_out_table):
+                for (in_table, out_table) in zip(self.path_in_table_list, self.path_out_table_list):
                     self.get_subpolicy_compile_stats_per_stage(in_table, out_table)
             else:
-                for (in_table, out_table, ingress, egress) in zip(self.path_in_table, 
-                        self.path_out_table, self.path_ingress, self.path_egress):
+                for (in_table, out_table, ingress, egress) in zip(self.path_in_table_list,
+                        self.path_out_table_list, self.path_ingress, self.path_egress):
                     self.get_subpolicy_compile_stats_per_stage(in_table, out_table, ingress[0],
                                                                 ingress[1],egress[0], egress[1])
     
@@ -592,17 +592,19 @@ class Runtime(object):
         self.path_up_table.policy = us_policy
 
         if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table, self.path_out_table) = ds_policy_fragments
+            (self.path_in_table_list, self.path_out_table_list) = ds_policy_fragments
         else:
             (ingress, egress) = ds_policy_fragments
             self.path_ingress = ingress
             self.path_egress = egress
-            self.path_in_table = []
+            self.path_in_table_list = []
             for (in_tag, in_capture) in self.path_ingress:
-                self.path_in_table.append(in_tag + in_capture)
-            self.path_out_table = []
+                self.path_in_table_list.append(in_tag + in_capture)
+            self.path_out_table_list = []
             for (out_tag, out_capture) in self.path_egress:
-                self.path_out_table.append(out_tag + out_capture) 
+                self.path_out_table_list.append(out_tag + out_capture)
+            self.path_in_table.policy = sequential(self.path_in_table_list)
+            self.path_out_table.policy = sequential(self.path_out_table_list)
             '''(in_tag, in_cap, out_tag, out_cap) = policy_fragments
             self.path_in_tagging.policy  = in_tag
             self.path_in_capture.policy  = in_cap
@@ -2008,8 +2010,8 @@ class Runtime(object):
             self.policy = self.policy_map[1]
         elif use_nx and pipeline == 'path_query_pipeline' and path_main:
             self.policy_map = self.path_query_pipeline_policy_map(
-                self.virtual_tag, sequential(self.path_in_table),
-                self.forwarding, sequential(self.path_out_table),
+                self.virtual_tag, self.path_in_table,
+                self.forwarding, self.path_out_table,
                 self.virtual_untag, self.path_up_table)
             self.policy = (self.policy_map[0] >>
                            self.policy_map[1] >>
@@ -2082,12 +2084,16 @@ class Runtime(object):
         * edge_contraction_enabled: is contraction of DFA edges enabled?
         """
         self.path_policy = None
+        self.us_path_policy = None
+        self.ds_path_policy = None
         self.path_in_tagging  = DynamicPolicy(identity)
         self.path_in_capture  = DynamicPolicy(drop)
         self.path_out_tagging = DynamicPolicy(identity)
         self.path_out_capture = DynamicPolicy(drop)
-        self.path_in_table = []
-        self.path_out_table = []
+        self.path_in_table = DynamicPolicy(identity)
+        self.path_out_table = DynamicPolicy(identity)
+        self.path_in_table_list = []
+        self.path_out_table_list = []
         self.path_up_table = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
@@ -2111,9 +2117,9 @@ class Runtime(object):
             # switches.
             self.path_based_forwarding = (self.path_up_table +
                 (self.virtual_tag >>
-                 sequential(self.path_in_table) >>
+                 self.path_in_table  >>
                  self.forwarding >>
-                 sequential(self.path_out_table) >>
+                 self.path_out_table >>
                  self.virtual_untag))
 
 ##########################
