@@ -1672,7 +1672,7 @@ class edge_network(DynamicFilter):
         updated_egresses = network.topology.egress_locations()
         if not self.egresses == updated_egresses:
             self.egresses = updated_egresses
-            self.policy = parallel([match(switch=l.switch,
+            self.policy = union([match(switch=l.switch,
                                        port=l.port_no)
                                  for l in self.egresses])
 
