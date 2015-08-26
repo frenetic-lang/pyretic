@@ -642,6 +642,11 @@ def filt_path_test_2_inbound(l):
 def filt_path_test_2_outbound(l):
     return pkt_srcip(ip1, l) and pkt_interface('s3-eth2', l)
 
+def filt_path_test_5_2_inbound_upstream(l):
+    return ((pkt_interface('s1-eth2',l) and
+             (pkt_dstip(ip2,l) or pkt_dstip(ip3,l))) or
+            (pkt_interface('s2-eth3',l) and pkt_dstip(ip1,l)))
+
 def filt_path_test_gwpv_st1_inbound(l):
     """filter function for generalized waypoint violation. This filter function only
     works with the static forwarding policy corresponding to spanning tree 1 (in
@@ -669,6 +674,11 @@ def filt_path_test_gwpv_st1_outbound(l):
             (pkt_interface('s1-eth3',l) or pkt_interface('s2-eth3',l) or
              pkt_interface('s3-eth3',l)))
 
+def filt_path_test_gwpv_st1_inbound_upstream(l):
+    return ((not (pkt_srcip(ip4,l) or pkt_dstip(ip4,l))) and
+            (pkt_interface('s1-eth3',l) or pkt_interface('s2-eth3',l) or
+             pkt_interface('s3-eth3',l)))
+
 def filt_path_test_gwpv_st2_inbound(l):
     """filter function for generalized waypoint violation when the forwarding
     policy uses spanning_tree_2 (see path_query.py example file). Only traffic
@@ -686,6 +696,12 @@ def filt_path_test_gwpv_st2_outbound(l):
              pkt_interface('s3-eth3',l)) or
             (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
              pkt_interface('s2-eth3',l)))
+
+def filt_path_test_gwpv_st2_inbound_upstream(l):
+    return ((pkt_srcip(ip2,l) and pkt_dstip(ip3,l) and
+             pkt_interface('s2-eth3',l)) or
+            (pkt_srcip(ip3,l) and pkt_dstip(ip2,l) and
+             pkt_interface('s3-eth3',l)))
 
 def filt_path_test_23_p1_static_inbound(l):
     """ This filter only works for static fwding policy. """

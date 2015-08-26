@@ -170,6 +170,34 @@ def path_test_3_mac_learner_multistage(default_pyopts, capture_dir):
         capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_5_2_static_single_stage_upstream(default_pyopts):
+    """ Path test 5.2 upstream with static policy, single stage. """
+    query = "path_test_5_2"
+    fwding = "static_fwding_chain_3_3"
+    pyopts = default_pyopts
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_5_2_inbound_upstream',
+        topo_name="ChainTopo", topo_args="3,3",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='5.2', interface_map="map_chain_3_3",
+        capture_dir='inbound')
+    update_test_stats(query, fwding, pyopts, res)
+
+def path_test_5_2_static_multistage_upstream(default_pyopts):
+    """ Path test 5.2 upstream with static policy, multistage. """
+    query = "path_test_5_2"
+    fwding = "static_fwding_chain_3_3"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_5_2_inbound_upstream',
+        topo_name="ChainTopo", topo_args="3,3",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='5.2', interface_map="map_chain_3_3",
+        capture_dir='inbound')
+    update_test_stats(query, fwding, pyopts, res)
+
 def waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir):
     """ Waypoint violation with spanning tree 1, multistage """
     query = "path_test_waypoint_violation_general"
@@ -185,6 +213,21 @@ def waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir):
         capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def waypoint_violation_spanning_tree_1_multistage_upstream(default_pyopts):
+    """ Waypoint violation upstream with spanning tree 1, multistage """
+    query = "path_test_waypoint_violation_general_upstream"
+    fwding = "static_fwding_cycle_4_4_spanning_tree_1"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_gwpv_st1_inbound_upstream',
+        topo_name="CycleTopo", topo_args="4,4",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='generalized_waypoint_violation',
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir='inbound')
+    update_test_stats(query, fwding, pyopts, res)
+
 def waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir):
     """ Waypoint violation with spanning tree 2, multistage """
     query = "path_test_waypoint_violation_general"
@@ -198,6 +241,21 @@ def waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir):
         test_nums='generalized_waypoint_violation',
         interface_map="map_cycle_4_4", tshark_slack_sec=20,
         capture_dir=capture_dir)
+    update_test_stats(query, fwding, pyopts, res)
+
+def waypoint_violation_spanning_tree_2_multistage_upstream(default_pyopts):
+    """ Waypoint violation upstream with spanning tree 2, multistage """
+    query = "path_test_waypoint_violation_general_upstream"
+    fwding = "static_fwding_cycle_4_4_spanning_tree_2"
+    pyopts = "%s --nx --pipeline=path_query_pipeline" % default_pyopts
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs='filt_path_test_gwpv_st2_inbound_upstream',
+        topo_name="CycleTopo", topo_args="4,4",
+        results_folder=results_folder, success_file=success_file,
+        test_nums='generalized_waypoint_violation',
+        interface_map="map_cycle_4_4", tshark_slack_sec=20,
+        capture_dir='inbound')
     update_test_stats(query, fwding, pyopts, res)
 
 def path_test_23_static_single_stage(default_pyopts, capture_dir):
@@ -235,9 +293,13 @@ def bunched_path_tests(default_pyopts='', capture_dir='outbound'):
     path_test_0_5_static_single_stage(default_pyopts, capture_dir)
     path_test_2_mac_learner_single_stage(default_pyopts, capture_dir)
     path_test_3_static_single_stage(default_pyopts, capture_dir)
+    path_test_5_2_static_single_stage_upstream(default_pyopts)
+    path_test_5_2_static_multistage_upstream(default_pyopts)
     path_test_3_mac_learner_multistage(default_pyopts, capture_dir)
     waypoint_violation_spanning_tree_1_multistage(default_pyopts, capture_dir)
     waypoint_violation_spanning_tree_2_multistage(default_pyopts, capture_dir)
+    waypoint_violation_spanning_tree_1_multistage_upstream(default_pyopts)
+    waypoint_violation_spanning_tree_2_multistage_upstream(default_pyopts)
     path_test_23_static_single_stage(default_pyopts, capture_dir)
     path_test_23_static_multistage(default_pyopts, capture_dir)
 
