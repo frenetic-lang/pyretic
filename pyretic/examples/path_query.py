@@ -437,6 +437,11 @@ def path_test_waypoint_violation_general():
     p.register_callback(query_callback("generalized_waypoint_violation"))
     return p
 
+def path_test_waypoint_violation_general_upstream():
+    p = path_test_waypoint_violation_general()
+    p.measure_upstream()
+    return p
+
 def change_dynamic_path(path_pol, interval, f_old_new_path_pol):
     """ A function that periodically changes the path policy of a dynamic path
     policy object.
