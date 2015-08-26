@@ -2945,6 +2945,8 @@ def get_filter_type(pol):
         for p in pol.policies:
             res |= get_filter_type(p)
         return res
+    elif isinstance(pol, DynamicFilter):
+        return get_filter_type(pol.policy)
     else:
         raise TypeError
 
