@@ -387,8 +387,9 @@ class Runtime(object):
                 for dyn_pred_obj in self.dynamic_path_preds:
                     dyn_pred_obj.pred.set_network(self.network)
                 from pyretic.lib.path import path_empty
-                if (self.dyn_path_pred_changed or not
-                    isinstance(self.us_path_policy, path_empty)):
+                if (self.dyn_path_pred_changed or ((not self.us_path_policy is
+                        None) and not isinstance(self.us_path_policy,
+                                                path_empty))):
                     self.handle_path_change()
                     self.dyn_path_pred_changed = False
 
