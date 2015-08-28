@@ -1072,8 +1072,8 @@ class in_out_group(in_out_atom):
     constructor.
     """
     def __init__(self, in_pred, out_pred, in_groupby=[], out_groupby=[]):
-        self.in_groupby = in_groupby
-        self.out_groupby = out_groupby
+        self.in_groupby = sorted(in_groupby)
+        self.out_groupby = sorted(out_groupby)
         super(in_out_group, self).__init__(in_pred, out_pred)
 
     def substitute(self, in_group_val, out_group_val):
@@ -1081,8 +1081,14 @@ class in_out_group(in_out_atom):
         substituted for the headers in in_groupby and out_groupby. """
         assert set(in_group_val.keys()) == set(self.in_groupby)
         assert set(out_group_val.keys()) == set(self.out_groupby)
-        return in_out_atom(self.in_pred & match(**in_group_val),
-                           self.out_pred & match(**out_group_val))
+        in_match = identity if not in_group_val else match(**in_group_val)
+        out_match = identity if not out_group_val else match(**out_group_val)
+        if (classifier_utils.is_not_drop(in_match & self.in_pred) and
+            classifier_utils.is_not_drop(out_match & self.out_pred)):
+            return in_out_atom(self.in_pred & in_match,
+                               self.out_pred & out_match)
+        else:
+            return None
 
     def __repr__(self):
         return (super(in_out_group, self).__repr__() + ';\n' +
