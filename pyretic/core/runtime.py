@@ -574,10 +574,12 @@ class Runtime(object):
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
-        from pyretic.lib.path import pathcomp, path
-        self.ds_path_policy = pathcomp.get_directional_pathpol(self.path_policy,
+        from pyretic.lib.path import pathcomp, path, path_grouping
+        path_grouping.set_rtm_fvlist(self.sw_port_ids())
+        expanded_paths = path_grouping.expand_groupby(self.path_policy)
+        self.ds_path_policy = pathcomp.get_directional_pathpol(expanded_paths,
                                                                path.MEASURE_LOC_DOWNSTREAM)
-        self.us_path_policy = pathcomp.get_directional_pathpol(self.path_policy,
+        self.us_path_policy = pathcomp.get_directional_pathpol(expanded_paths,
                                                                path.MEASURE_LOC_UPSTREAM)
 
         ds_policy_fragments = pathcomp.compile_downstream(self.ds_path_policy,
