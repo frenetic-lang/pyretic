@@ -1525,7 +1525,41 @@ class path_grouping(object):
         return actual_callback
 
     @classmethod
-    def expand_groupby(cls, path_pol, fvlist):
+    def get_eff_fvlist(cls, p, fvlist):
+        """ For each path query being processed, get an effective field=value
+        list for expansion of grouping atoms. The priority is as follows:
+        - the runtime populated list has lowest priority
+        - the field value list set when defining the path query gets higher
+        priority
+        - the arguments to the expand_groupby function get highest
+        priority. This is to allow the function to be called by applications to
+        enforce their own expansions on queries they choose to expand (e.g., see
+        path_test_tm_groupby in examples/path_query.py).
+        """
+        assert isinstance(p, path_policy)
+        eff_fvlist = {}
+        eff_fvlist.update(cls.rtm_fvlist)
+        eff_fvlist.update(p.grouping_fvlist)
+        eff_fvlist.update(fvlist)
+        return eff_fvlist
+
+    @classmethod
+    def specialize_query(cls, p, mapper, mapping={}):
+        """Return a "basic" version of a groupby query, where groupby atoms are
+        replaced by the in/out atoms with the same predicates. Given a mapper to
+        replace the instance of the grouping atom by an atom of choice, return a
+        query that looks identical to the original query. """
+        ppu = path_policy_utils
+        new_query = ppu.path_ast_map(p, mapper)
+        p_cbs = p.get_bucket().callbacks
+        p_bucket = type(p.get_bucket())()
+        p_bucket.register_callback(cls.aggwrap(p_cbs, mapping))
+        new_query.set_bucket(p_bucket)
+        new_query.set_measure_loc(p.get_measure_loc())
+        return new_query
+
+    @classmethod
+    def expand_groupby(cls, path_pol, fvlist={}):
         """ Statically substitute groupby atoms in queries by query predicates
         that have 'complete' values, e.g.,:
 
@@ -1551,25 +1585,25 @@ class path_grouping(object):
         res_ppols = []
         for p in ppols_list:
             gatm_list = ppu.path_ast_fold(p, cls.groupby_collect, set())
+            if not gatm_list:
+                res_ppols.append(p)
+                continue
+            # From here on, deal with queries p that have groupby atoms.
+            fvlist = cls.get_eff_fvlist(p, fvlist)
             gid_to_atoms = cls.gatom_to_ioatom_combos(gatm_list, fvlist)
+            if not gid_to_atoms:
+                mapper = cls.atom_substitute_groupby()
+                res_ppols.append(cls.specialize_query(p, mapper, {}))
+                continue
+            # From here on, deal with queries p that have a nonzero expansion.
             for mapping in gid_to_atoms:
-                sub_mapper = cls.map_substitute_groupby(mapping)
-                new_query = ppu.path_ast_map(p, sub_mapper)
-                p_cbs = p.get_bucket().callbacks
-                p_bucket = type(p.get_bucket())()
-                p_bucket.register_callback(cls.aggwrap(p_cbs, mapping))
-                new_query.set_bucket(p_bucket)
-                res_ppols.append(new_query)
-        if res_ppols:
+                mapper = cls.map_substitute_groupby(mapping)
+                res_ppols.append(cls.specialize_query(p, mapper, mapping))
+        assert len(res_ppols) > 0
+        if len(res_ppols) > 1:
             return path_policy_union(res_ppols)
         else:
-            # TODO(ngsrinivas): currently we just return the original query with
-            # in_out_groups substituted by corresponding in_out_atoms, but this
-            # may be not be the right thing to do. We could return path_empty(),
-            # but that complicates the runtime mechanics, e.g., what if a
-            # dynamic predicate creates new path queries later on?
-            sub_mapper = cls.atom_substitute_groupby()
-            return ppu.path_ast_map(p, sub_mapper)
+            return res_ppols[0]
 
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
