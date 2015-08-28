@@ -1044,46 +1044,29 @@ class atom(in_atom):
     def __init__(self, m):
         super(atom, self).__init__(m)
 
-
-class drop_atom(abstract_atom):
-    """An atom that matches on packets that were dropped by the forwarding
-    policy.
-    """
-    def __init__(self, m):
-        super(drop_atom, self).__init__(m)
-
-
-class hook(abstract_atom):
+class in_out_group(in_out_atom):
     """A hook is essentially like an atom, but has a notion of "grouping"
     associated with it. Whenever a packet arrives into this hook, we group them
     by the values of the fields specified in the groupby=... argument of the
     constructor.
     """
-    def __init__(self, m, groupby=[]):
-        assert groupby and len(groupby) > 0
-        self.groupby = groupby
-        super(hook, self).__init__(m)
+    def __init__(self, in_pred, out_pred, in_groupby=[], out_groupby=[]):
+        self.in_groupby = in_groupby
+        self.out_groupby = out_groupby
+        super(in_out_group, self).__init__(in_pred, out_pred)
 
-    def __and__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook(self.policy & other.policy, self.groupby)
-
-    def __or__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook(self.policy | other.policy, self.groupby)
-
-    def __sub__(self, other):
-        assert isinstance(other, hook)
-        assert self.groupby == other.groupby
-        return hook((~other.policy) & self.policy, self.groupby)
-
-    def __invert__(self):
-        return hook(~(self.policy), self.groupby)
+    def substitute(self, in_group_val, out_group_val):
+        """ Return a new in_out_atom with in_group_val and out_group_val
+        substituted for the headers in in_groupby and out_groupby. """
+        assert set(in_group_val.keys()) == set(self.in_groupby)
+        assert set(out_group_val.keys()) == set(self.out_groupby)
+        return in_out_atom(self.in_pred & match(**in_group_val),
+                           self.out_pred & match(**out_group_val))
 
     def __repr__(self):
-        return super(hook, self).__repr__() + '; groupby:' + str(self.groupby)
+        return (super(in_out_group, self).__repr__() + ';\n' +
+                'in_grouping:' + str(self.in_groupby) + '\n' +
+                'out_grouping:' + str(self.out_groupby) + '\n')
 
 ### Path combinator classes ###
 
