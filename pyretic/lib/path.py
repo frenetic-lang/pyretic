@@ -1090,6 +1090,13 @@ class in_out_group(in_out_atom):
         else:
             return None
 
+    def replace_by_atom(self):
+        """Return a corresponding in_out_atom without any grouping
+        substitutions, including only the predicates provided during
+        construction.
+        """
+        return in_out_atom(self.in_pred, self.out_pred)
+
     def __repr__(self):
         return (super(in_out_group, self).__repr__() + ';\n' +
                 'in_grouping:' + str(self.in_groupby) + '\n' +
@@ -1407,6 +1414,16 @@ class path_grouping(object):
                     raise RuntimeError("Substitution vals has no "
                                        "substitution for current AST: %s" % repr(ast))
                 return vals[id(ast)]
+            else:
+                return ast
+        return actual_mapper
+
+    @classmethod
+    def atom_substitute_groupby(cls):
+        def actual_mapper(ast):
+            assert isinstance(ast, path)
+            if isinstance(ast, in_out_group):
+                return ast.replace_by_atom()
             else:
                 return ast
         return actual_mapper
