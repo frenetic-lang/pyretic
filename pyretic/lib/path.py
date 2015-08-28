@@ -854,6 +854,7 @@ class path(path_policy):
         """
         super(path, self).__init__(self, FwdBucket())
         self.measure_loc = path.MEASURE_LOC_DOWNSTREAM
+        self.grouping_fvlist = {}
 
     @property
     def expr(self):
@@ -917,6 +918,20 @@ class path(path_policy):
         """ Instruct the runtime to measure packets satisfying this query
         upstream. """
         self.measure_loc = path.MEASURE_LOC_DOWNSTREAM
+
+    def get_measure_loc(self):
+        return self.measure_loc
+
+    def set_measure_loc(self, val):
+        self.measure_loc = val
+
+    def set_fvlist(self, fvdict):
+        """ A way to inform the compiler that a set of substitutions may be used
+        for grouping atoms. The format of the input is a dictionary of the form:
+
+        {header:  [list of values]}
+        """
+        self.grouping_fvlist = fvdict
 
 class path_epsilon(path):
     """ Path of length 0. """
