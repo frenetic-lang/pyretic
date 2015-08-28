@@ -1481,6 +1481,13 @@ class path_grouping(object):
         return res
 
     @classmethod
+    def aggwrap(cls, funlist, agg):
+        def actual_callback(res):
+            for f in funlist:
+                f(agg, res)
+        return actual_callback
+
+    @classmethod
     def expand_groupby(cls, path_pol, fvlist):
         """ Statically substitute groupby atoms in queries by query predicates
         that have 'complete' values, e.g.,:
@@ -1511,8 +1518,10 @@ class path_grouping(object):
             for mapping in gid_to_atoms:
                 sub_mapper = cls.map_substitute_groupby(mapping)
                 new_query = ppu.path_ast_map(p, sub_mapper)
-                # TODO(ngsrinivas): must add a way to recover results
-                # separately for each sub-aggregate query
+                p_cbs = p.get_bucket().callbacks
+                p_bucket = type(p.get_bucket())()
+                p_bucket.register_callback(cls.aggwrap(p_cbs, mapping))
+                new_query.set_bucket(p_bucket)
                 res_ppols.append(new_query)
         return res_ppols
 
