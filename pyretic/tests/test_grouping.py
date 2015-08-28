@@ -83,7 +83,7 @@ class grouptest(object):
         return res
 
     @classmethod
-    def expand_groupby(cls, path_pol, sw_ports):
+    def expand_groupby(cls, path_pol, fvlist):
         """ Statically substitute groupby atoms in queries by query predicates
         that have 'complete' values, e.g.,:
 
@@ -98,7 +98,25 @@ class grouptest(object):
         IPs, etc. Instead, applications should use a sampling bucket to collect
         per-header-aggregate statistics.
         """
-        return None
+        ppu = path_policy_utils
+        ppols_list = []
+        if isinstance(path_pol, path_policy_union):
+            ppols_list = path_pol.path_policies
+        elif isinstance(path_pol, path_policy):
+            ppols_list = [path_pol]
+        else:
+            raise TypeError("cannot expand groupby from non-path-policies!")
+        res_ppols = []
+        for p in ppols_list:
+            gatm_list = ppu.path_ast_fold(p, cls.groupby_collect, set())
+            gid_to_atoms = gt.gatom_to_ioatom_combos(gatm_list, fvlist)
+            for mapping in gid_to_atoms:
+                sub_mapper = gt.map_substitute_groupby(mapping)
+                new_query = ppu.path_ast_map(p, sub_mapper)
+                # TODO(ngsrinivas): must add a way to recover results
+                # separately for each sub-aggregate query
+                res_ppols.append(new_query)
+        return res_ppols
 
 if __name__ == "__main__":
     fvlist = {'switch': range(1,4), 'port': range(1,5)}
@@ -124,6 +142,11 @@ if __name__ == "__main__":
         res.append(path_policy_utils.path_ast_map(p,
                     gt.map_substitute_groupby(combo)))
 
+    print res[0]
+    print len(res), "queries"
+
+    print '======='
+    res = gt.expand_groupby(p, fvlist)
     print res[0]
     print len(res), "queries"
     print "Done"
