@@ -1467,6 +1467,11 @@ class path_grouping(object):
             return [[]]
         else:
             res = []
+            if not fvlist[flist[0]]:
+                # Sometimes, the value list for a field may be empty.
+                return [[None]]
+            # From here on, fvlist[...] has a nonempty list of values for header
+            # flist[0].
             for first_val in fvlist[flist[0]]:
                 tail_vals = cls.flist_vlist_combos(flist[1:], fvlist)
                 if tail_vals:
@@ -1500,6 +1505,10 @@ class path_grouping(object):
         assert list_isinstance(galist, in_out_group)
         ga_subst_map = {id(gatom): cls.gen_groupby_substitutes(gatom, fvlist)
                         for gatom in galist}
+        empty_subs = reduce(lambda acc, v: acc or (False if v else True),
+                            ga_subst_map.values(), False)
+        if empty_subs:
+            return []
         id_sorted_gatoms = sorted(map(id, galist))
         combos = cls.flist_vlist_combos(id_sorted_gatoms,
                                         ga_subst_map)
