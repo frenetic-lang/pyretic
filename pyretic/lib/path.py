@@ -1436,7 +1436,7 @@ class path_grouping(object):
         `flist` in the same order as `flist`.
         """
         if len(flist) == 0:
-            return []
+            return [[]]
         else:
             res = []
             for first_val in fvlist[flist[0]]:
