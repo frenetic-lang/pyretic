@@ -788,6 +788,27 @@ class path_policy_utils(object):
             raise TypeError("Can only fold path objects!")
 
     @classmethod
+    def path_ast_map(cls, ast, map_f):
+        """ Apply a map function `map_f` to a path AST, returning a tree with
+        the same structure.
+
+        :param ast: path
+        :param map_f: path -> path
+        """
+        if (isinstance(ast, path_epsilon) or
+            isinstance(ast, path_empty) or
+            isinstance(ast, in_out_atom)):
+            return map_f(ast)
+        elif isinstance(ast, path_combinator):
+            res_paths = []
+            for p in ast.paths:
+                res_paths.append(cls.path_ast_map(p, map_f))
+            comb_typ = type(ast)
+            return map_f(comb_typ(res_paths))
+        else:
+            raise TypeError("Can only fold path objects!")
+
+    @classmethod
     def get_dyn_pols(cls, p):
         """ Get the dynamic sub policies from a policy p. """
         return policy_ast_fold(add_dynamic_sub_pols, list(), p)
