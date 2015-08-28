@@ -1095,6 +1095,14 @@ class in_out_group(in_out_atom):
                 'in_grouping:' + str(self.in_groupby) + '\n' +
                 'out_grouping:' + str(self.out_groupby) + '\n')
 
+class in_group(in_out_group):
+    def __init__(self, pred, groupby=[]):
+        super(in_group, self).__init__(pred, identity, groupby, [])
+
+class out_group(in_out_group):
+    def __init__(self, pred, groupby=[]):
+        super(out_group, self).__init__(identity, pred, [], groupby)
+
 ### Path combinator classes ###
 
 class path_combinator(path):
