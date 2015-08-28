@@ -11,7 +11,7 @@ class grouptest(object):
     def groupby_collect(cls, acc, ast):
         assert isinstance(ast, path)
         if isinstance(ast, in_out_group):
-            return acc | set([id(ast)])
+            return acc | set([ast])
         else:
             return acc
 
@@ -25,7 +25,7 @@ class grouptest(object):
                 except KeyError:
                     raise RuntimeError("Substitution vals has no "
                                        "substitution for current AST: %s" % repr(ast))
-                return ast.substitute(val['in'], val['out'])
+                return vals[id(ast)]
             else:
                 return ast
         return actual_mapper
@@ -74,7 +74,7 @@ class grouptest(object):
         assert list_isinstance(galist, in_out_group)
         ga_subst_map = {id(gatom): cls.gen_groupby_substitutes(gatom, fvlist)
                         for gatom in galist}
-        id_sorted_gatoms = sorted(galist, key=id)
+        id_sorted_gatoms = sorted(map(id, galist))
         combos = cls.flist_vlist_combos(id_sorted_gatoms,
                                         ga_subst_map)
         res = []
