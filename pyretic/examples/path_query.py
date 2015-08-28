@@ -604,12 +604,7 @@ def path_test_tm():
                 pset += p
     return pset
 
-def path_test_tm_groupby():
-    ''' TODO(ngsrinivas):
-    - dynamic predicates don't work inside of in_out_groups yet!
-    - the application shouldn't have to supply the fvlist; get it from the
-    runtime!
-    '''
+def path_test_tm_groupby_static():
     fvlist = {'switch': range(1,5)}
     p = in_group(match(port=3), ['switch']) ** out_group(match(port=3), ['switch'])
     fb = FwdBucket()
@@ -617,6 +612,28 @@ def path_test_tm_groupby():
     p.set_bucket(fb)
     res_paths = path_grouping.expand_groupby(p, fvlist)
     return res_paths
+
+def path_test_tm_groupby():
+    p = (in_group(ingress_network(), ['switch']) **
+         out_group(egress_network(), ['switch']))
+    fb = FwdBucket()
+    fb.register_callback(agg_callback("tm_groupby"))
+    p.set_bucket(fb)
+    return p
+
+def path_test_27():
+    return path_test_tm_groupby() + path_test_1()
+
+def path_test_28():
+    p = (in_group(ingress_network(), ['srcip']) **
+         out_group(egress_network(), ['dstip', 'switch']))
+    fb = FwdBucket()
+    fb.register_callback(agg_callback("28_ip_groupby"))
+    p.set_bucket(fb)
+    fvlist = {'srcip': ['10.0.0.3', '10.0.0.4'],
+              'dstip': ['10.0.0.1', '10.0.0.2']}
+    p.set_fvlist(fvlist)
+    return p
 
 def get_query(kwargs, default):
     params = dict(kwargs)
