@@ -1144,10 +1144,11 @@ class path_star(path_combinator):
     """ Kleene star on a path. """
     def __init__(self, p):
         self.__check_type(p)
-        super(path_star, self).__init__(paths=[p])
+        super(path_star, self).__init__(paths=(p if isinstance(p, list) else [p]))
 
     def __check_type(self, p):
-        assert isinstance(p, path)
+        assert ((isinstance(p, list) and len(p) == 1 and isinstance(p[0], path))
+                or isinstance(p, path))
 
     def gen_re_tree(self, in_cg, out_cg):
         p = self.paths[0]
@@ -1192,10 +1193,11 @@ class path_negate(path_combinator):
     """ Negation of paths. """
     def __init__(self, p):
         self.__check_type(p)
-        super(path_negate, self).__init__(paths=[p])
+        super(path_negate, self).__init__(paths=(p if isinstance(p, list) else [p]))
 
     def __check_type(self, p):
-        assert isinstance(p, path)
+        assert ((isinstance(p, list) and len(p) == 1 and isinstance(p[0], path))
+                or isinstance(p, path))
 
     def gen_re_tree(self, in_cg, out_cg):
         p = self.paths[0]
