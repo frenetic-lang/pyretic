@@ -1391,6 +1391,19 @@ class path_grouping(object):
     egress) switches in the network. This pass by the compiler precedes regular
     compilation by methods in the `pathcomp` class.
     """
+    rtm_fvlist  = {}
+
+    @classmethod
+    def set_rtm_fvlist(cls, switch_ports):
+        """ Set the field=value list populated by runtime, including the latest
+        topology information. """
+        cls.rtm_fvlist = {'switch': [], 'port': set()}
+        for (sw,ports) in switch_ports:
+            cls.rtm_fvlist['switch'].append(sw)
+            # for now, all ports can go with all switches.
+            cls.rtm_fvlist['port'] |= set(ports)
+        cls.rtm_fvlist['port'] = list(cls.rtm_fvlist['port'])
+
     @classmethod
     def list_isinstance(cls, l, typ):
         return reduce(lambda acc, x: acc and isinstance(item, typ), l, True)
