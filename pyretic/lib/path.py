@@ -1523,7 +1523,16 @@ class path_grouping(object):
                 p_bucket.register_callback(cls.aggwrap(p_cbs, mapping))
                 new_query.set_bucket(p_bucket)
                 res_ppols.append(new_query)
-        return res_ppols
+        if res_ppols:
+            return path_policy_union(res_ppols)
+        else:
+            # TODO(ngsrinivas): currently we just return the original query with
+            # in_out_groups substituted by corresponding in_out_atoms, but this
+            # may be not be the right thing to do. We could return path_empty(),
+            # but that complicates the runtime mechanics, e.g., what if a
+            # dynamic predicate creates new path queries later on?
+            sub_mapper = cls.atom_substitute_groupby()
+            return ppu.path_ast_map(p, sub_mapper)
 
 class pathcomp(object):
     """ Functionality related to actual compilation of path queries. """
