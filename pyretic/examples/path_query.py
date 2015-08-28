@@ -189,6 +189,16 @@ def path_callback(test_num):
         print '**************'
     return actual_callback
 
+def agg_callback(test_num):
+    def actual_callback(agg, res):
+        print '**************'
+        print datetime.now()
+        print 'Test', test_num, ' -- got a callback from installed path query!'
+        print res
+        print 'from aggregate', agg
+        print '**************'
+    return actual_callback
+
 def path_test_empty():
     return path_empty()
 
@@ -593,6 +603,20 @@ def path_test_tm():
                 query_thread.start()
                 pset += p
     return pset
+
+def path_test_tm_groupby():
+    ''' TODO(ngsrinivas):
+    - dynamic predicates don't work inside of in_out_groups yet!
+    - the application shouldn't have to supply the fvlist; get it from the
+    runtime!
+    '''
+    fvlist = {'switch': range(1,5)}
+    p = in_group(match(port=3), ['switch']) ** out_group(match(port=3), ['switch'])
+    fb = FwdBucket()
+    fb.register_callback(agg_callback("tm_groupby"))
+    p.set_bucket(fb)
+    res_paths = path_grouping.expand_groupby(p, fvlist)
+    return res_paths
 
 def get_query(kwargs, default):
     params = dict(kwargs)
