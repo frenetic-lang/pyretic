@@ -12,6 +12,8 @@
 ##################
 pyretic/evaluations/results
 pyretic/evaluations/evaluation_results
+pyretic/evaluations/Tests/*/Results
+pyretic/evaluations/code_opt/
 # frenetic #
 ###########
 frenetic
