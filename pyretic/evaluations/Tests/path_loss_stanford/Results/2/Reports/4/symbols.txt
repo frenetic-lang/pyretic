@@ -1,4 +1,0 @@
-1: match: ('srcip', IPv4Network('10.0.0.1/32')) ('switch', 1) ('dstip', IPv4Network('10.0.0.2/32'))
-3: match: ('switch', 3)
-2: match: ('switch', 2)
-4: match: ('switch', 4)

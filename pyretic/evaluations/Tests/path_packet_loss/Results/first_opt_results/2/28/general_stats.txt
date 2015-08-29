@@ -1,4 +1,0 @@
-out capture edges: 28
-in tagging edges: 28
-in capture edges: 0
-out tagging edges: 28
