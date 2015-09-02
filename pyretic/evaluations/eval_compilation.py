@@ -41,7 +41,7 @@ class eval_compilation:
                      )
         """ Start the frenetic compiler-server """
         if not self.use_pyretic:
-            netkat_cmd = "bash start-frenetic.sh"
+            netkat_cmd = "bash ~/pyretic/start-frenetic.sh"
             try:
                 output = subprocess.Popen(netkat_cmd, shell=True,
                                           stderr=subprocess.STDOUT)
