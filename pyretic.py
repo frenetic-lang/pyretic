@@ -139,7 +139,7 @@ def parseArgs():
     op.add_option('--enable_edge_contraction', '-g', action = "store_true",
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contraction optimization, only works with cache enabled')
-    op.add_option('--enable_preddecomp', action="store_true",
+    op.add_option('--enable_preddecomp', '-b', action="store_true",
                   dest = "preddecomp_enabled",
                   help = "enable predicate decomposition into several stages")
     op.add_option('--use_pyretic', action="store_true",
