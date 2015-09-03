@@ -1321,7 +1321,7 @@ class QuerySwitch(Policy):
         c = Classifier(final_rules)
         return c
     
-    def netkat_compile(self, switch_cnt, multistage=True):
+    def netkat_compile(self, switch_cnt=None, multistage=True):
         from pyretic.core.classifier import Rule, Classifier
         import time
         tot_time = 0
@@ -1345,7 +1345,9 @@ class QuerySwitch(Policy):
         final_rules = []
         for tag_value in self.policy_dic:
             tot_time += time.time() - t_s
-            p_class = self.policy_dic[tag_value].netkat_compile(switch_cnt, multistage)
+            p_class = self.policy_dic[tag_value].netkat_compile(
+                switch_cnt=switch_cnt,
+                multistage=multistage)
             p_rules = p_class[0].rules
             tot_time += float(p_class[1])
             t_s = time.time()
