@@ -1465,6 +1465,9 @@ class DerivedPolicy(Policy):
             self._classifier = self.generate_classifier()
         return self._classifier
 
+    def netkat_compile(self, **kwargs):
+        return self.policy.netkat_compile(**kwargs)
+
     def generate_classifier(self):
         return self.policy.compile()
 
