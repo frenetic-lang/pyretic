@@ -590,6 +590,7 @@ class Runtime(object):
 
         us_policy = pathcomp.compile_upstream(self.us_path_policy,
             self.sw_port_ids(), self.nw_edges(), self.forwarding,
+            self.sw_cnt(),
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled)

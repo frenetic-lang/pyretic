@@ -1733,12 +1733,15 @@ class pathcomp(object):
 
     @classmethod
     def compile_upstream(cls, path_pol, switch_ports, network_links, fwding,
+                         sw_cnt,
                          max_states=65000, disjoint_enabled=False,
                          default_enabled=False, integrate_enabled=False,
                          ragel_enabled=False, match_enabled=False):
         """ Generates a policy corresponding to upstream path queries. """
         from pyretic.lib.hsa import (pyr_hs_format, get_hsa_edge_policy,
-                                     setup_tfs_data, get_portid_map,
+                                     setup_tfs_data_from_policy,
+                                     setup_tfs_data_from_cls,
+                                     get_portid_map,
                                      get_hsa_edge_ports,
                                      get_reachable_inheaders)
         sw_ports = {k:v for (k,v) in switch_ports}
@@ -1763,7 +1766,19 @@ class pathcomp(object):
                out_table_pol)
 
         ''' Set up headerspace reachability preliminaries '''
-        setup_tfs_data(hs_format, pol, sw_ports, network_links)
+        if disjoint_enabled:
+            # TODO(ngsrinivas): fwding policy is compiled with pyretic; not
+            # netkat. This is to temporarily allow compilation of forwarding
+            # policies which are used for evaluation, which are anyhow generated
+            # in "non-standard" ways independent of the compiler.
+            c = (vin_tagging.netkat_compile(switch_cnt=sw_cnt)[0] >>
+                 in_table_pol.netkat_compile(switch_cnt=sw_cnt)[0] >>
+                 fwding.compile() >>
+                 out_table_pol.netkat_compile(switch_cnt=sw_cnt)[0])
+            setup_tfs_data_from_classifier(hs_format, c, sw_ports,
+                                           network_links)
+        else:
+            setup_tfs_data(hs_format, pol, sw_ports, network_links)
         portids = get_portid_map(sw_ports)
         edge_ports = get_hsa_edge_ports(sw_ports, network_links)
 
