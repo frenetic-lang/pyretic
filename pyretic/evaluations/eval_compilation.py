@@ -30,6 +30,7 @@ class eval_compilation:
         self.switch_cnt = args.switch_cnt
         self.cache_enabled = args.cache_enabled
         self.edge_contraction_enabled = args.edge_contraction_enabled
+        self.preddecomp_enabled = args.preddecomp_enabled
         self.use_pyretic = args.use_pyretic 
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
@@ -37,6 +38,7 @@ class eval_compilation:
                      self.ragel_enabled, self.partition_enabled, 
                      self.switch_cnt,
                      self.cache_enabled, self.edge_contraction_enabled,
+                     self.preddecomp_enabled
                      )
         """ Start the frenetic compiler-server """
         if not self.use_pyretic:
@@ -146,6 +148,10 @@ def parse_args():
     parser.add_argument('--enable_edge_contraction', '-g', action="store_true",
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contratction optimization, works only with cache enabled')
+
+    parser.add_argument('--enable_preddecomp', '-b', action="store_true",
+                    dest = "preddecomp_enabled",
+                    help = "enable predicate decomposition into multiple stages")
 
     parser.add_argument('--use_pyretic', action="store_true",
                     dest = 'use_pyretic',
