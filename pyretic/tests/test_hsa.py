@@ -169,7 +169,7 @@ def basic_test():
     sw_ports = get_test_switch_port_ids()
     net_links = get_test_network_links()
     pol = static_fwding_chain_3_3()
-    setup_tfs_data(hs_format, pol, sw_ports, net_links)
+    setup_tfs_data_from_policy(hs_format, pol, sw_ports, net_links)
     portids = get_portid_map(sw_ports)
 
     # basic reachability tests with known samples
@@ -196,7 +196,7 @@ def hsa_path_test(testnum, in_table_pol, out_table_pol, outmatches_list):
            in_table_pol >>
            static_fwding_chain_3_3() >>
            out_table_pol)
-    setup_tfs_data(hs_format, pol, sw_ports, net_links)
+    setup_tfs_data_from_policy(hs_format, pol, sw_ports, net_links)
     portids = get_portid_map(sw_ports)
 
     edge_ports = get_hsa_edge_ports(sw_ports, net_links)

@@ -288,12 +288,15 @@ def write_port_map(sw_ports, portids):
             f.write('s%d-eth%d:%d\n' % (sw, p, portids[(sw,p)]))
     f.close()
 
-def setup_tfs_data(hsf, pol, sw_ports, network_links):
-    """ Set up transfer functions and hassel-c data files from a given
-    policy, and topology information. """
-    # get a classifier
+def setup_tfs_data_from_policy(hsf, pol, sw_ports, network_links):
+    """ Set up transfer functions and hassel-c data files from a given policy,
+    and topology information. """
     c = pol.netkat_compile()[0]
+    setup_tfs_data_from_cls(hsf, c, sw_ports, network_links)
 
+def setup_tfs_data_from_cls(hsf, c, sw_ports, network_links):
+    """ Set up transfer functions and hassel-c data files from a given
+    classifier `c`, and topology information. """
     # get a forwarding transfer function
     portids = get_portid_map(sw_ports)
     convert_classifier(c, hsf, portids, sw_ports)
