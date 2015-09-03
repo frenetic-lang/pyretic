@@ -3267,7 +3267,7 @@ def join_list_inout(type_list):
 def join((in1, out1), (in2, out2)):
     return (join_type(in1, in2), join_type(out1, out2))
 
-def pack(type_list, limit):
+def pack(type_list, limit, stagelimit=14):
     stages = []
     assgn = {}
 
@@ -3288,6 +3288,7 @@ def pack(type_list, limit):
             if in_cnt <= limit and out_cnt <= limit:
                 stages.append(typ)
                 assgn[len(stages) - 1] = [q]
+                assert len(stages) < stagelimit
             else:
                 print q, in_cnt, out_cnt
                 raise TypeError
