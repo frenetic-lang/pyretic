@@ -1775,8 +1775,7 @@ class pathcomp(object):
                  in_table_pol.netkat_compile(switch_cnt=sw_cnt)[0] >>
                  fwding.compile() >>
                  out_table_pol.netkat_compile(switch_cnt=sw_cnt)[0])
-            setup_tfs_data_from_classifier(hs_format, c, sw_ports,
-                                           network_links)
+            setup_tfs_data_from_cls(hs_format, c, sw_ports, network_links)
         else:
             setup_tfs_data(hs_format, pol, sw_ports, network_links)
         portids = get_portid_map(sw_ports)
