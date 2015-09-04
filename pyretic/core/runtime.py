@@ -575,7 +575,7 @@ class Runtime(object):
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
-        from pyretic.lib.path import pathcomp, path, path_grouping
+        from pyretic.lib.path import pathcomp, path, path_grouping, path_empty
         path_grouping.set_rtm_fvlist(self.sw_port_ids())
         expanded_paths = path_grouping.expand_groupby(self.path_policy)
         self.ds_path_policy = pathcomp.get_directional_pathpol(expanded_paths,
@@ -588,12 +588,15 @@ class Runtime(object):
             self.multitable_enabled and self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled, self.preddecomp_enabled)
 
-        us_policy = pathcomp.compile_upstream(self.us_path_policy,
-            self.sw_port_ids(), self.nw_edges(), self.forwarding,
-            self.sw_cnt(),
-            NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
-            self.multitable_enabled and self.integrate_enabled,
-            self.ragel_enabled, self.partition_enabled)
+        if self.us_path_policy == path_empty():
+            us_policy = drop
+        else:
+            us_policy = pathcomp.compile_upstream(self.us_path_policy,
+                self.sw_port_ids(), self.nw_edges(), self.forwarding,
+                self.sw_cnt(),
+                NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
+                self.multitable_enabled and self.integrate_enabled,
+                self.ragel_enabled, self.partition_enabled)
         self.path_up_table.policy = us_policy
 
         if self.multitable_enabled and self.integrate_enabled:
