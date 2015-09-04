@@ -56,8 +56,7 @@ class eval_compilation:
         self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
                                opt_flags = opt_flags, mode = 'proactive0',
                                use_pyretic = self.use_pyretic, offline=True,
-                               write_log = self.write_log)
-        
+                               write_log = self.write_log, restart_frenetic = True)
         Stat.stop()
     
     def recompile_paths(self):

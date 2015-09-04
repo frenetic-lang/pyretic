@@ -75,7 +75,7 @@ class Runtime(object):
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal',use_nx=False, pipeline="default_pipeline",
                  opt_flags=None, use_pyretic=False, offline=False,
-                 write_log='rt_log.txt'):
+                 write_log='rt_log.txt', restart_frenetic=False):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
         self.pipeline = pipeline
@@ -104,7 +104,7 @@ class Runtime(object):
 
         """ If subpolicy stats are required, compute them. """
         if self.get_subpol_stats:
-            self.get_subpolicy_compile_stats(path_main)
+            self.get_subpolicy_compile_stats(path_main, restart_frenetic)
 
         self.mode = mode
         if not offline:
@@ -194,21 +194,25 @@ class Runtime(object):
         return (self.partition_cnt if self.partition_cnt
                 else len(self.network.topology.nodes()))
         
-    def get_subpolicy_compile_stats(self, path_main):
+    def get_subpolicy_compile_stats(self, path_main, restart_frenetic=False):
         if path_main:
             pass
             if self.integrate_enabled and self.multitable_enabled:
                 for (in_table, out_table) in zip(self.path_in_table_list, self.path_out_table_list):
-                    self.get_subpolicy_compile_stats_per_stage(in_table, out_table)
+                    self.get_subpolicy_compile_stats_per_stage(in_table,
+                                                               out_table,
+                                                               restart_frenetic=restart_frenetic)
             else:
                 for (in_table, out_table, ingress, egress) in zip(self.path_in_table_list,
                         self.path_out_table_list, self.path_ingress, self.path_egress):
                     self.get_subpolicy_compile_stats_per_stage(in_table, out_table, ingress[0],
-                                                                ingress[1],egress[0], egress[1])
+                        ingress[1],egress[0],egress[1],restart_frenetic=restart_frenetic)
     
     def get_subpolicy_compile_stats_per_stage(self, in_table, out_table,
-                                                    in_tag = None, in_cap = None,
-                                                    out_tag = None, out_cap = None):
+                                              in_tag = None, in_cap = None,
+                                              out_tag = None,
+                                              out_cap = None,
+                                              restart_frenetic = False):
         """ In the "offline" case, get compile time and classifier size stats
         for sub-policies. This function only compiles the sub-parts of the
         policy. It neither compiles the entire policy, nor touches the
@@ -274,6 +278,18 @@ class Runtime(object):
                     s[0].compile()
                 else:
                     self.write_log.info("starting to compile %s" % s[0].name)
+                    if restart_frenetic:
+                        import subprocess
+                        netkat_cmd = "bash restart-frenetic.sh"
+                        try:
+                            output = subprocess.Popen(netkat_cmd, shell=True,
+                                                      stderr=subprocess.STDOUT)
+                            self.write_log.info("restarted frenetic")
+                        except Exception as e:
+                            print "Could not restart frenetic successfully."
+                            print e
+                            sys.exit(1)
+                        time.sleep(2)
                     s[0].netkat_compile(self.sw_cnt(), multistage=True)
                     self.write_log.info("done compiling %s" % s[0].name)
 
