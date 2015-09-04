@@ -40,8 +40,8 @@ class StanfordTopo( Topo ):
     
     DUMMY_SWITCH_BASE = 1000
     
-    PORT_MAP_FILENAME = "data/port_map.txt"
-    TOPO_FILENAME = "data/backbone_topology.tf"
+    PORT_MAP_FILENAME = "pyretic/evaluations/data/port_map.txt"
+    TOPO_FILENAME = "pyretic/evaluations/data/backbone_topology.tf"
     
     dummy_switches = set()
 
