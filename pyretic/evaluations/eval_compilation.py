@@ -32,7 +32,11 @@ class eval_compilation:
         self.edge_contraction_enabled = args.edge_contraction_enabled
         self.preddecomp_enabled = args.preddecomp_enabled
         self.use_pyretic = args.use_pyretic 
-        self.write_log = args.write_log
+        if args.write_log:
+            self.write_log = args.write_log
+        else:
+            self.write_log = os.path.join('pyretic/evaluations',
+                                          self.results_folder, 'rt_log.txt')
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
                      self.integrate_enabled, self.multitable_enabled,
@@ -159,8 +163,7 @@ def parse_args():
                     help = 'Use the pyretic compiler (uses netkat by default)')
 
     parser.add_argument('--write_log', dest="write_log",
-                        help = "Runtime write log file location",
-                        default="rt_log.txt")
+                        help = "Runtime write log file location")
 
     args = parser.parse_args()
 

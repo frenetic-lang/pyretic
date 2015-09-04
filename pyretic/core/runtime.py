@@ -80,7 +80,7 @@ class Runtime(object):
         self.use_nx = use_nx
         self.pipeline = pipeline
         self.log = logging.getLogger('%s.Runtime' % __name__)
-        self.setup_write_logging()
+        self.setup_write_logging(write_log)
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
@@ -145,12 +145,12 @@ class Runtime(object):
 # Logging setup
 ######################
 
-    def setup_write_logging(self):
+    def setup_write_logging(self, logfile):
         """ Configure write logging for runtime debugging with large automated
         runs. """
         self.write_log = logging.getLogger('%s.Runtime_write' % __name__)
         self.write_log.setLevel(logging.INFO)
-        fh = logging.FileHandler('rt_log.txt', mode='w')
+        fh = logging.FileHandler(logfile, mode='w')
         fh.setLevel(logging.INFO)
         self.write_log.addHandler(fh)
 
