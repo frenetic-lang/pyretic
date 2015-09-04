@@ -70,7 +70,7 @@ class StanfordForwarding(Policy):
 
                     partial_actions = partial_actions.compile().rules[0].actions
                     cls_rules.append(Rule(partial_match, partial_actions))
-        print len(cls_rules)
+        # print len(cls_rules)
         return Classifier(cls_rules)    
         
     def get_forwarding_policy(self):
@@ -133,5 +133,5 @@ class StanfordForwarding(Policy):
                     switch_policy += partial_policy
                 policy_dic[switch_id] = switch_policy
         
-        print policy_dic
+        # print policy_dic
         forwarding = QuerySwitch('switch', policy_dic, set([drop]))
