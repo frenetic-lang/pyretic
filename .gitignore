@@ -38,3 +38,7 @@ pyretic/lib/hassel-c/test
 pyretic/lib/hassel-c/tfs/pyretic/port_map.txt
 pyretic/lib/hassel-c/tfs/pyretic/*.tf
 pyretic/lib/hassel-c/data/out-inverted.json
+
+# runtime default write log #
+#############################
+rt_log.txt
