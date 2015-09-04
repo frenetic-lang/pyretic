@@ -56,6 +56,10 @@ class netkat_backend(object):
             return cls.log_writer
         except AttributeError:
             cls.log_writer = logging.getLogger('%s.netkat' % __name__)
+            handler = logging.StreamHandler()
+            handler.setLevel(logging.INFO)
+            cls.log_writer.addHandler(handler)
+            cls.log_writer.setLevel(logging.INFO)
             return cls.log_writer
 
     @classmethod
