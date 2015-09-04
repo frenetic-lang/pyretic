@@ -32,6 +32,7 @@ class eval_compilation:
         self.edge_contraction_enabled = args.edge_contraction_enabled
         self.preddecomp_enabled = args.preddecomp_enabled
         self.use_pyretic = args.use_pyretic 
+        self.write_log = args.write_log
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
                      self.integrate_enabled, self.multitable_enabled,
@@ -53,8 +54,9 @@ class eval_compilation:
         
         Stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
-                    opt_flags = opt_flags, mode = 'proactive0', 
-                    use_pyretic = self.use_pyretic, offline=True)
+                               opt_flags = opt_flags, mode = 'proactive0',
+                               use_pyretic = self.use_pyretic, offline=True,
+                               write_log = self.write_log)
         
         Stat.stop()
     
@@ -156,6 +158,10 @@ def parse_args():
     parser.add_argument('--use_pyretic', action="store_true",
                     dest = 'use_pyretic',
                     help = 'Use the pyretic compiler (uses netkat by default)')
+
+    parser.add_argument('--write_log', dest="write_log",
+                        help = "Runtime write log file location",
+                        default="rt_log.txt")
 
     args = parser.parse_args()
 
