@@ -128,6 +128,7 @@ class netkat_backend(object):
                 netkat_out = resp.read()
                 write_to_file(ctime, TEMP_HEADERS)
                 write_to_file(netkat_out, TEMP_OUTPUT)
+                conn.close()
             except Exception as e:
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
