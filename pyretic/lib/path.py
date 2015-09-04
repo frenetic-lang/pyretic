@@ -1787,19 +1787,20 @@ class pathcomp(object):
     def compile_downstream(cls, path_pol, max_states=65000,
                            disjoint_enabled=False, default_enabled=False,
                            integrate_enabled=False, ragel_enabled=False,
-                           match_enabled=False):
+                           match_enabled=False, preddecomp_enabled=False):
         if isinstance(path_pol, path_policy_union):
             query_list = path_pol.path_policies
         else:
             query_list = [path_pol]
 
-        # TODO(ngsrinivas): revert to rule limited query-packing after testing
-        # stages = pack_queries(query_list, 2000)
-        if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 1)
+        if preddecomp_enabled:
+            stages = pack_queries(query_list, 2000)
         else:
-            stages = {0: [path_pol]}
-        
+            if not isinstance(path_pol, path_empty):
+                stages = pack_queries_stagelimited(query_list, 1)
+            else:
+                stages = {0: [path_pol]}
+
         in_res = []
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))

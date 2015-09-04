@@ -158,12 +158,13 @@ class Runtime(object):
             self.cache_enabled = False
             self.edge_contraction_enabled = False
             self.partition_enabled = False
+            self.preddecomp_enabled = False
         else:
             (self.disjoint_enabled, self.default_enabled,
              self.integrate_enabled, self.multitable_enabled,
              self.ragel_enabled, self.partition_enabled,
              self.partition_cnt, self.cache_enabled,
-             self.edge_contraction_enabled) = opt_flags
+             self.edge_contraction_enabled, self.preddecomp_enabled) = opt_flags
              
             self.partition_enabled &= not self.partition_cnt is None
 
@@ -585,7 +586,7 @@ class Runtime(object):
         ds_policy_fragments = pathcomp.compile_downstream(self.ds_path_policy,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
             self.multitable_enabled and self.integrate_enabled,
-            self.ragel_enabled, self.partition_enabled)
+            self.ragel_enabled, self.partition_enabled, self.preddecomp_enabled)
 
         us_policy = pathcomp.compile_upstream(self.us_path_policy,
             self.sw_port_ids(), self.nw_edges(), self.forwarding,
@@ -2109,8 +2110,8 @@ class Runtime(object):
         if path_main:
             from pyretic.lib.path import pathcomp
             pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
-                            self.cache_enabled, self.edge_contraction_enabled
-                            ,self.partition_enabled)
+                            self.cache_enabled, self.edge_contraction_enabled,
+                            self.partition_enabled)
             self.path_policy = path_main(**kwargs)
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()

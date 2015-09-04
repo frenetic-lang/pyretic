@@ -139,6 +139,9 @@ def parseArgs():
     op.add_option('--enable_edge_contraction', '-g', action = "store_true",
                     dest = 'edge_contraction_enabled',
                     help = 'enable edge contraction optimization, only works with cache enabled')
+    op.add_option('--enable_preddecomp', action="store_true",
+                  dest = "preddecomp_enabled",
+                  help = "enable predicate decomposition into several stages")
     op.add_option('--use_pyretic', action="store_true",
                   dest = 'use_pyretic',
                   help = "Use the pyretic compiler (uses netkat by default)")
@@ -148,6 +151,7 @@ def parseArgs():
                     ragel_enabled=False, partition_enabled=False, 
                     switch_cnt=None, cache_enabled=False, 
                     edge_contraction_enabled=False,
+                    preddecomp_enabled=False,
                     nx=False, use_pyretic=False)
 
     options, args = op.parse_args()
@@ -250,7 +254,8 @@ def main():
                      options.integrate_enabled, options.multitable_enabled,
                      options.ragel_enabled, options.partition_enabled,
                      options.switch_cnt, options.cache_enabled, 
-                     options.edge_contraction_enabled)
+                     options.edge_contraction_enabled,
+                     options.preddecomp_enabled)
     runtime = Runtime(Backend(),main,path_main,kwargs,
                       mode=options.mode, verbosity=options.verbosity,
                       opt_flags=opt_flags_arg, use_nx=options.nx,
