@@ -74,11 +74,13 @@ class Runtime(object):
     
     def __init__(self, backend, main, path_main, kwargs, mode='interpreted',
                  verbosity='normal',use_nx=False, pipeline="default_pipeline",
-                 opt_flags=None, use_pyretic=False, offline=False):
+                 opt_flags=None, use_pyretic=False, offline=False,
+                 write_log='rt_log.txt'):
         self.verbosity = self.verbosity_numeric(verbosity)
         self.use_nx = use_nx
         self.pipeline = pipeline
         self.log = logging.getLogger('%s.Runtime' % __name__)
+        self.setup_write_logging()
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
@@ -138,6 +140,19 @@ class Runtime(object):
             self.num_packet_ins = 0
             self.update_dynamic_sub_pols()
             self.total_packets_removed = 0 # pkt count from flow removed messages
+
+######################
+# Logging setup
+######################
+
+    def setup_write_logging(self):
+        """ Configure write logging for runtime debugging with large automated
+        runs. """
+        self.write_log = logging.getLogger('%s.Runtime_write' % __name__)
+        self.write_log.setLevel(logging.INFO)
+        fh = logging.FileHandler('rt_log.txt', mode='w')
+        fh.setLevel(logging.INFO)
+        self.write_log.addHandler(fh)
 
 ######################
 # Stat Methods 
@@ -206,7 +221,9 @@ class Runtime(object):
         forwarding = LeafSketch('forwarding', self.forwarding)
         vf_tag = LeafSketch('vf_tag', self.virtual_tag)
         vf_untag = LeafSketch('vf_untag', self.virtual_untag)
-        
+
+        self.write_log.info("compiling new stage.")
+
         if self.multitable_enabled:
             
 
@@ -256,9 +273,9 @@ class Runtime(object):
                 if self.use_pyretic_compiler:
                     s[0].compile()
                 else:
-                    self.log.debug("starting to compile %s" % s[0].name)
+                    self.write_log.info("starting to compile %s" % s[0].name)
                     s[0].netkat_compile(self.sw_cnt(), multistage=True)
-                    self.log.debug("done compiling %s" % s[0].name)
+                    self.write_log.info("done compiling %s" % s[0].name)
 
     def verbosity_numeric(self,verbosity_option):
         numeric_map = { 'low': 1,

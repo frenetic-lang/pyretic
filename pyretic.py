@@ -145,6 +145,9 @@ def parseArgs():
     op.add_option('--use_pyretic', action="store_true",
                   dest = 'use_pyretic',
                   help = "Use the pyretic compiler (uses netkat by default)")
+    op.add_option('--write_log', dest="write_log",
+                  help = ("Location of the runtime's write log for post-run"
+                          "debugging"))
     op.set_defaults(frontend_only=False, mode='proactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
@@ -152,7 +155,7 @@ def parseArgs():
                     switch_cnt=None, cache_enabled=False, 
                     edge_contraction_enabled=False,
                     preddecomp_enabled=False,
-                    nx=False, use_pyretic=False)
+                    nx=False, use_pyretic=False, write_log="rt_log.txt")
 
     options, args = op.parse_args()
 
@@ -260,7 +263,8 @@ def main():
                       mode=options.mode, verbosity=options.verbosity,
                       opt_flags=opt_flags_arg, use_nx=options.nx,
                       pipeline=options.pipeline,
-                      use_pyretic=options.use_pyretic)
+                      use_pyretic=options.use_pyretic,
+                      write_log=options.write_log)
 
     """ Start pox backend. """
     if not options.frontend_only:
