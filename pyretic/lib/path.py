@@ -2041,8 +2041,8 @@ class pathcomp(object):
                                                  max_states, disjoint_enabled,
                                                  default_enabled, integrate_enabled,
                                                  ragel_enabled, match_enabled)
-            #print '-----------------'
-            #continue
+            print '-----------------'
+            continue
             (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
@@ -2091,7 +2091,7 @@ class pathcomp(object):
         t_s = time.time()
         cls.pred_part(path_pol, in_cg, out_cg)        
         print time.time() - t_s
-        #return 
+        return 
         (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         
         cls.log.debug('compiling')
@@ -3537,6 +3537,49 @@ def pack(type_list, limit):
                 print q, in_cnt, out_cnt
                 raise TypeError
     return assgn
+
+def pack_stage(type_list, limit, max_stage):
+    stages = []
+    assgn = {}
+
+    for (q, typ) in type_list:
+        assigned = False
+        min_cost = None
+        min_stage = None
+        min_type = None
+
+        for i in range(len(stages)):
+            ((_, cnt1), (_, cnt2)) = stages[i] 
+            new_typ = join(stages[i], typ)
+            ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ 
+
+            cost = (in_cnt + out_cnt) - (cnt1 + cnt2)
+            if min_cost is None or cost < min_cost:
+                min_cost = cost
+                min_stage = i
+                min_type = new_typ
+
+            if in_cnt <= limit and out_cnt <= limit:
+                stages[i] = new_typ
+                if not i in assgn:
+                    assgn[i] = []
+                assgn[i].append(q)
+                assigned = True
+                break
+        if not assigned:
+            if len(stages) == max_stage:
+                stages[min_stage] = min_type
+                assgn[i].append(q)
+            else:
+                ((_, in_cnt), (_, out_cnt)) = typ 
+                if in_cnt <= limit and out_cnt <= limit:
+                    stages.append(typ)
+                    assgn[len(stages) - 1] = [q]
+                else:
+                    print q, in_cnt, out_cnt
+                    raise TypeError
+    return assgn
+
 
 def pack_stagelimited(type_list, numstages):
     stages = []
