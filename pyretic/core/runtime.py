@@ -2112,7 +2112,9 @@ class Runtime(object):
             pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
                             self.cache_enabled, self.edge_contraction_enabled
                             ,self.partition_enabled, use_fdd = use_fdd)
+            t_s = time.time()
             self.path_policy = path_main(**kwargs)
+            cls.log.debug("query instantiation time : %f" % (time.time() - t_s))
             self.handle_path_change()
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()

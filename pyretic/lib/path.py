@@ -1,4 +1,4 @@
-################################################################################
+
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Srinivas Narayana (narayana@cs.princeton.edu)                        #
@@ -50,7 +50,7 @@ from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 import logging
-
+import sys
 from collections import Counter
 
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
@@ -2078,14 +2078,14 @@ class pathcomp(object):
             query_list = path_pol.path_policies
         else:
             query_list = [path_pol]
-
+        t_s = time.time()
         # TODO(ngsrinivas): revert to rule limited query-packing after testing
         # stages = pack_queries(query_list, 2000)
         if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 1)
+            stages = pack_queries_stagelimited(query_list, 10)
         else:
             stages = {0: [path_pol]}
-         
+        cls.log.debug('stage assignment %f' % (time.time() - t_s))
         in_res = []
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))
@@ -2103,13 +2103,10 @@ class pathcomp(object):
                 stage_path_pol = stage[0]
             else:
                 stage_path_pol = path_policy_union(stage)
-
             res = cls.compile_stage(stage_path_pol, in_cg, out_cg,
                                                  max_states, disjoint_enabled,
                                                  default_enabled, integrate_enabled,
                                                  ragel_enabled, match_enabled)
-            #print '-----------------'
-            #continue
             (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
@@ -2144,20 +2141,16 @@ class pathcomp(object):
         if cls.use_fdd:
             t_s = time.time()
             ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
-            print time.time() - t_s
-            t_s = time.time()
             in_cg.prep_re_tree()
-            print time.time() - t_s
-            t_s = time.time()
             out_cg.prep_re_tree()
-            print time.time() - t_s
+            cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
             (re_list, pol_list) =  ast_fold(path_pol, cls.__get_re_strings__, ([], []), in_cg, out_cg)
 
         else: 
             cls.log.debug('pred_part started')
             t_s = time.time()
             cls.pred_part(path_pol, in_cg, out_cg)        
-            print time.time() - t_s
+            cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
             (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         
         cls.log.debug('compiling')
@@ -3502,7 +3495,6 @@ def get_filter_type(pol):
     '''
 
     assert isinstance(pol, Filter)
-    
     if pol == identity:
         return set()
     elif pol == drop:
@@ -3523,7 +3515,6 @@ def get_filter_type(pol):
         raise TypeError
 
 def get_types_dict(query):    
-
     if isinstance(query, path_combinator):
         in_type = Counter()
         out_type = Counter()
@@ -3607,19 +3598,19 @@ def pack(type_list, limit):
 def pack_stage(type_list, limit, max_stage):
     stages = []
     assgn = {}
-
+    range_dict = dict([(i, range(i)) for i in range(max_stage + 1)])
+    stage_len = 0
     for (q, typ) in type_list:
         assigned = False
         min_cost = None
         min_stage = None
         min_type = None
 
-        for i in range(len(stages)):
-            ((_, cnt1), (_, cnt2)) = stages[i] 
+        for i in range_dict[stage_len]:
             new_typ = join(stages[i], typ)
             ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ 
 
-            cost = (in_cnt + out_cnt) - (cnt1 + cnt2)
+            cost = max(in_cnt , out_cnt)
             if min_cost is None or cost < min_cost:
                 min_cost = cost
                 min_stage = i
@@ -3633,14 +3624,15 @@ def pack_stage(type_list, limit, max_stage):
                 assigned = True
                 break
         if not assigned:
-            if len(stages) == max_stage:
+            if stage_len == max_stage:
                 stages[min_stage] = min_type
-                assgn[i].append(q)
+                assgn[min_stage].append(q)
             else:
                 ((_, in_cnt), (_, out_cnt)) = typ 
                 if in_cnt <= limit and out_cnt <= limit:
                     stages.append(typ)
-                    assgn[len(stages) - 1] = [q]
+                    stage_len += 1
+                    assgn[stage_len - 1] = [q]
                 else:
                     print q, in_cnt, out_cnt
                     raise TypeError
@@ -3691,7 +3683,7 @@ def pack_queries_stagelimited(queries, numstages):
     assert numstages > 0
     q_list = [get_type(q) for q in queries]
     q_list = zip(range(len(q_list)), q_list)
-    assgn = pack_stage(q_list, 3500, numstages)
+    assgn = pack_stage(q_list, 2000, numstages)
     for i in assgn:
         res = []
         for qi in assgn[i]:
