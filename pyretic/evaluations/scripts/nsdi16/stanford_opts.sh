@@ -18,8 +18,8 @@ do
     echo "Start time"
     date
     name=${OPT_NAMES_ARR[$i]}
-    echo sudo /opt/pypy-2.4.0/bin/pypy pyretic/results/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j
-    sudo /opt/pypy-2.4.0/bin/pypy pyretic/results/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j
+    echo sudo /opt/pypy-2.4.0/bin/pypy pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j
+    sudo /opt/pypy-2.4.0/bin/pypy pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j
     i=$((i + DCR))
 done # end opts loop
 
