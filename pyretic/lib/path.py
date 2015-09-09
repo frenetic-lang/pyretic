@@ -2082,7 +2082,7 @@ class pathcomp(object):
         # TODO(ngsrinivas): revert to rule limited query-packing after testing
         # stages = pack_queries(query_list, 2000)
         if not isinstance(path_pol, path_empty):
-            stages = pack_queries_stagelimited(query_list, 1)
+            stages = pack_queries_stagelimited(query_list, 10)
         else:
             stages = {0: [path_pol]}
         cls.log.debug('stage assignment %f' % (time.time() - t_s))
@@ -2137,19 +2137,27 @@ class pathcomp(object):
         in_cg.clear()
         out_cg.clear()
         ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
-        
-        if cls.use_fdd:
-            t_s = time.time()
+
+        @Stat.elapsed_time
+        def partition_fdd(ast_fold, path_pol, prep_fdd, in_cg, out_cg):
             ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
             in_cg.prep_re_tree()
             out_cg.prep_re_tree()
+
+        @Stat.elapsed_time
+        def partition_nonfdd(path_pol, in_cg, out_cg):
+            cls.pred_part(path_pol, in_cg, out_cg)
+
+        if cls.use_fdd:
+            t_s = time.time()
+            partition_fdd(ast_fold, path_pol, prep_fdd, in_cg, out_cg)
             cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
             (re_list, pol_list) =  ast_fold(path_pol, cls.__get_re_strings__, ([], []), in_cg, out_cg)
 
         else: 
             cls.log.debug('pred_part started')
             t_s = time.time()
-            cls.pred_part(path_pol, in_cg, out_cg)        
+            partition_nonfdd(path_pol, in_cg, out_cg)
             cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
             (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
         

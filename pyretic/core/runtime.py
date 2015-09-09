@@ -79,6 +79,7 @@ class Runtime(object):
         self.use_nx = use_nx
         self.pipeline = pipeline
         self.log = logging.getLogger('%s.Runtime' % __name__)
+        logging.basicConfig()
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
@@ -2115,7 +2116,10 @@ class Runtime(object):
             t_s = time.time()
             self.path_policy = path_main(**kwargs)
             self.log.debug("query instantiation time : %f" % (time.time() - t_s))
+            t_s = time.time()
             self.handle_path_change()
+            self.log.debug("total handle_path_change time: %f" % (
+                time.time() - t_s))
             self.virtual_tag = virtual_field_tagging()
             self.virtual_untag = virtual_field_untagging()
             # Path_based_forwarding, below, is the policy used in the

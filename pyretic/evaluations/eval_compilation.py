@@ -200,6 +200,7 @@ if __name__ == '__main__':
     #import cProfile
     #cProfile.run('eval_comp = eval_compilation(args, get_testwise_params(args))')
     eval_comp = eval_compilation(args, get_testwise_params(args)) 
+    print "Returned from eval_compilation"
     
     if args.added_query:
         for aq in args.added_query:
@@ -208,4 +209,3 @@ if __name__ == '__main__':
             print aparams 
             eval_comp.add(**aparams)
     
-
