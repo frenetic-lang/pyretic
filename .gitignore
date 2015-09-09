@@ -42,3 +42,7 @@ pyretic/lib/hassel-c/data/out-inverted.json
 # runtime default write log #
 #############################
 rt_log.txt
+
+# evaluation log #
+##################
+pyretic/evaluations/script-log.txt
