@@ -1,4 +1,4 @@
-################################################################################
+
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Srinivas Narayana (narayana@cs.princeton.edu)                        #
@@ -50,7 +50,7 @@ from pyretic.evaluations.stat import Stat
 from netaddr import IPNetwork, cidr_merge
 import time
 import logging
-
+import sys
 from collections import Counter
 
 TOKEN_START_VALUE = 0 # start with printable ASCII for visual inspection ;)
@@ -165,7 +165,481 @@ class classifier_utils(object):
                 matched_packets += rule.match
         return ~matched_packets
 
+#########################################
+#####             FDD               #####
+#########################################
 
+class FDD(object):
+
+    def level_repr(self, acc, shift):
+        raise NotImplementedError
+
+    def get_leaves(self):
+        raise NotImplementedError
+
+    def __str__(self):
+        lrepr = self.level_repr([], '')
+        return '\n'.join(lrepr) + "\n\n-------------------\n"
+
+    def __hash__(self):
+        return hash(str(self))
+
+class Node(FDD):
+    def __init__(self, test, lchild, rchild):
+        assert isinstance(test, tuple) and len(test) == 2
+        assert issubclass(lchild.__class__, FDD)
+        assert issubclass(rchild.__class__, FDD)
+        super(Node, self).__init__()
+        self.test = test
+        self.lchild = lchild
+        self.rchild = rchild
+    
+    def level_repr(self, acc, shift):
+        acc.append(shift + self.test.__repr__())
+        acc = (self.lchild.level_repr(acc, shift + '\t'))
+        acc = (self.rchild.level_repr(acc, shift + '\t')) 
+        return acc
+
+    def get_leaves(self):
+        res = self.lchild.get_leaves()
+        res += self.rchild.get_leaves()
+        return res
+
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.test == other.test and
+                self.lchild == other.lchild and
+                self.rchild == other.rchild)
+
+    def __repr__(self):
+        return self.test.__repr__()
+
+class Leaf(FDD):
+
+    def __init__(self, pred_set = frozenset(), path = ([], set())):
+        super(Leaf, self).__init__()
+        self.pred_set = pred_set
+        self.path = path
+        self.symbol = None
+    
+    def level_repr(self, acc, shift):
+        acc.append(shift + self.__repr__())
+        return acc
+
+    def get_leaves(self):
+        return [self]
+
+    def is_drop(self):
+        return len(self.pred_set) == 0
+
+    def __add__(self, other):
+        
+        new_pred_set = self.pred_set | other.pred_set
+        #new_path = self.path | other.path
+        res = Leaf(new_pred_set)
+        #print 'adding'
+        #print self.__repr__()
+        #print other.__repr__()
+        #print res.__repr__()
+        #print '-------' 
+        return res
+
+    def __rshift__(self, other):
+        new_pred_set = self.pred_set & other.pred_set
+        #new_path = self.path | other.path
+        return Leaf(new_pred_set)
+
+    def neg(self, pred):
+        assert len(self.pred_set) < 2
+        if len(self.pred_set) == 0:
+            return Leaf(set([pred])) 
+        else:
+            return Leaf()
+
+    def get_pred(self, neg_cache):
+        (true_dict, false_set) = self.path
+        if len(true_dict) == 0:
+            true_match = identity
+        else:
+            true_match = match(**dict(true_dict))
+        false_match = None
+        for (f, v) in false_set:
+            if f in true_dict:
+                continue
+            pred = neg_cache[(f,v)]
+            if false_match is None:
+                false_match = pred
+            else:
+                false_match &= pred
+        if false_match == None:
+            false_match = identity
+        return true_match & false_match
+
+    def __eq__(self, other):
+        res = (isinstance(other, Leaf) and self.pred_set == other.pred_set)
+        return res 
+
+    def __hash__(self):
+        return hash(self.pred_set)
+
+    def __repr__(self):
+
+        res = '{'
+        res += ','.join([str(x) for x in self.pred_set])
+        res += '}'
+        #res += '{'
+        #res += ','.join([str(x) for x in self.path])
+        #res += "}"
+        return res
+
+class FDDTranslator(object):
+   
+    @classmethod
+    def refine(cls, d, fmap):
+        if isinstance(d, Node):
+            (f, v) = d.test
+            if f in fmap:
+                if fmap[f] == v:
+                    return cls.refine(d.lchild, fmap)
+                else:
+                    return cls.refine(d.rchild, fmap)
+            else:
+                return d
+        else:
+            return d
+
+    @classmethod
+    def fmap_digest(cls, fmap, t):
+        (f, v) = t
+        if f in fmap:
+            return (True, f, fmap[f])
+        else:
+            return (False, f, None)
+
+    @classmethod
+    def revert_fmap(cls, fmap, digest):
+        (changed, f, v) = digest
+        if changed:
+            fmap[f] = v
+        else:
+            del fmap[f]
+        return fmap
+
+    @classmethod
+    def merge(cls, d1, d2, fmap, union):
+        d1 = cls.refine(d1, fmap)
+        d2 = cls.refine(d2, fmap)
+        if isinstance(d1, Node):
+            t1 = d1.test
+            if isinstance(d2, Node):
+                t2 = d2.test
+                if t1 == t2:
+                    digest = cls.fmap_digest(fmap, t1)
+                    (f, v) = t1
+                    fmap[f] = v
+                    lchild = cls.merge(d1.lchild, d2.lchild, fmap, union)
+                    fmap = cls.revert_fmap(fmap, digest)
+                    rchild = cls.merge(d1.rchild, d2.rchild, fmap, union)
+                    test = t1
+                else:
+                    if t1 > t2:
+                        d1, d2 = d2, d1
+                        t1, t2 = t2, t1
+                    
+                    (f1, v1) = t1
+                    (f2, v2) = t2
+                    digest = cls.fmap_digest(fmap, t1)
+                    fmap[f1] = v1
+                    if f1 == f2 and v1 != v2:
+                        lchild = cls.merge(d1.lchild, d2.rchild, fmap, union)
+                        fmap = cls.revert_fmap(fmap, digest)
+                        rchild = cls.merge(d1.rchild, d2, fmap, union)
+                        test = t1
+                    else:
+                        lchild = cls.merge(d1.lchild, d2, fmap, union)
+                        fmap = cls.revert_fmap(fmap, digest)
+                        rchild = cls.merge(d1.rchild, d2, fmap, union)
+                        test = t1
+                         
+            elif isinstance(d2, Leaf):
+                lchild = cls.merge(d1.lchild, d2, fmap, union)
+                rchild = cls.merge(d1.rchild, d2, fmap, union)
+                test = t1
+            else:
+                raise TypeError
+        elif isinstance(d1, Leaf):
+            if isinstance(d2, Node):
+                lchild = cls.merge(d2.lchild, d1, fmap, union)
+                rchild = cls.merge(d2.rchild, d1, fmap, union)
+                test = d2.test
+
+            elif isinstance(d2, Leaf):
+                if union:
+                    return d1 + d2
+                else:
+                    return d1 >> d2
+            else:
+                raise TypeError
+        else: 
+            raise TypeError
+        if rchild == lchild:
+            res = lchild
+        else:
+            res = Node(test, lchild, rchild)
+        return res
+    @classmethod
+    def neg(cls, d, pred):
+        if isinstance(d, Node):
+            lchild = cls.neg(d.lchild, pred)
+            rchild = cls.neg(d.rchild, pred)
+            return Node(d.test, lchild, rchild)
+                    
+        elif isinstance(d, Leaf):
+            return d.neg(pred)
+        else:
+            raise TypeError
+
+
+    @classmethod
+    def get_id(cls, pred, path = ([], set())):
+        return Leaf(frozenset([pred]), path)
+
+    @classmethod
+    def get_drop(cls, path = ([], set())):
+        return Leaf(frozenset(), path)
+
+    @classmethod 
+    def translate(cls, pol, pred):
+        if pol == identity:
+            return cls.get_id(pred)            
+        if pol == drop:
+            return cls.get_drop()
+
+        typ = type(pol)
+        if issubclass(typ, DynamicFilter):
+            return cls.translate(pol.policy, pred)
+        if typ == match:
+            fmap = pol.map.items()
+            (f, v) = fmap[0]
+            res = Node((f, v), cls.get_id(pred), cls.get_drop())
+
+            for (f, v) in fmap[1:]:
+                new_match = Node((f, v), cls.get_id(pred), cls.get_drop())
+                res = cls.merge(res, new_match, {}, False)
+            return res
+
+        elif typ == negate:
+            inner_pol = cls.translate(pol.policies[0], pred)
+            return cls.neg(inner_pol, pred)
+       
+        elif issubclass(typ, union):
+            res = cls.translate(pol.policies[0], pred)            
+            for p in pol.policies[1:]:
+                p_fdd = cls.translate(p, pred)
+                res = cls.merge(res, p_fdd, {}, True)
+            return res
+        
+        if issubclass(typ, intersection):
+            res = cls.translate(pol.policies[0], pred)
+            for p in pol.policies[1:]:
+                p_fdd = cls.translate(p, pred)
+                res = cls.merge(res, p_fdd, {}, False)
+            return res
+        raise TypeError
+
+    @classmethod
+    def assign_path(cls, fdd, path, neg_cache):
+        if isinstance(fdd, Node):
+            (true_dict, false_set) = path
+            (f, v) = fdd.test
+            assert not f in true_dict
+            true_dict[f] = v
+            cls.assign_path(fdd.lchild, path, neg_cache)
+            del true_dict[f]
+            new_false = false_set | {(f, v)}
+            if not (f,v) in neg_cache:
+                neg_cache[(f,v)] = ~match(**{f:v})
+            cls.assign_path(fdd.rchild, (true_dict, new_false), neg_cache)
+        elif isinstance(fdd, Leaf):
+            (true_dict, false_set) = path
+            fdd.path = (true_dict.items(), false_set)
+        else:
+            raise TypeError
+
+
+class fdd_re_tree_gen(object):
+    token = TOKEN_START_VALUE
+    in_cg_list = []
+    out_cg_list = []
+
+    def __init__(self):
+        self.num_to_pred = {}
+        self.next = 0
+        self.neg_cache = {}
+
+        self.pred_to_atoms = {}
+        self.pred_to_leafs = {}
+        self.symbol_to_leaf = {}
+        self.symbol_to_pred = {}
+        self.leaf_list = []
+        self.base = None
+        self.dyn_preds = []
+
+    def clear(self):
+        self.num_to_pred = {}
+        self.next = 0
+        self.neg_cache = {}
+
+        self.pred_to_atoms = {}
+        self.pred_to_leafs = {}
+        self.symbol_to_leaf = {}
+        self.symbol_to_pred = {}
+        self.leaf_list = []
+        self.base = None
+        self.dyn_preds = []
+
+    @classmethod
+    def global_sym_list(cls):
+        res = []
+        for cg in cls.in_cg_list + cls.out_cg_list:
+            res.extend([l.token for l in cg.leaf_list])
+        return res
+
+    @classmethod
+    def global_dyn_list(cls):
+        res = []
+        for cg in cls.in_cg_list + cls.out_cg_list:
+            res.extend(cg.get_dyn_preds())
+        return res
+
+    class dyn_pred_obj(object):
+        """ A dynamic predicate occuring as a sub-policy in a bigger predicate."""
+        def __init__(self, pred, pol):
+            self.pred = pred
+            self.pol  = pol
+
+        def __hash__(self):
+            return id(self.pred) * id(self.pol)
+
+        def __eq__(self, other):
+            return (isinstance(other, re_tree_gen.dyn_pred_obj) and
+                    id(self.pred) == id(other.pred) and
+                    id(self.pol)  == id(other.pol))
+
+
+    def __add_dyn_preds__(self, preds, atom_pol):
+        """ Add each predicate in `preds` to list of dynamic predicates, with
+        the corresponding `atom`. """
+        for pred in preds:
+            dyn_obj = self.dyn_pred_obj(pred, atom_pol)
+            self.dyn_preds.append(dyn_obj)
+
+            
+    def add_pred(self, pred, at):
+        
+        """ Record dynamic predicates separately for update purposes."""
+        dyn_pols = path_policy_utils.get_dyn_pols(pred)
+        if dyn_pols:
+            """ If new_pred contains a dynamic predicate, it must be remembered
+            explicitly to set up recompilation routines in the runtime."""
+            self.__add_dyn_preds__(dyn_pols, at.policy)
+       
+        if pred in self.pred_to_atoms:
+            self.pred_to_atoms[pred].append(at)
+            return
+        
+        self.pred_to_atoms[pred] = [at]
+        self.num_to_pred[self.next] = pred
+        pred_fdd = FDDTranslator.translate(pred, self.next)
+        self.next += 1
+        #FDDTranslator.assign_path(pred_fdd, set())
+        if self.base == None:
+            self.base = pred_fdd
+        else:
+            self.base = FDDTranslator.merge(pred_fdd, self.base, {}, True)
+
+    def prep_re_tree(self):
+        FDDTranslator.assign_path(self.base, ({}, set()), self.neg_cache)
+        self.leaf_list = self.base.get_leaves()
+        for leaf in self.leaf_list:
+            if leaf.is_drop():
+                continue
+            sym = self.__new_symbol__()
+            leaf.symbol = sym
+            self.symbol_to_leaf[sym] = leaf
+            self.symbol_to_pred[sym] = leaf.get_pred(self.neg_cache)
+            for pred_id in leaf.pred_set:
+                pred = self.num_to_pred[pred_id]
+                if not pred in self.pred_to_leafs:
+                    self.pred_to_leafs[pred] = []
+                self.pred_to_leafs[pred].append(leaf)
+    
+    def get_re_tree(self, pred, at):
+        assert isinstance(at, abstract_atom)
+        assert isinstance(pred, Filter)
+         
+        if not pred in self.pred_to_leafs:
+            return re_empty()
+        
+        re_tree = re_empty()
+        for leaf in self.pred_to_leafs[pred]:
+            re_tree |= re_symbol(leaf.symbol, metadata=at)
+        return re_tree
+ 
+    def get_re_string(self, pred, at):
+        assert isinstance(at, abstract_atom)
+        assert isinstance(pred, Filter)
+         
+        if not pred in self.pred_to_leafs:
+            return "^any"
+        
+        syms = [str(leaf.symbol) for leaf in self.pred_to_leafs[pred]]
+        return '(' + string.join(syms, ')|(') + ')'
+
+    def get_leaf_preds(self):
+        output = ''
+        for sym in self.symbol_to_pred:
+            pred = self.symbol_to_pred[sym]
+            output += (str(sym) + ': ' + repr(pred) + '\n')
+        return output
+
+    
+    def get_unaffected_pred(self):
+        """ Predicate that covers packets unaffected by query predicates. """
+        pred_list = self.symbol_to_pred.values()
+        if len(pred_list) >= 1:
+            return ~(reduce(lambda a,x: a | x, pred_list))
+        else:
+            return identity
+
+    def __new_token__(self):
+        re_tree_gen.token += 2
+        if re_tree_gen.token > TOKEN_END_VALUE:
+            re_tree_gen.token = re_tree_gen.token_start
+
+    def __new_symbol__(self):
+        """ Returns a new token/symbol for a leaf-level predicate. """
+        self.__new_token__()
+        sym_list = re_tree_gen.global_sym_list()
+        while re_tree_gen.token in sym_list:
+            self.__new_token__()
+
+        return re_tree_gen.token
+
+class __fdd_in_re_tree_gen__(fdd_re_tree_gen):
+    """ Character generator for in_atom matches. """
+    def __init__(self):
+        super(__fdd_in_re_tree_gen__, self).__init__()
+        fdd_re_tree_gen.in_cg_list.append(self)
+
+class __fdd_out_re_tree_gen__(fdd_re_tree_gen):
+    """ Character generator for out_atom matches. """
+    def __init__(self):
+
+        super(__fdd_out_re_tree_gen__, self).__init__()
+        fdd_re_tree_gen.out_cg_list.append(self)
+
+           
 class re_tree_gen(object):
     """ A class that provides utilities to book-keep "leaf-level" predicates in
     a regular expression abstract syntax tree (AST), and return new re_deriv
@@ -967,6 +1441,8 @@ class path_empty(path):
     def gen_re_tree(self, in_cg, out_cg):
         return re_empty()
 
+    def gen_re_string(self, in_cg, out_cg):
+        return "^any"
 
 class abstract_atom(object):
     """A single atomic match in a path expression. This is an abstract class
@@ -982,6 +1458,7 @@ class abstract_atom(object):
         self.tree_counter = 0 # diagnostic; counts each time re_tree is set
         self.re_tree_class = re_tree_class
 
+    
     def gen_re_tree(self, cg):
         """ The internal representation of an abstract atom in terms of the
         constituent leaf-level predicates. """
@@ -1000,11 +1477,17 @@ class abstract_atom(object):
         self._re_tree = rt
         self.tree_counter += 1
 
+    def gen_re_string(self, cg):
+        return cg.get_re_string(self.policy, self)
+
     def invalidate_re_tree(self):
         """ Invalidate the internal representation in terms of regular
         expressions, for example, during recompilation. """
         self._re_tree = None
         self.tree_counter = 0
+
+    def add_to_fdd(self, cg):
+        cg.add_pred(self.policy, self)
 
     def __eq__(self, other):
         return (type(self) == type(other) and
@@ -1044,9 +1527,18 @@ class in_out_atom(path):
                          self.out_atom.gen_re_tree(out_cg))
         return self._re_tree
 
+    def gen_re_string(self, in_cg, out_cg):
+        re_string = ('(' + self.in_atom.gen_re_string(in_cg) + ').(' +
+                         self.out_atom.gen_re_string(out_cg) + ')')
+        return re_string
+
     def invalidate_re_tree(self):
         self.in_atom.invalidate_re_tree()
         self.out_atom.invalidate_re_tree()
+
+    def add_to_fdd(self, in_cg, out_cg):
+        self.in_atom.add_to_fdd(in_cg)
+        self.out_atom.add_to_fdd(out_cg)
 
     def __eq__(self, other):
         return (isinstance(other, in_out_atom) and
@@ -1168,7 +1660,10 @@ class path_alternate(path_combinator):
         for p in self.paths:
             tree = tree | p.gen_re_tree(in_cg, out_cg)
         return tree
-
+   
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ')|(') + ')'
 
 class path_star(path_combinator):
     """ Kleene star on a path. """
@@ -1184,6 +1679,8 @@ class path_star(path_combinator):
         p = self.paths[0]
         return +(p.gen_re_tree(in_cg, out_cg))
 
+    def gen_re_string(self, in_cg, out_cg):
+        return '(' + self.paths[0].gen_re_string(in_cg, out_cg) + ')*'
 
 class path_concat(path_combinator):
     """ Concatenation of paths. """
@@ -1218,6 +1715,9 @@ class path_concat(path_combinator):
             tree = tree ^ p.gen_re_tree(in_cg, out_cg)
         return tree
 
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ').(') + ')'
 
 class path_negate(path_combinator):
     """ Negation of paths. """
@@ -1233,6 +1733,8 @@ class path_negate(path_combinator):
         p = self.paths[0]
         return ~(p.gen_re_tree(in_cg, out_cg))
 
+    def gen_re_string(self, in_cg, out_cg):
+        return '!(' + self.paths[0] + ')'
 
 class path_inters(path_combinator):
     """ Intersection of paths. """
@@ -1249,6 +1751,11 @@ class path_inters(path_combinator):
         for p in self.paths:
             tree = tree & p.gen_re_tree(in_cg, out_cg)
         return tree
+
+    def gen_re_string(self, in_cg, out_cg):
+        words = map(lambda x : x.gen_re_string(in_cg, out_cg), self.paths)
+        return '(' + string.join(words, ')&(') + ')'
+
 
 #############################################################################
 ###                      Optimizations                                    ###
@@ -1675,6 +2182,23 @@ class pathcomp(object):
             raise TypeError("Can't prep re_tree for non-path-policy!")
 
     @classmethod
+    def __prep_fdd__(cls, acc, p, in_cg, out_cg):
+        def add_atoms(acc, x):
+            if isinstance(x, in_out_atom):
+                x.add_to_fdd(in_cg, out_cg)
+            return None
+
+        if (isinstance(p, path_policy) and
+            not isinstance(p, dynamic_path_policy) and
+            not isinstance(p, path_policy_union)):
+            path_policy_utils.path_ast_fold(p.path, add_atoms, None)
+            return None
+        elif isinstance(p, path_policy):
+            return None
+        else:
+            raise TypeError("Can't prep fdd for non-path-policy!")
+
+    @classmethod
     def __get_re_pols__(cls, acc, p, in_cg, out_cg):
         """ A reduce lambda which extracts an re and a policy to go with the re,
         from the AST of paths. """
@@ -1693,8 +2217,27 @@ class pathcomp(object):
             raise TypeError("Can't get re_pols from non-path-policy!")
 
     @classmethod
+    def __get_re_strings__(cls, acc, p, in_cg, out_cg):
+        """ A reduce lambda which extracts an re and a policy to go with the re,
+        from the AST of paths. """
+        (re_acc, pol_acc) = acc
+        """ Skip re extraction for all but the leaves of the path policy ast. """
+        if isinstance(p, dynamic_path_policy):
+            return acc
+        elif isinstance(p, path_policy_union):
+            return acc
+        elif isinstance(p, path_policy):
+            """ Reached a leaf """
+            tree = p.path.gen_re_string(in_cg, out_cg)
+            piped_pol = p.piped_policy
+            return (re_acc + [tree], pol_acc + [piped_pol])
+        else:
+            raise TypeError("Can't get re_pols from non-path-policy!")
+
+    @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
-            edge_contraction_enabled = False, partition_enabled = False):
+            edge_contraction_enabled = False, partition_enabled = False,
+            use_fdd = False):
         
         """ Initialize path-related structures, namely:
         - a new virtual field for path tag;
@@ -1709,7 +2252,7 @@ class pathcomp(object):
         cls.cache_enabled = cache_enabled
         cls.partition_enabled = partition_enabled
         cls.edge_contraction_enabled = edge_contraction_enabled
-    
+        cls.use_fdd = use_fdd 
     @classmethod
     @Stat.elapsed_time
     def pred_part(cls, path_pol, in_cg, out_cg):
@@ -1748,9 +2291,13 @@ class pathcomp(object):
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
         vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
-        in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
-                                   cls.partition_enabled)
-        out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+        if cls.use_fdd:
+            in_cg = __fdd_in_re_tree_gen__()
+            out_cg = __fdd_out_re_tree_gen__()
+        else:
+            in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                    cls.partition_enabled)
+            out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
                                      cls.partition_enabled)
 
         ''' Downstream compilation to get full policy to test. '''
@@ -1804,41 +2351,56 @@ class pathcomp(object):
                            disjoint_enabled=False, default_enabled=False,
                            integrate_enabled=False, ragel_enabled=False,
                            match_enabled=False, preddecomp_enabled=False):
+        @Stat.elapsed_time
+        def stage_pack_helper(query_list, path_pol, numstages):
+            if not isinstance(path_pol, path_empty):
+                # TODO(ngsrinivas): check whether rule-limit-driven or
+                # stage-limit-driven functions do better.
+                # i.e., pack_queries(query_list, 2000) versus the one below.
+                stages = pack_queries_stagelimited(query_list, numstages)
+            else:
+                stages = {0: [path_pol]}
+            return stages
+
         if isinstance(path_pol, path_policy_union):
             query_list = path_pol.path_policies
         else:
             query_list = [path_pol]
 
         if preddecomp_enabled:
-            stages = pack_queries(query_list, 2000)
+            numstages = MAX_STAGES
         else:
-            if not isinstance(path_pol, path_empty):
-                stages = pack_queries_stagelimited(query_list, 1)
-            else:
-                stages = {0: [path_pol]}
+            numstages = 1
+        stage_pack_helper(query_list, path_pol, numstages)
 
         in_res = []
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))
         for stage in stages.values():
-            in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
-            out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled, cls.partition_enabled)
+            if cls.use_fdd:
+                in_cg = __fdd_in_re_tree_gen__()
+                out_cg = __fdd_out_re_tree_gen__()
+            else:
+                in_cg = __in_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                        cls.partition_enabled)
+                out_cg = __out_re_tree_gen__(cls.swich_cnt, cls.cache_enabled,
+                                         cls.partition_enabled)
 
             if len(stage) == 1:
                 stage_path_pol = stage[0]
             else:
                 stage_path_pol = path_policy_union(stage)
-
-            (compile_res, _) = cls.compile_stage(stage_path_pol, in_cg, out_cg,
+            res = cls.compile_stage(stage_path_pol, in_cg, out_cg,
                                                  max_states, disjoint_enabled,
                                                  default_enabled, integrate_enabled,
                                                  ragel_enabled, match_enabled)
+            (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
             out_part = compile_res[sep_index:]
             in_res.append(in_part if len(in_part) != 1 else in_part[0])
             out_res.append(out_part if len(out_part) != 1 else out_part[0])
-        
+       
         return (in_res, out_res)
     
     @classmethod
@@ -1855,17 +2417,37 @@ class pathcomp(object):
         ast_fold = path_policy_utils.path_policy_ast_fold
         re_pols  = cls.__get_re_pols__
         inv_trees = cls.__invalidate_re_trees__
+        prep_fdd = cls.__prep_fdd__
         prep_trees = cls.__prep_re_trees__
-
+       
         
         in_cg.clear()
         out_cg.clear()
         ast_fold(path_pol, inv_trees, None, in_cg, out_cg)
-        
-        cls.log.debug('pred_part started')
-        cls.pred_part(path_pol, in_cg, out_cg)        
 
-        (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
+        @Stat.elapsed_time
+        def partition_fdd(ast_fold, path_pol, prep_fdd, in_cg, out_cg):
+            ast_fold(path_pol, prep_fdd, None, in_cg, out_cg)
+            in_cg.prep_re_tree()
+            out_cg.prep_re_tree()
+
+        @Stat.elapsed_time
+        def partition_nonfdd(path_pol, in_cg, out_cg):
+            cls.pred_part(path_pol, in_cg, out_cg)
+
+        if cls.use_fdd:
+            t_s = time.time()
+            partition_fdd(ast_fold, path_pol, prep_fdd, in_cg, out_cg)
+            cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
+            (re_list, pol_list) =  ast_fold(path_pol, cls.__get_re_strings__, ([], []), in_cg, out_cg)
+
+        else: 
+            cls.log.debug('pred_part started')
+            t_s = time.time()
+            partition_nonfdd(path_pol, in_cg, out_cg)
+            cls.log.debug('predicate partitioning: %f' % (time.time() - t_s))
+            (re_list, pol_list) =  ast_fold(path_pol, re_pols, ([], []), in_cg, out_cg)
+        
         cls.log.debug('compiling')
         res = cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states, 
                                 disjoint_enabled, default_enabled, 
@@ -2918,7 +3500,7 @@ class ragel_dfa_utils(common_dfa_utils):
         
         re_list_str = '\tmain := '
         for i,q in re_list:
-            re_list_str += '((' + q.re_string_repr() + (') @_%d)|' %i)
+            re_list_str += '((' + q + (') @_%d)|' %i)
         res += re_list_str[:-1] + ';}%%\n%% write data;'
         return res
 
@@ -3208,7 +3790,6 @@ def get_filter_type(pol):
     '''
 
     assert isinstance(pol, Filter)
-    
     if pol == identity:
         return set()
     elif pol == drop:
@@ -3229,7 +3810,6 @@ def get_filter_type(pol):
         raise TypeError
 
 def get_types_dict(query):    
-
     if isinstance(query, path_combinator):
         in_type = Counter()
         out_type = Counter()
@@ -3311,6 +3891,50 @@ def pack(type_list, limit, stagelimit=14):
                 raise TypeError
     return assgn
 
+def pack_stage(type_list, limit, max_stage):
+    stages = []
+    assgn = {}
+    range_dict = dict([(i, range(i)) for i in range(max_stage + 1)])
+    stage_len = 0
+    for (q, typ) in type_list:
+        assigned = False
+        min_cost = None
+        min_stage = None
+        min_type = None
+
+        for i in range_dict[stage_len]:
+            new_typ = join(stages[i], typ)
+            ((in_fset, in_cnt), (out_fset, out_cnt)) = new_typ 
+
+            cost = max(in_cnt , out_cnt)
+            if min_cost is None or cost < min_cost:
+                min_cost = cost
+                min_stage = i
+                min_type = new_typ
+
+            if in_cnt <= limit and out_cnt <= limit:
+                stages[i] = new_typ
+                if not i in assgn:
+                    assgn[i] = []
+                assgn[i].append(q)
+                assigned = True
+                break
+        if not assigned:
+            if stage_len == max_stage:
+                stages[min_stage] = min_type
+                assgn[min_stage].append(q)
+            else:
+                ((_, in_cnt), (_, out_cnt)) = typ 
+                if in_cnt <= limit and out_cnt <= limit:
+                    stages.append(typ)
+                    stage_len += 1
+                    assgn[stage_len - 1] = [q]
+                else:
+                    print q, in_cnt, out_cnt
+                    raise TypeError
+    return assgn
+
+
 def pack_stagelimited(type_list, numstages):
     stages = []
     assgn = {}
@@ -3355,7 +3979,7 @@ def pack_queries_stagelimited(queries, numstages):
     assert numstages > 0
     q_list = [get_type(q) for q in queries]
     q_list = zip(range(len(q_list)), q_list)
-    assgn = pack_stagelimited(q_list, numstages)
+    assgn = pack_stage(q_list, 2000, numstages)
     for i in assgn:
         res = []
         for qi in assgn[i]:

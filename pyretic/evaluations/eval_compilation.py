@@ -38,6 +38,7 @@ class eval_compilation:
         else:
             self.write_log = os.path.join('pyretic/evaluations',
                                           self.results_folder, 'rt_log.txt')
+        self.use_fdd = args.use_fdd
         
         opt_flags = (self.disjoint_enabled, self.default_enabled, 
                      self.integrate_enabled, self.multitable_enabled,
@@ -49,7 +50,7 @@ class eval_compilation:
         """ Start the frenetic compiler-server """
         netkat_out = None
         if not self.use_pyretic:
-            netkat_cmd = "bash start-frenetic.sh"
+            netkat_cmd = "bash ~/pyretic/start-frenetic.sh"
             try:
                 netkat_out = subprocess.Popen(netkat_cmd, shell=True,
                                           stderr=subprocess.STDOUT)
@@ -61,7 +62,8 @@ class eval_compilation:
         Stat.start(self.results_folder, (self.disjoint_enabled, self.integrate_enabled, self.multitable_enabled, self.ragel_enabled))
         self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
                                opt_flags = opt_flags, mode = 'proactive0',
-                               use_pyretic = self.use_pyretic, offline=True,
+                               use_pyretic = self.use_pyretic, use_fdd = self.use_fdd,
+                               offline=True,
                                write_log = self.write_log, restart_frenetic = False)
         Stat.stop()
         if netkat_out:
@@ -176,9 +178,11 @@ def parse_args():
     parser.add_argument('--use_pyretic', action="store_true",
                     dest = 'use_pyretic',
                     help = 'Use the pyretic compiler (uses netkat by default)')
-
     parser.add_argument('--write_log', dest="write_log",
                         help = "Runtime write log file location")
+    parser.add_argument('--use_fdd', action="store_true",
+                    dest = 'use_fdd',
+                    help = 'Use FDD for predicate decomposition')
 
     args = parser.parse_args()
 
@@ -220,8 +224,11 @@ def get_optimization_flags(args):
 if __name__ == '__main__':
     args = parse_args()
     print get_optimization_flags(args)
-
-    eval_comp = eval_compilation(args, get_testwise_params(args))
+    
+    #import cProfile
+    #cProfile.run('eval_comp = eval_compilation(args, get_testwise_params(args))')
+    eval_comp = eval_compilation(args, get_testwise_params(args)) 
+    print "Returned from eval_compilation"
     
     if args.added_query:
         for aq in args.added_query:
@@ -232,4 +239,3 @@ if __name__ == '__main__':
 
     sys.exit(0)
     
-

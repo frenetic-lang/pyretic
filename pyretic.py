@@ -148,6 +148,9 @@ def parseArgs():
     op.add_option('--write_log', dest="write_log",
                   help = ("Location of the runtime's write log for post-run"
                           "debugging"))
+    op.add_option('--use_fdd', action="store_true",
+                  dest = 'use_fdd',
+                  help = "Use FDD for predicate decomposition")
     op.set_defaults(frontend_only=False, mode='proactive0', enable_profile=False,
                     disjoint_enabled=False, default_enabled=False,
                     integrate_enabled=False, multitable_enabled=False,
@@ -155,7 +158,8 @@ def parseArgs():
                     switch_cnt=None, cache_enabled=False, 
                     edge_contraction_enabled=False,
                     preddecomp_enabled=False,
-                    nx=False, use_pyretic=False, write_log="rt_log.txt")
+                    nx=False, use_pyretic=False, use_fdd=False,
+                    write_log="rt_log.txt")
 
     options, args = op.parse_args()
 
@@ -264,6 +268,7 @@ def main():
                       opt_flags=opt_flags_arg, use_nx=options.nx,
                       pipeline=options.pipeline,
                       use_pyretic=options.use_pyretic,
+                      use_fdd=options.use_fdd,
                       write_log=options.write_log)
 
     """ Start pox backend. """
