@@ -1,14 +1,15 @@
 #!/bin/sh
 
-declare -a OPT_FLAGS_ARR=("-d -l" "-d -l -i" "-d -l -i -a" "-d -l -i -a -c" "-d -l -i -a -c -b")
+declare -a OPT_FLAGS_ARR=("" "-d -l" "-d -l -i" "-d -l -i -a" "-d -l -i -a -c" "-d -l -i -a -c -b")
 # declare -a OPT_NAMES_ARR=("disjoint" "integration" "partition" "cache" "preddecomp" "fdd")
-declare -a OPT_NAMES_ARR=("disjoint" "integration" "partition" "cache" "preddecomp")
-declare -a TESTS=("traffic_matrix_stanford" "congested_stanford" "ddos_stanford" "firewall_stanford" "path_loss_stanford" "slice_stanford")
+declare -a OPT_NAMES_ARR=("noopts" "disjoint" "integration" "partition" "cache" "preddecomp")
+declare -a TESTS=("ddos_stanford" "firewall_stanford" "path_loss_stanford" "slice_stanford")
 
 SCRIPT_LOG="pyretic/evaluations/script-log.txt"
 rm -f $SCRIPT_LOG
 
-CNT=5
+function run_tests {
+CNT=1
 for j in $(seq 1 $CNT)
 do
 
@@ -34,3 +35,12 @@ done # end opts loop
 done # end test loop
 
 done # end count loop
+}
+
+run_tests
+
+declare -a OPT_FLAGS_ARR=("-d -l -i" "-d -l -i -a" "-d -l -i -a -c" "-d -l -i -a -c -b")
+declare -a OPT_NAMES_ARR=("integration" "partition" "cache" "preddecomp")
+declare -a TESTS=("traffic_matrix_stanford" "congested_stanford" )
+
+run_tests
