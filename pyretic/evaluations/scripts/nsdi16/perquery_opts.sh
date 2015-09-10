@@ -9,6 +9,12 @@ declare -a TESTS=("congested_stanford" "traffic_matrix_stanford")
 CNT=5
 run_tests
 
+declare -a OPT_FLAGS_ARR=("")
+declare -a OPT_NAMES_ARR=("noopts")
+declare -a TESTS=("congested_stanford" "traffic_matrix_stanford")
+CNT=5
+run_tests
+
 # remove the `exit` below to generate full table of results
 exit 
 
