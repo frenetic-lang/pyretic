@@ -329,6 +329,7 @@ def to_pol(p):
                                      egress_network, sequential, fwd, if_,
                                      FwdBucket, DynamicPolicy, DerivedPolicy,
                                      Controller, _modify, CountBucket)
+  from pyretic.lib.path import QuerySwitch
   from pyretic.lib.netflow import NetflowBucket
   if isinstance(p, match):
     return mk_filter(to_pred(p))
@@ -364,8 +365,21 @@ def to_pol(p):
       return to_pol(p.policy)
   elif isinstance(p, DerivedPolicy):
       return to_pol(p.policy)
+  elif isinstance(p, QuerySwitch):
+      # TODO: is there a neater way of incorporating QuerySwitch?
+      return to_pol(cls_to_pol(p.netkat_compile()[0]))
   else:
     raise TypeError("unknown policy %s %s" % (type(p), repr(p)))
+
+def cls_to_pol(c):
+    from pyretic.core.language import parallel
+    p = None
+    for rule in c.rules:
+        if p:
+            p += (rule.match >> parallel(rule.actions))
+        else:
+            p = (rule.match >> parallel(rule.actions))
+    return p
 
 def mk_union(pols):
   return { "type": "union", "pols": pols }
