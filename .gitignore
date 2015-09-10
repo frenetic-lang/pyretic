@@ -45,4 +45,4 @@ rt_log.txt
 
 # evaluation log #
 ##################
-pyretic/evaluations/script-log.txt
+pyretic/evaluations/log-evals.txt
