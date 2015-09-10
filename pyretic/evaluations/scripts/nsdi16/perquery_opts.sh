@@ -6,6 +6,8 @@ declare -a OPT_NAMES_ARR=("noopts" "disjoint" "integration" "partition" "cache" 
 declare -a TESTS=("ddos_stanford" "firewall_stanford" "path_loss_stanford" "slice_stanford")
 
 SCRIPT_LOG="pyretic/evaluations/script-log.txt"
+PYCMD="/opt/pypy-2.4.0/bin/pypy"
+#PYCMD="python"
 rm -f $SCRIPT_LOG
 
 function run_tests {
@@ -27,8 +29,9 @@ do
     echo "Start time" | tee -a $SCRIPT_LOG
     date | tee -a $SCRIPT_LOG
     name=${OPT_NAMES_ARR[$i]}
-    echo sudo /opt/pypy-2.4.0/bin/pypy pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
-    sudo /opt/pypy-2.4.0/bin/pypy pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
+    echo sudo $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
+    sudo $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
+    echo "Done with run" $TEST $name $j | tee -a $SCRIPT_LOG
     i=$((i + DCR))
 done # end opts loop
 
