@@ -3,6 +3,7 @@ sys.path.append('/home/mina/pyretic')
 sys.path.append('/home/mina/mininet')
 import os
 import shutil
+import subprocess, shlex
 
 from pyretic.core.runtime import Runtime, NUM_PATH_TAGS
 from pyretic.core.language import *
@@ -46,10 +47,11 @@ class eval_compilation:
                      self.preddecomp_enabled
                      )
         """ Start the frenetic compiler-server """
+        netkat_out = None
         if not self.use_pyretic:
             netkat_cmd = "bash start-frenetic.sh"
             try:
-                output = subprocess.Popen(netkat_cmd, shell=True,
+                netkat_out = subprocess.Popen(netkat_cmd, shell=True,
                                           stderr=subprocess.STDOUT)
             except Exception as e:
                 print "Could not start frenetic server successfully."
@@ -60,8 +62,21 @@ class eval_compilation:
         self.runtime = Runtime(None, eval_path.main, eval_path.path_main, kwargs,
                                opt_flags = opt_flags, mode = 'proactive0',
                                use_pyretic = self.use_pyretic, offline=True,
-                               write_log = self.write_log, restart_frenetic = True)
+                               write_log = self.write_log, restart_frenetic = False)
         Stat.stop()
+        if netkat_out:
+            netkat_out.kill()
+        self.kill_netkat_server()
+
+    def kill_netkat_server(self):
+        print "Killing frenetic.."
+        kill_cmd = "sudo bash kill-frenetic.sh"
+        try:
+            netkat_out = subprocess.check_output(shlex.split(kill_cmd))
+        except Exception as e:
+            print "Could not kill the frenetic server."
+            print e
+            sys.exit(1)
     
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
@@ -214,5 +229,7 @@ if __name__ == '__main__':
             aparams = {'test': aq}
             print aparams 
             eval_comp.add(**aparams)
+
+    sys.exit(0)
     
 
