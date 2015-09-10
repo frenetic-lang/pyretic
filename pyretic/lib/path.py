@@ -2371,7 +2371,7 @@ class pathcomp(object):
             numstages = MAX_STAGES
         else:
             numstages = 1
-        stage_pack_helper(query_list, path_pol, numstages)
+        stages = stage_pack_helper(query_list, path_pol, numstages)
 
         in_res = []
         out_res = []
