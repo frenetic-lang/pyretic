@@ -9,7 +9,7 @@ SCRIPT_LOG="pyretic/evaluations/script-log.txt"
 rm -f $SCRIPT_LOG
 
 function run_tests {
-CNT=1
+CNT=5
 for j in $(seq 1 $CNT)
 do
 
