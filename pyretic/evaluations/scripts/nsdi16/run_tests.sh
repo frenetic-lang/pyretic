@@ -17,7 +17,7 @@ do
     date | tee -a $SCRIPT_LOG
     name=${OPT_NAMES_ARR[$i]}
     echo sudo $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
-    sudo $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
+    sudo timeout $RUN_TIMEOUT $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j | tee -a $SCRIPT_LOG
     echo "Done with run" $TEST $name $j | tee -a $SCRIPT_LOG
     i=$((i + DCR))
 done # end opts loop

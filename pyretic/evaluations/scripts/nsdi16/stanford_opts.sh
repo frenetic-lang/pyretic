@@ -1,13 +1,12 @@
 #!/bin/sh
 
-
 source pyretic/evaluations/scripts/nsdi16/run_tests.sh
 source pyretic/evaluations/scripts/nsdi16/init_settings.sh
 
 declare -a OPT_FLAGS_ARR=("-d -l" "")
 declare -a OPT_NAMES_ARR=("disjoint" "noopts")
 declare -a TESTS=("stanford")
-CNT=5
+CNT=1
 run_tests
 
 # remove the `exit` below to generate full table of results
