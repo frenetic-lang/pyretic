@@ -61,7 +61,8 @@ TOK_EGRESS = "egress"
 TOK_DROP = "drop"
 TOK_END_PATH = "end_path"
 TOK_HOOK = "ingress_hook"
-
+# limit on the number of stages for multi-stage table rule packing
+MAX_STAGES = 10
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
