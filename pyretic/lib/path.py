@@ -2452,7 +2452,7 @@ class pathcomp(object):
         cls.log.debug('compiling')
         res = cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states, 
                                 disjoint_enabled, default_enabled, 
-                                integrate_enabled, ragel_enabled)
+                                integrate_enabled, ragel_enabled, cls.use_fdd)
         return res
 
     @classmethod
@@ -2475,6 +2475,8 @@ class pathcomp(object):
         (re_list, pol_list) = ast_fold(cls.path_policy, re_pols, ([], []),
                                        in_cg, out_cg)
 
+        # TODO(ngsrinivas): this call will need to be refactored when we test
+        # incremental query addition.
         return cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states,
                                 disjoint_enabled, default_enabled,
                                 integrate_enabled, ragel_enabled)
@@ -2509,7 +2511,7 @@ class pathcomp(object):
                     ('pred_in_list', [], True), ('pred_out_list', [], True)])
     def compile_core(cls, re_list, pol_list, in_cg, out_cg, max_states,
                      disjoint_enabled, default_enabled,
-                     integrate_enabled, ragel_enabled):
+                     integrate_enabled, ragel_enabled, use_fdd):
 
         default_link = default_enabled
        
@@ -2534,11 +2536,13 @@ class pathcomp(object):
         if ragel_enabled:
             ragel_dfa_utils.init(in_cg, out_cg, cls.edge_contraction_enabled)
             du = ragel_dfa_utils
+            regexes_to_dfa_fun = lambda rlist: du.regexes_to_dfa(rlist, use_fdd=use_fdd)
         else:
             dfa_utils.init(in_cg, out_cg)
             du = dfa_utils
+            regexes_to_dfa_fun = du.regexes_to_dfa
 
-        dfa = du.regexes_to_dfa(re_list)
+        dfa = regexes_to_dfa_fun(re_list)
         assert du.get_num_states(dfa) <= max_states
         
 
@@ -3494,14 +3498,15 @@ class ragel_dfa_utils(common_dfa_utils):
         return cls.get_num_states(dfa)
 
     @classmethod
-    def regex_to_ragel_format(cls, re_list):
+    def regex_to_ragel_format(cls, re_list, use_fdd):
         res = '%%{\n\tmachine pyretic;\n\talphtype unsigned int;\n'
         for i in range(len(re_list)):
             res += '\taction _%d {}\n' % i
         
         re_list_str = '\tmain := '
         for i,q in re_list:
-            re_list_str += '((' + q + (') @_%d)|' %i)
+            q_str = q if use_fdd else q.re_string_repr()
+            re_list_str += '((' + q_str + (') @_%d)|' %i)
         res += re_list_str[:-1] + ';}%%\n%% write data;'
         return res
 
@@ -3551,9 +3556,9 @@ class ragel_dfa_utils(common_dfa_utils):
 
     @classmethod
     @Stat.elapsed_time
-    def regexes_to_dfa(cls, re_list):
+    def regexes_to_dfa(cls, re_list, use_fdd=False):
         re_list = zip(range(len(re_list)), re_list)
-        lex_input = cls.regex_to_ragel_format(re_list)
+        lex_input = cls.regex_to_ragel_format(re_list, use_fdd)
        
         lex_input_file = '/tmp/pyretic-regexes.txt'
         f = open(lex_input_file, 'w')
