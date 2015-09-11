@@ -216,7 +216,8 @@ def get_optimization_flags(args):
     params = []
     d = args.__dict__
     for arg in d:
-        if ('enabled' in arg or arg == 'switch_cnt') and d[arg]:
+        if (('enabled' in arg or arg == 'switch_cnt' or arg == 'use_fdd')
+            and d[arg]):
             params.append(arg)
 
     return params
