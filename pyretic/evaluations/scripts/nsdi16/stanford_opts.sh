@@ -1,6 +1,6 @@
 #!/bin/sh
 
-source pyretic/evaluations/scripts/nsdi16/run_tests.sh
+source pyretic/evaluations/scripts/nsdi16/run_stanford_tests.sh
 source pyretic/evaluations/scripts/nsdi16/init_settings.sh
 
 declare -a OPT_FLAGS_ARR=("-d -l" "")
