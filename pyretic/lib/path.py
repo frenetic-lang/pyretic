@@ -2352,7 +2352,6 @@ class pathcomp(object):
                            disjoint_enabled=False, default_enabled=False,
                            integrate_enabled=False, ragel_enabled=False,
                            match_enabled=False, preddecomp_enabled=False):
-        @Stat.elapsed_time
         def stage_pack_helper(query_list, path_pol, numstages):
             if not isinstance(path_pol, path_empty):
                 # TODO(ngsrinivas): check whether rule-limit-driven or
