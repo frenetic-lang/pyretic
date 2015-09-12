@@ -3,6 +3,15 @@
 source pyretic/evaluations/scripts/nsdi16/run_stanford_tests.sh
 source pyretic/evaluations/scripts/nsdi16/init_settings.sh
 
+declare -a OPT_FLAGS_ARR=("-d -l -i -a -c -b --use_fdd")
+declare -a OPT_NAMES_ARR=("fdd")
+declare -a TESTS=("stanford" "congested_stanford" "traffic_matrix_stanford" "ddos_stanford" "firewall_stanford" "path_loss_stanford" "slice_stanford")
+CNT=5
+run_tests
+
+# remove the `exit` below to generate full table of results
+exit;
+
 declare -a OPT_FLAGS_ARR=("-d -l")
 declare -a OPT_NAMES_ARR=("disjoint")
 declare -a TESTS=("congested_stanford" "traffic_matrix_stanford")

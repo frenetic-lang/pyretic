@@ -19,7 +19,8 @@ do
     name=${OPT_NAMES_ARR[$i]}
     run_cmd="sudo timeout $RUN_TIMEOUT $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s 16 $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j"
     echo $run_cmd | $cap_cmd
-    $run_cmd | $cap_cmd
+    $run_cmd 2>&1 | $cap_cmd
+    dmesg | tail -4 | $cap_cmd
     echo "Done with run" $TEST $name $j | $cap_cmd
     echo "End time" | $cap_cmd
     date | $cap_cmd
