@@ -1833,9 +1833,15 @@ class QuerySwitch(Policy):
         return c
     
     def netkat_compile(self, switch_cnt=None, multistage=True):
+        global rt_write_log
         from pyretic.core.classifier import Rule, Classifier
+        import cProfile, pstats, StringIO
         import time
+        pr = cProfile.Profile()
+        pr.enable()
         tot_time = 0
+        netkat_tot_time = 0
+        other_tot_time = 0
         t_s = time.time()
         def resolve_virtual_fields(act):
             try:
@@ -1856,11 +1862,13 @@ class QuerySwitch(Policy):
         final_rules = []
         for tag_value in self.policy_dic:
             tot_time += time.time() - t_s
+            other_tot_time += time.time() - t_s
             p_class = self.policy_dic[tag_value].netkat_compile(
                 switch_cnt=switch_cnt,
                 multistage=multistage)
             p_rules = p_class[0].rules
             tot_time += float(p_class[1])
+            netkat_tot_time += float(p_class[1])
             t_s = time.time()
             for r in p_rules:
                 new_match = r.match.intersect(match(**{self.tag : tag_value}))
@@ -1878,6 +1886,14 @@ class QuerySwitch(Policy):
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
         tot_time += time.time() - t_s
+        pr.disable()
+        s = StringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        rt_write_log.info(s.getvalue())
+        rt_write_log.info("netkat time: %d; other time: %d" % (netkat_tot_time,
+                                                               other_tot_time))
         return (c, str(tot_time))
 
     def __repr__(self):
