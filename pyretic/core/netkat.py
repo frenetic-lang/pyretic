@@ -331,11 +331,12 @@ def to_pol(p):
                                      Controller, _modify, CountBucket)
   from pyretic.lib.path import QuerySwitch
   from pyretic.lib.netflow import NetflowBucket
+  from pyretic.evaluations.Tests.common_modules.stanford_forwarding import StanfordForwarding
   if isinstance(p, match):
     return mk_filter(to_pred(p))
-  elif p == identity:
+  elif p is identity:
     return mk_filter({ "type": "true" })
-  elif p == drop:
+  elif p is drop:
     return mk_filter({ "type": "false" })
   elif isinstance(p, modify):
     return mod_to_pred(_modify(**p.map).map)
@@ -368,8 +369,10 @@ def to_pol(p):
   elif isinstance(p, QuerySwitch):
       # TODO: is there a neater way of incorporating QuerySwitch?
       return to_pol(cls_to_pol(p.netkat_compile()[0]))
+  elif isinstance(p, StanfordForwarding):
+      return to_pol(cls_to_pol(p.compile()))
   else:
-    raise TypeError("unknown policy %s %s" % (type(p), repr(p)))
+      raise TypeError("unknown policy %s %s" % (type(p), repr(p)))
 
 def cls_to_pol(c):
     from pyretic.core.language import parallel
