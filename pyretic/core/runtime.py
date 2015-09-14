@@ -92,7 +92,7 @@ class Runtime(object):
         """ If there are path-policies, initialize path query components. """
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled,
-                             use_fdd=use_fdd)
+                             use_fdd=use_fdd, write_log=self.write_log)
         """ Initialize a `policy map', which determines how the network policy
         is mapped onto the tables on switches. By default (i.e., a single stage
         table), the entire policy goes into the first table on each switch.
@@ -2118,7 +2118,7 @@ class Runtime(object):
 ###############################
 
     def init_path_query(self, path_main, kwargs, partition_cnt, cache_enabled,
-                        edge_contraction_enabled, use_fdd=False):
+                        edge_contraction_enabled, use_fdd=False, write_log=None):
         """
         Initialization of path query library with optimization parameters.
         * partition_cnt: how many partitions for predicate overlap detection?
@@ -2148,8 +2148,9 @@ class Runtime(object):
         if path_main:
             from pyretic.lib.path import pathcomp
             pathcomp.init(NUM_PATH_TAGS, self.sw_cnt(),
-                            self.cache_enabled, self.edge_contraction_enabled,
-                            self.partition_enabled, use_fdd = use_fdd)
+                          self.cache_enabled, self.edge_contraction_enabled,
+                          self.partition_enabled, use_fdd = use_fdd,
+                          write_log=write_log)
             t_s = time.time()
             self.path_policy = path_main(**kwargs)
             self.log.debug("query instantiation time : %f" % (time.time() - t_s))

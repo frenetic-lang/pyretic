@@ -63,6 +63,9 @@ TOK_END_PATH = "end_path"
 TOK_HOOK = "ingress_hook"
 # limit on the number of stages for multi-stage table rule packing
 MAX_STAGES = 10
+# Runtime write log, for a single place to log everything from the runtime
+# Default is None.
+rt_write_log=None
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -2237,23 +2240,26 @@ class pathcomp(object):
 
     @classmethod
     def init(cls, numvals, switch_cnt = None, cache_enabled = False,
-            edge_contraction_enabled = False, partition_enabled = False,
-            use_fdd = False):
+             edge_contraction_enabled = False, partition_enabled = False,
+             use_fdd = False, write_log = None):
         
         """ Initialize path-related structures, namely:
         - a new virtual field for path tag;
         - in and out character generators.
         """
+        global rt_write_log
         virtual_field(name="path_tag",
                       values=range(0, numvals),
                       type="integer")
        
-        
         cls.swich_cnt = switch_cnt
         cls.cache_enabled = cache_enabled
         cls.partition_enabled = partition_enabled
         cls.edge_contraction_enabled = edge_contraction_enabled
         cls.use_fdd = use_fdd 
+        if write_log:
+            rt_write_log = write_log
+
     @classmethod
     @Stat.elapsed_time
     def pred_part(cls, path_pol, in_cg, out_cg):
