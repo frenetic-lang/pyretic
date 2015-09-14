@@ -85,6 +85,14 @@ def static_fwding_chain_3_3():
                               (match(switch=3) >> fwd(2))))
         )
 
+def edge_network_cycle_4_4():
+    return (
+        match(switch=1, port=3) |
+        match(switch=2, port=3) |
+        match(switch=3, port=3) |
+        match(switch=4, port=3)
+    )
+
 def query_func(bucket, interval):
     while True:
         output = str(datetime.now())
@@ -445,6 +453,14 @@ def path_test_waypoint_violation_general():
     p = ((in_atom(ing & ~fw) ^ +in_atom(~fw) ^ out_atom(eg & ~fw)) |
          (in_out_atom(ing, eg & ~fw)))
     p.register_callback(query_callback("generalized_waypoint_violation"))
+    return p
+
+def path_test_waypoint_violation_general_static():
+    fw = match(switch=4)
+    edge = edge_network_cycle_4_4()
+    p = ((in_atom(edge & ~fw) ^ +in_atom(~fw) ^ out_atom(edge & ~fw)) |
+         (in_out_atom(edge, edge & ~fw)))
+    p.register_callback(query_callback("generalized_waypoint_violation_static"))
     return p
 
 def path_test_waypoint_violation_general_upstream():
