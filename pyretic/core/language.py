@@ -41,7 +41,7 @@ import logging
 from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.classifier import Rule, Classifier
-from pyretic.core.util import frozendict, singleton
+from pyretic.core.util import frozendict, singleton, SingletonMetaclass
 from pyretic.core.netkat import netkat_backend
 from pyretic.evaluations import stat
 
@@ -253,6 +253,7 @@ class Singleton(Filter):
     """Abstract policy from which Singletons descend"""
 
     _classifier = None
+    __metaclass__ = SingletonMetaclass
 
     def compile(self):
         """
@@ -269,8 +270,7 @@ class Singleton(Filter):
     def generate_classifier(self):
         return Classifier([Rule(identity, {self}, [self])])
 
-@singleton
-class identity(Singleton):
+class IdentityClass(Singleton):
     """The identity policy, leaves all packets unchanged."""
     def eval(self, pkt):
         """
@@ -292,10 +292,10 @@ class identity(Singleton):
         return ( id(self) == id(other)
             or ( isinstance(other, match) and len(other.map) == 0) )
 
-    
     def __repr__(self):
         return "identity"
 
+identity = IdentityClass() # Singleton instance used everywhere
 passthrough = identity   # Imperative alias
 true = identity          # Logic alias
 all_packets = identity   # Matching alias
@@ -336,8 +336,7 @@ false = drop             # Logic alias
 no_packets = drop        # Matching alias
 
 
-@singleton
-class Controller(Singleton):
+class ControllerClass(Singleton):
     def eval(self, pkt):
         return set()
 
@@ -346,6 +345,8 @@ class Controller(Singleton):
 
     def __repr__(self):
         return "Controller"
+
+Controller = ControllerClass() # singleton instance used everywhere
     
 class match(Filter):
     """
