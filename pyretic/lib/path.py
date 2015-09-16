@@ -1888,6 +1888,34 @@ class QuerySwitch(Policy):
             outq.put((tag_value, final_rules, netkat_time, other_time))
             return 0
 
+        def setwise_process(tag_field, outq, tag_policy_set, switch_cnt,
+                            multistage, comp_defaults, frenetic_port):
+            """ Compile a set of tag -> policy policies from the
+            QuerySwitch. This is the core compilation logic in QuerySwitch. """
+            for (tag_value, tag_policy) in tag_policy_set:
+                final_rules = []
+                p_class = tag_policy.netkat_compile(switch_cnt=switch_cnt,
+                                                    multistage=multistage,
+                                                    server_port=frenetic_port)
+                t_s = time.time()
+                p_rules = p_class[0].rules
+                netkat_time = float(p_class[1])
+                for r in p_rules:
+                    new_match = r.match.intersect(match(**{tag_field : tag_value}))
+                    new_match = new_match.compile().rules[0].match
+                    if new_match == drop:
+                        raise TypeError
+                    new_r = copy.copy(r)
+                    new_r.match = new_match
+                    if not new_r.actions:
+                        new_r.actions = comp_defaults
+                    new_r.parents = [r]
+                    new_r.op = "switch"
+                    final_rules.append(new_r)
+                other_time = time.time() - t_s
+                outq.put((tag_value, final_rules, netkat_time, other_time))
+            return 0
+
         def wait_outputs(unscheduled_remaining, num_completed, num_total,
                          tagwise_rules, outputs, queue_timeout=2,
                          max_retries=5):
@@ -1912,9 +1940,54 @@ class QuerySwitch(Policy):
                     if num_retries == 0:
                         return 0
 
-        def process_pool_compile(policy_dic, comp_defaults, tag, use_standard_port=False):
+        def chunks(l, n):
+            """ generate successive n-sized from a list l. """
+            for i in xrange(0, len(l), n):
+                yield l[i:i+n]
+
+        def pset_pool_compile(policy_dic, comp_defaults, tag,
+                               use_standard_port=False):
+            """ Implement a process pool where the querySwitch policies are
+            partitioned off among a pre-generated static number of
+            processes. There are no more than QS_MAX_PROCESSES spawned through
+            the entire time. """
+            outputs = multiprocessing.Queue()
+            q_timeout = 2
+            q_maxretries = 5
+            all_tagpols = [x for x in policy_dic.iteritems()]
+            chunk_size = (len(all_tagpols) / QS_MAX_PROCESSES) + 1
+            tagpolsets = list(chunks(all_tagpols, chunk_size))
+            assert len(tagpolsets) <= QS_MAX_PROCESSES
+            for tagpolset in tagpolsets:
+                rt_write_log.info("Spawning a new process with %d items" %
+                                  len(tagpolset))
+                proc_port = 0 if use_standard_port else (total_scheduled %
+                                                         QS_MAX_PROCESSES)
+                proc_port += NETKAT_PORT
+                p = Process(target=setwise_process,
+                            args=((tag, outputs,tagpolset,switch_cnt,
+                                   multistage, comp_defaults, proc_port)))
+                p.start()
+            num_completed = 0
+            num_total = len(policy_dic.keys())
+            tagwise_rules = []
+            completed = wait_outputs(False, num_completed, num_total,
+                                     tagwise_rules, outputs,
+                                     q_timeout, q_maxretries)
+            if completed > 0:
+                assert completed == num_total
+            else:
+                raise RuntimeError("Processes did not make enough progress in %d"
+                                   " seconds" % (q_timeout * q_maxretries))
+            rt_write_log.info("Got ALL the outputs back from processes!")
+            return tagwise_rules
+
+        def process_pool_compile(policy_dic, comp_defaults, tag,
+                                 use_standard_port=False):
             """ Implement a process pool to parallelize the compilation of
-            QuerySwitch over at most QS_MAX_PROCESSES processes. """
+            QuerySwitch over at most QS_MAX_PROCESSES processes. This method
+            spawns a new process for each new tag policy that's being
+            compiled."""
             outputs = multiprocessing.Queue()
             q_timeout = 2
             q_maxretries = 5
@@ -1993,10 +2066,10 @@ class QuerySwitch(Policy):
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         parallelize_frenetic = False
         phandles = start_frenetics() if parallelize_frenetic else []
-        tagwise_rules = process_pool_compile(self.policy_dic, comp_defaults,
-                                             self.tag,
-                                             use_standard_port=not
-                                             parallelize_frenetic)
+        # Try the "process-set" pool, instead of "process" pool, for compilation.
+        pool_method = pset_pool_compile
+        tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
+                                    use_standard_port=not parallelize_frenetic)
         if parallelize_frenetic:
             kill_frenetics(phandles)
         netkat_tot_time = 0.0
