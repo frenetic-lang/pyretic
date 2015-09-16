@@ -1940,9 +1940,15 @@ class QuerySwitch(Policy):
                                                           q_maxretries))
                 assert num_active_procs < QS_MAX_PROCESSES
                 rt_write_log.info("Schedule new compile process...")
+                # TODO: this isn't *ideal* load balancing; since processes don't
+                # necessarily complete in the order they were spawned.
+                proc_port = 0 if use_standard_port else (total_scheduled %
+                                                         QS_MAX_PROCESSES)
+                proc_port += NETKAT_PORT
                 p = Process(target=tagwise_process,
                             args=((tag, outputs,) + tagpol +
-                                  (switch_cnt, multistage, comp_defaults)))
+                                  (switch_cnt, multistage, comp_defaults,
+                                   proc_port)))
                 p.start()
                 total_scheduled += 1
                 num_active_procs += 1
@@ -1961,10 +1967,38 @@ class QuerySwitch(Policy):
             rt_write_log.info("Got ALL the outputs back from processes!")
             return tagwise_rules
 
+        def start_frenetics():
+            num_servers = QS_MAX_PROCESSES
+            plist = []
+            for proc in range(1, num_servers+1):
+                port = NETKAT_PORT + proc
+                netkat_cmd = "./frenetic compile-server --http-port %d" % port
+                try:
+                    phandle = subprocess.Popen(netkat_cmd, shell=True,
+                                               stderr=subprocess.STDOUT)
+                    rt_write_log.info("Executed command %s" % netkat_cmd)
+                    plist.append(phandle)
+                except Exception as e:
+                    print "Could not start frenetic server successfully."
+                    print e
+                    sys.exit(1)
+            return plist
+
+        def kill_frenetics(plist):
+            for p in plist:
+                p.kill()
+
         pr = cProfile.Profile()
         pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
-        tagwise_rules = process_pool_compile(self.policy_dic, comp_defaults, self.tag)
+        parallelize_frenetic = False
+        phandles = start_frenetics() if parallelize_frenetic else []
+        tagwise_rules = process_pool_compile(self.policy_dic, comp_defaults,
+                                             self.tag,
+                                             use_standard_port=not
+                                             parallelize_frenetic)
+        if parallelize_frenetic:
+            kill_frenetics(phandles)
         netkat_tot_time = 0.0
         other_tot_time = 0.0
         tot_time = 0.0
