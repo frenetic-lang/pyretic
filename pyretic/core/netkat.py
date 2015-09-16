@@ -121,6 +121,9 @@ class netkat_backend(object):
         def httplib_channel_compilation(pol):
             json_input = compile_to_netkat(pol)
             write_to_file(json_input, TEMP_INPUT)
+            if print_json:
+                cls.log().error("This is the JSON input:")
+                cls.log().error(str(json_input))
             headers = {"Content-Type": "application/x-www-form-urlencoded",
                        "Accept": "*/*"}
             ctime = '0'
@@ -133,6 +136,9 @@ class netkat_backend(object):
                 netkat_out = resp.read()
                 write_to_file(ctime, TEMP_HEADERS)
                 write_to_file(netkat_out, TEMP_OUTPUT)
+                if print_json:
+                    cls.log().error("This is the JSON output:")
+                    cls.log().error(netkat_out)
                 conn.close()
             except Exception as e:
                 cls.log().error(("Compiling with the netkat compilation" +
