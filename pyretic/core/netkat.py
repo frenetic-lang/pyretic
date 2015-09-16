@@ -63,7 +63,8 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False):
+    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False, return_json=False):
+        """ Generate JSON or classifier output from compiling an input policy. """
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
             sent to netkat. This is because netkat generates a separate copy of
@@ -81,7 +82,7 @@ class netkat_backend(object):
                 pred_policy = identity
             return pred_policy >> pol
 
-        def curl_channel_compilation(pol, qdict):
+        def curl_channel_compilation(pol):
             """ Communicate with the netKAT compile server through curl. """
             import subprocess
 
@@ -100,7 +101,6 @@ class netkat_backend(object):
             except subprocess.CalledProcessError:
                 print "error in calling frenetic"
 
-            cls = json_to_classifier(output, qdict, multistage)
             if print_json:
                 cls.log().error("This is the json output:")
                 cls.log().error(str(output))
@@ -111,9 +111,9 @@ class netkat_backend(object):
                     time = float(line[line.index(":") + 1:-1])
                     break
 
-            return (cls, time)
+            return (output, time)
 
-        def httplib_channel_compilation(pol, qdict):
+        def httplib_channel_compilation(pol):
             json_input = compile_to_netkat(pol)
             write_to_file(json_input, TEMP_INPUT)
             headers = {"Content-Type": "application/x-www-form-urlencoded",
@@ -133,13 +133,17 @@ class netkat_backend(object):
                 cls.log().error(("Compiling with the netkat compilation" +
                                  " server failed. (%s)") % str(e))
                 sys.exit(0)
-            classifier = json_to_classifier(netkat_out, qdict, multistage)
-            return (classifier, ctime)
+            return (netkat_out, ctime)
 
         pol = use_explicit_switches(pol)
         qdict = {str(id(b)) : b for b in get_buckets_list(pol)}
-        # return curl_channel_compilation(pol, qdict)
-        return httplib_channel_compilation(pol, qdict)
+        # return curl_channel_compilation(pol)
+        (cls_json, ctime) = httplib_channel_compilation(pol)
+        if not return_json:
+            classifier = json_to_classifier(cls_json, qdict, multistage)
+            return (classifier, ctime)
+        else:
+            return (cls_json, ctime)
 
 ##################### Helper functions #################
 

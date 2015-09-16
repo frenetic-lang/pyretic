@@ -147,7 +147,7 @@ class Policy(object):
         return "%s : %d" % (self.name(),id(self))
 
     def netkat_compile(self, switch_cnt=None, multistage=False,
-                       print_json=False, force_compile=False):
+                       print_json=False, force_compile=False, return_json=False):
         """
         Compile a policy using the netkat compiler.
 
@@ -162,6 +162,9 @@ class Policy(object):
         :param force_compile: disregard cached results and recompile policy
         anyway
         :type force_compile: boolean
+        :param return_json: make the netkat library return un-processed JSON,
+        instead of the pyretic classifier.
+        :type return_json: boolean
         :rtype: (Classifier, int)
         """
         comp_t = '0'
@@ -171,7 +174,8 @@ class Policy(object):
             (self._classifier, comp_t) = nb.generate_classifier(self,
                                                                 switch_cnt,
                                                                 multistage,
-                                                                print_json)
+                                                                print_json=print_json,
+                                                                return_json=return_json)
         return (self._classifier, comp_t)
 
 
