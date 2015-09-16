@@ -42,7 +42,7 @@ from pyretic.core import util
 from pyretic.core.network import *
 from pyretic.core.classifier import Rule, Classifier
 from pyretic.core.util import frozendict, singleton, SingletonMetaclass
-from pyretic.core.netkat import netkat_backend
+from pyretic.core.netkat import netkat_backend, NETKAT_PORT
 from pyretic.evaluations import stat
 
 from multiprocessing import Lock, Condition
@@ -147,7 +147,8 @@ class Policy(object):
         return "%s : %d" % (self.name(),id(self))
 
     def netkat_compile(self, switch_cnt=None, multistage=False,
-                       print_json=False, force_compile=False, return_json=False):
+                       print_json=False, force_compile=False, return_json=False,
+                       server_port=NETKAT_PORT):
         """
         Compile a policy using the netkat compiler.
 
@@ -165,6 +166,10 @@ class Policy(object):
         :param return_json: make the netkat library return un-processed JSON,
         instead of the pyretic classifier.
         :type return_json: boolean
+        :param server_port: post to a custom frenetic server port (useful to
+        parallelize policy compilations in libraries). Default is the
+        NETKAT_PORT 9000.
+        :type server_port: int
         :rtype: (Classifier, int)
         """
         comp_t = '0'
@@ -175,7 +180,8 @@ class Policy(object):
                                                                 switch_cnt,
                                                                 multistage,
                                                                 print_json=print_json,
-                                                                return_json=return_json)
+                                                                return_json=return_json,
+                                                                server_port=server_port)
         return (self._classifier, comp_t)
 
 

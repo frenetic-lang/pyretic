@@ -1843,6 +1843,8 @@ class QuerySwitch(Policy):
         import cProfile, pstats, StringIO
         import time
         from Queue import Empty as QE
+        import subprocess, shlex
+        from pyretic.core.netkat import NETKAT_PORT
 
         def resolve_virtual_fields(act):
             try:
@@ -1858,12 +1860,14 @@ class QuerySwitch(Policy):
                 return act
 
         def tagwise_process(tag_field, outq, tag_value, tag_policy,
-                               switch_cnt, multistage, comp_defaults):
+                            switch_cnt, multistage, comp_defaults,
+                            frenetic_port):
             """ This function computes the classifier for a given state
             (tag_value) specialized by the value of the state on all
             matches. This is core to the compilation logic of QuerySwitch. """
             p_class = tag_policy.netkat_compile(switch_cnt=switch_cnt,
-                                                multistage=multistage)
+                                                multistage=multistage,
+                                                server_port=frenetic_port)
             p_rules = p_class[0].rules
             netkat_time = float(p_class[1])
             t_s = time.time()
@@ -1908,7 +1912,7 @@ class QuerySwitch(Policy):
                     if num_retries == 0:
                         return 0
 
-        def process_pool_compile(policy_dic, comp_defaults, tag):
+        def process_pool_compile(policy_dic, comp_defaults, tag, use_standard_port=False):
             """ Implement a process pool to parallelize the compilation of
             QuerySwitch over at most QS_MAX_PROCESSES processes. """
             outputs = multiprocessing.Queue()

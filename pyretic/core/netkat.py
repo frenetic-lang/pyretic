@@ -63,7 +63,8 @@ class netkat_backend(object):
             return cls.log_writer
 
     @classmethod
-    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False, return_json=False):
+    def generate_classifier(cls, pol, switch_cnt, multistage, print_json=False,
+                            return_json=False, server_port=NETKAT_PORT):
         """ Generate JSON or classifier output from compiling an input policy. """
         def use_explicit_switches(pol):
             """ Ensure every switch in the network gets reflected in the policy
@@ -94,7 +95,11 @@ class netkat_backend(object):
             f.close()
 
             try:
-                output = subprocess.check_output(['curl', '-X', 'POST', 'localhost:9000/compile', '--data-binary', '@/tmp/in.json', '-D', '/tmp/header.txt'])
+                output = subprocess.check_output(['curl', '-X', 'POST',
+                                                  'localhost:%d/compile' %
+                                                  server_port, '--data-binary',
+                                                  '@/tmp/in.json', '-D',
+                                                  '/tmp/header.txt'])
                 f = open('/tmp/out.json', 'w')
                 f.write(output)
                 f.close()
@@ -121,7 +126,7 @@ class netkat_backend(object):
             ctime = '0'
             try:
                 # TODO: make the connection persist across compilations
-                conn = httplib.HTTPConnection("localhost", NETKAT_PORT)
+                conn = httplib.HTTPConnection("localhost", server_port)
                 conn.request("POST", NETKAT_DOM, json_input, headers)
                 resp = conn.getresponse()
                 ctime = resp.getheader(NETKAT_TIME_HDR, "-1")
