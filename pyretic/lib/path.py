@@ -1859,6 +1859,9 @@ class QuerySwitch(Policy):
 
         def tagwise_process(tag_field, outq, tag_value, tag_policy,
                                switch_cnt, multistage, comp_defaults):
+            """ This function computes the classifier for a given state
+            (tag_value) specialized by the value of the state on all
+            matches. This is core to the compilation logic of QuerySwitch. """
             p_class = tag_policy.netkat_compile(switch_cnt=switch_cnt,
                                                 multistage=multistage)
             p_rules = p_class[0].rules
@@ -1881,45 +1884,83 @@ class QuerySwitch(Policy):
             outq.put((tag_value, final_rules, netkat_time, other_time))
             return 0
 
+        def wait_outputs(unscheduled_remaining, num_completed, num_total,
+                         tagwise_rules, outputs, queue_timeout=2,
+                         max_retries=5):
+            """ This function implements the logic to wait for a spawned process
+            to complete its execution. Used by the process pool to implement
+            parallelized compilation over states. """
+            num_retries = max_retries
+            while True:
+                try:
+                    next_ruleset = outputs.get(block=True, timeout=2)
+                    tagwise_rules.append(next_ruleset)
+                    num_completed += 1
+                    rt_write_log.info("%d processes have completed" %
+                                      num_completed)
+                    if unscheduled_remaining or (num_completed == num_total):
+                        return num_completed
+                except QE:
+                    rt_write_log.error("Empty queue after waiting 2 sec")
+                    rt_write_log.info("%d processes have completed" %
+                                      num_completed)
+                    num_retries -= 1
+                    if num_retries == 0:
+                        return 0
+
+        def process_pool_compile(policy_dic, comp_defaults, tag):
+            """ Implement a process pool to parallelize the compilation of
+            QuerySwitch over at most QS_MAX_PROCESSES processes. """
+            outputs = multiprocessing.Queue()
+            q_timeout = 2
+            q_maxretries = 5
+            rt_write_log.info("Parallelizing %d jobs into %d processes" % (
+                len(policy_dic.keys()), QS_MAX_PROCESSES))
+            num_active_procs = 0
+            num_completed = 0
+            num_total = len(policy_dic.keys())
+            tagwise_rules = []
+            total_scheduled = 0
+            for tagpol in policy_dic.iteritems():
+                if num_active_procs >= QS_MAX_PROCESSES:
+                    rt_write_log.info("Max process threshold: wait for process results...")
+                    completed = wait_outputs(True, num_completed, num_total,
+                                             tagwise_rules, outputs,
+                                             q_timeout, q_maxretries)
+                    if completed > 0:
+                        num_completed = completed
+                        num_active_procs -= 1
+                    else:
+                        raise RuntimeError("Processes did not make enough progress"
+                                           "in %d seconds" % (q_timeout *
+                                                          q_maxretries))
+                assert num_active_procs < QS_MAX_PROCESSES
+                rt_write_log.info("Schedule new compile process...")
+                p = Process(target=tagwise_process,
+                            args=((tag, outputs,) + tagpol +
+                                  (switch_cnt, multistage, comp_defaults)))
+                p.start()
+                total_scheduled += 1
+                num_active_procs += 1
+                rt_write_log.info("Scheduled %d'th process (%d active)" %
+                                  (total_scheduled, num_active_procs))
+            # At most QS_MAX_PROCESSES compilations remain to finish; and
+            # they've all been scheduled by now.
+            completed = wait_outputs(False, num_completed, num_total,
+                                     tagwise_rules, outputs,
+                                     q_timeout, q_maxretries)
+            if completed > 0:
+                assert completed == num_total
+            else:
+                raise RuntimeError("Processes did not make enough progress in %d"
+                                   " seconds" % (q_timeout * q_maxretries))
+            rt_write_log.info("Got ALL the outputs back from processes!")
+            return tagwise_rules
+
         pr = cProfile.Profile()
         pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
-        outputs = multiprocessing.Queue()
-        rt_write_log.info("Parallelizing into %d processes" % (
-            len(self.policy_dic.keys())))
-        processes = []
-        for tagpol in self.policy_dic.iteritems():
-            p = Process(target=tagwise_process,
-                        args=((self.tag, outputs,) + tagpol +
-                              (switch_cnt, multistage, comp_defaults)))
-            processes.append(p)
-        for p in processes:
-            p.start()
-
-        rt_write_log.info("Starting to wait for process results...")
-        work_remaining = True
-        tagwise_rules = []
-        num_completed = 0
-        num_total = len(self.policy_dic.keys())
-
-        # TODO(ngsrinivas): Currently this is implementing the logic for a
-        # process pool in the middle of some compilation code, which is quite
-        # messy. Refactor.
-        while work_remaining:
-            try:
-                next_ruleset = outputs.get(block=True, timeout=2)
-                tagwise_rules.append(next_ruleset)
-                num_completed += 1
-                rt_write_log.info("%d processes have completed" % num_completed)
-                if num_completed == num_total:
-                    work_remaining = False
-                    break
-            except QE:
-                rt_write_log.error("Empty queue after waiting 2 sec")
-                rt_write_log.info("%d processes have completed" % num_completed)
-                pass
-
-        rt_write_log.info("Got ALL the outputs back from processes!")
+        tagwise_rules = process_pool_compile(self.policy_dic, comp_defaults, self.tag)
         netkat_tot_time = 0.0
         other_tot_time = 0.0
         tot_time = 0.0
