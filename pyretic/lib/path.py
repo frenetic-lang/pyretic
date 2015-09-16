@@ -66,6 +66,9 @@ MAX_STAGES = 10
 # Runtime write log, for a single place to log everything from the runtime
 # Default is None.
 rt_write_log=None
+# QuerySwitch compilation parallelism has this limit on maximum number of
+# spawned processes.
+QS_MAX_PROCESSES = 8
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -1831,18 +1834,16 @@ class QuerySwitch(Policy):
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
         return c
-    
+
     def netkat_compile(self, switch_cnt=None, multistage=True):
         global rt_write_log
+        import multiprocessing
+        from multiprocessing import Process
         from pyretic.core.classifier import Rule, Classifier
         import cProfile, pstats, StringIO
         import time
-        pr = cProfile.Profile()
-        pr.enable()
-        tot_time = 0
-        netkat_tot_time = 0
-        other_tot_time = 0
-        t_s = time.time()
+        from Queue import Empty as QE
+
         def resolve_virtual_fields(act):
             try:
                 if isinstance(act, modify):
@@ -1855,23 +1856,17 @@ class QuerySwitch(Policy):
                 return act
             except:
                 return act
-            
 
-        
-        comp_defaults = set(map(resolve_virtual_fields, self.default))
-        final_rules = []
-        for tag_value in self.policy_dic:
-            tot_time += time.time() - t_s
-            other_tot_time += time.time() - t_s
-            p_class = self.policy_dic[tag_value].netkat_compile(
-                switch_cnt=switch_cnt,
-                multistage=multistage)
+        def tagwise_process(tag_field, outq, tag_value, tag_policy,
+                               switch_cnt, multistage, comp_defaults):
+            p_class = tag_policy.netkat_compile(switch_cnt=switch_cnt,
+                                                multistage=multistage)
             p_rules = p_class[0].rules
-            tot_time += float(p_class[1])
-            netkat_tot_time += float(p_class[1])
+            netkat_time = float(p_class[1])
             t_s = time.time()
+            final_rules = []
             for r in p_rules:
-                new_match = r.match.intersect(match(**{self.tag : tag_value}))
+                new_match = r.match.intersect(match(**{tag_field : tag_value}))
                 new_match = new_match.compile().rules[0].match
                 if new_match == drop:
                     raise TypeError
@@ -1882,17 +1877,71 @@ class QuerySwitch(Policy):
                 new_r.parents = [r]
                 new_r.op = "switch"
                 final_rules.append(new_r)
+            other_time = time.time() - t_s
+            outq.put((tag_value, final_rules, netkat_time, other_time))
+            return 0
 
+        pr = cProfile.Profile()
+        pr.enable()
+        comp_defaults = set(map(resolve_virtual_fields, self.default))
+        outputs = multiprocessing.Queue()
+        rt_write_log.info("Parallelizing into %d processes" % (
+            len(self.policy_dic.keys())))
+        processes = []
+        for tagpol in self.policy_dic.iteritems():
+            p = Process(target=tagwise_process,
+                        args=((self.tag, outputs,) + tagpol +
+                              (switch_cnt, multistage, comp_defaults)))
+            processes.append(p)
+        for p in processes:
+            p.start()
+
+        rt_write_log.info("Starting to wait for process results...")
+        work_remaining = True
+        tagwise_rules = []
+        num_completed = 0
+        num_total = len(self.policy_dic.keys())
+
+        # TODO(ngsrinivas): Currently this is implementing the logic for a
+        # process pool in the middle of some compilation code, which is quite
+        # messy. Refactor.
+        while work_remaining:
+            try:
+                next_ruleset = outputs.get(block=True, timeout=2)
+                tagwise_rules.append(next_ruleset)
+                num_completed += 1
+                rt_write_log.info("%d processes have completed" % num_completed)
+                if num_completed == num_total:
+                    work_remaining = False
+                    break
+            except QE:
+                rt_write_log.error("Empty queue after waiting 2 sec")
+                rt_write_log.info("%d processes have completed" % num_completed)
+                pass
+
+        rt_write_log.info("Got ALL the outputs back from processes!")
+        netkat_tot_time = 0.0
+        other_tot_time = 0.0
+        tot_time = 0.0
+        final_rules = []
+        tag_field = self.tag
+        from pyretic.core.netkat import json_to_classifier, get_buckets_list
+        for (tag_value, tag_rules, netkat_time, other_time) in tagwise_rules:
+            final_rules += tag_rules
+            netkat_tot_time += netkat_time
+            other_tot_time += other_time
+            tot_time += (netkat_time + other_time)
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
-        tot_time += time.time() - t_s
         pr.disable()
         s = StringIO.StringIO()
         sortby = 'cumulative'
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
-        rt_write_log.info(s.getvalue())
-        rt_write_log.info("netkat time: %d; other time: %d" % (netkat_tot_time,
+        # TODO(ngsrinivas): remove profiling altogether after debugging
+        # parallelized code.
+        # rt_write_log.info(s.getvalue())
+        rt_write_log.info("netkat time: %f; other time: %f" % (netkat_tot_time,
                                                                other_tot_time))
         return (c, str(tot_time))
 
@@ -1911,6 +1960,8 @@ class QuerySwitch(Policy):
         return (isinstance(other, QuerySwitch) and self.tag == other.tag
                 and self.policy_dic == other.policy_dic
                 and self.default == other.default)
+
+
 #############################################################################
 ###                      Path query compilation                           ###
 #############################################################################
@@ -3672,6 +3723,7 @@ def pickle_dump(policy):
 
     while instance(policy, DynamicPolicy):
         policy = policy.policy
+        raise NotImplementedError
         # TODO(Mina)
         # ... add more stuff here.
         # ... need unpickling as well.
