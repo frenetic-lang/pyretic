@@ -200,6 +200,18 @@ def unip(v):
   else:
     raise TypeError(type(v))
 
+def stringip(v):
+  if isinstance(v, IPv4Network):
+    if v.prefixlen == 32:
+      sip = str(v.network)
+      return sip
+    else:
+      raise TypeError("%s: can't compress subnet into single IP" % type(v))
+  elif isinstance(v, str):
+    return '"%s"' % v
+  else:
+    raise TypeError(type(v))
+
 def unethaddr(v):
   return repr(v)
 
