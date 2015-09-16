@@ -2061,8 +2061,10 @@ class QuerySwitch(Policy):
             for p in plist:
                 p.kill()
 
-        pr = cProfile.Profile()
-        pr.enable()
+        profile_enabled = False
+        if profile_enabled:
+            pr = cProfile.Profile()
+            pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         parallelize_frenetic = False
         phandles = start_frenetics() if parallelize_frenetic else []
@@ -2085,14 +2087,12 @@ class QuerySwitch(Policy):
             tot_time += (netkat_time + other_time)
         final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
         c = Classifier(final_rules)
-        pr.disable()
-        s = StringIO.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        # TODO(ngsrinivas): remove profiling altogether after debugging
-        # parallelized code.
-        # rt_write_log.info(s.getvalue())
+        if profile_enabled:
+            pr.disable()
+            s = StringIO.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
         rt_write_log.info("netkat time: %f; other time: %f" % (netkat_tot_time,
                                                                other_tot_time))
         return (c, str(tot_time))
