@@ -41,6 +41,7 @@ NETKAT_TIME_HDR = "x-compile-time"
 TEMP_INPUT = "/tmp/temp.in.json"
 TEMP_HEADERS = "/tmp/temp.headers.txt"
 TEMP_OUTPUT = "/tmp/temp.out.json"
+NETKAT_DEBUG_BUILD = True
 
 class netkat_backend(object):
     """
@@ -230,19 +231,19 @@ def header_val(h, v):
   elif h == "vlan_id":
     return mk_header("vlan", v)
   elif h == "vlan_pcp":
-    return mk_header("vlanpcp", v)
+    return mk_header("vlanpcp", str(v)) if NETKAT_DEBUG_BUILD else mk_header("vlanpcp", v)
   elif h == "ethtype":
-    return mk_header("ethtype", v)
+    return mk_header("ethtype", str(v)) if NETKAT_DEBUG_BUILD else mk_header("ethtype", v)
   elif h == "protocol":
-    return mk_header("ipproto", v)
+    return mk_header("ipproto", str(v)) if NETKAT_DEBUG_BUILD else mk_header("ipproto", v)
   elif h == "srcip":
-    return mk_header("ip4src", unip(v))
+    return mk_header("ipSrc", stringip(v)) if NETKAT_DEBUG_BUILD else mk_header("ip4src", unip(v))
   elif h == "dstip":
-    return mk_header("ip4dst", unip(v))
+    return mk_header("ipDst", stringip(v)) if NETKAT_DEBUG_BUILD else mk_header("ip4dst", unip(v))
   elif h == "srcport":
-    return mk_header("tcpsrcport", v)
+    return mk_header("tcpsrcport", str(v)) if NETKAT_DEBUG_BUILD else mk_header("tcpsrcport", v)
   elif h == "dstport":
-    return mk_header("tcpdstport", v)
+    return mk_header("tcpdstport", str(v)) if NETKAT_DEBUG_BUILD else mk_header("tcpdstport", v)
   else:
     raise TypeError("bad header %s" % h)
 
@@ -510,11 +511,13 @@ def json_to_classifier(fname, qdict, multistage):
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id)
             action = create_action(rule['action'], multistage)
-            queries = get_queries_from_names(rule['queries'], qdict)
-            if rule['queries']:
+            # This check allows classifier construction to proceed whether or
+            # not there's a "queries" field in the rule.
+            if 'queries' in rule and rule['queries']:
+                queries = get_queries_from_names(rule['queries'], qdict)
                 pyrule = Rule(m, action | queries, [None], "netkat_query")
             else:
-                pyrule = Rule(m, action | queries, [None], "netkat")
+                pyrule = Rule(m, action, [None], "netkat")
             rules.append((prio, pyrule))
     #rules.sort()
     rules = [v for (k,v) in rules]
