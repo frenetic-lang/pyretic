@@ -1935,13 +1935,13 @@ class QuerySwitch(Policy):
                     tagwise_rules.append(next_ruleset)
                     num_completed += 1
                     num_retries = max_retries
-                    rt_write_log.info("%d processes have completed" %
-                                      num_completed)
+                    rt_write_log.info("%d outputs have completed (%d total)" %
+                                      (num_completed, num_total))
                     if unscheduled_remaining or (num_completed == num_total):
                         return num_completed
                 except QE:
                     rt_write_log.error("Empty queue after waiting 2 sec")
-                    rt_write_log.info("%d processes have completed" %
+                    rt_write_log.info("%d outputs have completed" %
                                       num_completed)
                     num_retries -= 1
                     if num_retries == 0:
