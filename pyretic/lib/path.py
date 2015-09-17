@@ -1968,7 +1968,7 @@ class QuerySwitch(Policy):
             the entire time. """
             outputs = multiprocessing.Queue()
             q_timeout = 2
-            q_maxretries = 5
+            q_maxretries = 20
             all_tagpols = [x for x in policy_dic.iteritems()]
             chunk_size = (len(all_tagpols) / QS_MAX_PROCESSES) + 1
             tagpolsets = list(chunks(all_tagpols, chunk_size))
