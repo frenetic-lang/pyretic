@@ -2051,9 +2051,10 @@ class QuerySwitch(Policy):
             plist = []
             for proc in range(1, num_servers+1):
                 port = NETKAT_PORT + proc
-                netkat_cmd = "./frenetic compile-server --http-port %d" % port
+                netkat_cmd = ("./frenetic compile-server --http-port %d"
+                              " --verbosity error" % port)
                 try:
-                    phandle = subprocess.Popen(netkat_cmd, shell=True,
+                    phandle = subprocess.Popen(shlex.split(netkat_cmd), #shell=True,
                                                stderr=subprocess.STDOUT)
                     rt_write_log.info("Executed command %s" % netkat_cmd)
                     plist.append(phandle)
