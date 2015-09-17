@@ -1964,11 +1964,11 @@ class QuerySwitch(Policy):
             chunk_size = (len(all_tagpols) / QS_MAX_PROCESSES) + 1
             tagpolsets = list(chunks(all_tagpols, chunk_size))
             assert len(tagpolsets) <= QS_MAX_PROCESSES
-            for tagpolset in tagpolsets:
+            iter_tagpolsets = zip(range(0, len(tagpolsets)), tagpolsets)
+            for (index, tagpolset) in iter_tagpolsets:
                 rt_write_log.info("Spawning a new process with %d items" %
                                   len(tagpolset))
-                proc_port = 0 if use_standard_port else (total_scheduled %
-                                                         QS_MAX_PROCESSES)
+                proc_port = 0 if use_standard_port else index
                 proc_port += NETKAT_PORT
                 p = Process(target=setwise_process,
                             args=((tag, outputs,tagpolset,switch_cnt,
