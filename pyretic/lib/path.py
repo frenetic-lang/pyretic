@@ -2051,6 +2051,7 @@ class QuerySwitch(Policy):
             return tagwise_rules
 
         def start_frenetics():
+            global par_frenetics_started
             par_frenetics_started = True
             num_servers = QS_MAX_PROCESSES
             plist = []
