@@ -2069,6 +2069,7 @@ class QuerySwitch(Policy):
             for p in plist:
                 p.kill()
 
+        t_s = time.time()
         profile_enabled = False
         if profile_enabled:
             pr = cProfile.Profile()
@@ -2109,8 +2110,10 @@ class QuerySwitch(Policy):
             sortby = 'cumulative'
             ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
             ps.print_stats()
+        wall_clock_time = time.time() - t_s
         rt_write_log.info("netkat time: %f; other time: %f" % (netkat_tot_time,
                                                                other_tot_time))
+        rt_write_log.info("wall clock time: %f" % wall_clock_time)
         return (c, str(tot_time))
 
     def __repr__(self):
