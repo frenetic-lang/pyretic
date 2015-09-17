@@ -1946,7 +1946,12 @@ class QuerySwitch(Policy):
                     rt_write_log.error("Empty queue after waiting 2 sec")
                     rt_write_log.info("%d outputs have completed" %
                                       num_completed)
-                    num_retries -= 1
+                    if num_completed > 0:
+                        # only subtract retries if we know outputs have started
+                        # coming already. Note: this is dangerous because it is
+                        # possible that the process waits indefinitely
+                        # for outputs forever.
+                        num_retries -= 1
                     if num_retries == 0:
                         return 0
 
