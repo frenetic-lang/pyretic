@@ -3781,20 +3781,42 @@ class ragel_dfa_utils(common_dfa_utils):
     @classmethod
     @Stat.elapsed_time
     def regexes_to_dfa(cls, re_list, use_fdd=False):
+        import cProfile, pstats, StringIO
+        import time
+        global rt_write_log
+        profile_enabled = True
+        lex_gen_time = 0.0
+        lex_write_time = 0.0
+        ragel_time = 0.0
+        graph_read_time = 0.0
+        dfa_attr_gen_time = 0.0
+        leaf_gen_time = 0.0
+        dfa_gen_time = 0.0
+        if profile_enabled:
+            pr = cProfile.Profile()
+            pr.enable()
+        t_s = time.time()
         re_list = zip(range(len(re_list)), re_list)
         lex_input = cls.regex_to_ragel_format(re_list, use_fdd)
-       
+        lex_gen_time = time.time() - t_s
+
+        t_s = time.time()
         lex_input_file = '/tmp/pyretic-regexes.txt'
         f = open(lex_input_file, 'w')
         f.write(lex_input)
         f.close()
+        lex_write_time = time.time() - t_s
         try:
             g = open('/tmp/graph.dot', 'w')
+            t_s = time.time()
             subprocess.call(['ragel', '-V', lex_input_file], stdout=g)
             g.close()
+            ragel_time = time.time() - t_s
+            t_s = time.time()
             g = open('/tmp/graph.dot')
             output = g.read()
             g.close()
+            graph_read_time = time.time() - t_s
         except subprocess.CalledProcessError as e:
             
             print "Error occured while running ragel"
@@ -3802,7 +3824,8 @@ class ragel_dfa_utils(common_dfa_utils):
             print e.returncode
             print e.cmd
             print e.output
-        
+
+        t_s = time.time()
         (accepting_states, state_num) = cls.get_accepting_states(output)
         if cls.edge_contraction_enabled:
             (edges, edge_ordinal) = cls.get_extended_edges_contracted(output)
@@ -3810,15 +3833,35 @@ class ragel_dfa_utils(common_dfa_utils):
             (edges, edge_ordinal) = cls.get_extended_edges(output)
         # Add missing edges going to dead states, if needed.
         cls.add_dead_edges(edges, state_num)
+        dfa_attr_gen_time = time.time() - t_s
        
         #print 'dfa stat count', state_num
         #print 'dfa edge count', len(edges)  
+        t_s = time.time()
         leaf_preds = (cls.in_cg.get_leaf_preds() +
                       cls.out_cg.get_leaf_preds())
        
         dfa_utils.__dump_file__(leaf_preds, '/tmp/symbols.txt')
+        leaf_gen_time = time.time() - t_s
 
+        t_s = time.time()
         dfa = ragel_dfa(state_num, accepting_states, None, edges, edge_ordinal)
+        dfa_gen_time = time.time() - t_s
+        if profile_enabled:
+            pr.disable()
+            s = StringIO.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            ps.print_stats()
+            rt_write_log.info(s.getvalue())
+        rt_write_log.info("Times:\n" +
+                          "lex_gen_time: %f\n" % lex_gen_time +
+                          "lex_write_time: %f\n" % lex_write_time +
+                          "ragel_time: %f\n" % ragel_time +
+                          "graph_read_time: %f\n" % graph_read_time +
+                          "dfa_attr_gen_time: %f\n" % dfa_attr_gen_time +
+                          "leaf_gen_time: %f\n" % leaf_gen_time +
+                          "dfa_gen_time: %f\n" % dfa_gen_time)
         return dfa
 
 
