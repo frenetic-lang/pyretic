@@ -143,7 +143,8 @@ class netkat_backend(object):
                 conn.close()
             except Exception as e:
                 cls.log().error(("Compiling with the netkat compilation" +
-                                 " server failed. (%s)") % str(e))
+                                 " server failed. (%s, port %d") % (
+                                     str(e), server_port))
                 sys.exit(0)
             return (netkat_out, ctime)
 

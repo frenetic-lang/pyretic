@@ -69,6 +69,8 @@ rt_write_log=None
 # QuerySwitch compilation parallelism has this limit on maximum number of
 # spawned processes.
 QS_MAX_PROCESSES = 8
+# Flag to remember if parallel Frenetic compilers have started
+par_frenetics_started=False
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -1845,6 +1847,7 @@ class QuerySwitch(Policy):
         from Queue import Empty as QE
         import subprocess, shlex
         from pyretic.core.netkat import NETKAT_PORT
+        global par_frenetics_started
 
         def resolve_virtual_fields(act):
             try:
@@ -2048,9 +2051,7 @@ class QuerySwitch(Policy):
             return tagwise_rules
 
         def start_frenetics():
-            rt_write_log.info("Existing frenetics:\n%s" %
-                              subprocess.check_output("pgrep frenetic",
-                                                      shell=True))
+            par_frenetics_started = True
             num_servers = QS_MAX_PROCESSES
             plist = []
             for proc in range(1, num_servers+1):
@@ -2068,10 +2069,6 @@ class QuerySwitch(Policy):
                     sys.exit(1)
             return plist
 
-        def kill_frenetics(plist):
-            for p in plist:
-                p.kill()
-
         t_s = time.time()
         profile_enabled = False
         if profile_enabled:
@@ -2081,13 +2078,11 @@ class QuerySwitch(Policy):
         parallelize_frenetic = True
         parallelize_compilation = True
         if parallelize_compilation:
-            phandles = start_frenetics() if parallelize_frenetic else []
+            phandles = start_frenetics() if parallelize_frenetic and not par_frenetics_started else []
             # Try the "process-set" pool, instead of "process" pool, for compilation.
             pool_method = pset_pool_compile
             tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
                                         use_standard_port=not parallelize_frenetic)
-            if parallelize_frenetic:
-                kill_frenetics(phandles)
         else:
             frenetic_port = NETKAT_PORT
             tagwise_rules = []
