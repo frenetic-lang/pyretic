@@ -1934,6 +1934,7 @@ class QuerySwitch(Policy):
                     next_ruleset = outputs.get(block=True, timeout=2)
                     tagwise_rules.append(next_ruleset)
                     num_completed += 1
+                    num_retries = max_retries
                     rt_write_log.info("%d processes have completed" %
                                       num_completed)
                     if unscheduled_remaining or (num_completed == num_total):
