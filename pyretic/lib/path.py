@@ -1859,9 +1859,8 @@ class QuerySwitch(Policy):
             except:
                 return act
 
-        def tagwise_process(tag_field, outq, tag_value, tag_policy,
-                            switch_cnt, multistage, comp_defaults,
-                            frenetic_port):
+        def tagwise_helper(tag_field, tag_value, tag_policy, switch_cnt,
+                           multistage, comp_defaults, frenetic_port):
             """ This function computes the classifier for a given state
             (tag_value) specialized by the value of the state on all
             matches. This is core to the compilation logic of QuerySwitch. """
@@ -1885,7 +1884,14 @@ class QuerySwitch(Policy):
                 new_r.op = "switch"
                 final_rules.append(new_r)
             other_time = time.time() - t_s
-            outq.put((tag_value, final_rules, netkat_time, other_time))
+            return (tag_value, final_rules, netkat_time, other_time)
+
+        def tagwise_process(tag_field, outq, tag_value, tag_policy,
+                            switch_cnt, multistage, comp_defaults,
+                            frenetic_port):
+            outq.put(tagwise_helper(tag_field, tag_value, tag_policy,
+                                    switch_cnt, multistage, comp_defaults,
+                                    frenetic_port))
             return 0
 
         def setwise_process(tag_field, outq, tag_policy_set, switch_cnt,
@@ -2067,19 +2073,27 @@ class QuerySwitch(Policy):
             pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         parallelize_frenetic = False
-        phandles = start_frenetics() if parallelize_frenetic else []
-        # Try the "process-set" pool, instead of "process" pool, for compilation.
-        pool_method = pset_pool_compile
-        tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
-                                    use_standard_port=not parallelize_frenetic)
-        if parallelize_frenetic:
-            kill_frenetics(phandles)
+        parallelize_compilation = False
+        if parallelize_compilation:
+            phandles = start_frenetics() if parallelize_frenetic else []
+            # Try the "process-set" pool, instead of "process" pool, for compilation.
+            pool_method = pset_pool_compile
+            tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
+                                        use_standard_port=not parallelize_frenetic)
+            if parallelize_frenetic:
+                kill_frenetics(phandles)
+        else:
+            frenetic_port = NETKAT_PORT
+            tagwise_rules = []
+            for (tag_value, tag_policy) in self.policy_dic.iteritems():
+                tagwise_rules.append(tagwise_helper(self.tag, tag_value, tag_policy,
+                                                    switch_cnt, multistage, comp_defaults,
+                                                    frenetic_port))
+        # Aggregate results and return the final classifier
         netkat_tot_time = 0.0
         other_tot_time = 0.0
         tot_time = 0.0
         final_rules = []
-        tag_field = self.tag
-        from pyretic.core.netkat import json_to_classifier, get_buckets_list
         for (tag_value, tag_rules, netkat_time, other_time) in tagwise_rules:
             final_rules += tag_rules
             netkat_tot_time += netkat_time
