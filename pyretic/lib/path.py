@@ -2073,8 +2073,8 @@ class QuerySwitch(Policy):
             pr = cProfile.Profile()
             pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
-        parallelize_frenetic = False
-        parallelize_compilation = False
+        parallelize_frenetic = True
+        parallelize_compilation = True
         if parallelize_compilation:
             phandles = start_frenetics() if parallelize_frenetic else []
             # Try the "process-set" pool, instead of "process" pool, for compilation.
