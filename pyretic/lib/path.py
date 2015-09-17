@@ -68,7 +68,7 @@ MAX_STAGES = 10
 rt_write_log=None
 # QuerySwitch compilation parallelism has this limit on maximum number of
 # spawned processes.
-QS_MAX_PROCESSES = 8
+QS_MAX_PROCESSES = 6
 # Flag to remember if parallel Frenetic compilers have started
 par_frenetics_started=False
 
