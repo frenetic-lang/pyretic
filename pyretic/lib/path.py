@@ -2048,6 +2048,9 @@ class QuerySwitch(Policy):
             return tagwise_rules
 
         def start_frenetics():
+            rt_write_log.info("Existing frenetics:\n%s" %
+                              subprocess.check_output("pgrep frenetic",
+                                                      shell=True))
             num_servers = QS_MAX_PROCESSES
             plist = []
             for proc in range(1, num_servers+1):
