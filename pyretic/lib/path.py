@@ -2073,7 +2073,12 @@ class QuerySwitch(Policy):
                     print "Could not start frenetic server successfully."
                     print e
                     sys.exit(1)
+            time.sleep(2) # to allow daemons to be started
             return plist
+
+        def kill_frenetics(phandles):
+            for p in phandles:
+                p.terminate()
 
         t_s = time.time()
         profile_enabled = False
@@ -2084,11 +2089,13 @@ class QuerySwitch(Policy):
         parallelize_frenetic = True
         parallelize_compilation = True
         if parallelize_compilation:
-            phandles = start_frenetics() if parallelize_frenetic and not par_frenetics_started else []
+            phandles = start_frenetics() if parallelize_frenetic else []
             # Try the "process-set" pool, instead of "process" pool, for compilation.
             pool_method = pset_pool_compile
             tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
-                                        use_standard_port=not parallelize_frenetic)
+                                        use_standard_port=not
+                                        parallelize_frenetic)
+            kill_frenetics(phandles)
         else:
             frenetic_port = NETKAT_PORT
             tagwise_rules = []
