@@ -10,7 +10,7 @@ import networkx as nx
 def get_topo():
     topo = nx.Graph()
     edge_map = {}
-    f = open('topo.txt', 'r')
+    f = open('pyretic/evaluations/Tests/rf3257/topo.txt', 'r')
     in_edge = False
     in_link = False
     for line in f.readlines():

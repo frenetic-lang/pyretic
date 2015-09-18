@@ -2091,7 +2091,7 @@ class QuerySwitch(Policy):
             pr.enable()
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         parallelize_frenetic = True
-        parallelize_compilation = True
+        parallelize_compilation = False
         docker_start = True
         if parallelize_compilation:
             phandles = (start_frenetics(docker_start) if parallelize_frenetic
