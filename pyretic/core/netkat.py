@@ -41,7 +41,7 @@ NETKAT_TIME_HDR = "x-compile-time"
 TEMP_INPUT = "/tmp/temp.in.json"
 TEMP_HEADERS = "/tmp/temp.headers.txt"
 TEMP_OUTPUT = "/tmp/temp.out.json"
-NETKAT_DEBUG_BUILD = True
+NETKAT_DEBUG_BUILD = False
 
 class netkat_backend(object):
     """

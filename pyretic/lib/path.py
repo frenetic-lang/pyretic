@@ -1838,6 +1838,7 @@ class QuerySwitch(Policy):
         return c
 
     def netkat_compile(self, switch_cnt=None, multistage=True):
+        """ QuerySwitch netkat compilation. """
         global rt_write_log
         import multiprocessing
         from multiprocessing import Process
@@ -1973,7 +1974,7 @@ class QuerySwitch(Policy):
             chunk_size = (len(all_tagpols) / QS_MAX_PROCESSES) + 1
             tagpolsets = list(chunks(all_tagpols, chunk_size))
             assert len(tagpolsets) <= QS_MAX_PROCESSES
-            iter_tagpolsets = zip(range(0, len(tagpolsets)), tagpolsets)
+            iter_tagpolsets = zip(range(1, len(tagpolsets)+1), tagpolsets)
             for (index, tagpolset) in iter_tagpolsets:
                 rt_write_log.info("Spawning a new process with %d items" %
                                   len(tagpolset))
@@ -2055,15 +2056,18 @@ class QuerySwitch(Policy):
             rt_write_log.info("Got ALL the outputs back from processes!")
             return tagwise_rules
 
-        def start_frenetics():
+        def start_frenetics(docker_start):
             global par_frenetics_started
             par_frenetics_started = True
             num_servers = QS_MAX_PROCESSES
             plist = []
             for proc in range(1, num_servers+1):
                 port = NETKAT_PORT + proc
-                netkat_cmd = ("./frenetic compile-server --http-port %d"
-                              " --verbosity error" % port)
+                if docker_start:
+                    netkat_cmd = ("bash start-docker.sh %d" % port)
+                else:
+                    netkat_cmd = ("./frenetic compile-server --http-port %d"
+                                  " --verbosity error" % port)
                 try:
                     phandle = subprocess.Popen(shlex.split(netkat_cmd), #shell=True,
                                                stderr=subprocess.STDOUT)
@@ -2088,8 +2092,11 @@ class QuerySwitch(Policy):
         comp_defaults = set(map(resolve_virtual_fields, self.default))
         parallelize_frenetic = True
         parallelize_compilation = True
+        docker_start = True
         if parallelize_compilation:
-            phandles = start_frenetics() if parallelize_frenetic else []
+            phandles = (start_frenetics(docker_start) if parallelize_frenetic
+                        else [])
+            time.sleep(1)
             # Try the "process-set" pool, instead of "process" pool, for compilation.
             pool_method = pset_pool_compile
             tagwise_rules = pool_method(self.policy_dic, comp_defaults, self.tag,
