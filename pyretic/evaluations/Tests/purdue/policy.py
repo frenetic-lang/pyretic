@@ -137,8 +137,8 @@ def path_loss_query(topo, edge_map):
    
     assert isinstance(topo, nx.Graph)
     
-    h1 = 63
-    h2 = 15
+    h1 = 46
+    h2 = 10
 
     shortest_path_length = nx.shortest_path_length(topo, h1, h2)
     paths = nx.all_simple_paths(topo, h1, h2, cutoff=shortest_path_length * 2)

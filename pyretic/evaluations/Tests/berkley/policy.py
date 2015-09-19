@@ -36,7 +36,7 @@ def ddos_query(topo, edge_map):
     ports = edge_map
     switches = ports.keys()
     
-    target = 31 
+    target = switches[0]
 
     port_pol = None
     
@@ -137,8 +137,8 @@ def path_loss_query(topo, edge_map):
    
     assert isinstance(topo, nx.Graph)
     
-    h1 = 33
-    h2 = 34
+    h1 = 3
+    h2 = 4
     shortest_path_length = nx.shortest_path_length(topo, h1, h2)
     paths = nx.all_simple_paths(topo, h1, h2, cutoff=shortest_path_length * 2)
     base_query = atom(match(switch = h1) & match(srcip=ip_h1) & match(dstip=ip_h2))
