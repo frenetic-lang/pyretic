@@ -29,7 +29,7 @@ def get_topo():
             src = int(parts[0])
             dst = int(parts[1])
             topo.add_edge(src, dst) 
-    nx.write_dot(topo, "graph.dot") 
+    # nx.write_dot(topo, "graph.dot")
     return topo, edge_map
 
 def ddos_query(topo, edge_map):
