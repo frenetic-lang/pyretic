@@ -1839,6 +1839,53 @@ class QuerySwitch(Policy):
 
     def netkat_compile(self, switch_cnt=None, multistage=True):
         """ QuerySwitch netkat compilation. """
+        from pyretic.core.classifier import Rule, Classifier
+        import time
+        tot_time = 0
+        t_s = time.time()
+        def resolve_virtual_fields(act):
+            try:
+                if isinstance(act, modify):
+                    r = act.compile().rules[0]
+                    (mod_act,) =  r.actions
+                    return mod_act
+                if isinstance(act, match):
+                    return act.compile().rules[0].match
+
+                return act
+            except:
+                return act
+
+        comp_defaults = set(map(resolve_virtual_fields, self.default))
+        final_rules = []
+        for tag_value in self.policy_dic:
+            tot_time += time.time() - t_s
+            p_class = self.policy_dic[tag_value].netkat_compile(
+                switch_cnt=switch_cnt,
+                multistage=multistage)
+            p_rules = p_class[0].rules
+            tot_time += float(p_class[1])
+            t_s = time.time()
+            for r in p_rules:
+                new_match = r.match.intersect(match(**{self.tag : tag_value}))
+                new_match = new_match.compile().rules[0].match
+                if new_match == drop:
+                    raise TypeError
+                new_r = copy.copy(r)
+                new_r.match = new_match
+                if not new_r.actions:
+                    new_r.actions = comp_defaults
+                new_r.parents = [r]
+                new_r.op = "switch"
+                final_rules.append(new_r)
+
+        final_rules.append(Rule(identity, comp_defaults, [self], "switch"))
+        c = Classifier(final_rules)
+        tot_time += time.time() - t_s
+        return (c, str(tot_time))
+
+    def netkat_compile_par(self, switch_cnt=None, multistage=True):
+        """ QuerySwitch netkat compilation; the parallel version. """
         global rt_write_log
         import multiprocessing
         from multiprocessing import Process
