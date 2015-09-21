@@ -14,13 +14,13 @@ echo '----' | $cap_cmd
 echo "Running test" $TEST | $cap_cmd
 i=0
 DCR=1
-for OPT_FLAGS in "${OPT_FLAGS_ARR[@]}"
+for QUERY_FLAGS in "${QUERY_FLAGS_ARR[@]}"
 do
     echo '-----' | $cap_cmd
     echo "Start time" | $cap_cmd
     date | $cap_cmd
-    name=${OPT_NAMES_ARR[$i]}
-    run_cmd="sudo timeout $RUN_TIMEOUT $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s $NUM_NODES $OPT_FLAGS -f evaluation_results/nsdi16/${TEST}_${name}_$j"
+    name=${QUERY_NAMES_ARR[$i]}
+    run_cmd="sudo timeout $RUN_TIMEOUT $PYCMD pyretic/evaluations/eval_compilation.py -t $TEST -u -r -s $NUM_NODES $OPT_FLAGS -polargs $QUERY_FLAGS -f evaluation_results/nsdi16/${name}_${TEST}_${OPT_NAME}_$j"
     echo $run_cmd | $cap_cmd
     $run_cmd 2>&1 | $cap_cmd
     dmesg | tail -4 | $cap_cmd
@@ -28,7 +28,7 @@ do
     echo "End time" | $cap_cmd
     date | $cap_cmd
     i=$((i + DCR))
-done # end opts loop
+done # end per-query-combination loop
 
 nodeindex=$((nodeindex + INCR))
 done # end test loop
