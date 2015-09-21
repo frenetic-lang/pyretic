@@ -10,7 +10,7 @@ import networkx as nx
 def get_topo():
     topo = nx.Graph()
     edge_map = {}
-    f = open('pyretic/evaluations/Tests/purdue/topo.txt', 'r')
+    f = open('pyretic/evaluations/Tests/rf1755/topo.txt', 'r')
     in_edge = False
     in_link = False
     for line in f.readlines():
@@ -29,7 +29,7 @@ def get_topo():
             src = int(parts[0])
             dst = int(parts[1])
             topo.add_edge(src, dst) 
-    
+    nx.write_dot(topo, "graph.dot") 
     return topo, edge_map
 
 def ddos_query(topo, edge_map):
@@ -137,19 +137,21 @@ def path_loss_query(topo, edge_map):
    
     assert isinstance(topo, nx.Graph)
     
-    h1 = 46
-    h2 = 10
+    h1 = 2 #4
+    h2 = 6 #7
 
     shortest_path_length = nx.shortest_path_length(topo, h1, h2)
-    paths = nx.all_simple_paths(topo, h1, h2, cutoff=shortest_path_length * 2)
-
+    paths = nx.all_simple_paths(topo, h1, h2, cutoff=shortest_path_length + 3)
+    
     base_query = atom(match(switch = h1) & match(srcip=ip_h1) & match(dstip=ip_h2))
     
     p = base_query
     
     prefix_queries = {}
-   
+  
+    cnt = 0
     for path in paths:
+        cnt += 1
         partial_query = base_query
         for hop in path:
             ind = path.index(hop)
@@ -160,7 +162,6 @@ def path_loss_query(topo, edge_map):
                 partial_query = partial_query ^ atom(match(switch = hop))
                 prefix_queries[prefix] = partial_query
                 p += partial_query
-    
     return p
 
 def get_slices(s):
@@ -272,6 +273,7 @@ def path_main(**kwargs):
 
     queries = [query_dict[q] for q in queries]
     (topo, edge_map) = get_topo()
+    
     path_policy = None
     for q in queries:
         path_query = q(topo, edge_map)
@@ -281,7 +283,6 @@ def path_main(**kwargs):
             path_policy += path_query
     
     return path_policy
-
 
 def main(**kwargs):
     return identity
