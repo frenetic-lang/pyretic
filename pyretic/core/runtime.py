@@ -2488,7 +2488,7 @@ class virtual_field:
         if 'vlan_id' not in fields:
             return {}
 
-        virtual_fields = virtual_field.fields
+        virtual_fields = cls.fields
         vf_names       = virtual_fields.keys()
         num = fields['vlan_pcp'] << 12 + fields['vlan_id']
 
