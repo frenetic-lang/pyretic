@@ -2413,6 +2413,25 @@ class virtual_field:
            virtual_field.stages[stage].append(self)
         except KeyError:
             virtual_field.stages[stage] = [self]
+        virtual_field.allocate_stage_bits()
+
+    @classmethod
+    def allocate_stage_bits(cls):
+        """Compute the bits used to represent virtual header fields at each stage.
+        """
+        stages_dict = cls.stages
+        fields_dict = cls.fields
+        import math
+        bit_offset = 0
+        stages = filter(lambda x: x <= stage, sorted(stages_dict.keys()))
+        cls.stage_offset_nbits = {}
+        for s in range(0, max(stages)):
+            cardinality_list = map(lambda x: x.cardinality, stages_dict[s])
+            num_total_values = reduce(lambda acc, x: acc * x,
+                                      cardinality_list, 1)
+            nbits = math.ceil(math.log(num_total_values, 2))
+            cls.stage_offset_nbits[s] = (bit_offset, nbits)
+            bit_offset += nbits
 
     def index(self,key):
         try:
