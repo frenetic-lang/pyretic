@@ -2409,6 +2409,10 @@ class virtual_field:
         self.cardinality = len(values) + 1
         self.type   = type
         virtual_field.fields[name] = self
+        try:
+           virtual_field.stages[stage].append(self)
+        except KeyError:
+            virtual_field.stages[stage] = [self]
 
     def index(self,key):
         try:
@@ -2482,6 +2486,7 @@ class virtual_field:
         }
 
 virtual_field.fields = {}
+virtual_field.stages = {}
 
 
 
