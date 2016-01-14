@@ -2401,9 +2401,10 @@ class ConcreteNetwork(Network):
 # Virtual Fields
 ################################################################################
 class virtual_field:
-    def __init__(self, name, values, type="string"):
+    def __init__(self, name, values, type="string", stage=0):
         self.name   = name
         self.values = values
+        self.stage = stage
         # We need a None value as well
         self.cardinality = len(values) + 1
         self.type   = type
