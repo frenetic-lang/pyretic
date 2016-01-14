@@ -2451,8 +2451,9 @@ class virtual_field:
 
     @classmethod
     def compress(cls,fields):
-        virtual_fields = virtual_field.fields
+        virtual_fields = cls.fields
         vf_names       = virtual_fields.keys()
+
 
         def vhs_to_num(fields):
             vheaders = dict(filter(lambda a: a[0] in vf_names, fields.iteritems()))
@@ -2460,17 +2461,26 @@ class virtual_field:
             # Just return -1 so that calling function knows that the predicate doesn't have any virtual
             # fields on it
             if len(vheaders) == 0: return -1
+            stages = set()
 
             for n in vf_names:
                 if n not in vheaders:
                     vheaders[n] = None
+                else:
+                    stages.add(virtual_fields[n].stage)
+            if len(stages) != 1:
+                raise RuntimeError("Can't compile virtual headers from different"
+                                   " stages together!")
+            active_stage = list(stages)[0]
+
             ret,temp = 0,1
             for n,vf in virtual_fields.iteritems():
-                ret *= temp
-                ret += vf.index(vheaders[n])
-                temp = vf.cardinality
+                if virtual_fields[n].stage == active_stage:
+                    ret *= temp
+                    ret += vf.index(vheaders[n])
+                    temp = vf.cardinality
 
-            return ret
+            return (ret,) + cls.stage_offset_nbits[active_stage] # (value, offset, nbits)
         return vhs_to_num(fields)
 
     @classmethod
@@ -2506,6 +2516,7 @@ class virtual_field:
 
 virtual_field.fields = {}
 virtual_field.stages = {}
+virtual_field.stage_offset_nbits = {}
 
 
 
