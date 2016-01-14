@@ -2497,11 +2497,14 @@ class virtual_field:
             # Just return -1 so that calling function knows that the predicate doesn't have any virtual
             # fields on it
             vfs = {}
-            tmp = num
-            for n,vf in reversed(virtual_fields.items()):
-                val    = tmp % vf.cardinality
-                tmp    = tmp / vf.cardinality
-                vfs[n] = vf.value(val)
+            for stage in cls.stages.keys():
+                (offset, nbits) = cls.stage_offset_nbits[stage]
+                tmp = (num >> offset) & ((1 << nbits) - 1)
+                for n,vf in reversed(virtual_fields.items()):
+                    if vf.stage == stage:
+                        val    = tmp % vf.cardinality
+                        tmp    = tmp / vf.cardinality
+                        vfs[n] = vf.value(val)
 
             return vfs
         return num_to_vhs(num)
