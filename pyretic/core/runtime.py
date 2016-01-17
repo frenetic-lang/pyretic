@@ -2510,11 +2510,16 @@ class virtual_field:
         return num_to_vhs(num)
 
     @classmethod
-    def map_to_vlan(cls,num):
+    def map_to_vlan(cls,compressed):
+        (num, offset, nbits) = compressed
         if num == -1: return {}
+        if num > (1 << 15):
+            raise RuntimeError("Too many virtual values to stuff into VLAN.")
         return {
-           "vlan_id" : 0b000111111111111 & num,
-           "vlan_pcp": 0b111000000000000 & num
+            "vlan_id" : 0b000111111111111 & num,
+            "vlan_pcp": 0b111000000000000 & num,
+            "vlan_offset": offset,
+            "vlan_nbits": nbits
         }
 
 virtual_field.fields = {}
