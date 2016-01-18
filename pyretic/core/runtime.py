@@ -2480,7 +2480,10 @@ class virtual_field:
                     ret += vf.index(vheaders[n])
                     temp = vf.cardinality
 
-            return (ret,) + cls.stage_offset_nbits[active_stage] # (value, offset, nbits)
+            (offset, nbits) = cls.stage_offset_nbits[active_stage]
+            # shift virtual headers into position
+            ret = (ret<<offset) & ((1<<nbits)-1)
+            return (ret, offset, nbits)
         return vhs_to_num(fields)
 
     @classmethod
