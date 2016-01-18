@@ -335,6 +335,11 @@ class POXClient(revent.EventMixin):
             match.dl_dst = pred['dstmac']
         if 'vlan_id' in pred:
             match.dl_vlan = pred['vlan_id']
+            # Checks to ensure correct use of VLANs with single-stage tables
+            assert 'vlan_total_stages' in pred
+            assert pred['vlan_total_stages'] == 1, ("Cannot use multi-stage "
+                "virtual header fields without enabling the multistage (--nx) "
+                "option.")
         if 'vlan_pcp' in pred:
             match.dl_vlan_pcp = pred['vlan_pcp']
         if 'protocol' in pred:

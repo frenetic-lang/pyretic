@@ -2520,6 +2520,7 @@ class virtual_field:
             "vlan_pcp": 0b111000000000000 & num,
             "vlan_offset": offset,
             "vlan_nbits": nbits
+            "vlan_total_stages": len(cls.stages.keys())
         }
 
 virtual_field.fields = {}

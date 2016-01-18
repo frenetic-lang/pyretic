@@ -53,7 +53,8 @@ NETKAT_CLASSIFIER_CACHE=True
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
-tagging_headers = ["vlan_id", "vlan_pcp", "vlan_offset", "vlan_nbits"]
+tagging_headers = ["vlan_id", "vlan_pcp", "vlan_offset", "vlan_nbits",
+                   "vlan_total_stages"]
 native_headers = basic_headers + tagging_headers
 location_headers = ["switch", "port"]
 compilable_headers = native_headers + location_headers
