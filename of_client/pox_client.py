@@ -436,6 +436,8 @@ class POXClient(revent.EventMixin):
                 if actions['vlan_id'] is None:
                     of_actions.append(of.ofp_action_strip_vlan())
                 else:
+                    assert 'vlan_total_stages' in actions
+                    assert actions['vlan_total_stages'] == 1
                     of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
             if 'vlan_pcp' in actions:
                 if actions['vlan_pcp'] is None:
