@@ -2423,9 +2423,9 @@ class virtual_field:
         fields_dict = cls.fields
         import math
         bit_offset = 0
-        stages = filter(lambda x: x <= stage, sorted(stages_dict.keys()))
+        stages = sorted(stages_dict.keys())
         cls.stage_offset_nbits = {}
-        for s in range(0, max(stages)):
+        for s in stages:
             cardinality_list = map(lambda x: x.cardinality, stages_dict[s])
             num_total_values = reduce(lambda acc, x: acc * x,
                                       cardinality_list, 1)
