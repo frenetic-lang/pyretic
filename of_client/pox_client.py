@@ -375,6 +375,8 @@ class POXClient(revent.EventMixin):
             match.of_eth_dst = packetaddr.EthAddr(pred['dstmac'])
         if 'vlan_id' in pred:
             assert 'vlan_pcp' in pred
+            assert 'vlan_offset' in pred and 'vlan_nbits' in pred
+            assert 'vlan_total_stages' in pred
             # Setting the 16-bit TCI: (from highest to least significant bits):
             # 3 bits vlan_pcp
             # 1 bit CFI forced to 1
@@ -383,7 +385,13 @@ class POXClient(revent.EventMixin):
             vlan_16bit = ((int(pred['vlan_pcp']) << 13) |
                           0x1000 |
                           (int(pred['vlan_id'])))
-            match.of_vlan_tci = vlan_16bit
+            if table_id == 0:
+                match.of_vlan_tci = vlan_16bit
+            else:
+                """ NXM_NX_REG3 is where we store the intermittent value of
+                VLAN. """
+                vlan_mask = ((1 << pred['vlan_nbits']) - 1) << pred['vlan_offset']
+                match.append(nx.NXM_NX_REG3(value=vlan_16bit, mask=vlan_mask))
         if 'ethtype' in pred:
             match.of_eth_type = pred['ethtype']
         if 'srcip' in pred:
