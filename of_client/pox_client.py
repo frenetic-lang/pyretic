@@ -511,6 +511,38 @@ class POXClient(revent.EventMixin):
                 """ Otherwise there are no physical outports; just a possibility
                 of resubmitting to the next table. Pass. """
 
+        """Construct routines to move packet VLAN into the register, do a masked write
+        into the register, and to write back the register into the packet.
+        """
+        vlan_reg = nx.NXM_NX_REG3
+        def vlan_load_reg():
+            if vlan_removed:
+                of_actions.append(nx.nx_reg_load(dst=vlan_reg,
+                                                 value=0, nbits=16))
+            else:
+                of_actions.append(nx.nx_reg_move(dst=vlan_reg,
+                                                 src=nx.NXM_OF_VLAN_TCI,
+                                                 nbits=16))
+
+        def vlan_masked_modify():
+            if vlan_removed:
+                of_actions.append(nx.nx_reg_load(dst=vlan_reg,
+                                                 value=0, nbits=16))
+            elif vlan_written:
+                vlan_16bit = ((int(vlan_written['pcp']) << 13) |
+                              0x1000 |
+                              (int(vlan_written['id'])))
+                load_value = ((vlan_16bit >> vlan_written['offset']) &
+                              ((1 << vlan_written['nbits'])-1))
+                of_actions.append(nx.nx_reg_load(dst=vlan_reg,
+                                                 value=load_value,
+                                                 offset=vlan_written['offset'],
+                                                 nbits=vlan_written['nbits']))
+        def vlan_write_back():
+            of_actions.append(nx.nx_reg_move(dst=nx.NXM_OF_VLAN_TCI,
+                                             src=vlan_reg,
+                                             nbits=16))
+
         """In general, actual packet forwarding may have to wait until the final table
         in the pipeline. This means we must determine if there is a "next" table
         that processes the packet from here, or if this is the last one.
