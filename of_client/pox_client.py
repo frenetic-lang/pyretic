@@ -592,6 +592,7 @@ class POXClient(revent.EventMixin):
             of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
         elif possibly_resubmit_next_table and (not exists_next_table):
             # (3) last stage of pipeline
+            vlan_write_back()
             if len(phys_outports) > 0: # fwd out of latest assigned ports
                 for p in phys_outports:
                     of_actions.append(of.ofp_action_output(port=p))
@@ -610,6 +611,13 @@ class POXClient(revent.EventMixin):
         # Act on packet with knowledge that subsequent tables must process it
         assert (possibly_resubmit_next_table and exists_next_table and
                 (not immediately_fwd))
+
+        # 1. Handle VLAN writing for resubmitted packets
+        if table_id == 0:
+            vlan_load_reg()
+        vlan_masked_write()
+
+        # 2. Handle packet forwarding for resubmitted packets
         next_table = pipeline.edges[table_id]
         if len(phys_outports) > 0:
             # move port register to latest assigned port values
