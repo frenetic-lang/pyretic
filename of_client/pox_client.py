@@ -468,6 +468,10 @@ class POXClient(revent.EventMixin):
         possibly_resubmit_next_table = False # should packet be passed on to next table?
         atleast_one_action = False
 
+        # vlan handling flags
+        vlan_removed = False
+        vlan_written = {}
+
         for actions in action_list:
             atleast_one_action = True
             if 'srcmac' in actions:
@@ -484,17 +488,15 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_tp_port.set_dst(actions['dstport']))
             if 'vlan_id' in actions:
                 if actions['vlan_id'] is None:
-                    of_actions.append(of.ofp_action_strip_vlan())
+                    vlan_removed = True
                 else:
-                    of_actions.append(of.ofp_action_vlan_vid(vlan_vid=actions['vlan_id']))
+                    assert 'vlan_pcp' in actions
+                    assert 'vlan_offset' in actions
+                    assert 'vlan_nbits' in actions
+                    vlan_written = {k: actions['vlan_' + k] for k in
+                                      ['pcp', 'offset', 'nbits', 'id']}
             if 'vlan_pcp' in actions:
-                if actions['vlan_pcp'] is None:
-                    if not actions['vlan_id'] is None:
-                        raise RuntimeError("vlan_id and vlan_pcp must be set together!")
-                    pass
-                else:
-                    of_actions.append(of.ofp_action_vlan_pcp(vlan_pcp=actions['vlan_pcp']))
-
+                assert 'vlan_id' in actions, "vlan_id and vlan_pcp must be set together"
             assert 'port' in actions
             outport = actions['port']
 
