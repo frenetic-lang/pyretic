@@ -2490,7 +2490,7 @@ class virtual_field:
 
             (offset, nbits) = cls.stage_offset_nbits[active_stage]
             # shift virtual headers into position
-            ret = (ret<<offset) & ((1<<nbits)-1)
+            ret = ret << offset
             return (ret, offset, nbits)
         return vhs_to_num(fields)
 
