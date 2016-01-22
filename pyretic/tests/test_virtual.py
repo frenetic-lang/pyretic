@@ -38,8 +38,15 @@ ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
 def start_new_test():
-    print "**** Test %s" % inspect.stack()[1][3]
+    print "**** Test %s" % inspect.stack()[1][3],
     virtual_field.clear()
+
+def vdict(**kw):
+    """ Get the compiled field=value dictionary from a match specification. """
+    return match(**kw).compile().rules[0].match.map
+
+def success():
+    print "PASS"
 
 def test_single_field_1():
     start_new_test()
