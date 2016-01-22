@@ -2482,11 +2482,15 @@ class virtual_field:
             active_stage = list(stages)[0]
 
             ret,temp = 0,1
-            for n,vf in virtual_fields.iteritems():
+            # sort the field name list to have deterministic ordering by field
+            # name
+            field_list = sorted(virtual_fields.items(), key=lambda z: z[0])
+            for n,vf in field_list:
                 if virtual_fields[n].stage == active_stage:
                     ret *= temp
                     ret += vf.index(vheaders[n])
                     temp = vf.cardinality
+
 
             (offset, nbits) = cls.stage_offset_nbits[active_stage]
             # shift virtual headers into position
@@ -2511,7 +2515,10 @@ class virtual_field:
             for stage in cls.stages.keys():
                 (offset, nbits) = cls.stage_offset_nbits[stage]
                 tmp = (num >> offset) & ((1 << nbits) - 1)
-                for n,vf in reversed(virtual_fields.items()):
+                # sort the field name list to have deterministic ordering by
+                # field name
+                field_list = sorted(virtual_field.items(), key=lambda z:z[0])
+                for n,vf in reversed(field_list):
                     if vf.stage == stage:
                         val    = tmp % vf.cardinality
                         tmp    = tmp / vf.cardinality
