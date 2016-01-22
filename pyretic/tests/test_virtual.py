@@ -114,6 +114,23 @@ def test_multi_stage_1():
     assert m2['vlan_id'] == 3 << 7
     success()
 
+def test_multi_stage_2():
+    start_new_test()
+    virtual_field("field11", range(0,10), type="integer", stage=0)
+    virtual_field("field21", range(0,10), type="integer", stage=1)
+    virtual_field("field12", range(0, 5), type="integer", stage=0)
+    virtual_field("field22", range(0, 5), type="integer", stage=1)
+    m1 = vdict(field11=0, field12=0, srcip=ip1)
+    assert (m1['vlan_total_stages'] == 2 and m1['vlan_id'] == 12 and
+            m1['vlan_offset'] == 0 and m1['vlan_nbits'] == 7)
+    m2 = vdict(field21=4, field22=3, dstip=ip3)
+    assert m2['vlan_total_stages'] == 2
+    assert m2['vlan_offset'] == 7
+    assert m2['vlan_nbits'] == 7
+    assert m2['vlan_id'] == (59 << 7) & ((1<<12)-1) # least 12 bits
+    assert m2['vlan_pcp'] == (59 << 7) & (((1<<3)-1)<<12) # 3 pcp bits *in place*
+    success()
+
 if __name__ == "__main__":
     test_single_field_1()
     test_single_field_2()
@@ -121,3 +138,4 @@ if __name__ == "__main__":
     test_single_stage_1()
     test_single_stage_2()
     test_multi_stage_1()
+    test_multi_stage_2()
