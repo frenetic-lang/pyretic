@@ -85,8 +85,39 @@ def test_single_stage_1():
     assert not 'vlan_id' in m4
     success()
 
+def test_single_stage_2():
+    start_new_test()
+    virtual_field("field11", range(0, 10), type="integer", stage=4)
+    virtual_field("field12", range(0, 5), type="integer", stage=4)
+    m1 = vdict(field11=0, field12=0, srcip=ip2)
+    assert m1['vlan_id'] == 12 and m1['vlan_nbits'] == 7
+    m2 = vdict(field11=4, field12=3, srcip=ip2)
+    assert m2['vlan_id'] == 59
+    m3 = vdict(field11=4, srcip=ip2)
+    assert m3['vlan_id'] == 55
+    m4 = vdict(srcip=ip3)
+    assert not 'vlan_id' in m4
+    success()
+
+def test_multi_stage_1():
+    start_new_test()
+    virtual_field("field11", range(0,10), type="integer", stage=0)
+    virtual_field("field12", range(0, 5), type="integer", stage=0)
+    virtual_field("field2", range(0, 15), type="integer", stage=1)
+    m1 = vdict(field11=4, field12=3, srcip=ip1)
+    assert (m1['vlan_total_stages'] == 2 and m1['vlan_id'] == 59 and
+            m1['vlan_offset'] == 0 and m1['vlan_nbits'] == 7)
+    m2 = vdict(field2=2, dstip=ip3)
+    assert m2['vlan_total_stages'] == 2
+    assert m2['vlan_offset'] == 7
+    assert m2['vlan_nbits'] == 4
+    assert m2['vlan_id'] == 3 << 7
+    success()
+
 if __name__ == "__main__":
     test_single_field_1()
     test_single_field_2()
     test_single_field_3()
     test_single_stage_1()
+    test_single_stage_2()
+    test_multi_stage_1()
