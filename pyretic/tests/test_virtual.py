@@ -31,15 +31,47 @@ from pyretic.core.language import *
 from pyretic.core.runtime import virtual_field
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
+import inspect
 
 ip1 = IPAddr('10.0.0.1')
 ip2 = IPAddr('10.0.0.2')
 ip3 = IPAddr('10.0.0.3')
 
-def test_single_field():
+def start_new_test():
+    print "**** Test %s" % inspect.stack()[1][3]
+    virtual_field.clear()
+
+def test_single_field_1():
+    start_new_test()
     virtual_field("test1", range(0, 10), type="integer")
     m = match(test1=4, srcip=ip1)
     print m.compile()
 
+def test_single_field_2():
+    start_new_test()
+    virtual_field("test2", range(0,15), type="integer")
+    m = match(test2=4, srcip=ip1)
+    print m.compile()
+
+def test_single_field_3():
+    start_new_test()
+    virtual_field("test3", range(0,16), type="integer")
+    m = match(test3=4, srcip=ip1)
+    print m.compile()
+
+def test_single_stage_1():
+    start_new_test()
+    virtual_field("field11", range(0, 10), type="integer")
+    virtual_field("field12", range(1, 5), type="integer")
+    m1 = match(field11=4, field12=3, srcip=ip2)
+    print m1.compile()
+    m2 = match(field11=4, srcip=ip2)
+    print m2.compile()
+    m3 = match(srcip=ip3)
+    print m3.compile()
+
 if __name__ == "__main__":
-    test_single_field()
+    test_single_field_1()
+    test_single_field_2()
+    test_single_field_3()
+    test_single_stage_1()
