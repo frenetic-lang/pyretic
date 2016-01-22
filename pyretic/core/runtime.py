@@ -2416,6 +2416,14 @@ class virtual_field:
         virtual_field.allocate_stage_bits()
 
     @classmethod
+    def clear(cls):
+        """ Clear all state associated with virtual header. Useful for unit
+        testing. """
+        cls.fields = {}
+        cls.stages = {}
+        cls.stage_offset_nbits = {}
+
+    @classmethod
     def allocate_stage_bits(cls):
         """Compute the bits used to represent virtual header fields at each stage.
         """
@@ -2429,7 +2437,7 @@ class virtual_field:
             cardinality_list = map(lambda x: x.cardinality, stages_dict[s])
             num_total_values = reduce(lambda acc, x: acc * x,
                                       cardinality_list, 1)
-            nbits = math.ceil(math.log(num_total_values, 2))
+            nbits = int(math.ceil(math.log(num_total_values, 2)))
             cls.stage_offset_nbits[s] = (bit_offset, nbits)
             bit_offset += nbits
 
@@ -2522,7 +2530,7 @@ class virtual_field:
             "vlan_id" : 0b000111111111111 & num,
             "vlan_pcp": 0b111000000000000 & num,
             "vlan_offset": offset,
-            "vlan_nbits": nbits
+            "vlan_nbits": nbits,
             "vlan_total_stages": len(cls.stages.keys())
         }
 
