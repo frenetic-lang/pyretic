@@ -51,31 +51,39 @@ def success():
 def test_single_field_1():
     start_new_test()
     virtual_field("test1", range(0, 10), type="integer")
-    m = match(test1=4, srcip=ip1)
-    print m.compile()
+    m = vdict(test1=4, srcip=ip1)
+    assert (m['vlan_id'] == 5 and m['vlan_total_stages'] == 1 and
+            m['vlan_nbits'] == 4)
+    success()
 
 def test_single_field_2():
     start_new_test()
     virtual_field("test2", range(0,15), type="integer")
-    m = match(test2=4, srcip=ip1)
-    print m.compile()
+    m = vdict(test2=14, srcip=ip1)
+    assert (m['vlan_id'] == 15 and m['vlan_total_stages'] == 1 and
+            m['vlan_nbits'] == 4)
+    success()
 
 def test_single_field_3():
     start_new_test()
     virtual_field("test3", range(0,16), type="integer")
-    m = match(test3=4, srcip=ip1)
-    print m.compile()
+    m = vdict(test3=4, srcip=ip1)
+    assert m['vlan_id'] == 5 and m['vlan_nbits'] == 5
+    success()
 
 def test_single_stage_1():
     start_new_test()
     virtual_field("field11", range(0, 10), type="integer")
-    virtual_field("field12", range(1, 5), type="integer")
-    m1 = match(field11=4, field12=3, srcip=ip2)
-    print m1.compile()
-    m2 = match(field11=4, srcip=ip2)
-    print m2.compile()
-    m3 = match(srcip=ip3)
-    print m3.compile()
+    virtual_field("field12", range(0, 5), type="integer")
+    m1 = vdict(field11=0, field12=0, srcip=ip2)
+    assert m1['vlan_id'] == 12 and m1['vlan_nbits'] == 7
+    m2 = vdict(field11=4, field12=3, srcip=ip2)
+    assert m2['vlan_id'] == 59
+    m3 = vdict(field11=4, srcip=ip2)
+    assert m3['vlan_id'] == 55
+    m4 = vdict(srcip=ip3)
+    assert not 'vlan_id' in m4
+    success()
 
 if __name__ == "__main__":
     test_single_field_1()
