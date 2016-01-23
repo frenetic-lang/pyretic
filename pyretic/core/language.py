@@ -53,8 +53,9 @@ NETKAT_CLASSIFIER_CACHE=True
 
 basic_headers = ["srcmac", "dstmac", "srcip", "dstip", "tos", "srcport", "dstport",
                  "ethtype", "protocol"]
-tagging_headers = ["vlan_id", "vlan_pcp", "vlan_offset", "vlan_nbits",
-                   "vlan_total_stages"]
+tagging_helper_headers = ["vlan_offset", "vlan_nbits", "vlan_total_stages"]
+tagging_native_headers = ["vlan_id", "vlan_pcp"]
+tagging_headers = tagging_native_headers + tagging_helper_headers
 native_headers = basic_headers + tagging_headers
 location_headers = ["switch", "port"]
 compilable_headers = native_headers + location_headers
@@ -514,7 +515,7 @@ class _match(match):
                     if pattern is None or not v in pattern:
                         return set()
             except Exception, e:
-                if pattern is not None:
+                if (not field in tagging_helper_headers) and pattern is not None:
                     return set()
         return {pkt}
 
