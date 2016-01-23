@@ -2481,16 +2481,14 @@ class virtual_field:
                                    " stages together!")
             active_stage = list(stages)[0]
 
-            ret,temp = 0,1
             # sort the field name list to have deterministic ordering by field
             # name
             field_list = sorted(virtual_fields.items(), key=lambda z: z[0])
+            ret = 0
             for n,vf in field_list:
                 if virtual_fields[n].stage == active_stage:
-                    ret *= temp
+                    ret *= vf.cardinality
                     ret += vf.index(vheaders[n])
-                    temp = vf.cardinality
-
 
             (offset, nbits) = cls.stage_offset_nbits[active_stage]
             # shift virtual headers into position
@@ -2505,7 +2503,7 @@ class virtual_field:
 
         virtual_fields = cls.fields
         vf_names       = virtual_fields.keys()
-        num = fields['vlan_pcp'] << 12 + fields['vlan_id']
+        num = (fields['vlan_pcp'] << 12) + fields['vlan_id']
 
         def num_to_vhs(num):
             # If we there are no virtual_fields specified we wouldn't want to match on them at all
@@ -2517,7 +2515,7 @@ class virtual_field:
                 tmp = (num >> offset) & ((1 << nbits) - 1)
                 # sort the field name list to have deterministic ordering by
                 # field name
-                field_list = sorted(virtual_field.items(), key=lambda z:z[0])
+                field_list = sorted(virtual_fields.items(), key=lambda z:z[0])
                 for n,vf in reversed(field_list):
                     if vf.stage == stage:
                         val    = tmp % vf.cardinality
@@ -2535,7 +2533,7 @@ class virtual_field:
             raise RuntimeError("Too many virtual values to stuff into VLAN.")
         return {
             "vlan_id" : 0b000111111111111 & num,
-            "vlan_pcp": 0b111000000000000 & num,
+            "vlan_pcp": (0b111000000000000 & num) >> 12,
             "vlan_offset": offset,
             "vlan_nbits": nbits,
             "vlan_total_stages": len(cls.stages.keys())
