@@ -158,6 +158,25 @@ def test_decode():
     assert 'field22' in m and m['field22'] == None
     success()
 
+def test_multi_stage_3():
+    start_new_test()
+    virtual_field("field1",  range(0,10), type="integer", stage=0)
+    virtual_field("field21", range(0,10), type="integer", stage=1)
+    virtual_field("field22", range(0, 4), type="integer", stage=1)
+    virtual_field("field3",  range(0, 5), type="integer", stage=2)
+    m1 = vdict(field21=5, field22=3, srcip=ip1)
+    assert m1['vlan_id'] == 28 << 4
+    assert m1['vlan_offset'] == 4
+    assert m1['vlan_nbits'] == 6
+    assert m1['vlan_total_stages'] == 3
+    m2 = vdict(field3=4, dstip=ip3)
+    vlan_16bit = 4 << 10
+    assert m2['vlan_id'] == vlan_16bit & ((1<<12)-1)
+    assert m2['vlan_pcp'] == vlan_16bit >> 12
+    assert m2['vlan_offset'] == 10
+    assert m2['vlan_nbits'] == 3
+    success()
+
 if __name__ == "__main__":
     test_single_field_1()
     test_single_field_2()
@@ -167,3 +186,4 @@ if __name__ == "__main__":
     test_multi_stage_1()
     test_multi_stage_2()
     test_decode()
+    test_multi_stage_3()
