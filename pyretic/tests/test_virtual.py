@@ -52,15 +52,16 @@ def test_single_field_1():
     start_new_test()
     virtual_field("test1", range(0, 10), type="integer")
     m = vdict(test1=4, srcip=ip1)
-    assert (m['vlan_id'] == 5 and m['vlan_total_stages'] == 1 and
-            m['vlan_nbits'] == 4)
+    assert m['vlan_id'] == 4
+    assert m['vlan_total_stages'] == 1
+    assert m['vlan_nbits'] == 4
     success()
 
 def test_single_field_2():
     start_new_test()
     virtual_field("test2", range(0,15), type="integer")
     m = vdict(test2=14, srcip=ip1)
-    assert (m['vlan_id'] == 15 and m['vlan_total_stages'] == 1 and
+    assert (m['vlan_id'] == 14 and m['vlan_total_stages'] == 1 and
             m['vlan_nbits'] == 4)
     success()
 
@@ -68,7 +69,7 @@ def test_single_field_3():
     start_new_test()
     virtual_field("test3", range(0,16), type="integer")
     m = vdict(test3=4, srcip=ip1)
-    assert m['vlan_id'] == 5 and m['vlan_nbits'] == 5
+    assert m['vlan_id'] == 4 and m['vlan_nbits'] == 5
     success()
 
 def test_single_stage_1():
@@ -76,11 +77,11 @@ def test_single_stage_1():
     virtual_field("field11", range(0, 10), type="integer")
     virtual_field("field12", range(0, 5), type="integer")
     m1 = vdict(field11=0, field12=0, srcip=ip2)
-    assert m1['vlan_id'] == 7 and m1['vlan_nbits'] == 7
+    assert m1['vlan_id'] == 0 and m1['vlan_nbits'] == 7
     m2 = vdict(field11=4, field12=3, srcip=ip2)
-    assert m2['vlan_id'] == 34
+    assert m2['vlan_id'] == 27
     m3 = vdict(field11=4, srcip=ip2)
-    assert m3['vlan_id'] == 30
+    assert m3['vlan_id'] == 29
     m4 = vdict(srcip=ip3)
     assert not 'vlan_id' in m4
     success()
@@ -90,11 +91,11 @@ def test_single_stage_2():
     virtual_field("field11", range(0, 10), type="integer", stage=4)
     virtual_field("field12", range(0, 5), type="integer", stage=4)
     m1 = vdict(field11=0, field12=0, srcip=ip2)
-    assert m1['vlan_id'] == 7 and m1['vlan_nbits'] == 7
+    assert m1['vlan_id'] == 0 and m1['vlan_nbits'] == 7
     m2 = vdict(field11=4, field12=3, srcip=ip2)
-    assert m2['vlan_id'] == 34
+    assert m2['vlan_id'] == 27
     m3 = vdict(field11=4, srcip=ip2)
-    assert m3['vlan_id'] == 30
+    assert m3['vlan_id'] == 29
     m4 = vdict(srcip=ip3)
     assert not 'vlan_id' in m4
     success()
@@ -105,13 +106,13 @@ def test_multi_stage_1():
     virtual_field("field12", range(0, 5), type="integer", stage=0)
     virtual_field("field2", range(0, 15), type="integer", stage=1)
     m1 = vdict(field11=4, field12=3, srcip=ip1)
-    assert (m1['vlan_total_stages'] == 2 and m1['vlan_id'] == 34 and
+    assert (m1['vlan_total_stages'] == 2 and m1['vlan_id'] == 27 and
             m1['vlan_offset'] == 0 and m1['vlan_nbits'] == 7)
     m2 = vdict(field2=2, dstip=ip3)
     assert m2['vlan_total_stages'] == 2
     assert m2['vlan_offset'] == 7
     assert m2['vlan_nbits'] == 4
-    assert m2['vlan_id'] == 3 << 7
+    assert m2['vlan_id'] == 2 << 7
     success()
 
 def test_multi_stage_2():
@@ -122,15 +123,15 @@ def test_multi_stage_2():
     virtual_field("field22", range(0, 5), type="integer", stage=1)
     m1 = vdict(field11=0, field12=0, srcip=ip1)
     assert m1['vlan_total_stages'] == 2
-    assert m1['vlan_id'] == 7
+    assert m1['vlan_id'] == 0
     assert m1['vlan_offset'] == 0
     assert m1['vlan_nbits'] == 7
     m2 = vdict(field21=4, field22=3, dstip=ip3)
     assert m2['vlan_total_stages'] == 2
     assert m2['vlan_offset'] == 7
     assert m2['vlan_nbits'] == 7
-    assert m2['vlan_id'] == (34 << 7) & ((1<<12)-1) # least 12 bits
-    assert m2['vlan_pcp'] == ((34 << 7) >> 12) & ((1<<3)-1) # highest 3 bits
+    assert m2['vlan_id'] == (27 << 7) & ((1<<12)-1) # least 12 bits
+    assert m2['vlan_pcp'] == ((27 << 7) >> 12) & ((1<<3)-1) # highest 3 bits
     success()
 
 def test_decode():
@@ -139,12 +140,12 @@ def test_decode():
     virtual_field("field21", range(0,10), type="integer", stage=1)
     virtual_field("field12", range(0, 5), type="integer", stage=0)
     virtual_field("field22", range(0, 5), type="integer", stage=1)
-    vlan_16bit = 8 + (34 << 7)
+    vlan_16bit = 2 + (27 << 7)
     vals = {'vlan_id': vlan_16bit & ((1<<12)-1),
             'vlan_pcp': (vlan_16bit >> 12) & ((1<<3)-1)}
     m = virtual_field.expand(vals)
     assert 'field11' in m and m['field11'] == 0
-    assert 'field12' in m and m['field12'] == 1
+    assert 'field12' in m and m['field12'] == 2
     assert 'field21' in m and m['field21'] == 4
     assert 'field22' in m and m['field22'] == 3
     success()
