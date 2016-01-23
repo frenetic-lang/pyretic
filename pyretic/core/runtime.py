@@ -2443,17 +2443,17 @@ class virtual_field:
 
     def index(self,key):
         try:
-            return self.values.index(key) + 1
+            return self.values.index(key)
         except ValueError as e:
             if key == None:
-                return 0
+                return len(self.values)
             raise e
 
     def value(self,index):
         try:
-            return self.values[index-1]
-        except ValueError as e:
-            if index == 0:
+            return self.values[index]
+        except IndexError as e:
+            if index == len(self.values):
                 return None
             raise e
 
