@@ -1730,6 +1730,13 @@ def virtual_field_untagging():
         # work with None. Since hosts still respond to packets with VLAN 0, we
         # retain this. (TODO: currently this is a brittle fix; need to fix
         # NetKat for a permanent solution.)
-        egress_network() >> _modify(vlan_id=0, vlan_pcp=0))+
-        (~egress_network()))
+        # FIXME: this will break NetKAT-based compilation, but it's a temp fix
+        # for testing the latest virtual header implementation with the pyretic
+        # compiler.
+        egress_network() >> _modify(vlan_id=None, vlan_pcp=None,
+                                    vlan_total_stages=1))+
+            (~egress_network()))
+        # Actual settings that work for NetKAT:
+        # egress_network() >> _modify(vlan_id=0, vlan_pcp=0))+
+        # (~egress_network()))
 
