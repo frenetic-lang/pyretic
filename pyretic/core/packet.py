@@ -539,6 +539,8 @@ class Packet(object):
         fixed_fields['source']   = ['srcip', 'srcmac']
         fixed_fields['dest']     = ['dstip', 'dstmac']
         order = ['location','vlocation','source','dest']
+        tagging_helper_headers = ['vlan_offset', 'vlan_nbits',
+                                  'vlan_total_stages']
         all_fields = self.header.keys()
         outer = []
         size = max(map(len, self.header) or map(len, order) or [len('md5'),0]) + 3
@@ -567,7 +569,7 @@ class Packet(object):
         ### ANY ADDITIONAL FIELDS
         for field in sorted(all_fields):
             try:             
-                if self.header[field]:
+                if self.header[field] and not field in tagging_helper_headers:
                     outer.append("%s:%s\t%s" % (field,
                                                 " " * (size - len(field)),
                                                 repr(self.header[field])))
