@@ -133,6 +133,20 @@ def test_multi_stage_2():
     assert m2['vlan_pcp'] == ((34 << 7) >> 12) & ((1<<3)-1) # highest 3 bits
     success()
 
+def test_decode():
+    start_new_test()
+    virtual_field("field11", range(0,10), type="integer", stage=0)
+    virtual_field("field21", range(0,10), type="integer", stage=1)
+    virtual_field("field12", range(0, 5), type="integer", stage=0)
+    virtual_field("field22", range(0, 5), type="integer", stage=1)
+    vlan_16bit = 8 + (34 << 7)
+    vals = {'vlan_id': vlan_16bit & ((1<<12)-1),
+            'vlan_pcp': (vlan_16bit >> 12) & ((1<<3)-1)}
+    m = virtual_field.expand(vals)
+    assert 'field11' in m and m['field11'] == 0
+    assert 'field12' in m and m['field12'] == 1
+    assert 'field21' in m and m['field21'] == 4
+    assert 'field22' in m and m['field22'] == 3
     success()
 
 if __name__ == "__main__":
@@ -143,3 +157,4 @@ if __name__ == "__main__":
     test_single_stage_2()
     test_multi_stage_1()
     test_multi_stage_2()
+    test_decode()
