@@ -148,6 +148,14 @@ def test_decode():
     assert 'field12' in m and m['field12'] == 2
     assert 'field21' in m and m['field21'] == 4
     assert 'field22' in m and m['field22'] == 3
+    vlan_16bit = 2 + (29 << 7)
+    vals = {'vlan_id': vlan_16bit & ((1<<12)-1),
+            'vlan_pcp': (vlan_16bit >> 12) & ((1<<3)-1)}
+    m = virtual_field.expand(vals)
+    assert 'field11' in m and m['field11'] == 0
+    assert 'field12' in m and m['field12'] == 2
+    assert 'field21' in m and m['field21'] == 4
+    assert 'field22' in m and m['field22'] == None
     success()
 
 if __name__ == "__main__":
