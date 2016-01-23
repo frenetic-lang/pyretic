@@ -71,6 +71,8 @@ rt_write_log=None
 QS_MAX_PROCESSES = 6
 # Flag to remember if parallel Frenetic compilers have started
 par_frenetics_started=False
+# Maximum number of states allowed
+NUM_PATH_TAGS=32000
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -2587,7 +2589,7 @@ class pathcomp(object):
     @classmethod
     def compile_upstream(cls, path_pol, switch_ports, network_links, fwding,
                          sw_cnt,
-                         max_states=65000, disjoint_enabled=False,
+                         max_states=NUM_PATH_TAGS, disjoint_enabled=False,
                          default_enabled=False, integrate_enabled=False,
                          ragel_enabled=False, match_enabled=False):
         """ Generates a policy corresponding to upstream path queries. """
@@ -2657,7 +2659,7 @@ class pathcomp(object):
         return up_capture
 
     @classmethod
-    def compile_downstream(cls, path_pol, max_states=65000,
+    def compile_downstream(cls, path_pol, max_states=NUM_PATH_TAGS,
                            disjoint_enabled=False, default_enabled=False,
                            integrate_enabled=False, ragel_enabled=False,
                            match_enabled=False, preddecomp_enabled=False):
@@ -2714,7 +2716,7 @@ class pathcomp(object):
     
     @classmethod
     @Stat.elapsed_time
-    def compile_stage(cls, path_pol, in_cg, out_cg, max_states=65000, 
+    def compile_stage(cls, path_pol, in_cg, out_cg, max_states=NUM_PATH_TAGS,
             disjoint_enabled=False, default_enabled = False, 
             integrate_enabled=False, ragel_enabled = False, match_enabled = False):
         """ Compile the list of paths along with the forwarding policy `fwding`
@@ -2765,7 +2767,7 @@ class pathcomp(object):
 
     @classmethod
     @Stat.elapsed_time
-    def add_query(cls, path_pol, max_states = 65000, disjoint_enabled = False, default_enabled = False, 
+    def add_query(cls, path_pol, max_states = NUM_PATH_TAGS, disjoint_enabled = False, default_enabled = False,
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
         
         classifier_utils.__set_init_vars__(match_enabled)
