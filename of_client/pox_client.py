@@ -584,9 +584,21 @@ class POXClient(revent.EventMixin):
                                                  nbits=1))
 
         def vlan_write_back():
-            of_actions.append(nx.nx_reg_move(dst=nx.NXM_OF_VLAN_TCI,
-                                             src=vlan_reg,
-                                             nbits=16))
+            """ The write back operation is slightly complicated for reasons
+            described under `vlan_load_reg()`. """
+            if table_id > 0:
+                of_actions.append(nx.nx_reg_move(src=vlan_reg,
+                                                 dst=nx.NXM_OF_VLAN_TCI,
+                                                 src_ofs=0, dst_ofs=0,
+                                                 nbits=12))
+                of_actions.append(nx.nx_reg_move(src=vlan_reg,
+                                                 dst=nx.NXM_OF_VLAN_TCI,
+                                                 src_ofs=12, dst_ofs=13,
+                                                 nbits=3))
+                of_actions.append(nx.nx_reg_move(src=vlan_reg,
+                                                 dst=nx.NXM_OF_VLAN_TCI,
+                                                 src_ofs=15, dst_ofs=12,
+                                                 nbits=1))
 
         """In general, actual packet forwarding may have to wait until the final table
         in the pipeline. This means we must determine if there is a "next" table
@@ -634,6 +646,7 @@ class POXClient(revent.EventMixin):
             of_actions = []
         elif ctlr_outport: # (2) controller
             of_actions = []
+            vlan_write_back()
             of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
         elif possibly_resubmit_next_table and (not exists_next_table):
             # (3) last stage of pipeline
