@@ -471,7 +471,7 @@ class POXClient(revent.EventMixin):
                 of_actions.append(of.ofp_action_output(port=outport))
         return of_actions
 
-    def build_nx_actions(self,inport,action_list,table_id,pipeline):
+    def build_nx_actions(self,inport,action_list,table_id,pipeline,debug=False):
         ### BUILD NX ACTIONS
         of_actions = []
         ctlr_outport = False # there is a controller outport action
@@ -482,6 +482,10 @@ class POXClient(revent.EventMixin):
         # vlan handling flags
         vlan_removed = False
         vlan_written = {}
+
+        if debug:
+            print "pox_client: build_nx_actions: Received actions:"
+            print action_list
 
         for actions in action_list:
             atleast_one_action = True
@@ -619,6 +623,9 @@ class POXClient(revent.EventMixin):
         if immediately_fwd:
             return of_actions
 
+        if debug:
+            print "pox_client: build_nx_actions: Not the last stage."
+
         # Act on packet with knowledge that subsequent tables must process it
         assert (possibly_resubmit_next_table and exists_next_table and
                 (not immediately_fwd))
@@ -661,8 +668,9 @@ class POXClient(revent.EventMixin):
         else:
             match = self.build_of_match(switch,inport,pred)
         if self.use_nx:
+            debug = False # use for debugging specific rules by priority in build_nx_actions
             of_actions = self.build_nx_actions(inport, action_list, table_id,
-                                               self.pipeline)
+                                               self.pipeline, debug=debug)
         else:
             of_actions = self.build_of_actions(inport, action_list)
 
