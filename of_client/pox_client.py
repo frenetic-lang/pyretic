@@ -386,10 +386,23 @@ class POXClient(revent.EventMixin):
                 match.dl_vlan = pred['vlan_id']
                 match.dl_vlan_pcp = pred['vlan_pcp']
             else:
-                """ NXM_NX_REG3 is where we store the intermittent value of
-                VLAN. """
-                vlan_mask = ((1 << pred['vlan_nbits']) - 1) << pred['vlan_offset']
-                match.append(nx.NXM_NX_REG3(value=vlan_16bit, mask=vlan_mask))
+                """NXM_NX_REG3 is where we store the intermittent value of
+                VLAN. The VLAN ID and PCP are loaded as one contiguous set of 15
+                bits in the register. See `vlan_load_reg()` for more details.
+
+                Further, whenever the VLAN is matched, we also check whether the
+                packet has a VLAN in the first place, by checking the VLAN CFI
+                bit, which is now loaded in bit 15 in the register.
+                """
+                vlan_16bit = ((int(pred['vlan_pcp']) << 12) |
+                              0x8000 |
+                              (int(pred['vlan_id'])))
+                vlan_mask = ((((1 << pred['vlan_nbits']) - 1) <<
+                              pred['vlan_offset']) | 0x8000)
+                # zero out the unmasked value bits
+                # Ref: ~/pox/pox/openflow/nicira.py#L1817
+                vlan_value = vlan_16bit & vlan_mask
+                match.append(nx.NXM_NX_REG3(value=vlan_value, mask=vlan_mask))
         if 'ethtype' in pred:
             match.of_eth_type = pred['ethtype']
         if 'srcip' in pred:
