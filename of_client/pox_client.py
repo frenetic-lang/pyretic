@@ -382,11 +382,9 @@ class POXClient(revent.EventMixin):
             # 1 bit CFI forced to 1
             # 12 bits vlan_id
             # Ref: manpages.ubuntu.com/manpages/trusty/man8/ovs-ofctl.8.html
-            vlan_16bit = ((int(pred['vlan_pcp']) << 13) |
-                          0x1000 |
-                          (int(pred['vlan_id'])))
             if table_id == 0:
-                match.of_vlan_tci = vlan_16bit
+                match.dl_vlan = pred['vlan_id']
+                match.dl_vlan_pcp = pred['vlan_pcp']
             else:
                 """ NXM_NX_REG3 is where we store the intermittent value of
                 VLAN. """
