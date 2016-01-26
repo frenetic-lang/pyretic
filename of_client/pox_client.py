@@ -535,9 +535,35 @@ class POXClient(revent.EventMixin):
                 of_actions.append(nx.nx_reg_load(dst=vlan_reg,
                                                  value=0, nbits=16))
             else:
+                """The load/unload operations are complicated to simplify the intermediate
+                masked write operations. This is really helpful with multiple
+                stages: it's easier to do a single masked write per stage; there
+                are more stages which do the former than load/unload.
+
+                Basically what is happening is the following mapping of
+                different parts of the VLAN_TCI field into the register
+                (typically NXM_NX_REG3) as follows:
+
+                REG3:        CFI PCP2 PCP1 PCP0 ID11 ID10 ... ID1 ID0
+                VLAN_TCI:    PCP2 PCP1 PCP0 CFI ID11 ID10 ... ID1 ID0
+
+                This enables masked writes considering the VLAN as one
+                *contiguous* 15 bit field, instead of breaking the masked write
+                into two writes, one for the ID part and one for the PCP part
+                (yuck!)
+                """
                 of_actions.append(nx.nx_reg_move(dst=vlan_reg,
                                                  src=nx.NXM_OF_VLAN_TCI,
-                                                 nbits=16))
+                                                 dst_ofs=0, src_ofs=0,
+                                                 nbits=12))
+                of_actions.append(nx.nx_reg_move(dst=vlan_reg,
+                                                 src=nx.NXM_OF_VLAN_TCI,
+                                                 dst_ofs=12, src_ofs=13,
+                                                 nbits=3))
+                of_actions.append(nx.nx_reg_move(dst=vlan_reg,
+                                                 src=nx.NXM_OF_VLAN_TCI,
+                                                 dst_ofs=15, src_ofs=12,
+                                                 nbits=1))
 
         def vlan_masked_modify():
             if vlan_removed:
