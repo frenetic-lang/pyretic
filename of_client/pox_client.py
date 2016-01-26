@@ -565,13 +565,12 @@ class POXClient(revent.EventMixin):
                                                  dst_ofs=15, src_ofs=12,
                                                  nbits=1))
 
-        def vlan_masked_modify():
+        def vlan_masked_write():
             if vlan_removed:
                 of_actions.append(nx.nx_reg_load(dst=vlan_reg,
                                                  value=0, nbits=16))
             elif vlan_written:
-                vlan_16bit = ((int(vlan_written['pcp']) << 13) |
-                              0x1000 |
+                vlan_16bit = ((int(vlan_written['pcp']) << 12) |
                               (int(vlan_written['id'])))
                 load_value = ((vlan_16bit >> vlan_written['offset']) &
                               ((1 << vlan_written['nbits'])-1))
@@ -579,6 +578,11 @@ class POXClient(revent.EventMixin):
                                                  value=load_value,
                                                  offset=vlan_written['offset'],
                                                  nbits=vlan_written['nbits']))
+                of_actions.append(nx.nx_reg_load(dst=vlan_reg,
+                                                 value=1,
+                                                 offset=15,
+                                                 nbits=1))
+
         def vlan_write_back():
             of_actions.append(nx.nx_reg_move(dst=nx.NXM_OF_VLAN_TCI,
                                              src=vlan_reg,
