@@ -658,6 +658,7 @@ class POXClient(revent.EventMixin):
             of_actions.append(of.ofp_action_output(port=of.OFPP_CONTROLLER))
         elif possibly_resubmit_next_table and (not exists_next_table):
             # (3) last stage of pipeline
+            vlan_masked_write()
             vlan_write_back()
             if len(phys_outports) > 0: # fwd out of latest assigned ports
                 for p in phys_outports:
