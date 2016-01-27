@@ -2610,10 +2610,13 @@ class pathcomp(object):
 
         ''' Downstream compilation to get full policy to test. '''
         (comp_res, acc_pols) = cls.compile_stage(path_pol, in_cg, out_cg,
-                                                 max_states, disjoint_enabled,
-                                                 default_enabled,
-                                                 True,
-                                                 ragel_enabled, match_enabled)
+                                                 max_states=max_states,
+                                                 disjoint_enabled=disjoint_enabled,
+                                                 default_enabled=default_enabled,
+                                                 integrate_enabled=True,
+                                                 ragel_enabled=ragel_enabled,
+                                                 match_enabled=match_enabled,
+                                                 stage=0)
         (in_table_pol, out_table_pol) = comp_res
         pol = (vin_tagging >>
                in_table_pol >>
@@ -2698,9 +2701,13 @@ class pathcomp(object):
             else:
                 stage_path_pol = path_policy_union(stage)
             res = cls.compile_stage(stage_path_pol, in_cg, out_cg,
-                                                 max_states, disjoint_enabled,
-                                                 default_enabled, integrate_enabled,
-                                                 ragel_enabled, match_enabled)
+                                    max_stages=max_states,
+                                    disjoint_enabled=disjoint_enabled,
+                                    default_enabled=default_enabled,
+                                    integrate_enabled=integrate_enabled,
+                                    ragel_enabled=ragel_enabled,
+                                    match_enabled=match_enabled,
+                                    stage=stage_index)
             (compile_res, _) = res
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
@@ -2713,8 +2720,9 @@ class pathcomp(object):
     @classmethod
     @Stat.elapsed_time
     def compile_stage(cls, path_pol, in_cg, out_cg, max_states=NUM_PATH_TAGS,
-            disjoint_enabled=False, default_enabled = False, 
-            integrate_enabled=False, ragel_enabled = False, match_enabled = False):
+                      disjoint_enabled=False, default_enabled = False,
+                      integrate_enabled=False, ragel_enabled = False,
+                      match_enabled = False, stage=0):
         """ Compile the list of paths along with the forwarding policy `fwding`
         into a single classifier to be installed on switches.
         """
@@ -2758,7 +2766,7 @@ class pathcomp(object):
         cls.log.debug('compiling')
         res = cls.compile_core(re_list, pol_list, in_cg, out_cg, max_states, 
                                 disjoint_enabled, default_enabled, 
-                                integrate_enabled, ragel_enabled, cls.use_fdd)
+                                integrate_enabled, ragel_enabled, cls.use_fdd, stage)
         return res
 
     @classmethod
@@ -2817,7 +2825,7 @@ class pathcomp(object):
                     ('pred_in_list', [], True), ('pred_out_list', [], True)])
     def compile_core(cls, re_list, pol_list, in_cg, out_cg, max_states,
                      disjoint_enabled, default_enabled,
-                     integrate_enabled, ragel_enabled, use_fdd):
+                     integrate_enabled, ragel_enabled, use_fdd, stage):
 
         default_link = default_enabled
        
