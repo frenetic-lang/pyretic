@@ -720,7 +720,7 @@ class POXClient(revent.EventMixin):
         else:
             match = self.build_of_match(switch,inport,pred)
         if self.use_nx:
-            debug = False # use for debugging specific rules by priority in build_nx_actions
+            debug = False # use for debugging specific rules in build_nx_actions
             of_actions = self.build_nx_actions(inport, action_list, table_id,
                                                self.pipeline, debug=debug)
         else:
