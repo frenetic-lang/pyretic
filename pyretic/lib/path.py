@@ -2429,32 +2429,30 @@ class pathcomp(object):
     log.setLevel(logging.ERROR)
 
     @classmethod
-    def __num_set_tag__(cls, num):
-        if num == 0:
-            return modify(path_tag=None)
-        else:
-            return modify(path_tag=num)
+    def __num_set_tag__(cls, num, vfield):
+        val = None if num == 0 else num
+        kw = {vfield: val}
+        return modify(**kw)
 
     @classmethod
-    def __num_match_tag__(cls, num):
-        if num == 0:
-            return match(path_tag=None)
-        else:
-            return match(path_tag=num)
+    def __num_match_tag__(cls, num, vfield):
+        val = None if num == 0 else num
+        kw = {vfield: val}
+        return match(**kw)
 
     @classmethod
-    def __get_dead_state_pred__(cls, du, dfa):
+    def __get_dead_state_pred__(cls, du, dfa, vfield):
         dead = du.get_dead_state(dfa)
         if dead:
-            return cls.__num_match_tag__(dead)
+            return cls.__num_match_tag__(dead, vfield)
         else:
             return drop
 
     @classmethod
-    def __set_dead_state_tag__(cls, du, dfa):
+    def __set_dead_state_tag__(cls, du, dfa, vfield):
         dead = du.get_dead_state(dfa)
         if dead:
-            return cls.__num_set_tag__(dead)
+            return cls.__num_set_tag__(dead, vfield)
         else:
             return identity
 
