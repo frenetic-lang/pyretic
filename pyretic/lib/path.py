@@ -2685,7 +2685,7 @@ class pathcomp(object):
         in_res = []
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))
-        for stage in stages.values():
+        for (stage_index, stage) in stages.values():
             if cls.use_fdd:
                 in_cg = __fdd_in_re_tree_gen__()
                 out_cg = __fdd_out_re_tree_gen__()
@@ -2904,7 +2904,7 @@ class pathcomp(object):
 
                     if if_pred:
                                                 
-                        action_frag = set_tag(dst_num)
+                        action_frag = set_tag(dst_num, vfield)
 
                         ### statistics ###
                         if typ == __in__:
@@ -2942,9 +2942,9 @@ class pathcomp(object):
                             else:
                                 out_table_dic[src_num] += table_frag
  
-                table_default = set([cls.__set_dead_state_tag__(du, dfa)])
-                in_table = QuerySwitch('path_tag', in_table_dic, table_default)
-                out_table = QuerySwitch('path_tag', out_table_dic, table_default)
+                table_default = set([cls.__set_dead_state_tag__(du, dfa, vfield)])
+                in_table = QuerySwitch(vfield, in_table_dic, table_default)
+                out_table = QuerySwitch(vfield, out_table_dic, table_default)
                
                 return ((in_table, out_table), accstates_to_pols)
            
@@ -2964,7 +2964,7 @@ class pathcomp(object):
                         if_pred = if_pred and not du.is_dead(dfa, dst)
 
                     if if_pred:
-                        tag_frag = (pred >> set_tag(dst_num))
+                        tag_frag = (pred >> set_tag(dst_num, vfield))
                         if typ == __in__:
                             if not src_num in in_tagging_dic:
                                 in_tagging_dic[src_num] = tag_frag
@@ -2984,7 +2984,7 @@ class pathcomp(object):
                         ords = du.get_accepting_exps(dfa, edge, dst)
                         for i in ords:
 
-                            cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
+                            cap_frag = ((match_tag(src_num, vfield) & pred) >> pol_list[i])
                             if typ == __in__:
                                 in_capture += cap_frag
                                 in_cap_rules += 1
@@ -2992,22 +2992,22 @@ class pathcomp(object):
                                 out_capture += cap_frag
                                 out_cap_rules += 1
                      
-                tagging_default = set([cls.__set_dead_state_tag__(du,dfa)])
-                in_tagging = QuerySwitch('path_tag', in_tagging_dic, tagging_default)
-                out_tagging = QuerySwitch('path_tag', out_tagging_dic, tagging_default)
+                tagging_default = set([cls.__set_dead_state_tag__(du,dfa,vfield)])
+                in_tagging = QuerySwitch(vfield, in_tagging_dic, tagging_default)
+                out_tagging = QuerySwitch(vfield, out_tagging_dic, tagging_default)
                 
                 return ((in_tagging, in_capture, out_tagging, out_capture), accstates_to_pols)
 
         else:
             if integrate_enabled:
                 in_default = (((in_cg.get_unaffected_pred() &
-                                ~(cls.__get_dead_state_pred__(du,dfa)))
-                               >> cls.__set_dead_state_tag__(du, dfa)) +
-                              cls.__get_dead_state_pred__(du,dfa))
+                                ~(cls.__get_dead_state_pred__(du,dfa,vfield)))
+                               >> cls.__set_dead_state_tag__(du, dfa, vfield)) +
+                              cls.__get_dead_state_pred__(du,dfa,vfield))
                 out_default = (((out_cg.get_unaffected_pred() &
-                                 ~(cls.__get_dead_state_pred__(du,dfa)))
-                                >> cls.__set_dead_state_tag__(du,dfa)) +
-                               cls.__get_dead_state_pred__(du, dfa))
+                                 ~(cls.__get_dead_state_pred__(du,dfa,vfield)))
+                                >> cls.__set_dead_state_tag__(du,dfa,vfield)) +
+                               cls.__get_dead_state_pred__(du, dfa,vfield))
                 
                 in_table = in_default
                 out_table = out_default
@@ -3019,7 +3019,7 @@ class pathcomp(object):
                    
                     
                     if not du.is_dead(dfa, src):
-                        action_frag = set_tag(dst_num)
+                        action_frag = set_tag(dst_num, vfield)
 
                         if typ == __in__:
                             in_tag_rules += 1
@@ -3040,7 +3040,7 @@ class pathcomp(object):
                                 out_cap_rules += 1
                     
                     if action_frag is not None:
-                        tag_frag = (match_tag(src_num) & pred) >> action_frag
+                        tag_frag = (match_tag(src_num, vfield) & pred) >> action_frag
                         if typ == __in__:
                             in_table += tag_frag
                         elif typ == __out__:
@@ -3051,13 +3051,13 @@ class pathcomp(object):
             else:
                 """ Initialize tagging and capture policies. """
                 in_tagging = (((in_cg.get_unaffected_pred() &
-                                ~(cls.__get_dead_state_pred__(du,dfa)))
-                               >> cls.__set_dead_state_tag__(du, dfa)) +
-                              cls.__get_dead_state_pred__(du,dfa))
+                                ~(cls.__get_dead_state_pred__(du,dfa,vfield)))
+                               >> cls.__set_dead_state_tag__(du, dfa, vfield)) +
+                              cls.__get_dead_state_pred__(du,dfa,vfield))
                 out_tagging = (((out_cg.get_unaffected_pred() &
-                                 ~(cls.__get_dead_state_pred__(du,dfa)))
-                                >> cls.__set_dead_state_tag__(du,dfa)) +
-                               cls.__get_dead_state_pred__(du, dfa))
+                                 ~(cls.__get_dead_state_pred__(du,dfa,vfield)))
+                                >> cls.__set_dead_state_tag__(du,dfa,vfield)) +
+                               cls.__get_dead_state_pred__(du, dfa, vfield))
                 in_capture = drop
                 out_capture = drop
                 """ Generate transition/accept rules from DFA """
@@ -3065,7 +3065,8 @@ class pathcomp(object):
                     (src, src_num, dst, dst_num, pred, typ) = get_edge_attributes(dfa, edge)
                     assert typ in [__in__, __out__]
                     if not du.is_dead(dfa, src):
-                        tag_frag = ((match_tag(src_num) & pred) >> set_tag(dst_num))
+                        tag_frag = ((match_tag(src_num, vfield) & pred) >>
+                                    set_tag(dst_num, vfield))
                         if typ == __in__:
                             in_tagging += tag_frag
                             in_tag_rules += 1
@@ -3078,7 +3079,7 @@ class pathcomp(object):
                         ords = du.get_accepting_exps(dfa, edge, dst)
                         for i in ords:
 
-                            cap_frag = ((match_tag(src_num) & pred) >> pol_list[i])
+                            cap_frag = ((match_tag(src_num, vfield) & pred) >> pol_list[i])
                             if typ == __in__:
                                 in_capture += cap_frag
                                 in_cap_rules += 1
