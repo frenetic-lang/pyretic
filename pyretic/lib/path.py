@@ -2553,10 +2553,6 @@ class pathcomp(object):
         - in and out character generators.
         """
         global rt_write_log
-        virtual_field(name="path_tag",
-                      values=range(0, numvals),
-                      type="integer")
-       
         cls.swich_cnt = switch_cnt
         cls.cache_enabled = cache_enabled
         cls.partition_enabled = partition_enabled
@@ -2854,7 +2850,12 @@ class pathcomp(object):
 
         dfa = regexes_to_dfa_fun(re_list)
         assert du.get_num_states(dfa) <= max_states
-        
+
+        ''' Initialize virtual field for this stage to hold tag values. '''
+        vfield = 'path_tag_%d' % stage
+        virtual_field(vfield,
+                      range(0, du.get_num_stages(dfa)),
+                      type="integer", stage=stage)
 
         Stat.collect_stat('dfa', dfa)
         Stat.collect_stat('dfa_utils', du)

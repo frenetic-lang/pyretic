@@ -611,6 +611,11 @@ class Runtime(object):
         runtime's policy member. """
         from pyretic.lib.path import pathcomp, path, path_grouping, path_empty
         path_grouping.set_rtm_fvlist(self.sw_port_ids())
+        """ TODO(ngsrinivas): Clearing of virtual fields assumes that path
+        queries are the only users of virtual fields. This may not at all be
+        true in general!
+        """
+        virtual_field.clear()
         expanded_paths = path_grouping.expand_groupby(self.path_policy)
         self.ds_path_policy = pathcomp.get_directional_pathpol(expanded_paths,
                                                                path.MEASURE_LOC_DOWNSTREAM)
