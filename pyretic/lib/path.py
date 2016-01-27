@@ -2596,6 +2596,7 @@ class pathcomp(object):
         sw_ports = {k:v for (k,v) in switch_ports}
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
+        ## TODO(ngsrinivas): change path_tag to a different virtual field
         vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
         if cls.use_fdd:
             in_cg = __fdd_in_re_tree_gen__()
