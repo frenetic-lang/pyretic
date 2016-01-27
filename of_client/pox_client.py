@@ -566,7 +566,12 @@ class POXClient(revent.EventMixin):
                                                  nbits=1))
 
         def vlan_masked_write():
+            if debug:
+                print "pox_client: build_nx_actions: in rewrite function:"
+                print vlan_removed, vlan_written
             if vlan_removed:
+                if debug:
+                    print "pox_client: build_nx_actions: VLAN was removed"
                 of_actions.append(nx.nx_reg_load(dst=vlan_reg,
                                                  value=0, nbits=16))
             elif vlan_written:
@@ -586,6 +591,9 @@ class POXClient(revent.EventMixin):
         def vlan_write_back():
             """ The write back operation is slightly complicated for reasons
             described under `vlan_load_reg()`. """
+            if debug:
+                print "pox_client: build_nx_actions: Writing back VLAN. The actions are:"
+                print actions
             if table_id > 0:
                 of_actions.append(nx.nx_reg_move(src=vlan_reg,
                                                  dst=nx.NXM_OF_VLAN_TCI,
