@@ -1648,7 +1648,7 @@ class Runtime(object):
         bookkeep_count_buckets(diff_lists, table_id)
         bookkeep_netflow_buckets(diff_lists, table_id)
         diff_lists = remove_matching_aggregate_buckets(diff_lists)
-        
+
         self.log.debug('================================')
         self.log.debug('Final classifier to be installed:')
         for rule in new_rules:
