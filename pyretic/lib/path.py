@@ -2685,7 +2685,7 @@ class pathcomp(object):
         in_res = []
         out_res = []
         cls.log.debug("Stages: %d" % len(stages))
-        for (stage_index, stage) in stages.values():
+        for (stage_index, stage) in stages.items():
             if cls.use_fdd:
                 in_cg = __fdd_in_re_tree_gen__()
                 out_cg = __fdd_out_re_tree_gen__()
@@ -2700,7 +2700,7 @@ class pathcomp(object):
             else:
                 stage_path_pol = path_policy_union(stage)
             res = cls.compile_stage(stage_path_pol, in_cg, out_cg,
-                                    max_stages=max_states,
+                                    max_states=max_states,
                                     disjoint_enabled=disjoint_enabled,
                                     default_enabled=default_enabled,
                                     integrate_enabled=integrate_enabled,
@@ -2861,7 +2861,7 @@ class pathcomp(object):
         ''' Initialize virtual field for this stage to hold tag values. '''
         vfield = 'path_tag_%d' % stage
         virtual_field(vfield,
-                      range(0, du.get_num_stages(dfa)),
+                      range(0, du.get_num_states(dfa)),
                       type="integer", stage=stage)
 
         Stat.collect_stat('dfa', dfa)
