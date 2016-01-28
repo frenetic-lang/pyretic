@@ -763,12 +763,12 @@ class Runtime(object):
         """ Set a cookie which contains information both about the
         classifier version of the rule as well as the table it's going
         into. """
-        return (((table_id & 0b111) << 13) | (version & 0x1fff))
+        return (((table_id & 0b11111) << 11) | (version & 0x7ff))
 
     def get_version_table_from_cookie(self, cookie):
         """ Return a classifier version number and table_id from a cookie. """
-        table_id = (cookie >> 13) & 0b111
-        version  = cookie & 0x1fff
+        table_id = (cookie >> 11) & 0b11111
+        version  = cookie & 0x7ff
         return (version, table_id)
 
     def install_defaults(self, s, table_id):
