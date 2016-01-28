@@ -643,28 +643,32 @@ class Runtime(object):
                 self.ragel_enabled, self.partition_enabled)
         self.path_up_table.policy = us_policy
 
-        if self.multitable_enabled and self.integrate_enabled:
-            (self.path_in_table_list, self.path_out_table_list) = ds_policy_fragments
+        if self.integrate_enabled:
+            (in_res, out_res) = ds_policy_fragments
+            assert len(in_res) == len(out_res)
+            for i in range(0, len(in_res)):
+                self.path_in_table_list[i].policy  =  in_res[i]
+                self.path_out_table_list[i].policy = out_res[i]
         else:
-            (ingress, egress) = ds_policy_fragments
-            self.path_ingress = ingress
-            self.path_egress = egress
-            self.path_in_table_list = []
-            for (in_tag, in_capture) in self.path_ingress:
-                self.path_in_table_list.append(in_tag + in_capture)
-            self.path_out_table_list = []
-            for (out_tag, out_capture) in self.path_egress:
-                self.path_out_table_list.append(out_tag + out_capture)
-            self.path_in_table.policy = sequential(self.path_in_table_list)
-            self.path_out_table.policy = sequential(self.path_out_table_list)
-            '''(in_tag, in_cap, out_tag, out_cap) = policy_fragments
-            self.path_in_tagging.policy  = in_tag
-            self.path_in_capture.policy  = in_cap
-            self.path_out_tagging.policy = out_tag
-            self.path_out_capture.policy = out_cap
-            self.path_in_table.policy = in_tag + in_cap
-            self.path_out_table.policy = out_tag + out_cap
-            '''
+            (in_res, out_res) = ds_policy_fragments
+            self.path_ingress = in_res
+            self.path_egress  = out_res
+            assert len(in_res) == len(out_res)
+            for i in range(0, len(in_res)):
+                (intagp , incapp)  =  in_res[i]
+                (outtagp, outcapp) = out_res[i]
+                self.path_in_table_list[i].policy  =  intagp + incapp
+                self.path_out_table_list[i].policy = outtagp + outcapp
+        self.path_in_table.policy = sequential(self.path_in_table_list)
+        self.path_out_table.policy = sequential(self.path_out_table_list)
+        '''(in_tag, in_cap, out_tag, out_cap) = policy_fragments
+        self.path_in_tagging.policy  = in_tag
+        self.path_in_capture.policy  = in_cap
+        self.path_out_tagging.policy = out_tag
+        self.path_out_capture.policy = out_cap
+        self.path_in_table.policy = in_tag + in_cap
+        self.path_out_table.policy = out_tag + out_cap
+        '''
 
 #######################
 # REACTIVE COMPILATION
@@ -2162,8 +2166,8 @@ class Runtime(object):
         self.path_out_capture = DynamicPolicy(drop)
         self.path_in_table = DynamicPolicy(identity)
         self.path_out_table = DynamicPolicy(identity)
-        self.path_in_table_list = []
-        self.path_out_table_list = []
+        self.path_in_table_list = [DynamicPolicy(identity)] * MAX_STAGES
+        self.path_out_table_list = [DynamicPolicy(identity)] * MAX_STAGES
         self.path_up_table = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
