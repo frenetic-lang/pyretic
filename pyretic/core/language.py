@@ -1717,8 +1717,10 @@ def virtual_field_tagging():
         vf_matches[name] = None
     
     return ((
-        ingress_network() >> modify(**vf_matches))+
-        (~ingress_network()))
+        ingress_network() >> _modify(virtual_field.virtual_none()))+
+            (~ingress_network()))
+        #ingress_network() >> modify(**vf_matches))+
+        #    (~ingress_network()))
 
 def virtual_field_untagging():
     from pyretic.core.runtime import virtual_field

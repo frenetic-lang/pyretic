@@ -2544,6 +2544,15 @@ class virtual_field:
             "vlan_total_stages": len(cls.stages.keys())
         }
 
+    @classmethod
+    def virtual_none(cls):
+        """ Return a VLAN header corresponding to all `None` virtual fields. """
+        vlan = 0
+        for (stage, vals) in cls.stages.items():
+            (num, offset, nbits) = cls.compress({vals[0]: None})
+            vlan = vlan | (num & (((1 << nbits)-1)<<offset))
+        return cls.map_to_vlan(vlan, 0, 15)
+
 virtual_field.fields = {}
 virtual_field.stages = {}
 virtual_field.stage_offset_nbits = {}
