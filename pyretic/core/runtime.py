@@ -197,6 +197,10 @@ class Runtime(object):
                 else len(self.network.topology.nodes()))
         
     def get_subpolicy_compile_stats(self, path_main, restart_frenetic=False):
+        """ TODO(ngsrinivas): the stuff stored in the in_table_list;
+        out_table_list, etc. has changed. May need to update this function to
+        reflect statistics. See recompile_paths() for latest updated assignments
+        to these runtime variables. """
         if path_main:
             pass
             if self.integrate_enabled and self.multitable_enabled:
@@ -465,7 +469,7 @@ class Runtime(object):
         """ Multi-table specific policy compilation. Pol is the policy argument
         which is then compiled by netkat and returned.
         """
-        assert self.pipeline in ["default_pipeline", "path_query_pipeline"]
+        assert self.pipeline in ["default_pipeline", "path_query_pipeline", "mt"]
         t = '0'
         self.log.debug("Attempting to compile table %d with netkat" % table)
         if self.pipeline == 'default_pipeline':
@@ -473,7 +477,7 @@ class Runtime(object):
                 (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
             else:
                 c = pol.compile()
-        elif self.pipeline == 'path_query_pipeline':
+        elif self.pipeline == 'path_query_pipeline' or self.pipeline == 'mt':
             if self.use_pyretic_compiler:
                 c = pol.compile()
             else:
