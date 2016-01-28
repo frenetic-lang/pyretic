@@ -47,6 +47,7 @@ TABLE_START_PRIORITY = 60000
 STATS_REQUERY_THRESHOLD_SEC = 4
 NUM_PATH_TAGS = 32000
 DEFAULT_NX_TABLE_ID=1
+MAX_STAGES = 13 # max. for extensively multi-staged pipelines
 
 from pyretic.evaluations.stat import Stat
 

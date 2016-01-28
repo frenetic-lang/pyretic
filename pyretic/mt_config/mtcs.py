@@ -27,6 +27,8 @@
 # permissions and limitations under the License.                               #
 ################################################################################
 
+MAX_STAGES=13 # max. for the extensively multi-staged pipeline 'mt'
+
 class pipeline_config(object):
     def __init__(self, num_tables):
         self.num_tables = num_tables
@@ -56,6 +58,20 @@ def path_query_pipeline():
     for i in range(0, 5):
         pqc.add_edge(i, i+1)
     return pqc
+
+def mt():
+    """Pipeline configuration for multi-stage path query policies, with 30 packet
+    processing stages overall. This is an extensively multi-staged, but
+    deterministic, pipeline.
+    up_capture >> virtual_tagging >> ingress_table_stage_0 >> ... >> stage 13
+    >>
+    forwarding >>
+    egress_table_stage_0 >> ... >> stage 13 >> virtual_untagging
+    """
+    mt = pipeline_config((2*MAX_STAGES) + 4)
+    for i in range(0, 30):
+        mt.add_edge(i, i+1)
+    return mt
 
 def default_pipeline():
     """ Create a default, "testing" configuration for nicira extension

@@ -62,7 +62,7 @@ TOK_DROP = "drop"
 TOK_END_PATH = "end_path"
 TOK_HOOK = "ingress_hook"
 # limit on the number of stages for multi-stage table rule packing
-MAX_STAGES = 10
+MAX_STAGES = 13
 # Runtime write log, for a single place to log everything from the runtime
 # Default is None.
 rt_write_log=None
