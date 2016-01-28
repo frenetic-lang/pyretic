@@ -2406,6 +2406,12 @@ class ConcreteNetwork(Network):
 # Virtual Fields
 ################################################################################
 class virtual_field:
+    """ Class members for book-keeping across multiple virtual fields. """
+    fields = {}
+    stages = {}
+    stage_offset_nbits = {}
+    virtual_none = DynamicPolicy(identity)
+
     def __init__(self, name, values, type="string", stage=0):
         self.name   = name
         self.values = values
@@ -2419,6 +2425,7 @@ class virtual_field:
         except KeyError:
             virtual_field.stages[stage] = [self]
         virtual_field.allocate_stage_bits()
+        virtual_field.reset_virtual_none()
 
     @classmethod
     def clear(cls):
@@ -2427,6 +2434,7 @@ class virtual_field:
         cls.fields = {}
         cls.stages = {}
         cls.stage_offset_nbits = {}
+        cls.virtual_none.policy = identity
 
     @classmethod
     def allocate_stage_bits(cls):
@@ -2545,17 +2553,15 @@ class virtual_field:
         }
 
     @classmethod
-    def virtual_none(cls):
+    def reset_virtual_none(cls):
         """ Return a VLAN header corresponding to all `None` virtual fields. """
         vlan = 0
         for (stage, vals) in cls.stages.items():
-            (num, offset, nbits) = cls.compress({vals[0]: None})
+            (num, offset, nbits) = cls.compress({vals[0].name: None})
             vlan = vlan | (num & (((1 << nbits)-1)<<offset))
-        return cls.map_to_vlan(vlan, 0, 15)
+        from pyretic.core.language import _modify
+        cls.virtual_none.policy = _modify(cls.map_to_vlan((vlan, 0, 15)))
 
-virtual_field.fields = {}
-virtual_field.stages = {}
-virtual_field.stage_offset_nbits = {}
-
-
-
+    @classmethod
+    def get_virtual_none(cls):
+        return cls.virtual_none
