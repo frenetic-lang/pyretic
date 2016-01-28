@@ -2166,8 +2166,8 @@ class Runtime(object):
         self.path_out_capture = DynamicPolicy(drop)
         self.path_in_table = DynamicPolicy(identity)
         self.path_out_table = DynamicPolicy(identity)
-        self.path_in_table_list = [DynamicPolicy(identity)] * MAX_STAGES
-        self.path_out_table_list = [DynamicPolicy(identity)] * MAX_STAGES
+        self.path_in_table_list = [DynamicPolicy(identity) for k in range(0,MAX_STAGES)]
+        self.path_out_table_list = [DynamicPolicy(identity) for k in range(0,MAX_STAGES)]
         self.path_up_table = DynamicPolicy(drop)
         self.dynamic_sub_path_pols = set()
         self.dynamic_path_preds    = set()
