@@ -2051,7 +2051,7 @@ class Runtime(object):
                 return self.forwarding
         use_nx = self.use_nx
         pipeline = self.pipeline
-        assert pipeline in ['default_pipeline', 'path_query_pipeline']
+        assert pipeline in ['default_pipeline', 'path_query_pipeline', 'mt']
         if use_nx and pipeline == 'default_pipeline':
             self.policy_map = self.default_pipeline_policy_map(
                 get_effective_forwarding_policy(path_main))
@@ -2067,6 +2067,13 @@ class Runtime(object):
                            self.policy_map[3] >>
                            self.policy_map[4] >>
                            self.policy_map[5])
+        elif use_nx and pipeline == 'mt' and path_main:
+            """ EXTENSIVELY multi-staged pipeline """
+            self.policy_map = self.mt_policy_map(
+                self.virtual_tag, self.path_in_table_list,
+                self.forwarding, self.path_out_table_list,
+                self.virtual_untag, self.path_up_table)
+            self.policy = sequential([self.policy_map[x] for x in sorted(self.policy_map.keys())])
         elif use_nx:
             path_exists = 'not' if path_main is None else ''
             raise RuntimeError("No table to policy map configuration defined for"
@@ -2117,6 +2124,17 @@ class Runtime(object):
                 3: forwarding,
                 4: out_table,
                 5: virtual_untag}
+
+    def mt_policy_map(self, virtual_tag, in_table_list, forwarding,
+                      out_table_list, virtual_untag, up_table):
+        m = {0: identity + up_table,
+             1: virtual_tag,
+             MAX_STAGES + 2: forwarding,
+             (2*MAX_STAGES) + 3: virtual_untag}
+        m.update({k+2: in_table_list[k] for k in range(0, MAX_STAGES)})
+        m.update({k+MAX_STAGES+3: out_table_list[k]
+                  for k in range(0, MAX_STAGES)})
+        return m
 
 
 ###############################
