@@ -68,8 +68,9 @@ def mt():
     forwarding >>
     egress_table_stage_0 >> ... >> stage 13 >> virtual_untagging
     """
-    mt = pipeline_config((2*MAX_STAGES) + 4)
-    for i in range(0, 30):
+    num_tables = (2*MAX_STAGES) + 4
+    mt = pipeline_config(num_tables)
+    for i in range(0, num_tables-1):
         mt.add_edge(i, i+1)
     return mt
 
