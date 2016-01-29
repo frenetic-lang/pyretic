@@ -606,8 +606,43 @@ class _modify(modify):
         r = Rule(identity,{self},[self])
         return Classifier([r])
 
+    def vlan_modify(self,pkt):
+        """Evaluation is a simple modifymany operation on the packet, except when it
+        comes to VLANs."""
+        vid = self.map['vlan_id']
+        pcp = self.map['vlan_pcp'] if 'vlan_pcp' in self.map else 0
+        if vid is None:
+            return {pkt.modifymany({'vlan_id': None, 'vlan_pcp': None})}
+        offset = self.map['vlan_offset']
+        nbits = self.map['vlan_nbits']
+        vlan_to_write = (vid | (pcp << 12)) & (((1<<nbits)-1)<<offset)
+        existing_vlan = 0
+        try:
+            existing_vlan = pkt['vlan_id']
+            existing_vlan |= (pkt['vlan_pcp'] << 12)
+        except KeyError:
+            pass
+        new_vlan = existing_vlan & (0xffff - (((1<<nbits)-1)<<offset))
+        new_vlan |= vlan_to_write
+        return {pkt.modifymany({'vlan_id': new_vlan & 0xfff,
+                               'vlan_pcp': new_vlan & 0x7000})}
+
     def eval(self,pkt):
-        return {pkt.modifymany(self.map)}
+        nv_map = copy.copy(self.map)
+        vlan_required = False
+        try:
+            for k in ['vlan_id', 'vlan_offset', 'vlan_nbits', 'vlan_pcp',
+                      'vlan_total_stages']:
+                del nv_map[k]
+                vlan_required = True
+        except KeyError:
+            assert not vlan_required, "Incorrect VLAN settings on modify action."
+            pass
+        updated_pkt = pkt.modifymany(nv_map)
+        if vlan_required:
+            return self.vlan_modify(updated_pkt)
+        else:
+            return {updated_pkt}
 
     def translate_virtual_fields(self):
         from pyretic.core.runtime import virtual_field
