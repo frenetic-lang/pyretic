@@ -203,6 +203,8 @@ def queries_in_eval(acc, policy):
             sub_acc = queries_in_eval((res,pkts), sub_policy)
             res_acc = queries_in_eval((res,pkts), ~match_tag >> QuerySwitch(policy.tag, cases, policy.default))
             acc = (sub_acc[0] | res_acc[0], sub_acc[1] | res_acc[1]) 
+    else:
+        raise RuntimeError("unknown policy type")
     return acc
 
 
