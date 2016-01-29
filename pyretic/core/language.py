@@ -504,6 +504,18 @@ class _match(match):
         r2 = Rule(identity,set(),[None])
         return Classifier([r1, r2])
 
+    def remove_extra_tagging_headers(self):
+        """ Return a new _match without the VLAN helper headers, namely
+        - vlan_offset
+        - vlan_nbits
+        - vlan_total_stages
+        """
+        m = copy.copy(self.map)
+        m.pop("vlan_offset", None)
+        m.pop("vlan_nbits", None)
+        m.pop("vlan_total_stages", None)
+        return _match(**m)
+
     def eval(self,pkt):
         for field, pattern in self.map.iteritems():
             try:
@@ -602,6 +614,18 @@ class _modify(modify):
         super(_modify,self).__init__(*args, **kwargs)
         # Translate virtual-fields
         self.map = self.translate_virtual_fields()
+
+    def remove_extra_tagging_headers(self):
+        """ Return a new _modify without the VLAN helper headers, namely
+        - vlan_offset
+        - vlan_nbits
+        - vlan_total_stages
+        """
+        m = copy.copy(self.map)
+        m.pop("vlan_offset", None)
+        m.pop("vlan_nbits", None)
+        m.pop("vlan_total_stages", None)
+        return _modify(**m)
 
     def generate_classifier(self):
         r = Rule(identity,{self},[self])
