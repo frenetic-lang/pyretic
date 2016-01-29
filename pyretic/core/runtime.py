@@ -445,33 +445,61 @@ class Runtime(object):
             self.in_network_update = False
 
     
-    def netkat_classifier_compile(self):
+    def netkat_classifier_compile(self, pol):
         # Force recompilation overriding cached policies, if the network has
         # changed. This is to ensure that a local classifier is regenerated for
         # each switch in the (new) network topology.
         force_compile = self.in_network_update
-        return self.policy.netkat_compile(self.sw_cnt(),
-                                          force_compile=force_compile)[0]
-    
+        return pol.netkat_compile(self.sw_cnt(),
+                                  force_compile=force_compile)[0]
+
+    def vlan_preprocessed_policy(self, p):
+        from pyretic.core.language_tools import default_mapper, ast_map
+        from pyretic.core.language import _match, _modify
+
+        def need_vlan_preprocess():
+            """ A boolean check function to know whether helper tagging headers must
+            be removed before sending the policy to the compiler. """
+            return ((not self.use_nx) or
+                    (self.use_nx and self.pipeline == 'default_pipeline'))
+
+        def remove_vlan_helpers(parent, children):
+            """ Remove VLAN helper metadata from policies. """
+            if isinstance(parent, _modify) or isinstance(parent, _match):
+                # Use a modified _match or _modify *in place* in the policy
+                return parent.remove_extra_tagging_headers()
+            else:
+                return default_mapper(parent, children)
+
+        if need_vlan_preprocess():
+            # Pre-process policy to remove tagging helper fields
+            from pyretic.core.language_tools import ast_map
+            cp = ast_map(remove_vlan_helpers, p)
+        else:
+            cp = p
+        return cp
+
     @Stat.classifier_stat
     @Stat.elapsed_time
     def whole_policy_compile(self):
+        cp = self.vlan_preprocessed_policy(self.policy)
         if self.use_pyretic_compiler:
-            p = self.policy.compile()
+            p = cp.compile()
         elif self.path_policy:
-            p = self.netkat_classifier_compile()
+            p = self.netkat_classifier_compile(cp)
         else:
-            p = self.policy.netkat_compile(self.sw_cnt())[0] # directly compile with netkat
+            p = cp.netkat_compile(self.sw_cnt())[0] # directly compile with netkat
         #print "rule count", len(p.rules)
         return p
 
-    def mt_specific_policy_compile(self, pol, table):
+    def mt_specific_policy_compile(self, fpol, table):
         """ Multi-table specific policy compilation. Pol is the policy argument
         which is then compiled by netkat and returned.
         """
         assert self.pipeline in ["default_pipeline", "path_query_pipeline", "mt"]
         t = '0'
         self.log.debug("Attempting to compile table %d with netkat" % table)
+        pol = self.vlan_preprocessed_policy(fpol)
         if self.pipeline == 'default_pipeline':
             if table > 0 and not self.use_pyretic_compiler:
                 (c, t) = pol.netkat_compile(self.sw_cnt(), multistage=True)
