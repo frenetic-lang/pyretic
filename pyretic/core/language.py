@@ -302,7 +302,8 @@ class IdentityClass(Singleton):
 
     def __eq__(self, other):
         return ( id(self) == id(other)
-            or ( isinstance(other, match) and len(other.map) == 0) )
+                 or ( isinstance(other, match) and len(other.map) == 0)
+                 or ( isinstance(other, IdentityClass) ) )
 
     def __repr__(self):
         return "identity"

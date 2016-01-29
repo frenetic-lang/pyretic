@@ -130,7 +130,7 @@ def get_rule_exact_match(classifier, mat):
 def _commute_test(act, pkts):
     from pyretic.core.language import (match, modify, drop, identity,
                                        Controller, CountBucket,
-                                       DerivedPolicy, PathBucket)
+                                       DerivedPolicy, PathBucket, IdentityClass)
     from pyretic.lib.netflow import NetflowBucket
     while isinstance(act, DerivedPolicy):
         act = act.policy
