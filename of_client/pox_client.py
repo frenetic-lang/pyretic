@@ -433,10 +433,12 @@ class POXClient(revent.EventMixin):
             match.append(nx.NXM_OF_TCP_DST(pred['dstport']))
         return match
 
-    def build_of_actions(self,inport,action_list):
+    def build_of_actions(self,inport,action_list, debug=False):
         ### BUILD OF ACTIONS
         of_actions = []
         for actions in action_list:
+            if debug:
+                print "pox_client: build_of_actions: Actions:", actions
             outport = actions['port']
             del actions['port']
             if 'srcmac' in actions:
@@ -724,7 +726,8 @@ class POXClient(revent.EventMixin):
             of_actions = self.build_nx_actions(inport, action_list, table_id,
                                                self.pipeline, debug=debug)
         else:
-            of_actions = self.build_of_actions(inport, action_list)
+            debug = False # use for debugging specific rules in build_of_actions
+            of_actions = self.build_of_actions(inport, action_list, debug=debug)
 
         flags = 0
         if notify:
