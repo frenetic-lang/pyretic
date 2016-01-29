@@ -1737,6 +1737,7 @@ def virtual_field_untagging():
         # for testing the latest virtual header implementation with the pyretic
         # compiler.
         egress_network() >> _modify(vlan_id=None, vlan_pcp=None,
+                                    vlan_offset=0, vlan_nbits=15,
                                     vlan_total_stages=1))+
             (~egress_network()))
         # Actual settings that work for NetKAT:
