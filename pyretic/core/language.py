@@ -507,12 +507,24 @@ class _match(match):
         for field, pattern in self.map.iteritems():
             try:
                 v = pkt[field]
-                if not field in ['srcip', 'dstip']:
-                    if pattern is None or pattern != v:
-                        return set()
-                else:
+                if field in ['srcip', 'dstip']:
                     v = util.string_to_IP(v)
                     if pattern is None or not v in pattern:
+                        return set()
+                elif field == 'vlan_id':
+                    assert 'vlan_pcp' in self.map, "Incorrect VLAN setting."
+                    assert 'vlan_offset' in self.map, "Incorrect VLAN setting."
+                    assert 'vlan_nbits' in self.map, "Incorrect VLAN setting."
+                    fmap = self.map
+                    vlan_16bit = (fmap['vlan_id'] | (fmap['vlan_pcp'] << 12))
+                    mask = (((1 << fmap['vlan_nbits']) - 1) <<
+                            fmap['vlan_offset'])
+                    if (vlan_16bit & mask) != (v & mask):
+                        return set()
+                elif field in ['vlan_pcp', 'vlan_offset', 'vlan_nbits']:
+                    assert 'vlan_id' in self.map, "Incorrect VLAN setting."
+                else:
+                    if pattern is None or pattern != v:
                         return set()
             except Exception, e:
                 if (not field in tagging_helper_headers) and pattern is not None:
