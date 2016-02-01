@@ -549,15 +549,18 @@ def create_match(pattern, switch_id, vlan_offset_nbits):
     return match(**match_map)
 
 def create_action(action, multistage, vlan_offset_nbits):
+    """ Return value: (action list, suspicious_vlan_bool) """
     from pyretic.core.language import (modify, Controller, identity)
     if len(action) == 0:
-        return set()
+        return (set(), False)
     else:
         res = set()
+        suspicious_vlan = False
 
         for act_list in action:
             mod_dict = {}
             vlan_processed = False
+            vlans_processed = False
             for act in act_list:
                 if act[0] == "Modify":
                     hdr_field = act[1][0][3:]
@@ -579,11 +582,12 @@ def create_action(action, multistage, vlan_offset_nbits):
                                 mod_dict['vlan_id'] == VLAN_NONE_VALUE):
                                 mod_dict['vlan_pcp'] = None
                                 mod_dict['vlan_id'] = None
+                            vlans_processed = True
                         vlan_processed = True
                     else:
                         mod_dict[hdr_field] = value
                     # Add auxiliary information for VLAN modifications
-                    if hdr_field == 'vlan_id':
+                    if hdr_field == 'vlan_id' or hdr_field == 'vlan_pcp':
                         mod_dict['vlan_offset'] = vlan_offset_nbits['vlan_offset']
                         mod_dict['vlan_nbits'] = vlan_offset_nbits['vlan_nbits']
                         mod_dict['vlan_total_stages'] = vlan_offset_nbits['vlan_total_stages']
@@ -598,13 +602,41 @@ def create_action(action, multistage, vlan_offset_nbits):
                         mod_dict['port'] = OFPP_IN_PORT
             
             if len(mod_dict) > 0:
+                if (((not 'vlan_id' in mod_dict) and 'vlan_pcp' in mod_dict) or
+                    ((not 'vlan_pcp' in mod_dict) and 'vlan_id' in mod_dict)):
+                    suspicious_vlan = True
                 res.add(modify(**mod_dict))
         if len(res) == 0:
             res.add(identity)
-    return res
+    return (res, suspicious_vlan)
 
 def get_queries_from_names(qnames, qdict):
     return set([qdict[x] for x in qnames])
+
+def adjust_vlan_fields(mat, acts):
+    """Since netKAT is lazy about adding modifications whenever there is a
+    match on the same value, we add the matched value again whenever exactly one
+    of the vlan ID or PCP fields is missing.
+
+    Setting both ID and PCP is required by the pox_client to ensure simple and
+    correct operation of the metadata register.
+    """
+    from pyretic.core.language import modify
+    new_acts = []
+    for act in acts:
+        new_act = act
+        if isinstance(act, modify):
+            m = copy.copy(act.map)
+            if 'vlan_id' in m and not 'vlan_pcp' in m:
+                assert 'vlan_pcp' in mat.map
+                m['vlan_pcp'] = mat.map['vlan_pcp']
+                new_act = modify(**m)
+            elif 'vlan_pcp' in m and not 'vlan_id' in m:
+                assert 'vlan_id' in mat.map
+                m['vlan_id'] = mat.map['vlan_id']
+                new_act = modify(**m)
+        new_acts.append(new_act)
+    return new_acts
         
 def json_to_classifier(fname, qdict, multistage, vlan_offset_nbits):
     from pyretic.core.classifier import Rule, Classifier
@@ -615,7 +647,9 @@ def json_to_classifier(fname, qdict, multistage, vlan_offset_nbits):
         for rule in sw_tbl['tbl']:
             prio = rule['priority']
             m = create_match(rule['pattern'], switch_id, vlan_offset_nbits)
-            action = create_action(rule['action'], multistage, vlan_offset_nbits)
+            (action, susp_vlan) = create_action(rule['action'], multistage, vlan_offset_nbits)
+            if susp_vlan:
+                action = adjust_vlan_fields(m, action)
             # This check allows classifier construction to proceed whether or
             # not there's a "queries" field in the rule.
             if 'queries' in rule and rule['queries']:
