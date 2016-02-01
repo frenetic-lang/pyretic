@@ -43,6 +43,8 @@ TEMP_HEADERS = "/tmp/temp.headers.txt"
 TEMP_OUTPUT = "/tmp/temp.out.json"
 NETKAT_DEBUG_BUILD = False
 VLAN_LENGTH=15 # length of vlan field in bits
+VLAN_NONE_VALUE=0xfff
+VLAN_PCP_NONE_VALUE=0x7
 
 class netkat_backend(object):
     """
@@ -232,8 +234,13 @@ def header_val(h, v):
   elif h == "dstmac":
     return mk_header("ethdst", unethaddr(v))
   elif h == "vlan_id":
+    """ `None` values can't be handled by NetKAT correctly. Instead we use some
+    very high numeric values for these fields and reset `None` in the final
+    classifier."""
+    v = VLAN_NONE_VALUE if v is None else v
     return mk_header("vlan", v)
   elif h == "vlan_pcp":
+    v = VLAN_PCP_NONE_VALUE if v is None else v
     return mk_header("vlanpcp", str(v)) if NETKAT_DEBUG_BUILD else mk_header("vlanpcp", v)
   elif h == "ethtype":
     return mk_header("ethtype", str(v)) if NETKAT_DEBUG_BUILD else mk_header("ethtype", v)
@@ -501,11 +508,23 @@ def create_match(pattern, switch_id, vlan_offset_nbits):
         match_map = {'switch' : switch_id}
     else:
         match_map = {}
+    vlan_processed = False
     for k,v in pattern.items():
         if v is not None:
             if k == 'dlSrc' or k == 'dlDst':
                 """ TODO: NetKat returns MAC addresses reversed. """
                 match_map[field_map[k]] = MAC(__reverse_mac__(v))
+            elif k == 'dlVlan' or k == 'dlVlanPcp':
+                """ Reset `None` value for VLAN matches, if any. """
+                if not vlan_processed:
+                    if ((k == 'dlVlan' and v == VLAN_NONE_VALUE) and
+                        (k == 'dlVlanPcp' and v == VLAN_PCP_NONE_VALUE)):
+                        match_map['vlan_id'] = None
+                        match_map['vlan_pcp'] = None
+                    else:
+                        match_map['vlan_id'] = pattern['dlVlan']
+                        match_map['vlan_pcp'] = pattern['dlVlanPcp']
+                    vlan_processed = True
             else:
                 match_map[field_map[k]] = v
 
@@ -528,6 +547,7 @@ def create_action(action, multistage, vlan_offset_nbits):
 
         for act_list in action:
             mod_dict = {}
+            vlan_processed = False
             for act in act_list:
                 if act[0] == "Modify":
                     hdr_field = act[1][0][3:]
@@ -539,7 +559,24 @@ def create_action(action, multistage, vlan_offset_nbits):
                     value = act[1][1]
                     if hdr_field == 'srcmac' or hdr_field == 'dstmac':
                         value = MAC(value)
-                    mod_dict[hdr_field] = value
+                        mod_dict[hdr_field] = value
+                    elif hdr_field == 'vlan_id' or hdr_field == 'vlan_pcp':
+                        mod_dict[hdr_field] = value
+                        if vlan_processed:
+                            """ Only write both values to None if *both* vlan id and
+                            pcp fields contain respective None values. """
+                            if (mod_dict['vlan_pcp'] == VLAN_PCP_NONE_VALUE and
+                                mod_dict['vlan_id'] == VLAN_NONE_VALUE):
+                                mod_dict['vlan_pcp'] = None
+                                mod_dict['vlan_id'] = None
+                        vlan_processed = True
+                    else:
+                        mod_dict[hdr_field] = value
+                    # Add auxiliary information for VLAN modifications
+                    if hdr_field == 'vlan_id':
+                        mod_dict['vlan_offset'] = vlan_offset_nbits['vlan_offset']
+                        mod_dict['vlan_nbits'] = vlan_offset_nbits['vlan_nbits']
+                        mod_dict['vlan_total_stages'] = vlan_offset_nbits['vlan_total_stages']
                 elif act[0] == "Output":
                     outout_seen = True
                     out_info = act[1]
