@@ -2861,7 +2861,7 @@ class pathcomp(object):
         ''' Initialize virtual field for this stage to hold tag values. '''
         vfield = 'path_tag_%d' % stage
         virtual_field(vfield,
-                      range(0, du.get_num_states(dfa)),
+                      range(0, du.get_num_states(dfa)+1),
                       type="integer", stage=stage)
 
         Stat.collect_stat('dfa', dfa)
