@@ -42,6 +42,7 @@ TEMP_INPUT = "/tmp/temp.in.json"
 TEMP_HEADERS = "/tmp/temp.headers.txt"
 TEMP_OUTPUT = "/tmp/temp.out.json"
 NETKAT_DEBUG_BUILD = False
+VLAN_LENGTH=15 # length of vlan field in bits
 
 class netkat_backend(object):
     """
@@ -150,10 +151,11 @@ class netkat_backend(object):
 
         pol = use_explicit_switches(pol)
         qdict = {str(id(b)) : b for b in get_buckets_list(pol)}
+        vlan_offset_nbits = vlan_preprocess(pol)
         # return curl_channel_compilation(pol)
         (cls_json, ctime) = httplib_channel_compilation(pol)
         if not return_json:
-            classifier = json_to_classifier(cls_json, qdict, multistage)
+            classifier = json_to_classifier(cls_json, qdict, multistage, vlan_offset_nbits)
             return (classifier, ctime)
         else:
             return (cls_json, ctime)
@@ -245,15 +247,19 @@ def header_val(h, v):
     return mk_header("tcpsrcport", str(v)) if NETKAT_DEBUG_BUILD else mk_header("tcpsrcport", v)
   elif h == "dstport":
     return mk_header("tcpdstport", str(v)) if NETKAT_DEBUG_BUILD else mk_header("tcpdstport", v)
+  elif h in ["vlan_offset", "vlan_nbits", "vlan_total_stages"]:
+    return {} # Stage information is captured globally and re-applied to the classifier
   else:
     raise TypeError("bad header %s" % h)
 
 def match_to_pred(m):
-  lst = [mk_test(header_val(h, m[h])) for h in m]
+  header_lst = [header_val(h, m[h]) for h in m]
+  lst = [mk_test(hv) for hv in header_lst if hv]
   return mk_and(lst)
 
 def mod_to_pred(m):
-  lst = [ mk_mod(header_val(h, m[h])) for h in m ]
+  header_lst = [header_val(h, m[h]) for h in m]
+  lst = [mk_mod(hv) for hv in header_lst if hv]
   return mk_seq(lst)
 
 def mk_updated_maps(fmap, fvlist):
@@ -350,6 +356,52 @@ def get_buckets_list(p):
     else:
         return set([])
 
+def get_vlan_info(p):
+    """Collect vlan stage information from matches/modifications in the
+    policy. Returns a set of tuples, where each tuple is of the form
+
+    (offset, nbits, total_stages)
+
+    that occurred in the policy. In general there should be at most one element
+    in this set! """
+    from pyretic.core.language import (parallel, sequential,
+                                       DerivedPolicy, match, modify, _match,
+                                       _modify)
+    if isinstance(p, match) or isinstance(p, modify):
+        fmap = (_match(**p.map).map if isinstance(p, match) else
+                _modify(**p.map).map)
+        if 'vlan_id' in fmap:
+            if 'vlan_offset' not in fmap:
+                print "Invalid fmap:", fmap
+                print p
+            return set([(fmap['vlan_offset'], fmap['vlan_nbits'],
+                         fmap['vlan_total_stages'])])
+        else:
+            return set()
+    elif isinstance(p, parallel) or isinstance(p, sequential):
+        return reduce(lambda acc, x: acc | get_vlan_info(x), p.policies, set())
+    elif isinstance(p, DerivedPolicy):
+        return get_vlan_info(p.policy)
+    else:
+        return set()
+
+def vlan_preprocess(pol):
+    def extract_offset_nbits(info):
+        if len(info) == 1:
+            tup = list(info)[0]
+            return {'vlan_offset': tup[0], 'vlan_nbits': tup[1],
+                    'vlan_total_stages': tup[2]}
+        else:
+            return {'vlan_offset': 0, 'vlan_nbits': VLAN_LENGTH,
+                    'vlan_total_stages': 1}
+    vlan_stage_info = get_vlan_info(pol)
+    if len(vlan_stage_info) > 1:
+        if reduce(lambda acc, x: acc or x[2] != 1, vlan_stage_info, False):
+            raise RuntimeError("Incorrect usage of VLANs detected: are you only"
+                               " compiling virtual fields from a single"
+                               " 'stage'?")
+    return extract_offset_nbits(vlan_stage_info)
+
 # TODO(arjun): Consider using aspects to inject methods into each class. That
 # would be better object-oriented style.
 def to_pol(p):
@@ -441,7 +493,7 @@ field_map = {'dlSrc' : 'srcmac', 'dlDst': 'dstmac', 'dlTyp': 'ethtype',
                 'nwSrc' : 'srcip', 'nwDst' : 'dstip', 'nwProto' : 'protocol',
                 'tpSrc' : 'srcport', 'tpDst' : 'dstport', 'inPort' : 'port'}
 
-def create_match(pattern, switch_id):
+def create_match(pattern, switch_id, vlan_offset_nbits):
     from pyretic.core.language import match
     def __reverse_mac__(m):
         return ':'.join(m.split(':')[::-1])
@@ -460,9 +512,14 @@ def create_match(pattern, switch_id):
     # HACK! NetKat doesn't return vlan_pcp with vlan_id sometimes.
     if 'vlan_id' in match_map and not 'vlan_pcp' in match_map:
         match_map['vlan_pcp'] = 0
+    # Add auxiliary information for VLAN matches
+    if 'vlan_id' in match_map:
+        match_map['vlan_offset'] = vlan_offset_nbits['vlan_offset']
+        match_map['vlan_nbits'] = vlan_offset_nbits['vlan_nbits']
+        match_map['vlan_total_stages'] = vlan_offset_nbits['vlan_total_stages']
     return match(**match_map)
 
-def create_action(action, multistage):
+def create_action(action, multistage, vlan_offset_nbits):
     from pyretic.core.language import (modify, Controller, identity)
     if len(action) == 0:
         return set()
@@ -502,7 +559,7 @@ def create_action(action, multistage):
 def get_queries_from_names(qnames, qdict):
     return set([qdict[x] for x in qnames])
         
-def json_to_classifier(fname, qdict, multistage):
+def json_to_classifier(fname, qdict, multistage, vlan_offset_nbits):
     from pyretic.core.classifier import Rule, Classifier
     data = json.loads(fname)
     rules = []
@@ -510,8 +567,8 @@ def json_to_classifier(fname, qdict, multistage):
         switch_id = sw_tbl['switch_id']
         for rule in sw_tbl['tbl']:
             prio = rule['priority']
-            m = create_match(rule['pattern'], switch_id)
-            action = create_action(rule['action'], multistage)
+            m = create_match(rule['pattern'], switch_id, vlan_offset_nbits)
+            action = create_action(rule['action'], multistage, vlan_offset_nbits)
             # This check allows classifier construction to proceed whether or
             # not there's a "queries" field in the rule.
             if 'queries' in rule and rule['queries']:
