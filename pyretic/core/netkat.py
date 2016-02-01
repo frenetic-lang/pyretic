@@ -517,8 +517,8 @@ def create_match(pattern, switch_id, vlan_offset_nbits):
             elif k == 'dlVlan' or k == 'dlVlanPcp':
                 """ Reset `None` value for VLAN matches, if any. """
                 if not vlan_processed:
-                    if ((k == 'dlVlan' and v == VLAN_NONE_VALUE) and
-                        (k == 'dlVlanPcp' and v == VLAN_PCP_NONE_VALUE)):
+                    if (('dlVlan' in pattern and pattern['dlVlan'] == VLAN_NONE_VALUE) and
+                        ('dlVlanPcp' in pattern and pattern['dlVlanPcp'] == VLAN_PCP_NONE_VALUE)):
                         match_map['vlan_id'] = None
                         match_map['vlan_pcp'] = None
                     else:
