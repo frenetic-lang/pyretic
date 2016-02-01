@@ -404,6 +404,7 @@ def vlan_preprocess(pol):
     vlan_stage_info = get_vlan_info(pol)
     if len(vlan_stage_info) > 1:
         if reduce(lambda acc, x: acc or x[2] != 1, vlan_stage_info, False):
+            print "netkat: Here's the policy you're compiling:\n", pol
             raise RuntimeError("Incorrect usage of VLANs detected: are you only"
                                " compiling virtual fields from a single"
                                " 'stage'?")
