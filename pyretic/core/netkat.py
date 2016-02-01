@@ -522,8 +522,15 @@ def create_match(pattern, switch_id, vlan_offset_nbits):
                         match_map['vlan_id'] = None
                         match_map['vlan_pcp'] = None
                     else:
-                        match_map['vlan_id'] = pattern['dlVlan']
-                        match_map['vlan_pcp'] = pattern['dlVlanPcp']
+                        def get_num(v):
+                            # HACK! Sometimes, one of the fields has a value
+                            # `None`. TODO: Must understand why this happens,
+                            # because the compiler/runtime always set vlan_id
+                            # and vlan_pcp together. May well lead to bugs in
+                            # future!
+                            return v if not v is None else 0
+                        match_map['vlan_id'] = get_num(pattern['dlVlan'])
+                        match_map['vlan_pcp'] = get_num(pattern['dlVlanPcp'])
                     vlan_processed = True
             else:
                 match_map[field_map[k]] = v
