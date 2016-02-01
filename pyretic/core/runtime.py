@@ -460,7 +460,7 @@ class Runtime(object):
         def need_vlan_preprocess():
             """ A boolean check function to know whether helper tagging headers must
             be removed before sending the policy to the compiler. """
-            return ((not self.use_nx) or
+            return self.use_pyretic_compiler and ((not self.use_nx) or
                     (self.use_nx and self.pipeline == 'default_pipeline'))
 
         def remove_vlan_helpers(parent, children):
