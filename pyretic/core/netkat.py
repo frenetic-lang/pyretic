@@ -543,6 +543,9 @@ def create_match(pattern, switch_id, vlan_offset_nbits):
         match_map['vlan_offset'] = vlan_offset_nbits['vlan_offset']
         match_map['vlan_nbits'] = vlan_offset_nbits['vlan_nbits']
         match_map['vlan_total_stages'] = vlan_offset_nbits['vlan_total_stages']
+    # Ensure both id and pcp are set by the time we return match.
+    assert (not 'vlan_id' in match_map) or 'vlan_pcp' in match_map
+    assert (not 'vlan_pcp' in match_map) or 'vlan_id' in match_map
     return match(**match_map)
 
 def create_action(action, multistage, vlan_offset_nbits):
