@@ -2634,7 +2634,7 @@ class pathcomp(object):
                  out_table_pol.netkat_compile(switch_cnt=sw_cnt)[0])
             setup_tfs_data_from_cls(hs_format, c, sw_ports, network_links)
         else:
-            setup_tfs_data(hs_format, pol, sw_ports, network_links)
+            setup_tfs_data_from_policy(hs_format, pol, sw_ports, network_links)
         portids = get_portid_map(sw_ports)
         edge_ports = get_hsa_edge_ports(sw_ports, network_links)
 
