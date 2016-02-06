@@ -78,7 +78,13 @@ def set_field_val(hsf, wc_obj, field, val, process_field=True):
         int_val = ip2int(val) if process_field else val
         right_pfx = (32 - val.prefixlen) if process_field else 0
         set_header_field(hsf, wc_obj, field, int_val, right_pfx)
+    elif field in ['vlan_offset', 'vlan_nbits', 'vlan_total_stages']:
+        ''' ignore tagging helper fields. For now, we ensure that these fields
+        are irrelevant by sending in a single-stage policy. '''
+        pass
     elif not field in ['switch', 'port']:
+        assert "%s_pos" % field in hsf
+        assert "%s_len" % field in hsf
         set_header_field(hsf, wc_obj, field, val, 0)
     else:
         ''' do nothing '''

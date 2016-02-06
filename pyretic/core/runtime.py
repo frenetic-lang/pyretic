@@ -2530,6 +2530,10 @@ class virtual_field:
         virtual_fields = cls.fields
         vf_names       = virtual_fields.keys()
 
+        undeclared_vfs = set(fields.keys()) - set(vf_names)
+        if undeclared_vfs:
+            raise RuntimeError("Detected use of undefined fields: %s" %
+                               str(undeclared_vfs))
 
         def vhs_to_num(fields):
             vheaders = dict(filter(lambda a: a[0] in vf_names, fields.iteritems()))
