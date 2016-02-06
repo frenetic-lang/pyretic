@@ -2671,6 +2671,12 @@ class pathcomp(object):
                 stages = {0: [path_pol]}
             return stages
 
+        def stage_pack_helper_debug_static(query_list, path_pol, numstages):
+            """A debug stage pack helper for easy testing.  Use the example `path_test_3` or
+            any combination of two queries in `path_main`, and replace the call
+            to stage_pack_helper to a call to this function. """
+            return {0: [query_list[0]], 1: [query_list[1]]}
+
         if isinstance(path_pol, path_policy_union):
             query_list = path_pol.path_policies
         else:
