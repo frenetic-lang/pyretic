@@ -2597,7 +2597,7 @@ class pathcomp(object):
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
         ## TODO(ngsrinivas): change path_tag to a different virtual field
-        vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
+        vin_tagging = ((edge_pol >> modify(path_tag_0=None)) + ~edge_pol)
         if cls.use_fdd:
             in_cg = __fdd_in_re_tree_gen__()
             out_cg = __fdd_out_re_tree_gen__()
@@ -2647,7 +2647,7 @@ class pathcomp(object):
                 for (accstate, pol_list) in acc_pols.iteritems():
                     res_filter = reach_filter(hs_format, portids, sw_ports,
                                               sw, p,
-                                              match(path_tag=accstate),
+                                              match(path_tag_0=accstate),
                                               no_vlan=True)
                     res_filter = res_filter & match(switch=sw,port=p)
                     if up_capture == drop:
