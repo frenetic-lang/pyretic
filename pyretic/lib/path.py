@@ -33,7 +33,7 @@ from pyretic.core.language_tools import ast_fold as policy_ast_fold
 from pyretic.core.language_tools import add_dynamic_sub_pols
 
 from pyretic.lib.query import counts, packets
-from pyretic.core.runtime import virtual_field
+from pyretic.core.runtime import virtual_field, virtual_virtual_field
 
 from pyretic.lib.re import *
 
@@ -73,6 +73,10 @@ QS_MAX_PROCESSES = 6
 par_frenetics_started=False
 # Maximum number of states allowed
 NUM_PATH_TAGS=32000
+# virtual stage identifier for virtual virtual headers. An unreasonably high
+# number that can never be a "stage" for virtual header fields that actually
+# live in the data plane.
+VIRT_STAGE=1024
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -2596,8 +2600,7 @@ class pathcomp(object):
         sw_ports = {k:v for (k,v) in switch_ports}
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
-        ## TODO(ngsrinivas): change path_tag to a different virtual field
-        vin_tagging = ((edge_pol >> modify(path_tag_0=None)) + ~edge_pol)
+
         if cls.use_fdd:
             in_cg = __fdd_in_re_tree_gen__()
             out_cg = __fdd_out_re_tree_gen__()
@@ -2615,8 +2618,10 @@ class pathcomp(object):
                                                  integrate_enabled=True,
                                                  ragel_enabled=ragel_enabled,
                                                  match_enabled=match_enabled,
-                                                 stage=0)
+                                                 stage=VIRT_STAGE)
         (in_table_pol, out_table_pol) = comp_res
+        vvfield = 'path_tag_%s' % str(VIRT_STAGE)
+        vin_tagging = ((edge_pol >> modify(**{vvfield:None})) + ~edge_pol)
         pol = (vin_tagging >>
                in_table_pol >>
                fwding >>
@@ -2647,13 +2652,14 @@ class pathcomp(object):
                 for (accstate, pol_list) in acc_pols.iteritems():
                     res_filter = reach_filter(hs_format, portids, sw_ports,
                                               sw, p,
-                                              match(path_tag_0=accstate),
+                                              match(**{vvfield:accstate}),
                                               no_vlan=True)
                     res_filter = res_filter & match(switch=sw,port=p)
                     if up_capture == drop:
                         up_capture = res_filter >> parallel(pol_list)
                     else:
                         up_capture += (res_filter >> parallel(pol_list))
+
         return up_capture
 
     @classmethod
@@ -2865,10 +2871,11 @@ class pathcomp(object):
         assert du.get_num_states(dfa) <= max_states
 
         ''' Initialize virtual field for this stage to hold tag values. '''
-        vfield = 'path_tag_%d' % stage
-        virtual_field(vfield,
-                      range(0, du.get_num_states(dfa)+1),
-                      type="integer", stage=stage)
+        vfield = 'path_tag_%s' % str(stage)
+        vcls = virtual_field if stage != VIRT_STAGE else virtual_virtual_field
+        vcls(vfield,
+             range(0, du.get_num_states(dfa)+1),
+             type="integer", stage=stage)
 
         Stat.collect_stat('dfa', dfa)
         Stat.collect_stat('dfa_utils', du)
