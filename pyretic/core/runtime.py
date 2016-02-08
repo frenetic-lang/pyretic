@@ -2460,7 +2460,7 @@ class ConcreteNetwork(Network):
 ################################################################################
 # Virtual Fields
 ################################################################################
-class virtual_field:
+class abstract_virtual_field(object):
     """ Class members for book-keeping across multiple virtual fields. """
     fields = {}
     stages = {}
