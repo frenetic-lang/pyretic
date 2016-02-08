@@ -2897,7 +2897,11 @@ class pathcomp(object):
             (_, _, dst, dst_num, _, _) = get_edge_attributes(dfa, edge)
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, edge, dst)
-                accstates_to_pols[dst_num] = [pol_list[i] for i in ords]
+                polset = set([pol_list[i] for i in ords])
+                if dst_num in accstates_to_pols:
+                    accstates_to_pols[dst_num] |= polset
+                else:
+                    accstates_to_pols[dst_num] = polset
 
         if disjoint_enabled:
             
