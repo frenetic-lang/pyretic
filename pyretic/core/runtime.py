@@ -2634,3 +2634,18 @@ class abstract_virtual_field(object):
     @classmethod
     def get_virtual_none(cls):
         return cls.virtual_none
+
+class virtual_field(abstract_virtual_field):
+    """ Virtual header fields which eventually do make it to the data plane. """
+    fields = {}
+    stages = {}
+    stage_offset_nbits = {}
+    virtual_none = DynamicPolicy(identity)
+
+class virtual_virtual_field(abstract_virtual_field):
+    """ Keeping the virtual fields which don't make it to the data plane
+    separate. Bit allocations, etc. will be separate. """
+    fields = {}
+    stages = {}
+    stage_offset_nbits = {}
+    virtual_none = DynamicPolicy(identity)
