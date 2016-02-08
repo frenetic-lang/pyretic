@@ -297,7 +297,11 @@ def write_port_map(sw_ports, portids):
 def setup_tfs_data_from_policy(hsf, pol, sw_ports, network_links):
     """ Set up transfer functions and hassel-c data files from a given policy,
     and topology information. """
-    c = pol.netkat_compile()[0]
+    # TODO(ngsrinivas): need to investigate this further. Currently, we use
+    # pyretic to compile. NetKAT produces an what seems like an unnecessarily
+    # huge classifier, which may be a symptom of a buggy end-to-end compilation
+    # process.
+    c = pol.compile()
     setup_tfs_data_from_cls(hsf, c, sw_ports, network_links)
 
 def setup_tfs_data_from_cls(hsf, c, sw_ports, network_links):
