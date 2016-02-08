@@ -2474,13 +2474,14 @@ class abstract_virtual_field(object):
         # We need a None value as well
         self.cardinality = len(values) + 1
         self.type   = type
-        virtual_field.fields[name] = self
+        cls = self.__class__
+        cls.fields[name] = self
         try:
-           virtual_field.stages[stage].append(self)
+           cls.stages[stage].append(self)
         except KeyError:
-            virtual_field.stages[stage] = [self]
-        virtual_field.allocate_stage_bits()
-        virtual_field.reset_virtual_none()
+            cls.stages[stage] = [self]
+        cls.allocate_stage_bits()
+        cls.reset_virtual_none()
 
     @classmethod
     def clear(cls):
@@ -2490,6 +2491,15 @@ class abstract_virtual_field(object):
         cls.stages = {}
         cls.stage_offset_nbits = {}
         cls.virtual_none.policy = identity
+
+    @classmethod
+    def get_class(cls, name):
+        if name in virtual_field.fields:
+            return virtual_field
+        elif name in virtual_virtual_field.fields:
+            return virtual_virtual_field
+        else:
+            return None
 
     @classmethod
     def allocate_stage_bits(cls):
