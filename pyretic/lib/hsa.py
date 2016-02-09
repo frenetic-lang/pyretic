@@ -1,3 +1,31 @@
+################################################################################
+# The Pyretic Project                                                          #
+# frenetic-lang.org/pyretic                                                    #
+# author: Srinivas Narayana (narayana@cs.princeton.edu)                        #
+################################################################################
+# Licensed to the Pyretic Project by one or more contributors. See the         #
+# NOTICES file distributed with this work for additional information           #
+# regarding copyright and ownership. The Pyretic Project licenses this         #
+# file to you under the following license.                                     #
+#                                                                              #
+# Redistribution and use in source and binary forms, with or without           #
+# modification, are permitted provided the following conditions are met:       #
+# - Redistributions of source code must retain the above copyright             #
+#   notice, this list of conditions and the following disclaimer.              #
+# - Redistributions in binary form must reproduce the above copyright          #
+#   notice, this list of conditions and the following disclaimer in            #
+#   the documentation or other materials provided with the distribution.       #
+# - The names of the copyright holds and contributors may not be used to       #
+#   endorse or promote products derived from this work without specific        #
+#   prior written permission.                                                  #
+#                                                                              #
+# Unless required by applicable law or agreed to in writing, software          #
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT    #
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the     #
+# LICENSE file distributed with this work for specific language governing      #
+# permissions and limitations under the License.                               #
+################################################################################
+
 from pyretic.core.language import *
 from pyretic.core.language import _modify
 from pyretic.vendor.hsa.utils.wildcard import (wildcard_create_bit_repeat,
@@ -78,7 +106,13 @@ def set_field_val(hsf, wc_obj, field, val, process_field=True):
         int_val = ip2int(val) if process_field else val
         right_pfx = (32 - val.prefixlen) if process_field else 0
         set_header_field(hsf, wc_obj, field, int_val, right_pfx)
+    elif field in ['vlan_offset', 'vlan_nbits', 'vlan_total_stages']:
+        ''' ignore tagging helper fields. For now, we ensure that these fields
+        are irrelevant by sending in a single-stage policy. '''
+        pass
     elif not field in ['switch', 'port']:
+        assert "%s_pos" % field in hsf
+        assert "%s_len" % field in hsf
         set_header_field(hsf, wc_obj, field, val, 0)
     else:
         ''' do nothing '''
@@ -291,7 +325,11 @@ def write_port_map(sw_ports, portids):
 def setup_tfs_data_from_policy(hsf, pol, sw_ports, network_links):
     """ Set up transfer functions and hassel-c data files from a given policy,
     and topology information. """
-    c = pol.netkat_compile()[0]
+    # TODO(ngsrinivas): need to investigate this further. Currently, we use
+    # pyretic to compile. NetKAT produces an what seems like an unnecessarily
+    # huge classifier, which may be a symptom of a buggy end-to-end compilation
+    # process.
+    c = pol.compile()
     setup_tfs_data_from_cls(hsf, c, sw_ports, network_links)
 
 def setup_tfs_data_from_cls(hsf, c, sw_ports, network_links):

@@ -1,4 +1,4 @@
-
+################################################################################
 # The Pyretic Project                                                          #
 # frenetic-lang.org/pyretic                                                    #
 # author: Srinivas Narayana (narayana@cs.princeton.edu)                        #
@@ -33,7 +33,7 @@ from pyretic.core.language_tools import ast_fold as policy_ast_fold
 from pyretic.core.language_tools import add_dynamic_sub_pols
 
 from pyretic.lib.query import counts, packets
-from pyretic.core.runtime import virtual_field
+from pyretic.core.runtime import virtual_field, virtual_virtual_field
 
 from pyretic.lib.re import *
 
@@ -73,6 +73,10 @@ QS_MAX_PROCESSES = 6
 par_frenetics_started=False
 # Maximum number of states allowed
 NUM_PATH_TAGS=32000
+# virtual stage identifier for virtual virtual headers. An unreasonably high
+# number that can never be a "stage" for virtual header fields that actually
+# live in the data plane.
+VIRT_STAGE=1024
 
 #############################################################################
 ###             Utilities to map predicates to characters                 ###
@@ -2596,8 +2600,7 @@ class pathcomp(object):
         sw_ports = {k:v for (k,v) in switch_ports}
         hs_format = pyr_hs_format()
         edge_pol = get_hsa_edge_policy(sw_ports, network_links)
-        ## TODO(ngsrinivas): change path_tag to a different virtual field
-        vin_tagging = ((edge_pol >> modify(path_tag=None)) + ~edge_pol)
+
         if cls.use_fdd:
             in_cg = __fdd_in_re_tree_gen__()
             out_cg = __fdd_out_re_tree_gen__()
@@ -2615,8 +2618,10 @@ class pathcomp(object):
                                                  integrate_enabled=True,
                                                  ragel_enabled=ragel_enabled,
                                                  match_enabled=match_enabled,
-                                                 stage=0)
+                                                 stage=VIRT_STAGE)
         (in_table_pol, out_table_pol) = comp_res
+        vvfield = 'path_tag_%s' % str(VIRT_STAGE)
+        vin_tagging = ((edge_pol >> modify(**{vvfield:None})) + ~edge_pol)
         pol = (vin_tagging >>
                in_table_pol >>
                fwding >>
@@ -2647,13 +2652,14 @@ class pathcomp(object):
                 for (accstate, pol_list) in acc_pols.iteritems():
                     res_filter = reach_filter(hs_format, portids, sw_ports,
                                               sw, p,
-                                              match(path_tag=accstate),
+                                              match(**{vvfield:accstate}),
                                               no_vlan=True)
                     res_filter = res_filter & match(switch=sw,port=p)
                     if up_capture == drop:
                         up_capture = res_filter >> parallel(pol_list)
                     else:
                         up_capture += (res_filter >> parallel(pol_list))
+
         return up_capture
 
     @classmethod
@@ -2670,6 +2676,12 @@ class pathcomp(object):
             else:
                 stages = {0: [path_pol]}
             return stages
+
+        def stage_pack_helper_debug_static(query_list, path_pol, numstages):
+            """A debug stage pack helper for easy testing.  Use the example `path_test_3` or
+            any combination of two queries in `path_main`, and replace the call
+            to stage_pack_helper to a call to this function. """
+            return {0: [query_list[0]], 1: [query_list[1]]}
 
         if isinstance(path_pol, path_policy_union):
             query_list = path_pol.path_policies
@@ -2711,6 +2723,15 @@ class pathcomp(object):
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
             out_part = compile_res[sep_index:]
+            """ If the "integrate" option is enabled, in_res looks like:
+            [in_table1, in_table2, ..., in_tableN] for N query matching stages.
+
+            Otherwise, in_res looks like:
+            [(in_tag1, in_cap1), (in_tag2, in_cap2), ..., (in_tagN, in_capN)]
+            for N query matching stages.
+
+            Respectively for out_res.
+            """
             in_res.append(in_part if len(in_part) != 1 else in_part[0])
             out_res.append(out_part if len(out_part) != 1 else out_part[0])
        
@@ -2772,7 +2793,8 @@ class pathcomp(object):
     @Stat.elapsed_time
     def add_query(cls, path_pol, max_states = NUM_PATH_TAGS, disjoint_enabled = False, default_enabled = False,
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
-        
+        """TODO(ngsrinivas): this is a deprecated function. Refactor or
+        remove. """
         classifier_utils.__set_init_vars__(match_enabled)
 
         ast_fold = path_policy_utils.path_policy_ast_fold
@@ -2859,10 +2881,11 @@ class pathcomp(object):
         assert du.get_num_states(dfa) <= max_states
 
         ''' Initialize virtual field for this stage to hold tag values. '''
-        vfield = 'path_tag_%d' % stage
-        virtual_field(vfield,
-                      range(0, du.get_num_states(dfa)+1),
-                      type="integer", stage=stage)
+        vfield = 'path_tag_%s' % str(stage)
+        vcls = virtual_field if stage != VIRT_STAGE else virtual_virtual_field
+        vcls(vfield,
+             range(0, du.get_num_states(dfa)+1),
+             type="integer", stage=stage)
 
         Stat.collect_stat('dfa', dfa)
         Stat.collect_stat('dfa_utils', du)
@@ -2884,7 +2907,11 @@ class pathcomp(object):
             (_, _, dst, dst_num, _, _) = get_edge_attributes(dfa, edge)
             if du.is_accepting(dfa, dst):
                 ords = du.get_accepting_exps(dfa, edge, dst)
-                accstates_to_pols[dst_num] = [pol_list[i] for i in ords]
+                polset = set([pol_list[i] for i in ords])
+                if dst_num in accstates_to_pols:
+                    accstates_to_pols[dst_num] |= polset
+                else:
+                    accstates_to_pols[dst_num] = polset
 
         if disjoint_enabled:
             

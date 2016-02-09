@@ -85,7 +85,7 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
-        self.get_subpol_stats = True # TODO: make cmdline option to pyretic.py
+        self.get_subpol_stats = False # TODO: make cmdline option to pyretic.py
         self.use_pyretic_compiler = use_pyretic
 
         """ Set runtime flags for specific optimizations. """
@@ -184,6 +184,19 @@ class Runtime(object):
              self.edge_contraction_enabled, self.preddecomp_enabled) = opt_flags
              
             self.partition_enabled &= not self.partition_cnt is None
+        ''' Set multitable_enabled to True if other run-time options indicate
+        that we are using multi-stage tables with separate forwarding and
+        queries. :) '''
+        if self.use_nx and self.pipeline in ['path_query_pipeline','mt']:
+            self.log.info("Multitable option enabled gratuitously from other "
+                          "options")
+            self.multitable_enabled = True
+        elif self.use_nx and self.pipeline in ['default_pipeline']:
+            pass
+        elif self.use_nx:
+            raise NotImplementedError("Unknown pipeline configuration")
+        else:
+            pass
 
     def sw_port_ids(self):
         return self.network.switch_with_port_ids_list()
@@ -202,17 +215,20 @@ class Runtime(object):
         reflect statistics. See recompile_paths() for latest updated assignments
         to these runtime variables. """
         if path_main:
-            pass
-            if self.integrate_enabled and self.multitable_enabled:
+            if self.integrate_enabled:
                 for (in_table, out_table) in zip(self.path_in_table_list, self.path_out_table_list):
                     self.get_subpolicy_compile_stats_per_stage(in_table,
                                                                out_table,
                                                                restart_frenetic=restart_frenetic)
             else:
-                for (in_table, out_table, ingress, egress) in zip(self.path_in_table_list,
-                        self.path_out_table_list, self.path_ingress, self.path_egress):
-                    self.get_subpolicy_compile_stats_per_stage(in_table, out_table, ingress[0],
-                        ingress[1],egress[0],egress[1],restart_frenetic=restart_frenetic)
+                for (in_table, out_table, (in_tag, in_cap),
+                     (out_tag, out_cap)) in zip(self.path_in_table_list,
+                                                self.path_out_table_list,
+                                                self.path_ingress,
+                                                self.path_egress):
+                    self.get_subpolicy_compile_stats_per_stage(
+                        in_table, out_table, in_tag, in_cap, out_tag, out_cap,
+                        restart_frenetic=restart_frenetic)
     
     def get_subpolicy_compile_stats_per_stage(self, in_table, out_table,
                                               in_tag = None, in_cap = None,
@@ -657,7 +673,7 @@ class Runtime(object):
 
         ds_policy_fragments = pathcomp.compile_downstream(self.ds_path_policy,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
-            self.multitable_enabled and self.integrate_enabled,
+            self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled, self.preddecomp_enabled)
 
         if self.us_path_policy == path_empty():
@@ -667,18 +683,17 @@ class Runtime(object):
                 self.sw_port_ids(), self.nw_edges(), self.forwarding,
                 self.sw_cnt(),
                 NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
-                self.multitable_enabled and self.integrate_enabled,
+                self.integrate_enabled,
                 self.ragel_enabled, self.partition_enabled)
         self.path_up_table.policy = us_policy
 
+        (in_res, out_res) = ds_policy_fragments
         if self.integrate_enabled:
-            (in_res, out_res) = ds_policy_fragments
             assert len(in_res) == len(out_res)
             for i in range(0, len(in_res)):
                 self.path_in_table_list[i].policy  =  in_res[i]
                 self.path_out_table_list[i].policy = out_res[i]
         else:
-            (in_res, out_res) = ds_policy_fragments
             self.path_ingress = in_res
             self.path_egress  = out_res
             assert len(in_res) == len(out_res)
@@ -2460,7 +2475,7 @@ class ConcreteNetwork(Network):
 ################################################################################
 # Virtual Fields
 ################################################################################
-class virtual_field:
+class abstract_virtual_field(object):
     """ Class members for book-keeping across multiple virtual fields. """
     fields = {}
     stages = {}
@@ -2474,13 +2489,14 @@ class virtual_field:
         # We need a None value as well
         self.cardinality = len(values) + 1
         self.type   = type
-        virtual_field.fields[name] = self
+        cls = self.__class__
+        cls.fields[name] = self
         try:
-           virtual_field.stages[stage].append(self)
+           cls.stages[stage].append(self)
         except KeyError:
-            virtual_field.stages[stage] = [self]
-        virtual_field.allocate_stage_bits()
-        virtual_field.reset_virtual_none()
+            cls.stages[stage] = [self]
+        cls.allocate_stage_bits()
+        cls.reset_virtual_none()
 
     @classmethod
     def clear(cls):
@@ -2490,6 +2506,15 @@ class virtual_field:
         cls.stages = {}
         cls.stage_offset_nbits = {}
         cls.virtual_none.policy = identity
+
+    @classmethod
+    def get_class(cls, name):
+        if name in virtual_field.fields:
+            return virtual_field
+        elif name in virtual_virtual_field.fields:
+            return virtual_virtual_field
+        else:
+            return None
 
     @classmethod
     def allocate_stage_bits(cls):
@@ -2530,6 +2555,10 @@ class virtual_field:
         virtual_fields = cls.fields
         vf_names       = virtual_fields.keys()
 
+        undeclared_vfs = set(fields.keys()) - set(vf_names)
+        if undeclared_vfs:
+            raise RuntimeError("Detected use of undefined fields: %s" %
+                               str(undeclared_vfs))
 
         def vhs_to_num(fields):
             vheaders = dict(filter(lambda a: a[0] in vf_names, fields.iteritems()))
@@ -2620,3 +2649,18 @@ class virtual_field:
     @classmethod
     def get_virtual_none(cls):
         return cls.virtual_none
+
+class virtual_field(abstract_virtual_field):
+    """ Virtual header fields which eventually do make it to the data plane. """
+    fields = {}
+    stages = {}
+    stage_offset_nbits = {}
+    virtual_none = DynamicPolicy(identity)
+
+class virtual_virtual_field(abstract_virtual_field):
+    """ Keeping the virtual fields which don't make it to the data plane
+    separate. Bit allocations, etc. will be separate. """
+    fields = {}
+    stages = {}
+    stage_offset_nbits = {}
+    virtual_none = DynamicPolicy(identity)

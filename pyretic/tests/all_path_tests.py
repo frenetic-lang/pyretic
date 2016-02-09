@@ -387,10 +387,10 @@ if __name__ == "__main__":
     if opts.testrun: # just run one test, to sample
         path_test_0_static_single_stage('', 'outbound')
     else: # run full suite of tests
-        bunched_path_tests(default_pyopts='')
+        # bunched_path_tests(default_pyopts='')
         bunched_path_tests(default_pyopts='-r')
         bunched_path_tests(default_pyopts='-r --use_pyretic')
-        bunched_path_tests(default_pyopts='--use_pyretic')
+        # bunched_path_tests(default_pyopts='--use_pyretic')
 
     print "===== TESTS COMPLETE ====="
     print "%d tests passed, %d failed, %d ambiguous" % (

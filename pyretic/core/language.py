@@ -545,7 +545,7 @@ class _match(match):
         return {pkt}
 
     def translate_virtual_fields(self):
-        from pyretic.core.runtime import virtual_field
+        from pyretic.core.runtime import abstract_virtual_field as avf
         _map = {}
         _vf  = {}
 
@@ -555,9 +555,17 @@ class _match(match):
             else:
                 _vf[field] = pattern
 
+        if _vf:
+            vcls = list(set([avf.get_class(x) for x in _vf.keys()]))
+            assert len(vcls) == 1, "can't mix multiple virt header types!"
+            assert not vcls[0] is None, "not a defined virtual field: %s" % x
+            vcls = vcls[0]
+        else:
+            vcls = avf
+
         _map.update(
-          virtual_field.map_to_vlan(
-            virtual_field.compress(_vf)))
+          vcls.map_to_vlan(
+            vcls.compress(_vf)))
 
         return util.frozendict(**_map)
 
@@ -670,7 +678,7 @@ class _modify(modify):
             return {updated_pkt}
 
     def translate_virtual_fields(self):
-        from pyretic.core.runtime import virtual_field
+        from pyretic.core.runtime import abstract_virtual_field as avf
         _map = {}
         _vf  = {}
 
@@ -680,9 +688,17 @@ class _modify(modify):
             else:
                 _vf[field] = pattern
 
+        if _vf:
+            vcls = list(set([avf.get_class(x) for x in _vf.keys()]))
+            assert len(vcls) == 1, "can't mix multiple virt header types!"
+            assert not vcls[0] is None, "not a defined virtual field: %s" % x
+            vcls = vcls[0]
+        else:
+            vcls = avf
+
         _map.update(
-          virtual_field.map_to_vlan(
-            virtual_field.compress(_vf)))
+          vcls.map_to_vlan(
+            vcls.compress(_vf)))
 
         return _map
 
