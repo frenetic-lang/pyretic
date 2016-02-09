@@ -339,6 +339,91 @@ class SimplePrefixTopo(Topo):
         self.addLink('s1', 'h3')
 
 
+class StanfordTopo( Topo ):
+    "Topology for Stanford backbone"
+
+    PORT_ID_MULTIPLIER = 1
+    INTERMEDIATE_PORT_TYPE_CONST = 1
+    OUTPUT_PORT_TYPE_CONST = 2
+    PORT_TYPE_MULTIPLIER = 10000
+    SWITCH_ID_MULTIPLIER = 100000
+    
+    DUMMY_SWITCH_BASE = 1000
+    
+    PORT_MAP_FILENAME = "/home/mininet/hassel-public/mininet/data/port_map.txt"
+    TOPO_FILENAME = "/home/mininet/hassel-public/mininet/data/backbone_topology.tf"
+    
+    dummy_switches = set()
+
+    def __init__( self ):
+        # Read topology info
+        ports = self.load_ports(self.PORT_MAP_FILENAME)
+        links = self.load_topology(self.TOPO_FILENAME)
+        switches = ports.keys()
+
+        # Add default members to class.
+        super( StanfordTopo, self ).__init__()
+
+        # Create switch nodes
+        for s in switches:
+            self.addSwitch( "s%s" % s )
+
+        # Wire up switches       
+        link_set = set()
+        for (src_port_flat, dst_port_flat) in links:
+            src_dpid = src_port_flat / self.SWITCH_ID_MULTIPLIER
+            dst_dpid = dst_port_flat / self.SWITCH_ID_MULTIPLIER
+
+            if not (src_dpid, dst_dpid) in link_set:
+                self.addLink("s%d" % src_dpid, "s%d" % dst_dpid)
+                link_set.add((src_dpid, dst_dpid))
+                link_set.add((dst_dpid, src_dpid))
+
+        # Wire up hosts
+        host_id = len(switches) + 1
+        for s in switches:
+            # Edge ports
+            for port in list(ports[s])[0:1]:
+                self.addHost( "h%s" % host_id, ip = "10.0.%d.1" % (host_id - 1))
+                self.addLink( "h%s" % host_id, "s%s" % s)
+
+                host_id += 1
+
+        # Consider all switches and hosts 'on'
+        # self.enable_all()
+            
+    def load_ports(self, filename):
+        ports = {}
+        f = open(filename, 'r')
+        for line in f:
+            if not line.startswith("$") and line != "":
+                tokens = line.strip().split(":")
+                port_flat = int(tokens[1])
+                
+                dpid = port_flat / self.SWITCH_ID_MULTIPLIER
+                port = port_flat % self.PORT_TYPE_MULTIPLIER
+                
+                if dpid not in ports.keys():
+                    ports[dpid] = set()
+                if port not in ports[dpid]:
+                    ports[dpid].add(port)             
+        f.close()
+        return ports
+        
+    def load_topology(self, filename):
+        links = set()
+        f = open(filename, 'r')
+        for line in f:
+            if line.startswith("link"):
+                tokens = line.split('$')
+                src_port_flat = int(tokens[1].strip('[]').split(', ')[0])
+                dst_port_flat = int(tokens[7].strip('[]').split(', ')[0])
+                links.add((src_port_flat, dst_port_flat))
+        f.close()
+        return links
+        
+             
+
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
           'square': (lambda: CycleTopo(4,4)),
           'chain': ChainTopo,
@@ -351,6 +436,7 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'gateway1_ns': OneSwitchGatewayTopoNoSubnets,
           'gateway3': ThreeSwitchGatewayTopo,
           'gateway3_ns': ThreeSwitchGatewayTopoNoSubnets,
-          'simple_prefix': SimplePrefixTopo
+          'simple_prefix': SimplePrefixTopo,
+          'stanford' : StanfordTopo
 }
  
