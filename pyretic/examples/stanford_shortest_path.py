@@ -1,4 +1,5 @@
 from pyretic.core.language import *
+from pyretic.lib.path import *
 from pyretic.core.netkat import cls_to_pol
 from pyretic.core.classifier import Rule, Classifier
 import networkx as nx
@@ -10,6 +11,9 @@ PORT_TYPE_MULTIPLIER = 10000
 SWITCH_ID_MULTIPLIER = 100000
 
 DUMMY_SWITCH_BASE = 1000
+
+port_map_file = "pyretic/examples/stanford_data/port_map.txt"
+topo_file = "pyretic/examples/stanford_data/backbone_topology.tf"
 
 def load_ports(filename):
     ports = {}
@@ -88,23 +92,7 @@ def get_topo_info(port_map_file, topo_file):
     
     return topo, link_port_map
 
-def shortest_paths(topo):
-    assert isinstance(topo, nx.Graph)
-    
-    res = {}
-    edge_nodes = [n for n in topo.nodes() if topo.node[n]["isHost"]]
-    edge_node_cnt = len(edge_nodes)
-    for i in range(edge_node_cnt):
-        u = edge_nodes[i]
-        for v in edge_nodes[i + 1:]:
-            if u == v:
-                continue
-            else:
-                paths = list(nx.all_shortest_paths(topo, u, v))
-                index = hash(str(u) + " " + str(v)) % len(paths)
-                res[u, v] = paths[index][1:]
-
-    return res
+topo, link_port_map = get_topo_info(port_map_file, topo_file)
 
 def get_forwarding_policy(topo, link_port_map):
     #rules = []
@@ -120,6 +108,9 @@ def get_forwarding_policy(topo, link_port_map):
         dst_ip = base_ip % (u - 1)       
         
         paths = nx.single_source_shortest_path(topo, u)
+        for v in edge_nodes:
+            if u != v:
+                print u, v, paths[v]
         for s in core_nodes:
             next_hop = paths[s][-2]
             #m = match(switch = s, dstip = dst_ip).compile().rules[0].match 
@@ -133,11 +124,35 @@ def get_forwarding_policy(topo, link_port_map):
     return pol
     #return cls_to_pol(Classifier(rules))
 
-def main(**kwargs):
-    port_map_file = "pyretic/examples/stanford_data/port_map.txt"
-    topo_file = "pyretic/examples/stanford_data/backbone_topology.tf"
+def get_firewall_query(topo):
+    switches = [n for n in topo.nodes() if not topo.node[n]["isHost"]]
+    fw = 1
+    pol = None
+   
+    edge_predicate = None
+        
+    for sw in switches:
+        if sw == fw:
+            continue
+        p = len(nx.neighbors(topo, sw))
+        if edge_predicate is None:
+            edge_predicate = match(switch = sw, port = p)
+        else:
+            edge_predicate |= match(switch = sw, port = p)
+        
 
-    topo, link_port_map = get_topo_info(port_map_file, topo_file)
+    pol = in_atom(edge_predicate) ^ +(in_atom(~match(switch = fw))) ^ out_atom(edge_predicate) 
+    
+    def call_back(pkt):
+        print pkt
+    pol.register_callback(call_back)
+    return pol  
+
+def path_main(**kwargs):
+    return get_firewall_query(topo) 
+
+def main(**kwargs):
+    
     return get_forwarding_policy(topo, link_port_map) 
 
 if __name__ == "__main__":
@@ -145,4 +160,5 @@ if __name__ == "__main__":
     topo_file = "stanford_data/backbone_topology.tf"
 
     topo, link_port_map = get_topo_info(port_map_file, topo_file)
-    print get_forwarding_policy(topo, link_port_map)
+    #nx.write_dot(topo, "stanford.dot")
+    get_forwarding_policy(topo, link_port_map)
