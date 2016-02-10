@@ -2793,7 +2793,8 @@ class pathcomp(object):
     @Stat.elapsed_time
     def add_query(cls, path_pol, max_states = NUM_PATH_TAGS, disjoint_enabled = False, default_enabled = False,
             integrate_enabled = False, ragel_enabled = False, match_enabled = False):
-        
+        """TODO(ngsrinivas): this is a deprecated function. Refactor or
+        remove. """
         classifier_utils.__set_init_vars__(match_enabled)
 
         ast_fold = path_policy_utils.path_policy_ast_fold
