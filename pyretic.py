@@ -123,7 +123,10 @@ def parseArgs():
                     help = 'enable integration of tag and capture optimization, only works with multitable on')
     op.add_option('--enable_multitable', '-u', action="store_true",
                     dest = 'multitable_enabled',
-                    help = 'enable multitable optimization')
+                    help = 'enable multitable optimization. This option is'
+                    ' strictly necessary *only* if you do control plane'
+                    ' evaluations; it is set from the pipeline configuration'
+                    ' automatically.')
     op.add_option('--enable_ragel', '-r', action="store_true",
                     dest = 'ragel_enabled',
                     help = 'enable ragel optimization')

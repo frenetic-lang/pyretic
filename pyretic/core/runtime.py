@@ -184,6 +184,19 @@ class Runtime(object):
              self.edge_contraction_enabled, self.preddecomp_enabled) = opt_flags
              
             self.partition_enabled &= not self.partition_cnt is None
+        ''' Set multitable_enabled to True if other run-time options indicate
+        that we are using multi-stage tables with separate forwarding and
+        queries. :) '''
+        if self.use_nx and self.pipeline in ['path_query_pipeline','mt']:
+            self.log.info("Multitable option enabled gratuitously from other "
+                          "options")
+            self.multitable_enabled = True
+        elif self.use_nx and self.pipeline in ['default_pipeline']:
+            pass
+        elif self.use_nx:
+            raise NotImplementedError("Unknown pipeline configuration")
+        else:
+            pass
 
     def sw_port_ids(self):
         return self.network.switch_with_port_ids_list()
