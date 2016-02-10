@@ -85,7 +85,7 @@ class Runtime(object):
         self.network = ConcreteNetwork(self)
         self.prev_network = self.network.copy()
         self.forwarding = main(**kwargs)
-        self.get_subpol_stats = False # TODO: make cmdline option to pyretic.py
+        self.get_subpol_stats = True # TODO: make cmdline option to pyretic.py
         self.use_pyretic_compiler = use_pyretic
 
         """ Set runtime flags for specific optimizations. """
