@@ -215,8 +215,7 @@ class Runtime(object):
         reflect statistics. See recompile_paths() for latest updated assignments
         to these runtime variables. """
         if path_main:
-            pass
-            if self.integrate_enabled and self.multitable_enabled:
+            if self.integrate_enabled:
                 for (in_table, out_table) in zip(self.path_in_table_list, self.path_out_table_list):
                     self.get_subpolicy_compile_stats_per_stage(in_table,
                                                                out_table,
@@ -670,7 +669,7 @@ class Runtime(object):
 
         ds_policy_fragments = pathcomp.compile_downstream(self.ds_path_policy,
             NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
-            self.multitable_enabled and self.integrate_enabled,
+            self.integrate_enabled,
             self.ragel_enabled, self.partition_enabled, self.preddecomp_enabled)
 
         if self.us_path_policy == path_empty():
@@ -680,7 +679,7 @@ class Runtime(object):
                 self.sw_port_ids(), self.nw_edges(), self.forwarding,
                 self.sw_cnt(),
                 NUM_PATH_TAGS, self.disjoint_enabled, self.default_enabled,
-                self.multitable_enabled and self.integrate_enabled,
+                self.integrate_enabled,
                 self.ragel_enabled, self.partition_enabled)
         self.path_up_table.policy = us_policy
 
