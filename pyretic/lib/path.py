@@ -2723,6 +2723,15 @@ class pathcomp(object):
             sep_index = len(compile_res) / 2
             in_part = compile_res[:sep_index]
             out_part = compile_res[sep_index:]
+            """ If the "integrate" option is enabled, in_res looks like:
+            [in_table1, in_table2, ..., in_tableN] for N query matching stages.
+
+            Otherwise, in_res looks like:
+            [(in_tag1, in_cap1), (in_tag2, in_cap2), ..., (in_tagN, in_capN)]
+            for N query matching stages.
+
+            Respectively for out_res.
+            """
             in_res.append(in_part if len(in_part) != 1 else in_part[0])
             out_res.append(out_part if len(out_part) != 1 else out_part[0])
        

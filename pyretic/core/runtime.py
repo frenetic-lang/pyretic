@@ -221,10 +221,14 @@ class Runtime(object):
                                                                out_table,
                                                                restart_frenetic=restart_frenetic)
             else:
-                for (in_table, out_table, ingress, egress) in zip(self.path_in_table_list,
-                        self.path_out_table_list, self.path_ingress, self.path_egress):
-                    self.get_subpolicy_compile_stats_per_stage(in_table, out_table, ingress[0],
-                        ingress[1],egress[0],egress[1],restart_frenetic=restart_frenetic)
+                for (in_table, out_table, (in_tag, in_cap),
+                     (out_tag, out_cap)) in zip(self.path_in_table_list,
+                                                self.path_out_table_list,
+                                                self.path_ingress,
+                                                self.path_egress):
+                    self.get_subpolicy_compile_stats_per_stage(
+                        in_table, out_table, in_tag, in_cap, out_tag, out_cap,
+                        restart_frenetic=restart_frenetic)
     
     def get_subpolicy_compile_stats_per_stage(self, in_table, out_table,
                                               in_tag = None, in_cap = None,
@@ -683,14 +687,13 @@ class Runtime(object):
                 self.ragel_enabled, self.partition_enabled)
         self.path_up_table.policy = us_policy
 
+        (in_res, out_res) = ds_policy_fragments
         if self.integrate_enabled:
-            (in_res, out_res) = ds_policy_fragments
             assert len(in_res) == len(out_res)
             for i in range(0, len(in_res)):
                 self.path_in_table_list[i].policy  =  in_res[i]
                 self.path_out_table_list[i].policy = out_res[i]
         else:
-            (in_res, out_res) = ds_policy_fragments
             self.path_ingress = in_res
             self.path_egress  = out_res
             assert len(in_res) == len(out_res)
