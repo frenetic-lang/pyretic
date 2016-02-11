@@ -9,4 +9,4 @@ else
     MN=mn
 fi
 sudo $MN -c
-sudo $MN --custom $HOME/pyretic/mininet/extra-topos.py --controller remote --mac $@
+sudo $MN --custom $HOME/pyretic/mininet/extratopos.py --controller remote --mac $@

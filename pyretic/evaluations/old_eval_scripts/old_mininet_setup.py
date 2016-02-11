@@ -4,7 +4,7 @@ from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
 from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
-from extratopos import *
+from mininet.extratopos import *
 import subprocess, shlex, time, signal, os, sys
 from threading import Timer
 import time

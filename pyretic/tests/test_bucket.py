@@ -34,7 +34,7 @@ import time
 import re
 from mininet.log import setLogLevel
 from mininet.topo import *
-from pyretic.evaluations.extratopos import *
+from mininet.extratopos import *
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
