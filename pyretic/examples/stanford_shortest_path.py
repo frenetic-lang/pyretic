@@ -94,6 +94,16 @@ def get_topo_info(port_map_file, topo_file):
 
 topo, link_port_map = get_topo_info(port_map_file, topo_file)
 
+def get_shortest_paths(topo):
+    edge_nodes = [n for n in topo.nodes() if topo.node[n]["isHost"]]
+    shortest_paths = []
+    for u in edge_nodes:
+        paths = nx.single_source_shortest_path(topo, u)
+        for v in edge_nodes:
+            if u != v:
+                shortest_paths.append(paths[v])
+    return shortest_paths
+
 def get_forwarding_policy(topo, link_port_map):
     #rules = []
 
@@ -103,14 +113,14 @@ def get_forwarding_policy(topo, link_port_map):
     edge_nodes = [n for n in topo.nodes() if topo.node[n]["isHost"]]
     core_nodes = [n for n in topo.nodes() if topo.node[n]["isHost"] == False]
 
-    print "start"
+    # print "start"
     for u in edge_nodes: 
         dst_ip = base_ip % (u - 1)       
         
         paths = nx.single_source_shortest_path(topo, u)
         for v in edge_nodes:
             if u != v:
-                print u, v, paths[v]
+                # print u, v, paths[v]
         for s in core_nodes:
             next_hop = paths[s][-2]
             #m = match(switch = s, dstip = dst_ip).compile().rules[0].match 
