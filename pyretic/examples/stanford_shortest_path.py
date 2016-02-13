@@ -156,8 +156,8 @@ def main(**kwargs):
     return get_forwarding_policy(topo, link_port_map) 
 
 if __name__ == "__main__":
-    port_map_file = "stanford_data/port_map.txt"
-    topo_file = "stanford_data/backbone_topology.tf"
+    port_map_file = "pyretic/examples/stanford_data/port_map.txt"
+    topo_file = "pyretic/examples/stanford_data/backbone_topology.tf"
 
     topo, link_port_map = get_topo_info(port_map_file, topo_file)
     #nx.write_dot(topo, "stanford.dot")

@@ -350,8 +350,8 @@ class StanfordTopo( Topo ):
     
     DUMMY_SWITCH_BASE = 1000
     
-    PORT_MAP_FILENAME = "/home/mininet/hassel-public/mininet/data/port_map.txt"
-    TOPO_FILENAME = "/home/mininet/hassel-public/mininet/data/backbone_topology.tf"
+    PORT_MAP_FILENAME = "/home/mininet/pyretic/pyretic/examples/stanford_data/port_map.txt"
+    TOPO_FILENAME = "/home/mininet/pyretic/pyretic/examples/stanford_data/backbone_topology.tf"
     
     dummy_switches = set()
 
