@@ -93,7 +93,11 @@ def topo_setup(**kwargs):
     return StanfordTopo()
 
 def ovhead_filter_setup(**kwargs):
-    return "of.pktin"
+    params = dict(kwargs)
+    if 'pyopts' in params and '--nx' in params['pyopts']:
+        return "of.vendor or of.pktin"
+    else:
+        return "of.pktin"
 
 def optimal_filter_setup(**kwargs):
     (accs, others) = get_acc_other_pairs()

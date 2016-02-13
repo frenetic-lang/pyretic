@@ -120,6 +120,7 @@ def get_forwarding_policy(topo, link_port_map):
         paths = nx.single_source_shortest_path(topo, u)
         for v in edge_nodes:
             if u != v:
+                pass
                 # print u, v, paths[v]
         for s in core_nodes:
             next_hop = paths[s][-2]
@@ -133,6 +134,9 @@ def get_forwarding_policy(topo, link_port_map):
             #rules.append(Rule(m, act))
     return pol
     #return cls_to_pol(Classifier(rules))
+
+def get_sample_query(topo):
+    return in_atom(match(srcip='10.0.18.1', dstip='10.0.19.1'))
 
 def get_firewall_query(topo):
     switches = [n for n in topo.nodes() if not topo.node[n]["isHost"]]
@@ -159,10 +163,10 @@ def get_firewall_query(topo):
     return pol  
 
 def path_main(**kwargs):
+    # return get_sample_query(topo)
     return get_firewall_query(topo) 
 
 def main(**kwargs):
-    
     return get_forwarding_policy(topo, link_port_map) 
 
 if __name__ == "__main__":

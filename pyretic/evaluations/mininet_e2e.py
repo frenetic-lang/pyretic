@@ -54,7 +54,7 @@ PYRETIC_STDOUT="pyretic-stdout.txt"
 PYRETIC_STDERR="pyretic-stderr.txt"
 OVHEAD_TRAFFIC="overhead-traffic.txt"
 OPTIMAL_TRAFFIC="optimal-traffic.txt"
-TOTAL_BW_BYT_PS=18000000
+TOTAL_BW_BIT_PS=18000000
 IPERF_SERVER_PREFIX="server-udp"
 IPERF_CLIENT_PREFIX="client-udp"
 IPERF_MIN=1.63 * 1000 * 8
@@ -117,7 +117,7 @@ def get_tshark_ovhead(test_module, polopts, rfolder):
     ovhead_file = open("%s/%s" % (rfolder, OVHEAD_TRAFFIC), 'w')
     cmd = ("tshark -q -i lo -z io,stat,0,'%s' "
            "-f 'tcp port 6633' -a duration:%d" % (
-               ovhead_filter, TEST_DURATION_SEC+3))
+               ovhead_filter, TEST_DURATION_SEC+2*TSHARK_SLACK_SEC))
     print "Running tshark command", cmd
     p = subprocess.Popen(shlex.split(cmd), stdout=ovhead_file,
                          stderr=subprocess.STDOUT)
@@ -149,7 +149,7 @@ def get_tshark_optimal(test_module, polopts, rfolder):
     return (procs, opt_files)
 
 def run_iperf_test(test_module, polopts, rfolder, net):
-    (srcs, dsts, bws) = test_module.workload_setup(TOTAL_BW_BYT_PS, net, **polopts)
+    (srcs, dsts, bws) = test_module.workload_setup(TOTAL_BW_BIT_PS, net, **polopts)
     ''' start servers '''
     for dst in dsts:
         dst.cmd("iperf -fK -u -s -p 5002 2>&1 > %s/%s-%s.txt &" %
@@ -157,9 +157,10 @@ def run_iperf_test(test_module, polopts, rfolder, net):
     ''' start clients '''
     for i in range(0, len(srcs)):
         if bws[i] >= IPERF_MIN:
-            srcs[i].cmd("iperf -fK -t %d -c %s -u -p 5002 -b %s 2>&1 > %s/%s-%s.txt &"
+            srcs[i].cmd("iperf -fK -t %d -c %s -u -p 5002 -b %s 2>&1 > %s/%s-%s-%s.txt &"
                         % (TEST_DURATION_SEC, dsts[i].IP(), bws[i],
-                           rfolder, IPERF_CLIENT_PREFIX, srcs[i].name))
+                           rfolder, IPERF_CLIENT_PREFIX, srcs[i].name,
+                           dsts[i].name))
         else:
             print ("Avoiding transfer %s ---> %s because target bandwidth is too"
                    " low" % (srcs[i].name, dsts[i].name))
@@ -182,14 +183,18 @@ def query_test():
     test_module = get_test_module(test)
     polopts = get_testwise_params(args.polopts)
     polopts['test'] = test
+    polopts['pyopts'] = pyopts
 
     mn_cleanup()
     (ctlr, c_out, c_err) = get_controller(rfolder, pyopts, test, polopts)
     test_module.init_setup(**polopts)
     (net, hosts, switches) = get_mininet(test_module, polopts)
     (rules_installed) = wait_switch_rules_installed(switches, INSTALL_TIMEOUT_SEC)
+    # net.pingAll()
     (ovhp, ovhf) = get_tshark_ovhead(test_module, polopts, rfolder)
-    (optps, optfs) = get_tshark_optimal(test_module, polopts, rfolder)
+    #time.sleep(TSHARK_SLACK_SEC)
+    #(optps, optfs) = get_tshark_optimal(test_module, polopts, rfolder)
+    optps, optfs = [], []
     time.sleep(TSHARK_SLACK_SEC)
     run_iperf_test(test_module, polopts, rfolder, net)
     time.sleep(TEST_DURATION_SEC)
