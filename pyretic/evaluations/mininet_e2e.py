@@ -54,7 +54,7 @@ PYRETIC_STDOUT="pyretic-stdout.txt"
 PYRETIC_STDERR="pyretic-stderr.txt"
 OVHEAD_TRAFFIC="overhead-traffic.txt"
 OPTIMAL_TRAFFIC="optimal-traffic.txt"
-TOTAL_BW_BIT_PS=18000000
+TOTAL_BW_BIT_PS=1800000
 IPERF_SERVER_PREFIX="server-udp"
 IPERF_CLIENT_PREFIX="client-udp"
 IPERF_MIN=1.63 * 1000 * 8
@@ -197,7 +197,7 @@ def query_test():
     optps, optfs = [], []
     time.sleep(TSHARK_SLACK_SEC)
     run_iperf_test(test_module, polopts, rfolder, net)
-    time.sleep(TEST_DURATION_SEC)
+    time.sleep(TEST_DURATION_SEC + 2*TSHARK_SLACK_SEC)
     kill_processes([ctlr, ovhp] + optps)
     close_fds([c_out, c_err, ovhf] + optfs)
 

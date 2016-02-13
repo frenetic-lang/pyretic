@@ -76,14 +76,21 @@ def workload_setup(bw_budget, net, **kwargs):
     params = dict(kwargs)
     viol_frac = params.get('viol_frac', 0.3)
     acc_pairs, other_pairs = get_acc_other_pairs()
-    per_acc_bw = viol_frac * bw_budget / len(acc_pairs)
-    per_other_bw = (1-viol_frac) * bw_budget / len(other_pairs)
+
+    from random import shuffle
+    shuffle(acc_pairs)
+    shuffle(other_pairs)
+    acc_count = 3
+    other_count = 4
+    per_acc_bw = viol_frac * bw_budget / acc_count
+    per_other_bw = (1-viol_frac) * bw_budget / other_count
     srcs, dsts, bws = [], [], []
-    for (src, dst) in acc_pairs:
+
+    for (src, dst) in acc_pairs[:acc_count]:
         srcs.append(net.hosts[src-NUM_SWITCHES-1])
         dsts.append(net.hosts[dst-NUM_SWITCHES-1])
         bws.append(per_acc_bw)
-    for (src, dst) in other_pairs:
+    for (src, dst) in other_pairs[:other_count]:
         srcs.append(net.hosts[src-NUM_SWITCHES-1])
         dsts.append(net.hosts[dst-NUM_SWITCHES-1])
         bws.append(per_other_bw)
