@@ -56,6 +56,11 @@ def stanford_paths(paths=None):
     else:
         return stanford_paths.paths
 
+def get_acc_other_pairs_sample():
+    acc_pairs = [(17, 18)]
+    other_pairs = [(24, 29)]
+    return (acc_pairs, other_pairs)
+
 def get_acc_other_pairs():
     paths = stanford_paths()
     acc_pairs, other_pairs = [], []
@@ -74,14 +79,17 @@ def init_setup(**kwargs):
 
 def workload_setup(bw_budget, net, **kwargs):
     params = dict(kwargs)
-    viol_frac = params.get('viol_frac', 0.3)
+    viol_frac = float(params.get('viol_frac', 0.3))
+    print "The fraction of query-satisfying traffic is", viol_frac
     acc_pairs, other_pairs = get_acc_other_pairs()
 
     from random import shuffle
     shuffle(acc_pairs)
     shuffle(other_pairs)
-    acc_count = 3
-    other_count = 4
+    print "Accepted pairs:", acc_pairs
+    print "Other pairs:", other_pairs
+    acc_count = 3 #3
+    other_count = 4 #4
     per_acc_bw = viol_frac * bw_budget / acc_count
     per_other_bw = (1-viol_frac) * bw_budget / other_count
     srcs, dsts, bws = [], [], []

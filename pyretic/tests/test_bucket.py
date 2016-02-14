@@ -34,7 +34,7 @@ import time
 import re
 from mininet.log import setLogLevel
 from mininet.topo import *
-from mininet.extratopos import *
+from local_mininet.extratopos import *
 from mininet.net import Mininet
 from mininet.node import CPULimitedHost, RemoteController
 from mininet.cli import CLI
@@ -64,7 +64,10 @@ def pyretic_controller(ctlr_name, ctlr_params, c_out, c_err,
 
 def get_mininet(topo_args, listen_port):
     """ Get a mininet network from topology arguments. """
-    class_args = map(int, topo_args['class_args'].split(','))
+    if topo_args['class_args']:
+        class_args = map(int, topo_args['class_args'].split(','))
+    else:
+        class_args = []
     class_name = topo_args['class_name']
     topo = globals()[class_name](*class_args)
     net = Mininet(topo=topo, host=CPULimitedHost, controller=RemoteController,
@@ -266,6 +269,7 @@ def test_bucket_single_test():
     ints_list = globals()[args.interface_map]()
     capture_dir = args.capture_dir
     (tshark, t_out, t_err) = capture_packets(t_outfile, t_errfile, ints_list, capture_dir)
+    print "Waiting out tshark slack", tshark_slack_sec
     time.sleep(tshark_slack_sec)
 
     """ Workload """
@@ -274,13 +278,15 @@ def test_bucket_single_test():
     time.sleep(test_duration_sec)
 
     """ Finish up """
+    print "Waiting out tshark slack"
+    time.sleep(tshark_slack_sec)
     print "Actual run done. Cleaning up..."
     kill_process(ctlr, "controller")
     kill_process(tshark, "tshark")
     close_fds([c_out, c_err], "controller")
     close_fds([t_out, t_err], "tshark")
     net.stop()
-    time.sleep(tshark_slack_sec)
+    # time.sleep(tshark_slack_sec)
 
     """ Verify results """
     print "Verifying correctness..."
@@ -332,7 +338,8 @@ def parse_args():
     parser.add_argument("--success_file", help="File to write test pass/fail",
                         default="pass-fail.txt")
     parser.add_argument("--interface_map", default="map_any",
-                        choices=['map_any','map_chain_3_3', 'map_cycle_4_4'],
+                        choices=['map_any','map_chain_3_3', 'map_cycle_4_4',
+                                 'map_stanford_edges'],
                         help="Map that defines interfaces to run packet capture")
     parser.add_argument("--capture_dir", default="inbound",
                         choices=['inbound', 'outbound'],
@@ -721,6 +728,22 @@ def filt_path_test_23_p2_static_outbound(l):
     return (pkt_srcip(ip1,l) and
             (pkt_interface('s2-eth2',l) or pkt_interface('s2-eth3',l)))
 
+def filt_stanford_firewall_outbound(l):
+    src_dsts = [(19, 18), (25, 18), (29, 30), (27, 28), (23, 18), (28, 27), 
+                (18, 27), (26, 18), (28, 18), (23, 24), (29, 18), (22, 18),
+                (18, 30), (21, 18), (18, 20), (18, 28), (24, 18), (18, 25),
+                (19, 20), (25, 26), (30, 29), (18, 29), (18, 21), (32, 31),
+                (20, 19), (18, 22), (22, 21), (18, 32), (18, 19), (18, 23),
+                (18, 26), (24, 23), (31, 18), (30, 18), (26, 25), (21, 22),
+                (27, 18), (20, 18), (18, 31), (32, 18), (31, 32), (18, 24)]
+    def get_intf(s):
+        return 16 if (s == 1 or s == 2) else 4
+    filt_list = []
+    for (src, dst) in src_dsts:
+        filt_list.append(pkt_srcip('10.0.%d.1' % (src-1), l) and 
+                         pkt_interface('s%d-eth%d' % (dst, get_intf(dst)), l))
+    return reduce(lambda acc, x: acc or x, filt_list)
+
 ### Interfaces map for packet capture ###
 def map_any():
     global ints_map, rev_ints_map
@@ -742,6 +765,16 @@ def map_cycle_4_4():
                  "s2-eth1", "s2-eth2", "s2-eth3",
                  "s3-eth1", "s3-eth2", "s3-eth3",
                  "s4-eth1", "s4-eth2", "s4-eth3"]
+    ints_map  = {i: ints_list.index(i) for i in ints_list}
+    rev_ints_map = {j: ints_list[j] for j in range(0, len(ints_list))}
+    return ints_list
+
+def map_stanford_edges():
+    global ints_map, rev_ints_map
+    ints_list = ["s1-eth16", "s2-eth16", "s3-eth4", "s4-eth4", 
+                 "s5-eth4", "s6-eth4", "s7-eth4", "s8-eth4",
+                 "s9-eth4", "s10-eth4", "s11-eth4", "s12-eth4",
+                 "s13-eth4", "s14-eth4", "s15-eth4", "s16-eth4"]
     ints_map  = {i: ints_list.index(i) for i in ints_list}
     rev_ints_map = {j: ints_list[j] for j in range(0, len(ints_list))}
     return ints_list

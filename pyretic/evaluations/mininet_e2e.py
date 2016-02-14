@@ -54,10 +54,10 @@ PYRETIC_STDOUT="pyretic-stdout.txt"
 PYRETIC_STDERR="pyretic-stderr.txt"
 OVHEAD_TRAFFIC="overhead-traffic.txt"
 OPTIMAL_TRAFFIC="optimal-traffic.txt"
-TOTAL_BW_BIT_PS=1800000
+TOTAL_BW_BIT_PS=180000
 IPERF_SERVER_PREFIX="server-udp"
 IPERF_CLIENT_PREFIX="client-udp"
-IPERF_MIN=1.63 * 1000 * 8
+IPERF_MIN=500 * 8
 TSHARK_INTFS_COUNT=5
 
 def parse_args():
@@ -192,14 +192,16 @@ def query_test():
     (rules_installed) = wait_switch_rules_installed(switches, INSTALL_TIMEOUT_SEC)
     # net.pingAll()
     (ovhp, ovhf) = get_tshark_ovhead(test_module, polopts, rfolder)
-    #time.sleep(TSHARK_SLACK_SEC)
-    #(optps, optfs) = get_tshark_optimal(test_module, polopts, rfolder)
-    optps, optfs = [], []
+    time.sleep(TSHARK_SLACK_SEC)
+    (optps, optfs) = get_tshark_optimal(test_module, polopts, rfolder)
+    # optps, optfs = [], []
     time.sleep(TSHARK_SLACK_SEC)
     run_iperf_test(test_module, polopts, rfolder, net)
     time.sleep(TEST_DURATION_SEC + 2*TSHARK_SLACK_SEC)
     kill_processes([ctlr, ovhp] + optps)
     close_fds([c_out, c_err, ovhf] + optfs)
+
+    net.stop()
 
     print "Done!"
 

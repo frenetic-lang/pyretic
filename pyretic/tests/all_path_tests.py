@@ -333,6 +333,21 @@ def path_test_23_static_multistage(default_pyopts, capture_dir):
         capture_dir=capture_dir)
     update_test_stats(query, fwding, pyopts, res)
 
+def path_test_stanford_firewall_multistage(default_pyopts, capture_dir='outbound'):
+    """ Stanford topology with firewall query """
+    assert capture_dir == 'outbound'
+    query = "stanford_firewall"
+    fwding = "stanford_shortest_path"
+    pyopts = '%s --nx --pipeline=path_query_pipeline' % default_pyopts
+    res = single_path_test(
+        query=query, fwding=fwding, pyopts=pyopts,
+        tshark_filter_funs="filt_stanford_firewall_outbound",
+        topo_name="StanfordTopo", topo_args='',
+        results_folder=results_folder, success_file=success_file,
+        test_nums='stanford_firewall', interface_map="map_stanford_edges",
+        capture_dir='outbound', tshark_slack_sec=120)
+    update_test_stats(query, fwding, pyopts, res)
+
 def bunched_path_tests(default_pyopts='', capture_dir='outbound'):
     path_test_5_2_static_multistage_upstream(default_pyopts)
     path_test_5_2_static_single_stage_upstream(default_pyopts)
@@ -385,7 +400,8 @@ def print_failed_tests():
 if __name__ == "__main__":
     opts = parse_args()
     if opts.testrun: # just run one test, to sample
-        path_test_0_static_single_stage('', 'outbound')
+        # path_test_0_static_single_stage('', 'outbound')
+        path_test_stanford_firewall_multistage(default_pyopts='-r')
     else: # run full suite of tests
         # bunched_path_tests(default_pyopts='')
         bunched_path_tests(default_pyopts='-r')

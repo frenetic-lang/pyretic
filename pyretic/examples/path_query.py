@@ -85,6 +85,10 @@ def static_fwding_chain_3_3():
                               (match(switch=3) >> fwd(2))))
         )
 
+def stanford_shortest_path():
+    from pyretic.examples.stanford_shortest_path import main as stan_fwding
+    return stan_fwding()
+
 def edge_network_cycle_4_4():
     return (
         match(switch=1, port=3) |
@@ -169,7 +173,7 @@ def query_callback(test_num):
                 ac.pkt_count  += 1
                 ac.byte_count += pkt['payload_len']
                 update_predwise_counts(pkt)
-                print_predwise_entries()
+                # print_predwise_entries()
                 print_total_entries()
             else:
                 print "Bucket %s (packet, byte) counts: %s" % (
@@ -651,6 +655,77 @@ def path_test_28():
     p.set_fvlist(fvlist)
     return p
 
+def stanford_firewall():
+    from pyretic.examples.stanford_shortest_path import path_main as stan_query
+    fb = FwdBucket()
+    fb.register_callback(query_callback("stanford_firewall"))
+    p = stan_query()
+    p.set_bucket(fb)
+    return p
+
+def stanford_tm():
+    qlist = []
+    def edge_port(s):
+        return 16 if (s == 1 or s == 2) else 4
+    num_queries = 0
+    for src in range(1,17):
+        for dst in range(1,17):
+            if src != dst:
+                p = (in_atom(match(switch=src, port=edge_port(src))) **
+                     out_atom(match(switch=dst, port=edge_port(dst))))
+                # p = (in_atom(ingress_network() & match(switch=src)) **
+                #      out_atom(egress_network() & match(switch=dst)))
+                fb = FwdBucket()
+                fb.register_callback(query_callback("tm_%d_%d" % (src, dst)))
+                p.set_bucket(fb)
+                num_queries += 1
+                qlist.append(p)
+    print "installing %d queries (%d)" % (num_queries, len(qlist))
+    return path_policy_union(qlist)
+
+def stanford_tm_counts():
+    qlist = []
+    def edge_port(s):
+        return 16 if (s == 1 or s == 2) else 4
+    num_queries = 0
+    for src in range(1,17):
+        for dst in range(1,17):
+            if src != dst:
+                p = (in_atom(match(switch=src, port=edge_port(src))) **
+                     out_atom(match(switch=dst, port=edge_port(dst))))
+                # p = (in_atom(ingress_network() & match(switch=src)) **
+                #      out_atom(egress_network() & match(switch=dst)))
+                cb = CountBucket()
+                p.set_bucket(cb)
+                num_queries += 1
+                qlist.append(p)
+    print "installing %d queries (%d)" % (num_queries, len(qlist))
+    return path_policy_union(qlist)
+
+def stanford_tm_progressive(**kwargs):
+    qlist = []
+    def edge_port(s):
+        return 16 if (s == 1 or s == 2) else 4
+    params = dict(kwargs)
+    srccount = 4
+    if 'srccount' in params:
+        srccount = int(params['srccount'])
+    num_queries = 0
+    for src in range(1,srccount):
+        for dst in range(1,17):
+            if src != dst:
+                p = (in_atom(match(switch=src, port=edge_port(src))) **
+                     out_atom(match(switch=dst, port=edge_port(dst))))
+                # p = (in_atom(ingress_network() & match(switch=src)) **
+                #      out_atom(egress_network() & match(switch=dst)))
+                fb = FwdBucket()
+                fb.register_callback(query_callback("tm_%d_%d" % (src, dst)))
+                p.set_bucket(fb)
+                num_queries += 1
+                qlist.append(p)
+    print "installing %d queries (%d)" % (num_queries, len(qlist))
+    return path_policy_union(qlist)
+
 def get_query(kwargs, default):
     params = dict(kwargs)
     if 'query' in params:
@@ -678,7 +753,11 @@ def check_only_count(kwargs):
 def path_main(**kwargs):
     check_only_count(kwargs)
     default = path_test_waypoint_violation_general
-    return get_query(kwargs, default)()
+    query_fun = get_query(kwargs, default)
+    try:
+        return query_fun(**kwargs)
+    except TypeError:
+        return query_fun()
 
 def main(**kwargs):
 #    default = mac_learner()
