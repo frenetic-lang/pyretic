@@ -423,6 +423,27 @@ class StanfordTopo( Topo ):
         return links
         
              
+class DemoTopo(Topo):
+    def __init__(self):
+        super(DemoTopo, self).__init__()
+        print 'here'
+        # add switches
+        for i in range(1, 5):
+            self.addSwitch('s%d' % i)
+        
+        # add Hosts
+        for i in range(1, 5):
+            self.addHost("h%d" % i, ip = "10.0.0.%d" % i)
+
+        # add links
+        self.addLink('s1', 's2')
+        self.addLink('s1', 's4')
+        self.addLink('s3', 's2')
+        self.addLink('s3', 's4')
+        self.addLink('h1', 's1')
+        self.addLink('h2', 's1')
+        self.addLink('h3', 's3')
+        self.addLink('h4', 's3')
 
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
           'square': (lambda: CycleTopo(4,4)),
@@ -437,6 +458,7 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'gateway3': ThreeSwitchGatewayTopo,
           'gateway3_ns': ThreeSwitchGatewayTopoNoSubnets,
           'simple_prefix': SimplePrefixTopo,
-          'stanford' : StanfordTopo
+          'stanford' : StanfordTopo,
+          'demo' : DemoTopo
 }
  
