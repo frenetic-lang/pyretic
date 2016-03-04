@@ -2259,11 +2259,13 @@ class path_grouping(object):
             assert isinstance(ast, path)
             if isinstance(ast, in_out_group):
                 try:
-                    val = vals[id(ast)]
+                    # return the in_out_atom corresponding to this group.
+                    # recall that vals[id(ast)] has the form (in_out_atom, (field_map))
+                    val = vals[id(ast)][0] 
                 except KeyError:
                     raise RuntimeError("Substitution vals has no "
                                        "substitution for current AST: %s" % repr(ast))
-                return vals[id(ast)]
+                return val
             else:
                 return ast
         return actual_mapper
@@ -2317,13 +2319,22 @@ class path_grouping(object):
         res = []
         for inl in inlist:
             for outl in outlist:
-                res.append(gatom.substitute(
-                    {f:v for (f,v) in zip(ingby,  inl)},
-                    {f:v for (f,v) in zip(outgby, outl)}))
-        return filter(lambda x: not x is None, res)
+                in_field_map = dict(zip(ingby, inl))
+                out_field_map = dict(zip(outgby, outl))
+                atom = gatom.substitute(in_field_map, out_field_map)
+                res.append((atom, (in_field_map, out_field_map)))
+        return filter(lambda x: not x[0] is None, res)
 
     @classmethod
     def gatom_to_ioatom_combos(cls, galist, fvlist):
+        """ Result is of the form 
+            [ group_to_atom_metadata_map ]
+            where each element is a dictionary of the form
+            gatom_id : (in_out_atom, (in_field_list_map, out_field_list_map) )
+            where in_field_list_map is a dictionary of the form
+            { field1: value1, field2: value2, ...}
+            (corresponding to each groupby field substitution).
+        """
         assert list_isinstance(galist, in_out_group)
         ga_subst_map = {id(gatom): cls.gen_groupby_substitutes(gatom, fvlist)
                         for gatom in galist}
@@ -2375,6 +2386,7 @@ class path_grouping(object):
         new_query = ppu.path_ast_map(p, mapper)
         p_cbs = p.get_bucket().callbacks
         p_bucket = type(p.get_bucket())()
+        mapping = dict([(i, x[1]) for i, x in mapping.items()])
         p_bucket.register_callback(cls.aggwrap(p_cbs, mapping))
         new_query.set_bucket(p_bucket)
         new_query.set_measure_loc(p.get_measure_loc())
