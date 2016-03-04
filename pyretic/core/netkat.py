@@ -637,7 +637,7 @@ def adjust_vlan_fields(mat, acts):
                 m['vlan_id'] = mat.map['vlan_id']
                 new_act = modify(**m)
         new_acts.append(new_act)
-    return new_acts
+    return set(new_acts)
         
 def json_to_classifier(fname, qdict, multistage, vlan_offset_nbits):
     from pyretic.core.classifier import Rule, Classifier
@@ -655,7 +655,7 @@ def json_to_classifier(fname, qdict, multistage, vlan_offset_nbits):
             # not there's a "queries" field in the rule.
             if 'queries' in rule and rule['queries']:
                 queries = get_queries_from_names(rule['queries'], qdict)
-                pyrule = Rule(m, action | queries, [None], "netkat_query")
+                pyrule = Rule(m, queries | action, [None], "netkat_query")
             else:
                 pyrule = Rule(m, action, [None], "netkat")
             rules.append((prio, pyrule))
