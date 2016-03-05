@@ -1317,6 +1317,25 @@ class CountBucket(MatchingAggregateBucket):
         # be on names.
         return id(self) == id(other)
 
+    def add_match(self, match, priority, version):
+        """Add a match to list of classifier rules to be queried for counts,
+        corresponding to a given version of the classifier.
+        """
+        k = self.rule_entry(match, priority, version)
+        if not k in self.matches:
+            self.matches[k] = self.match_status()
+
+    def delete_match(self, match, priority, version, to_be_deleted=False):
+        """If a rule is deleted from the classifier, mark this rule (until we
+        get the flow_removed message with the counters on it).
+        """
+        k = self.rule_entry(match, priority, version)
+        if k in self.matches:
+            if to_be_deleted:
+                del self.matches[k]
+            else:
+                self.matches[k].to_be_deleted = True
+
 ################################################################################
 # Combinator Policies                                                          #
 ################################################################################
