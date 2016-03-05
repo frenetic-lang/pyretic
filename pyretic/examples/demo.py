@@ -103,15 +103,25 @@ EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
 
 def query1():
     tenant_pred = EDGE & match(srcip = TEN_IP, dstip = TEN_IP, ethtype=2048)
-    q = in_atom(tenant_pred) ** out_atom(EDGE)
-    q |= in_out_atom(tenant_pred, EDGE)
-    cb = CountBucket()
-    q.set_bucket(cb)
-    q.register_callback(count_callback("1"))
-    query_thread = threading.Thread(target=query_func, args=(cb,5))
+    q1 = in_atom(tenant_pred) ** out_atom(EDGE)
+    q1 |= in_out_atom(tenant_pred, EDGE)
+    cb1 = CountBucket()
+    q1.set_bucket(cb1)
+    q1.register_callback(count_callback("1 - Upstream"))
+    q1.measure_upstream()
+    query_thread = threading.Thread(target=query_func, args=(cb1,5))
     query_thread.daemon = True
     query_thread.start()
-    return q
+
+    q2 = in_atom(tenant_pred) ** out_atom(EDGE)
+    q2 |= in_out_atom(tenant_pred, EDGE)
+    cb2 = CountBucket()
+    q2.set_bucket(cb2)
+    q2.register_callback(count_callback("1 - Downstream"))
+    query_thread = threading.Thread(target=query_func, args=(cb2,5))
+    query_thread.daemon = True
+    query_thread.start()
+    return q1 + q2
 
 def query2():
     fvlist = {'switch': range(1,5)}
@@ -171,7 +181,7 @@ def query_test():
 
 
 def path_main(**kwargs):
-    return query2()
+    return query1()
 
 def main():
     return forwarding_policy()
