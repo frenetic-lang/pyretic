@@ -926,6 +926,13 @@ class MatchingAggregateBucket(Query):
                     ',priority=' + repr(self.priority) +
                     ',version=' + repr(self.version) + ')')
 
+    class rule_entry(match_entry):
+        def __init__(self, match, priority, version):
+            super(MatchingAggregateBucket.rule_entry, self).__init__(
+                match, priority, version)
+            self.match = util.frozendict(
+                {'switch':match['switch']} if 'switch' in match else {})
+
     class match_status(object):
         def __init__(self,to_be_deleted=False,existing_rule=False):
             self.to_be_deleted = to_be_deleted
@@ -1074,8 +1081,12 @@ class CountBucket(MatchingAggregateBucket):
         with self.in_update_cv:
             while self.in_update:
                 self.in_update_cv.wait()
-            k = self.match_entry(self.str_convert_match(match),
-                                 priority, version)
+            ''' To restore using matches, uncomment the following lines.
+            # k = self.match_entry(self.str_convert_match(match),
+            #                      priority, version)
+            '''
+            k = self.rule_entry(self.str_convert_match(match),
+                                priority, version)
             if k in self.matches:
                 self.log.debug("Deleted flow exists in the bucket's matches")
                 status = self.matches[k]
@@ -1203,9 +1214,19 @@ class CountBucket(MatchingAggregateBucket):
             bucket.matches."""
             f = copy.copy(flow_stat['match'])
             f['switch'] = s
-            fme = self.match_entry(self.str_convert_match(f),
-                                   flow_stat['priority'],
-                                   flow_stat['cookie'])
+            ''' To restore using matches, uncomment the following lines.
+            # fme = self.match_entry(self.str_convert_match(f),
+            #                        flow_stat['priority'],
+            #                        flow_stat['cookie'])
+            Note that the change from match_entry to rule_entry implicitly
+            denotes the assumption about the runtime that rules are uniquely
+            identified by their cookie and priority, which denote (1) priority
+            in a given table, (2) the table itself, and (3) the version number
+            of the entire policy.
+            '''
+            fme = self.rule_entry(self.str_convert_match(f),
+                                  flow_stat['priority'],
+                                  flow_stat['cookie'])
             if fme in self.matches.keys():
                 return fme
             return None
@@ -1295,6 +1316,25 @@ class CountBucket(MatchingAggregateBucket):
         # TODO: if buckets eventually have names, equality should
         # be on names.
         return id(self) == id(other)
+
+    def add_match(self, match, priority, version):
+        """Add a match to list of classifier rules to be queried for counts,
+        corresponding to a given version of the classifier.
+        """
+        k = self.rule_entry(match, priority, version)
+        if not k in self.matches:
+            self.matches[k] = self.match_status()
+
+    def delete_match(self, match, priority, version, to_be_deleted=False):
+        """If a rule is deleted from the classifier, mark this rule (until we
+        get the flow_removed message with the counters on it).
+        """
+        k = self.rule_entry(match, priority, version)
+        if k in self.matches:
+            if to_be_deleted:
+                del self.matches[k]
+            else:
+                self.matches[k].to_be_deleted = True
 
 ################################################################################
 # Combinator Policies                                                          #
