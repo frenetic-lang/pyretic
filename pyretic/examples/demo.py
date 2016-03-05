@@ -67,8 +67,7 @@ def query_callback(test_num):
 
     def actual_callback(pkt):
         ac = actual_callback
-        print type(ac)
-        print type(pkt)
+        
         def touch_vars():
             """ Initialize function-specific counters, if uninitialized. """
             try:
