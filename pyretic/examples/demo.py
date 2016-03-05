@@ -34,6 +34,14 @@ def forwarding_policy():
            drop))))
 
 
+def count_callback(test_num):
+    def actual_callback(counts):
+        print "***", str(datetime.now()), "| In user callback for bucket",
+        print test_num
+        print "Bucket", test_num, "(packet, byte) counts:", counts
+        print "-----------------------------------"
+    return actual_callback
+
 def agg_callback(test_num):
     def actual_callback(agg, res):
         print '**************'
@@ -148,7 +156,8 @@ def query1():
     q = in_atom(tenant_pred) ** out_atom(edge_network)
     cb = CountBucket()
     q.set_bucket(cb)
-    q.register_callback(query_callback(1))
+    # q.register_callback(query_callback(1))
+    q.register_callback(count_callback(1))
     query_thread = threading.Thread(target=query_func, args=(cb,5))
     query_thread.daemon = True
     query_thread.start()
