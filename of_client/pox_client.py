@@ -408,7 +408,7 @@ class POXClient(revent.EventMixin):
         if 'srcip' in pred:
             assert 'ethtype' in pred
             if pred['ethtype'] == IP_TYPE:
-                match.of_ip_src = packetaddr.IPAddr(pred['srcip'])
+                match.NXM_OF_IP_SRC = pred['srcip']
             elif pred['ethtype'] == ARP_TYPE:
                 match.arp_spa = packetaddr.IPAddr(pred['srcip'])
             else:
@@ -416,7 +416,7 @@ class POXClient(revent.EventMixin):
         if 'dstip' in pred:
             assert 'ethtype' in pred
             if pred['ethtype'] == IP_TYPE:
-                match.of_ip_dst = packetaddr.IPAddr(pred['dstip'])
+                match.NXM_OF_IP_DST = pred['dstip']
             elif pred['ethtype'] == ARP_TYPE:
                 match.arp_tpa = packetaddr.IPAddr(pred['dstip'])
             else:
