@@ -105,7 +105,7 @@ EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
 
 class DemoCLI(Cmd):
     """ Command-line prompt for demo queries. """
-    prompt = ">>> "
+    prompt = "query>>> "
 
     def __init__(self, dpp, default_cb):
         """Initialize the CLI's internal structures using a dynamic_path_policy
@@ -137,10 +137,11 @@ class DemoCLI(Cmd):
         print "\tadd\tAdd a new query"
         print "\trm\tRemove an existing query"
         print "\tpull\tPull statistics for an existing query"
+        print "\tshow\tShow installed queries"
 
     def do_add(self, qstr):
-        """ Dangerous!!! But this is the quickest way to do this. """
         try:
+            """ Dangerous!!! But this is the quickest way to do this. """
             q = eval(qstr)
         except Exception as e:
             print "*** Not a well formed expression:", e
@@ -154,6 +155,11 @@ class DemoCLI(Cmd):
         self.refq_map.update({id(q): q})
         self.dpp.path_policy += q
         print "Added query: reference %d" % id(q)
+
+    def do_show(self, line):
+        print "Showing installed queries:"
+        for (qid, q) in self.refq_map.items():
+            print qid, ':', q
 
     def do_rm(self, qidstr):
         qid = self.get_qid(qidstr)
@@ -181,6 +187,7 @@ class DemoCLI(Cmd):
 def span_cli(p, default_cb):
     cli = DemoCLI(p, default_cb)
     time.sleep(2)
+    print
     cli.cmdloop()
 
 def query1():
