@@ -4161,12 +4161,17 @@ def pack_queries(queries, limit):
 
 def pack_queries_stagelimited(queries, numstages):
     assert numstages > 0
-    q_list = [get_type(q) for q in queries]
+    nonempty_qs = filter(lambda x: not isinstance(x, path_empty), queries)
+    empty_qs = filter(lambda x: isinstance(x, path_empty), queries)
+    # only do packing for non-empty queries
+    q_list = [get_type(q) for q in nonempty_qs]
     q_list = zip(range(len(q_list)), q_list)
     assgn = pack_stage(q_list, 2000, numstages)
     for i in assgn:
         res = []
         for qi in assgn[i]:
-            res.append(queries[qi])
+            res.append(nonempty_qs[qi])
         assgn[i] = res
+    # attach all empty queries to 0th stage
+    assgn[0] += empty_qs
     return assgn
