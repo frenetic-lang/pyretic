@@ -1238,7 +1238,7 @@ class path_policy_utils(object):
         value.
 
         :param ast: path_policy
-        :param fold_f: 'a -> path_policy -> 'a
+        :param fold_f: 'a -> path_policy -> re_tree_gen -> re_tree_gen -> 'a
         :param default: 'a
         """
         if isinstance(ast, path_policy_union):
