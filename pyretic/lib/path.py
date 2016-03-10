@@ -2410,15 +2410,20 @@ class path_grouping(object):
         """
         ppu = path_policy_utils
         ppols_list = []
-        if isinstance(path_pol, path_policy_union):
-            ppols_list = path_pol.path_policies
-        elif isinstance(path_pol, path_policy):
-            ppols_list = [path_pol]
-        else:
-            raise TypeError("cannot expand groupby from non-path-policies!")
+        def collect_primitive_pathpols(acc, p, in_cg=None, out_cg=None):
+            if isinstance(p, path_policy_union) or isinstance(
+                    p, dynamic_path_policy):
+                return acc
+            elif isinstance(p, path_policy):
+                return acc | set([p])
+            else:
+                raise TypeError("Expecting type path_policy")
+        assert isinstance(path_pol, path_policy), "cannot expand groupby from non-path-policies"
+        ppols_list = ppu.path_policy_ast_fold(
+            path_pol, collect_primitive_pathpols, set([]))
         res_ppols = []
         for p in ppols_list:
-            gatm_list = ppu.path_ast_fold(p, cls.groupby_collect, set())
+            gatm_list = ppu.path_ast_fold(p.path, cls.groupby_collect, set())
             if not gatm_list:
                 res_ppols.append(p)
                 continue
