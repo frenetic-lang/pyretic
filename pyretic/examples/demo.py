@@ -105,7 +105,7 @@ EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
 
 class DemoCLI(Cmd):
     """ Command-line prompt for demo queries. """
-    prompt = "query>>> "
+    prompt = "query> "
 
     def __init__(self, dpp, default_cb):
         """Initialize the CLI's internal structures using a dynamic_path_policy
@@ -165,7 +165,13 @@ class DemoCLI(Cmd):
         qid = self.get_qid(qidstr)
         if qid:
             del self.refq_map[qid]
-            self.dpp.path_policy = path_policy_union(self.refq_map.values())
+            queries = self.refq_map.values()
+            if len(queries) > 1:
+                self.dpp.path_policy = path_policy_union(self.refq_map.values())
+            elif len(queries) == 1:
+                self.dpp.path_policy = queries[0]
+            else:
+                self.dpp.path_policy = path_empty()
 
     def do_pull(self, qidstr):
         qid = self.get_qid(qidstr)
