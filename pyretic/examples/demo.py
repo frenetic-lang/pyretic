@@ -1,6 +1,8 @@
 from pyretic.lib.path import *
 from pyretic.core.language import *
 from datetime import datetime
+import time
+from cmd import Cmd
 
 import threading
 import itertools
@@ -100,6 +102,86 @@ def pull_func(bucket_list, interval):
 
 EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
                match(switch = 3, port = 3) | match(switch = 3, port = 4) 
+
+class DemoCLI(Cmd):
+    """ Command-line prompt for demo queries. """
+    prompt = ">>> "
+
+    def __init__(self, dpp, default_cb):
+        """Initialize the CLI's internal structures using a dynamic_path_policy
+        object. The default callback for the queries is also an additional
+        argument.
+        """
+        assert isinstance(dpp, dynamic_path_policy)
+        self.dpp = dpp
+        self.default_cb = default_cb
+        self.refq_map = {id(dpp.path_policy): dpp.path_policy}
+        Cmd.__init__(self)
+
+    def get_qid(self, qidstr):
+        try:
+            qid = int(qidstr)
+        except Exception as e:
+            print "*** There is no query with this reference."
+            return False
+        if not qid in self.refq_map:
+            print "*** There is no query with this reference."
+            return False
+        return qid
+
+    def emptyline(self):
+        pass
+
+    def do_help(self, line):
+        print "The available commands are:"
+        print "\tadd\tAdd a new query"
+        print "\trm\tRemove an existing query"
+        print "\tpull\tPull statistics for an existing query"
+
+    def do_add(self, qstr):
+        """ Dangerous!!! But this is the quickest way to do this. """
+        try:
+            q = eval(qstr)
+        except Exception as e:
+            print "*** Not a well formed expression:", e
+            return
+        if not isinstance(q, path_policy):
+            print "*** Not a well formed query."
+            return
+        cb = CountBucket()
+        cb.register_callback(self.default_cb(id(q)))
+        q.set_bucket(cb)
+        self.refq_map.update({id(q): q})
+        self.dpp.path_policy += q
+        print "Added query: reference %d" % id(q)
+
+    def do_rm(self, qidstr):
+        qid = self.get_qid(qidstr)
+        if qid:
+            del self.refq_map[qid]
+            self.dpp.path_policy = path_policy_union(self.refq_map.values())
+
+    def do_pull(self, qidstr):
+        qid = self.get_qid(qidstr)
+        if qid:
+            q = self.refq_map[qid]
+            q.get_policy().pull_stats()
+
+    def do_EOF(self, line):
+        print '\n'
+        print "Exiting CLI"
+        return True
+
+    def do_exit(self, line):
+        return self.do_EOF(line)
+
+    def do_quit(self, line):
+        return self.do_EOF(line)
+
+def span_cli(p, default_cb):
+    cli = DemoCLI(p, default_cb)
+    time.sleep(2)
+    cli.cmdloop()
 
 def query1():
     tenant_pred = EDGE & match(srcip = TEN_IP, dstip = TEN_IP, ethtype=2048)
