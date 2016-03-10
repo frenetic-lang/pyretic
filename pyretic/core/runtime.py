@@ -339,7 +339,7 @@ class Runtime(object):
         start_time = time.time()
         self.num_packet_ins += 1
         # TODO: revert to debug logging
-        self.log.error("Packet-in # %d" % self.num_packet_ins)
+        self.log.info("Packet-in # %d" % self.num_packet_ins)
         with self.policy_lock:
             pyretic_pkt = self.concrete2pyretic(concrete_pkt)
 
