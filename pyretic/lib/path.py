@@ -4010,7 +4010,7 @@ def get_types_dict(query):
         out_type = Counter({ out_fields: 1 if len(out_fields) > 0 else 0})
         return (in_type, out_type)
     else:
-        raise TypeError
+        raise TypeError, "Got unexpected type %s" % type(query)
 
 def get_type(query):
     (in_dict, out_dict) = get_types_dict(query)
