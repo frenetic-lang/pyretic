@@ -91,6 +91,8 @@ class Runtime(object):
         """ Set runtime flags for specific optimizations. """
         self.set_optimization_opts(path_main, opt_flags)
         """ If there are path-policies, initialize path query components. """
+        self.path_triggered_policy_update = False
+        self.in_path_recompile = False
         self.init_path_query(path_main, kwargs, self.partition_cnt,
                              self.cache_enabled, self.edge_contraction_enabled,
                              use_fdd=use_fdd, write_log=self.write_log)
@@ -410,6 +412,10 @@ class Runtime(object):
             elif self.in_bucket_apply:
                 self.bucket_triggered_policy_update = True
 
+            # if this change driven by a path recompilation, flag
+            elif self.in_path_recompile:
+                self.path_triggered_policy_update = True
+
             # otherwise, update controller and switches accordingly
             else:
                 self.update_dynamic_sub_pols()
@@ -615,6 +621,9 @@ class Runtime(object):
         recompilation of the path (and hence pyretic) policy. """
         self.recompile_paths()
         self.update_dynamic_sub_path_pols(self.path_policy)
+        if self.path_triggered_policy_update:
+            self.update_switch_classifiers()
+            self.path_triggered_policy_update = False
 
     def handle_path_change_dyn_pred(self, sub_pol):
         dyn_preds = self.dynamic_path_preds
@@ -659,6 +668,7 @@ class Runtime(object):
     def recompile_paths(self):
         """ Recompile DFA based on new path policy, which in turns updates the
         runtime's policy member. """
+        self.in_path_recompile = True
         from pyretic.lib.path import pathcomp, path, path_grouping, path_empty
         path_grouping.set_rtm_fvlist(self.sw_port_ids())
         """ TODO(ngsrinivas): Clearing of virtual fields assumes that path
@@ -705,6 +715,7 @@ class Runtime(object):
                 self.path_out_table_list[i].policy = outtagp + outcapp
         self.path_in_table.policy = sequential(self.path_in_table_list)
         self.path_out_table.policy = sequential(self.path_out_table_list)
+        self.in_path_recompile = False
         '''(in_tag, in_cap, out_tag, out_cap) = policy_fragments
         self.path_in_tagging.policy  = in_tag
         self.path_in_capture.policy  = in_cap
