@@ -261,9 +261,17 @@ def query_test():
     print len(buckets)
     return res_paths
 
+def query3():
+    """ Use a dynamic path policy and a CLI to have user-typed queries. """
+    p = dynamic_path_policy(path_empty())
+    cli_thread = threading.Thread(target=span_cli, args=(
+        p, count_callback))
+    cli_thread.start()
+    return p
 
 def path_main(**kwargs):
-    return query1()
+    # return query1()
+    return query3()
 
 def main():
     return forwarding_policy()
