@@ -144,7 +144,6 @@ def aggr_callback(test_num, id_list):
         with stat_lock:    
             stat_dict[sw_list] = res
             pull_cnt += 1
-            print pull_cnt
             if pull_cnt == threshold:
                 print_gb_stats()
                 pull_cnt = 0
