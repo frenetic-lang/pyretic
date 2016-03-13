@@ -445,6 +445,29 @@ class DemoTopo(Topo):
         self.addLink('h3', 's3')
         self.addLink('h4', 's3')
 
+class NSDITopo(Topo):
+    def __init__(self):
+        super(NSDITopo, self).__init__()
+
+        for i in range(1, 10):
+            self.addSwitch("s%d" % i)
+
+        for i in range(1, 9):
+            self.addHost("h%d" % i, ip = "10.0.0.%d" % i)
+
+        links = [(1, 2), (2, 3), (3, 4), (4, 5),
+                 (1, 7), (7, 8), (8, 9), (9, 5),
+                 (2, 6), (4, 6), (7, 6), (9, 6)]
+
+        for i, j in links:
+            self.addLink("s%d" % i, "s%d" % j)
+
+        for i in range(1, 5):
+            self.addLink("h%d" % i, "s1")
+
+        for i in range(5, 9):
+            self.addLink("h%d" % i, "s5")
+
 topos = { 'triangle': ( lambda: CycleTopo(3,3) ), 
           'square': (lambda: CycleTopo(4,4)),
           'chain': ChainTopo,
@@ -459,6 +482,7 @@ topos = { 'triangle': ( lambda: CycleTopo(3,3) ),
           'gateway3_ns': ThreeSwitchGatewayTopoNoSubnets,
           'simple_prefix': SimplePrefixTopo,
           'stanford' : StanfordTopo,
-          'demo' : DemoTopo
+          'demo' : DemoTopo,
+          'nsdi' : NSDITopo
 }
  

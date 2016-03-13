@@ -9,10 +9,13 @@ import itertools
 
 TEN_IP = '10.0.0.0/24'
 EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
-               match(switch = 3, port = 3) | match(switch = 3, port = 4) 
+       match(switch = 1, port = 5) | match(switch = 1, port = 6) | \
+       match(switch = 5, port = 3) | match(switch = 5, port = 4) | \
+       match(switch = 5, port = 5) | match(switch = 5, port = 6) 
+
 TEN_SUBNET = match(srcip = TEN_IP, dstip = TEN_IP, ethtype=2048)
 
-def forwarding_policy():
+def forwarding_policy_small():
     return if_(match(dstip = '10.0.0.1'),
                if_(match(switch = 1), fwd(3),
                if_(match(switch = 2), fwd(1),
@@ -39,6 +42,68 @@ def forwarding_policy():
                drop)))),
            drop))))
 
+def forwarding_policy():
+    last_hop = if_(match(switch = 5),
+               if_(match(dstip = "10.0.0.5"), fwd(3),
+               if_(match(dstip = "10.0.0.6"), fwd(4),
+               if_(match(dstip = "10.0.0.7"), fwd(5),
+               if_(match(dstip = "10.0.0.8"), fwd(6), 
+               drop)))), drop)
+
+    pol = if_(match(dstip = '10.0.0.1'),
+               if_(match(switch = 1), fwd(3),
+               if_(match(switch = 2), fwd(1),
+               if_(match(switch = 3), fwd(1),
+               if_(match(switch = 4), fwd(1),
+               if_(match(switch = 5), fwd(1),
+               drop))))),
+           if_(match(dstip = '10.0.0.2'),
+               if_(match(switch = 1), fwd(4),
+               if_(match(switch = 2), fwd(1),
+               if_(match(switch = 4), fwd(3),
+               if_(match(switch = 5), fwd(1),
+               if_(match(switch = 6), fwd(1),
+               drop))))),
+           if_(match(dstip = '10.0.0.3'),
+               if_(match(switch = 1), fwd(5),
+               if_(match(switch = 7), fwd(1),
+               if_(match(switch = 6), fwd(3),
+               if_(match(switch = 9), fwd(3),
+               if_(match(switch = 5), fwd(2),
+               drop))))),
+           if_(match(dstip = '10.0.0.4'),
+               if_(match(switch = 1), fwd(6),
+               if_(match(switch = 7), fwd(1),
+               if_(match(switch = 8), fwd(1),
+               if_(match(switch = 9), fwd(1),
+               if_(match(switch = 5), fwd(2),
+               drop))))),
+           if_(match(srcip = '10.0.0.1'),
+               if_(match(switch = 1), fwd(1),
+               if_(match(switch = 2), fwd(2),
+               if_(match(switch = 3), fwd(2),
+               if_(match(switch = 4), fwd(2),
+               last_hop)))),
+           if_(match(srcip = '10.0.0.2'),
+               if_(match(switch = 1), fwd(1),
+               if_(match(switch = 2), fwd(3),
+               if_(match(switch = 4), fwd(2),
+               if_(match(switch = 6), fwd(2),
+               last_hop)))),
+           if_(match(srcip = '10.0.0.3'),
+               if_(match(switch = 1), fwd(2),
+               if_(match(switch = 7), fwd(3),
+               if_(match(switch = 6), fwd(4),
+               if_(match(switch = 9), fwd(2),
+               last_hop)))),
+           if_(match(srcip = '10.0.0.4'),
+               if_(match(switch = 1), fwd(2),
+               if_(match(switch = 7), fwd(2),
+               if_(match(switch = 8), fwd(2),
+               if_(match(switch = 9), fwd(2),
+               last_hop)))),
+           last_hop))))))))
+    return pol
 
 def count_callback(test_num):
     def actual_callback(counts):
@@ -49,7 +114,8 @@ def count_callback(test_num):
 first_hop_stat = {}
 second_hop_stat = {}
 third_hop_stat = {}
-stat_dict_list = [first_hop_stat, second_hop_stat, third_hop_stat]
+fourth_hop_stat = {}
+stat_dict_list = [first_hop_stat, second_hop_stat, third_hop_stat, fourth_hop_stat]
 stat_lock = threading.Lock()
 threshold = 0
 pull_cnt = 0
@@ -65,6 +131,9 @@ def print_gb_stats():
     print "Third Hop"
     print_stat_dict(third_hop_stat)
     print "************"
+    print "Fourth Hop"
+    print_stat_dict(fourth_hop_stat)
+    print "************"
 
 def aggr_callback(test_num, id_list):
     def actual_callback(agg, res):
@@ -75,6 +144,7 @@ def aggr_callback(test_num, id_list):
         with stat_lock:    
             stat_dict[sw_list] = res
             pull_cnt += 1
+            print pull_cnt
             if pull_cnt == threshold:
                 print_gb_stats()
                 pull_cnt = 0
@@ -137,7 +207,7 @@ def up_and_down(q):
 
 def per_switch_hop(pred, cnt):
     
-    fvlist = {'switch': range(1,5)}
+    fvlist = {'switch': range(1,10)}
     
     resq = None
 
