@@ -68,8 +68,8 @@ class BackendChannel(asynchat.async_chat):
         asynchat.async_chat.__init__(self, sock)
         # If there are delays in receiving messages from the other side, and
         # they are because of large message sizes, increase this buffer size.
-        self.ac_in_buffer_size = 4096 * 5
-        self.ac_out_buffer_size = 4096 * 5
+        self.ac_in_buffer_size = 4096 * 50
+        self.ac_out_buffer_size = 4096 * 50
         self.set_terminator(TERM_CHAR)
         return
 

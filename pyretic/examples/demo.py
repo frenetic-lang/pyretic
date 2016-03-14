@@ -6,6 +6,7 @@ from cmd import Cmd
 import copy
 import threading
 import itertools
+import networkx as nx
 
 TEN_IP = '10.0.0.0/24'
 EDGE = match(switch = 1, port = 3) | match(switch = 1, port = 4) | \
@@ -203,6 +204,66 @@ def up_and_down(q):
     q2.set_bucket(cb2)
     q2.register_callback(count_callback("Downstream"))
     return [q1 + q2, cb1, cb2]
+
+stitch_dict = {}
+stitch_dict_lock = threading.Lock()
+def stitch_callback(sw_list):
+    def actual_callback(res):
+        global pull_cnt
+        with stitch_dict_lock:
+            stitch_dict[sw_list] = res
+            pull_cnt += 1
+            if pull_cnt == threshold:
+                print_stitch_stats()
+                pull_cnt = 0
+    return actual_callback
+
+def print_stitch_stats():
+    count = 0
+    for (k, v) in stitch_dict.items():
+        [pkts, bytes] = v
+        if pkts > 0:
+            count += 1
+            print k, ':', v
+    print "Got %d keys" % count
+
+def stitch(pred, hopcount):
+    """ Convenience function to expand grouping for multiple paths and their
+    prefixes """
+    global threshold
+    src = 1
+    dst = 5
+    g = nx.Graph()
+    g.add_nodes_from(range(1,10))
+    links = [(1, 2), (2, 3), (3, 4), (4, 5),
+             (1, 7), (7, 8), (8, 9), (9, 5),
+             (2, 6), (4, 6), (7, 6), (9, 6)]
+    for l in links:
+        g.add_edge(*l)
+    paths = nx.all_simple_paths(g, src, dst)
+    prefix_set = set()
+    resq = None
+    for p in paths:
+        for prefix_len in range(0, len(p)):
+            prefix_path = tuple(p[1:prefix_len+1])
+            if len(prefix_path)+1 > hopcount:
+                continue
+            if not prefix_path in prefix_set:
+                q = in_out_atom(match(switch=src) & pred, ~EDGE)
+                for sw in prefix_path:
+                    q = q ^ in_atom(match(switch=sw))
+                cb = CountBucket()
+                q.set_bucket(cb)
+                q.register_callback(stitch_callback(prefix_path))
+            prefix_set.add(prefix_path)
+            if resq:
+                resq += q
+            else:
+                resq = q
+    buckets =  [p.piped_policy for p in resq.path_policies]
+    print "Initialized %d queries" % len(buckets)
+    threshold = len(buckets)
+    return [resq] + buckets
 
 def per_switch_hop(pred, cnt):
     
