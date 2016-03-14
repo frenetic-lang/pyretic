@@ -205,6 +205,40 @@ def up_and_down(q):
     q2.register_callback(count_callback("Downstream"))
     return [q1 + q2, cb1, cb2]
 
+
+demotopo="\
+                S3\n\
+	       /  \ \n\
+          %3d /    \ %3d \n\
+             /      \ \n\
+            /        \ \n\
+          S2          S4\n\
+	 /  \        /  \ \n\
+        /    \      /    \ %3d (from 1->2->3->4->5)\n\
+   %3d /  %3d \    / %3d  \ %3d (from 1->2->6->4->5)\n\
+      /        \  /        \ \n\
+%3d S1          S6          S5\n\
+      \        /  \        /\n\
+       \  %3d /    \ %3d  / %3d (from 1->7->6->9->5)\n\
+    %3d \    /      \    / %3d (from 1->7->8->9->5)\n\
+         \  /        \  /\n\
+          S7          S9\n\
+            \        /\n\
+             \      /\n\
+          %3d \    / %3d\n\
+               \  /\n\
+                S8"
+
+def print_demo_stats():
+    keys = [(2,3), (2,3,4),
+            (2,3,4,5),
+            (2,), (2,6), (2,6,4), (2,6,4,5),
+            (),
+            (7,6), (7,6,9), (7,6,9,5),
+            (7,), (7,8,9,5),
+            (7,8), (7,8,9)]
+    print demotopo % tuple([int(stitch_dict[k][0]) for k in keys])
+
 stitch_dict = {}
 stitch_dict_lock = threading.Lock()
 def stitch_callback(sw_list):
@@ -214,7 +248,8 @@ def stitch_callback(sw_list):
             stitch_dict[sw_list] = res
             pull_cnt += 1
             if pull_cnt == threshold:
-                print_stitch_stats()
+                # print_stitch_stats()
+                print_demo_stats()
                 pull_cnt = 0
     return actual_callback
 
@@ -226,6 +261,8 @@ def print_stitch_stats():
             count += 1
             print k, ':', v
     print "Got %d keys" % count
+
+
 
 def stitch(pred, hopcount):
     """ Convenience function to expand grouping for multiple paths and their
