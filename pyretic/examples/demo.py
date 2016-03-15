@@ -248,6 +248,7 @@ def stitch_callback(sw_list):
             if len(stitch_dict.keys()) == threshold:
                 # print_stitch_stats()
                 print_demo_stats()
+                stitch_dict.clear()
     return actual_callback
 
 def print_stitch_stats():
@@ -347,6 +348,7 @@ class DemoCLI(Cmd):
         self.refq_map = {zid: dpp.path_policy}
         self.buck_map = {zid : []}
         self.active_queries = set([0])
+        self.print_map = {zid: dpp.path_policy}
         Cmd.__init__(self)
 
     def get_new_id(self):
@@ -411,6 +413,7 @@ class DemoCLI(Cmd):
             buckets = [cb]
 
         self.refq_map.update({qid: q})
+        self.print_map.update({qid: qstr})
         self.buck_map[qid] = buckets
         print "Initialized query: reference %d" % qid
 
@@ -438,20 +441,21 @@ class DemoCLI(Cmd):
 
     def do_show_all(self, line):
         print "Showing queries:"
-        for (qid, q) in self.refq_map.items():
+        for (qid, q) in self.print_map.items():
             print qid, ':', q
     
     def do_show_active(self, line):
         print "Showing active queries:"
         for qid in self.active_queries:
-            if qid in self.refq_map:
-                print qid, ":", self.refq_map[qid]
+            if qid in self.print_map:
+                print qid, ":", self.print_map[qid]
 
     def do_rm(self, qidstr):
         qid = self.get_qid(qidstr)
         if qid:
             del self.refq_map[qid]
             del self.buck_map[qid]
+            del self.print_map[qid]
             self.active_queries.discard(qid)
             queries = self.refq_map.values()
             if len(queries) > 1:
