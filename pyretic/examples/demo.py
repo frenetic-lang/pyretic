@@ -243,14 +243,11 @@ stitch_dict = {}
 stitch_dict_lock = threading.Lock()
 def stitch_callback(sw_list):
     def actual_callback(res):
-        global pull_cnt
         with stitch_dict_lock:
             stitch_dict[sw_list] = res
-            pull_cnt += 1
-            if pull_cnt == threshold:
+            if len(stitch_dict.keys()) == threshold:
                 # print_stitch_stats()
                 print_demo_stats()
-                pull_cnt = 0
     return actual_callback
 
 def print_stitch_stats():
@@ -292,11 +289,11 @@ def stitch(pred, hopcount):
                 cb = CountBucket()
                 q.set_bucket(cb)
                 q.register_callback(stitch_callback(prefix_path))
+                if resq:
+                    resq += q
+                else:
+                    resq = q
             prefix_set.add(prefix_path)
-            if resq:
-                resq += q
-            else:
-                resq = q
     buckets =  [p.piped_policy for p in resq.path_policies]
     print "Initialized %d queries" % len(buckets)
     threshold = len(buckets)
