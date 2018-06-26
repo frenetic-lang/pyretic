@@ -2,6 +2,9 @@
 Pyretic
 =======
 
+THIS PROJECT IS NO LONGER SUPPORTED.  THE PYRETIC REPO HAS BEEN MADE AVAILABLE FOR ARCHIVAL PURPOSES.  USE OF CODE IS AT YOUR OWN RISK.
+
+
 The Pyretic platform - language & runtime system.
 See http://frenetic-lang.org/pyretic/ for more info.
 
