@@ -1659,7 +1659,7 @@ class Runtime(object):
 
             if to_delete:
                 for rule in to_delete:
-                    (match_dict,priority,_,_) = rule
+                    (match_dict,priority,_,_,_) = rule
                     if match_dict['switch'] in switches:
                         self.delete_rule((match_dict, priority))
             if to_add:
