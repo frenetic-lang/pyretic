@@ -5,8 +5,6 @@
 # author: Joshua Reich  (jreich@cs.princeton.edu)                              #
 ################################################################################
 
-from pox.lib.addresses import EthAddr
-
 from pyretic.lib.corelib import *
 from pyretic.lib.std import *
 from pyretic.modules.mac_learner import mac_learner
