@@ -304,7 +304,7 @@ class POXClient(revent.EventMixin):
         if self.show_traces:
             print "========= POX/OF SEND ================"
             print msg
-            print packetlib.ethernet(msg._get_data())
+            print packetlib.ethernet(msg.data)
             print
 
         ## HANDLE PACKETS SEND ON LINKS THAT HAVE TIMED OUT
