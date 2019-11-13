@@ -51,6 +51,7 @@ def tcp_packet_gen():
     pkt.protocols.append(tcp.tcp(0, 0, 0, 0, 0, 0, 0, 0, 0))
 
     return pkt
+    
 def icmp_packet_gen():
     pkt = packet.Packet()
     pkt.protocols.append(ethernet.ethernet("ff:ff:ff:ff:ff:ff", "ff:ff:ff:ff:ff:ff", IPV4))
