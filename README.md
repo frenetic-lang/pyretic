@@ -18,3 +18,12 @@ top-level structure:
 - pyretic.py:   A wrapper that starts up Pyretic
                 and optionally an OpenFlow client (see above)
 
+## Tests
+
+The full test suite for pyretic can be run with:
+
+`py.test pyretic/tests/tests.py`
+
+Alternatively, only the unit tests can be run with:
+
+`py.test pyretic/tests/unit_tests.py`
